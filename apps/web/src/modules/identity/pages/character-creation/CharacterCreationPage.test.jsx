@@ -12,21 +12,21 @@ describe("CharacterCreationPage", () => {
     const onComplete = vi.fn();
     render(<CharacterCreationPage onComplete={onComplete} />);
 
-    expect(screen.getAllByRole("button", { name: /Selecionar retrato/ })).toHaveLength(6);
-    fireEvent.click(screen.getByRole("button", { name: "Selecionar retrato 4" }));
-    fireEvent.change(screen.getByLabelText("Nome do detetive"), { target: { value: "Ada" } });
-    fireEvent.click(screen.getByRole("button", { name: "Criar personagem" }));
+    expect(screen.getAllByRole("button", { name: /Select portrait/ })).toHaveLength(6);
+    fireEvent.click(screen.getByRole("button", { name: "Select portrait 4" }));
+    fireEvent.change(screen.getByLabelText("Detective name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create detective" }));
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
     expect(createCharacter).toHaveBeenCalledWith({ displayName: "Ada", portraitId: 4 });
   });
 
   it("shows API errors and keeps the player in character setup", async () => {
-    createCharacter.mockRejectedValue(new Error("Sessão expirada."));
+    createCharacter.mockRejectedValue(new Error("Session expired."));
     render(<CharacterCreationPage onComplete={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("Nome do detetive"), { target: { value: "Ada" } });
-    fireEvent.click(screen.getByRole("button", { name: "Criar personagem" }));
+    fireEvent.change(screen.getByLabelText("Detective name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create detective" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Sessão expirada.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Session expired.");
   });
 });

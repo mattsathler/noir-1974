@@ -2,7 +2,7 @@
 name: atualizar-estado-roadmap
 description: >-
   Recalcula docs/roadmap/estado.md a partir do Status dos milestones
-  (M00–M06): aceitos, vigente, porcentagem até o primeiro deploy/playtest.
+  (M00–M11): aceitos, vigente, progresso do fluxo completo do crime até a prisão.
   Use when accepting or reopening a milestone, updating product status,
   playtest progress, estado.md, or when the user asks to atualizar o estado
   do roadmap / porcentagem de desenvolvimento.
@@ -27,17 +27,18 @@ Não editar a barra nem a porcentagem de `docs/roadmap/estado.md` à mão. A fon
 python3 .cursor/skills/atualizar-estado-roadmap/scripts/recompute_estado.py
 ```
 
-3. Conferir o stdout (`N/7 aceitos (P%).`) e o diff de `docs/roadmap/estado.md`.
+3. Conferir o stdout (milestones aceitos, porcentagem e estado de prontidão para playtest) e o diff de `docs/roadmap/estado.md`.
 4. No mesmo PR: milestone + `estado.md`. Não commitar só a porcentagem sem o Status que a justifica.
 
 ## Regras de cálculo (já no script)
 
-- Caminho do 1º deploy/playtest: **M00..M06** (`PLAYTEST_THROUGH = 6`).
-- Peso igual: `aceitos / 7`, arredondado para inteiro.
+- Alvo da porcentagem: fluxo completo do crime, da geração do caso à prisão do culpado: **M00..M11** (`CRIME_FLOW_THROUGH = 11`).
+- Peso igual: milestones aceitos / 12, arredondado para inteiro.
 - Só **Aceito** soma. **Em curso** aparece na barra como vazio.
 - Milestone vigente = primeiro que ainda não está Aceito, em ordem.
-- M06 Aceito ⇒ deploy/playtest = sim.
+- M06 aceito ⇒ primeiro recorte de playtest está pronto; isso não conclui o fluxo criminal.
+- M11 aceito ⇒ fluxo completo, incluindo acusação e prisão, está concluído.
 
-## Extra no caminho do playtest
+## Extra no fluxo criminal
 
-Se entrar um milestone **antes** de M06, alterar `PLAYTEST_THROUGH` no script (ou a regra de inclusão) **e** `docs/roadmap/ciclos.md`. Depois rerodar o script.
+Se milestones forem adicionados, removidos ou reordenados entre M00 e M11, atualizar `CRIME_FLOW_THROUGH`, os rótulos e as descrições no script e `docs/roadmap/ciclos.md`. Depois rerodar o script.

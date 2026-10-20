@@ -14,13 +14,13 @@ describe("IntroductionPage", () => {
     const onComplete = vi.fn();
     render(<IntroductionPage onComplete={onComplete} />);
     fireEvent.click(screen.getByRole("button", { name: "Lyon, France" }));
-    expect(screen.getByRole("progressbar", { name: "Inicialização" })).toHaveAttribute("aria-valuenow", "0");
+    expect(screen.getByRole("progressbar", { name: "System startup" })).toHaveAttribute("aria-valuenow", "0");
 
     act(() => vi.advanceTimersByTime(300));
     expect(screen.getByText("MERIDIAN GLOBAL / SYSTEM 74.04")).toBeInTheDocument();
     expect(onComplete).not.toHaveBeenCalled();
 
-    act(() => vi.advanceTimersByTime(2730));
+    act(() => vi.advanceTimersByTime(4000));
     expect(onComplete).toHaveBeenCalledOnce();
   });
 });

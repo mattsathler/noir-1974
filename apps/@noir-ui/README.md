@@ -14,6 +14,7 @@ Base visual compartilhada do frontend Noir 1974. Os estilos vivem em `styles/` e
 - `styles/_utilities.scss`: acessibilidade, visibilidade e interação.
 - `styles/_effects.scss`: efeitos visuais reutilizáveis.
 - `styles/_typewriter.scss`: cursor e animação de digitação.
+- `styles/_terminal.scss`: apresentação visual do computador/terminal do jogo.
 - `styles/index.scss`: entrada única que reúne a base.
 - `components/Typewriter.jsx`: componente React reutilizável para revelar texto progressivamente.
 
@@ -26,7 +27,7 @@ O SCSS é a fonte do sistema. A aplicação deve importar `styles/index.scss` um
 - Cada classe descreve uma propriedade ou comportamento reutilizável, como `pos-relative`, `overflow-hidden`, `min-h-full`, `grid` e `text-center`.
 - Tokens CSS ficam sob `--noir-*` para permitir temas e ajustes sem duplicar valores.
 - Escalas usam passos consistentes; adicione um token ou helper apenas quando houver uso real.
-- Estilos específicos de componentes devem ser avaliados como parte deste sistema antes de criar CSS local em uma aplicação.
+- Estilos específicos de componentes devem ser avaliados como parte deste sistema antes de criar CSS local em uma aplicação. O terminal do jogo fica neste sistema compartilhado; páginas não mantêm folhas SCSS próprias.
 - Prefira HTML semântico e mantenha estados de foco visíveis.
 
 ## Exemplo

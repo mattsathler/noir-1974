@@ -28,7 +28,14 @@ M00 docs + monorepo
       → M03 relações sociais
         → M04 mutations + reboot idêntico
           → M05 casos válidos
-            → M06 API + web mínimo
+              → M06 API + web mínimo
+                → M07 registros bancários + histórico do GATE
+                  → M08 correio eletrônico
+                    → M09 busca e apreensão
+                      → M10 whiteboards pessoais
+                        → M11 acusação + julgamento
 ```
+
+M06 é o primeiro recorte atravessável para playtest. A porcentagem geral não termina nele: ela acompanha o fluxo criminal completo até o aceite do M11, quando uma acusação válida pode levar à prisão do culpado.
 
 Pular um ciclo só com ADR explicando por que o critério deixou de ser necessário.

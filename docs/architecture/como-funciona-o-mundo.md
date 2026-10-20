@@ -11,12 +11,12 @@ Isso significa que o mundo não depende de sorteio novo a cada acesso: os jogado
 ## Como o mundo é criado
 
 1. O servidor recebe uma seed e uma versão do gerador.
-2. O gerador cria a cidade e escolhe distritos, ruas e edifícios.
+2. Um catálogo fixo comum a todos os servidores define 50 países e suas capitais e principais cidades; bairros lógicos são compostos proceduralmente a partir de um banco de palavras e criados sob demanda para distribuir detetives e ocorrências.
 3. Na versão 2, também cria 24 pessoas, três empresas e os vínculos entre elas.
 4. Cada pessoa trabalha em uma empresa; alguns pares também têm uma relação pessoal. Cada empresa tem um edifício como sede.
 5. O resultado pode ser gravado no banco para que suas relações sejam consultadas rapidamente.
 
-Hoje, a cidade gerada é Lyon. As listas de nomes e lugares são limitadas, mas a seed escolhe combinações diferentes.
+Na implementação atual, o gerador ainda produz apenas Lyon e escolhe três distritos de uma lista pequena, além de ruas e edifícios. O catálogo mundial de 50 países e cidades e a geração procedural expansível de bairros são o modelo documentado para a evolução do sistema, ainda não implementado.
 
 ## O que fica salvo e o que é reconstruído
 

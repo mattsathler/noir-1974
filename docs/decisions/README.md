@@ -20,5 +20,7 @@ Status: `Proposta` | `Aceita` | `Supersedida` | `Rejeitada`.
 | [0006](0006-versionamento-do-gerador.md) | Versionamento do gerador | Aceita |
 | [0007](0007-monorepo.md) | Monorepo frontend + backend | Aceita |
 | [0008](0008-relacoes-tipadas.md) | Relações tipadas por domínio | Aceita |
+| [0009](0009-stack-concreto-da-api.md) | Stack concreta da API | Aceita |
+| [0010](0010-geografia-fixa-e-bairros-procedurais.md) | Geografia fixa e bairros procedurais | Aceita |
 
 Quando uma decisão nova **substitui** outra, marcar a antiga como `Supersedida` e apontar o ADR sucessor.

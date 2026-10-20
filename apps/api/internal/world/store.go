@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -48,6 +49,26 @@ type NPCProfile struct {
 	NPC                   NPC                        `json:"npc"`
 	Employment            []EmploymentView           `json:"employment"`
 	PersonalRelationships []PersonalRelationshipView `json:"personalRelationships"`
+}
+
+type Address struct {
+	LocationID string `json:"locationId"`
+	Name       string `json:"name"`
+	Kind       string `json:"kind"`
+	District   string `json:"district"`
+	City       string `json:"city"`
+	Country    string `json:"country"`
+	Full       string `json:"full"`
+}
+
+type CompanyRecord struct {
+	Company   Company `json:"company"`
+	Address   Address `json:"address"`
+	Employees []NPC   `json:"employees"`
+}
+
+type LocationRecord struct {
+	Address Address `json:"address"`
 }
 
 func NewPostgresStore(db worldDatabase) *PostgresStore {
@@ -107,73 +128,80 @@ func (store *PostgresStore) Materialize(ctx context.Context, serverID, seed stri
 		return ErrWorldConflict
 	}
 
+	regionArgs := make([][]any, 0, len(generated.Regions))
 	for _, region := range generated.Regions {
-		if err := execConsistent(ctx, tx,
-			`INSERT INTO world_regions (server_id, region_id, parent_region_id, region_kind, display_name)
-			 VALUES ($1::uuid, $2, $3, $4, $5)
-			 ON CONFLICT (server_id, region_id) DO UPDATE
-			 SET display_name = EXCLUDED.display_name
-			 WHERE world_regions.parent_region_id IS NOT DISTINCT FROM EXCLUDED.parent_region_id
-			   AND world_regions.region_kind = EXCLUDED.region_kind
-			   AND world_regions.display_name = EXCLUDED.display_name`,
-			serverID, region.ID, optionalString(region.ParentID), region.Kind, region.Name,
-		); err != nil {
-			return fmt.Errorf("persist region %q: %w", region.ID, err)
-		}
+		regionArgs = append(regionArgs, []any{serverID, region.ID, optionalString(region.ParentID), region.Kind, region.Name})
 	}
+	regionIndex, err := execConsistentBatch(ctx, tx,
+		`INSERT INTO world_regions (server_id, region_id, parent_region_id, region_kind, display_name)
+		 VALUES ($1::uuid, $2, $3, $4, $5)
+		 ON CONFLICT (server_id, region_id) DO UPDATE SET display_name = EXCLUDED.display_name
+		 WHERE world_regions.parent_region_id IS NOT DISTINCT FROM EXCLUDED.parent_region_id
+		   AND world_regions.region_kind = EXCLUDED.region_kind
+		   AND world_regions.display_name = EXCLUDED.display_name`, regionArgs)
+	if err != nil {
+		return fmt.Errorf("persist region %q: %w", generated.Regions[max(regionIndex, 0)].ID, err)
+	}
+
+	entityArgs := make([][]any, 0, len(generated.Entities))
 	for _, entity := range generated.Entities {
-		if err := execConsistent(ctx, tx,
-			`INSERT INTO world_entities (server_id, entity_id, entity_type, region_id, generation_key, location_kind)
-			 VALUES ($1::uuid, $2, $3, $4, $5, $6)
-			 ON CONFLICT (server_id, entity_id) DO UPDATE
-			 SET generation_key = EXCLUDED.generation_key
-			 WHERE world_entities.entity_type = EXCLUDED.entity_type
-			   AND world_entities.region_id = EXCLUDED.region_id
-			   AND world_entities.generation_key = EXCLUDED.generation_key
-			   AND world_entities.location_kind IS NOT DISTINCT FROM EXCLUDED.location_kind`,
-			serverID, entity.ID, entity.EntityType, entity.RegionID, entity.GenerationKey, optionalString(entity.LocationKind),
-		); err != nil {
-			return fmt.Errorf("persist entity %q: %w", entity.ID, err)
-		}
+		entityArgs = append(entityArgs, []any{serverID, entity.ID, entity.EntityType, entity.RegionID, entity.GenerationKey, optionalString(entity.LocationKind)})
 	}
+	entityIndex, err := execConsistentBatch(ctx, tx,
+		`INSERT INTO world_entities (server_id, entity_id, entity_type, region_id, generation_key, location_kind)
+		 VALUES ($1::uuid, $2, $3, $4, $5, $6)
+		 ON CONFLICT (server_id, entity_id) DO UPDATE SET generation_key = EXCLUDED.generation_key
+		 WHERE world_entities.entity_type = EXCLUDED.entity_type
+		   AND world_entities.region_id = EXCLUDED.region_id
+		   AND world_entities.generation_key = EXCLUDED.generation_key
+		   AND world_entities.location_kind IS NOT DISTINCT FROM EXCLUDED.location_kind`, entityArgs)
+	if err != nil {
+		return fmt.Errorf("persist entity %q: %w", generated.Entities[max(entityIndex, 0)].ID, err)
+	}
+
+	employmentArgs := make([][]any, 0, len(generated.EmploymentRelationships))
 	for _, relationship := range generated.EmploymentRelationships {
-		if err := execConsistent(ctx, tx,
-			`INSERT INTO employment_relationships (server_id, relationship_id, employee_npc_id, employer_company_id, role)
-			 VALUES ($1::uuid, $2, $3, $4, $5)
-			 ON CONFLICT (server_id, relationship_id) DO UPDATE SET role = EXCLUDED.role
-			 WHERE employment_relationships.employee_npc_id = EXCLUDED.employee_npc_id
-			   AND employment_relationships.employer_company_id = EXCLUDED.employer_company_id
-			   AND employment_relationships.role IS NOT DISTINCT FROM EXCLUDED.role`,
-			serverID, relationship.ID, relationship.EmployeeNPCID, relationship.EmployerCompanyID, relationship.Role,
-		); err != nil {
-			return fmt.Errorf("persist employment relationship %q: %w", relationship.ID, err)
-		}
+		employmentArgs = append(employmentArgs, []any{serverID, relationship.ID, relationship.EmployeeNPCID, relationship.EmployerCompanyID, relationship.Role})
 	}
+	employmentIndex, err := execConsistentBatch(ctx, tx,
+		`INSERT INTO employment_relationships (server_id, relationship_id, employee_npc_id, employer_company_id, role)
+		 VALUES ($1::uuid, $2, $3, $4, $5)
+		 ON CONFLICT (server_id, relationship_id) DO UPDATE SET role = EXCLUDED.role
+		 WHERE employment_relationships.employee_npc_id = EXCLUDED.employee_npc_id
+		   AND employment_relationships.employer_company_id = EXCLUDED.employer_company_id
+		   AND employment_relationships.role IS NOT DISTINCT FROM EXCLUDED.role`, employmentArgs)
+	if err != nil {
+		return fmt.Errorf("persist employment relationship %q: %w", generated.EmploymentRelationships[max(employmentIndex, 0)].ID, err)
+	}
+
+	personalArgs := make([][]any, 0, len(generated.PersonalRelationships))
 	for _, relationship := range generated.PersonalRelationships {
-		if err := execConsistent(ctx, tx,
-			`INSERT INTO personal_relationships (server_id, relationship_id, person_a_npc_id, person_b_npc_id, relationship_type)
-			 VALUES ($1::uuid, $2, $3, $4, $5)
-			 ON CONFLICT (server_id, relationship_id) DO UPDATE SET relationship_type = EXCLUDED.relationship_type
-			 WHERE personal_relationships.person_a_npc_id = EXCLUDED.person_a_npc_id
-			   AND personal_relationships.person_b_npc_id = EXCLUDED.person_b_npc_id
-			   AND personal_relationships.relationship_type = EXCLUDED.relationship_type`,
-			serverID, relationship.ID, relationship.PersonANPCID, relationship.PersonBNPCID, relationship.RelationshipType,
-		); err != nil {
-			return fmt.Errorf("persist personal relationship %q: %w", relationship.ID, err)
-		}
+		personalArgs = append(personalArgs, []any{serverID, relationship.ID, relationship.PersonANPCID, relationship.PersonBNPCID, relationship.RelationshipType})
 	}
+	personalIndex, err := execConsistentBatch(ctx, tx,
+		`INSERT INTO personal_relationships (server_id, relationship_id, person_a_npc_id, person_b_npc_id, relationship_type)
+		 VALUES ($1::uuid, $2, $3, $4, $5)
+		 ON CONFLICT (server_id, relationship_id) DO UPDATE SET relationship_type = EXCLUDED.relationship_type
+		 WHERE personal_relationships.person_a_npc_id = EXCLUDED.person_a_npc_id
+		   AND personal_relationships.person_b_npc_id = EXCLUDED.person_b_npc_id
+		   AND personal_relationships.relationship_type = EXCLUDED.relationship_type`, personalArgs)
+	if err != nil {
+		return fmt.Errorf("persist personal relationship %q: %w", generated.PersonalRelationships[max(personalIndex, 0)].ID, err)
+	}
+
+	companyLocationArgs := make([][]any, 0, len(generated.CompanyLocations))
 	for _, relationship := range generated.CompanyLocations {
-		if err := execConsistent(ctx, tx,
-			`INSERT INTO company_locations (server_id, relationship_id, company_id, location_id, location_role)
-			 VALUES ($1::uuid, $2, $3, $4, $5)
-			 ON CONFLICT (server_id, relationship_id) DO UPDATE SET location_role = EXCLUDED.location_role
-			 WHERE company_locations.company_id = EXCLUDED.company_id
-			   AND company_locations.location_id = EXCLUDED.location_id
-			   AND company_locations.location_role = EXCLUDED.location_role`,
-			serverID, relationship.ID, relationship.CompanyID, relationship.LocationID, relationship.LocationRole,
-		); err != nil {
-			return fmt.Errorf("persist company location %q: %w", relationship.ID, err)
-		}
+		companyLocationArgs = append(companyLocationArgs, []any{serverID, relationship.ID, relationship.CompanyID, relationship.LocationID, relationship.LocationRole})
+	}
+	companyLocationIndex, err := execConsistentBatch(ctx, tx,
+		`INSERT INTO company_locations (server_id, relationship_id, company_id, location_id, location_role)
+		 VALUES ($1::uuid, $2, $3, $4, $5)
+		 ON CONFLICT (server_id, relationship_id) DO UPDATE SET location_role = EXCLUDED.location_role
+		 WHERE company_locations.company_id = EXCLUDED.company_id
+		   AND company_locations.location_id = EXCLUDED.location_id
+		   AND company_locations.location_role = EXCLUDED.location_role`, companyLocationArgs)
+	if err != nil {
+		return fmt.Errorf("persist company location %q: %w", generated.CompanyLocations[max(companyLocationIndex, 0)].ID, err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit world materialization: %w", err)
@@ -220,6 +248,118 @@ func (store *PostgresStore) GetNPC(ctx context.Context, serverID, npcID string) 
 		return NPCProfile{}, err
 	}
 	return profile, nil
+}
+
+// SearchNPCs reconstructs matching NPCs and their persisted relations from the server's world seed.
+func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query string) ([]NPCProfile, error) {
+	base, err := store.generatedWorld(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	query = strings.ToLower(strings.TrimSpace(query))
+	results := make([]NPCProfile, 0)
+	for _, npc := range base.NPCs {
+		if !strings.Contains(strings.ToLower(npc.Name), query) {
+			continue
+		}
+		profile, err := store.GetNPC(ctx, serverID, npc.ID)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, profile)
+	}
+	sort.Slice(results, func(i, j int) bool { return results[i].NPC.Name < results[j].NPC.Name })
+	return results, nil
+}
+
+// SearchCompanies finds companies by name or headquarters address and includes their employees.
+func (store *PostgresStore) SearchCompanies(ctx context.Context, serverID, query string) ([]CompanyRecord, error) {
+	base, err := store.generatedWorld(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	query = strings.ToLower(strings.TrimSpace(query))
+	entities := make(map[string]Entity, len(base.Entities))
+	regions := make(map[string]string, len(base.Regions))
+	for _, entity := range base.Entities {
+		entities[entity.ID] = entity
+	}
+	for _, region := range base.Regions {
+		regions[region.ID] = region.Name
+	}
+	results := make([]CompanyRecord, 0)
+	for _, company := range base.Companies {
+		var address Address
+		for _, relation := range base.CompanyLocations {
+			if relation.CompanyID == company.ID && relation.LocationRole == "headquarters" {
+				address = makeAddress(entities[relation.LocationID], regions)
+				break
+			}
+		}
+		if !strings.Contains(strings.ToLower(company.Name+" "+address.Full), query) {
+			continue
+		}
+		employees, err := store.EmployeesOfCompany(ctx, serverID, company.ID)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, CompanyRecord{Company: company, Address: address, Employees: employees})
+	}
+	sort.Slice(results, func(i, j int) bool { return results[i].Company.Name < results[j].Company.Name })
+	return results, nil
+}
+
+// SearchLocations finds persisted city locations by name or their complete address.
+func (store *PostgresStore) SearchLocations(ctx context.Context, serverID, query string) ([]LocationRecord, error) {
+	base, err := store.generatedWorld(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	query = strings.ToLower(strings.TrimSpace(query))
+	regions := make(map[string]string, len(base.Regions))
+	for _, region := range base.Regions {
+		regions[region.ID] = region.Name
+	}
+	results := make([]LocationRecord, 0)
+	for _, entity := range base.Entities {
+		if entity.EntityType != "location" {
+			continue
+		}
+		address := makeAddress(entity, regions)
+		if strings.Contains(strings.ToLower(address.Full+" "+entity.LocationKind), query) {
+			results = append(results, LocationRecord{Address: address})
+		}
+	}
+	sort.Slice(results, func(i, j int) bool { return results[i].Address.Full < results[j].Address.Full })
+	return results, nil
+}
+
+func (store *PostgresStore) generatedWorld(ctx context.Context, serverID string) (World, error) {
+	var seed string
+	var version int
+	err := store.db.QueryRow(ctx,
+		`SELECT world_seed, generator_version FROM worlds WHERE server_id = $1::uuid`, serverID,
+	).Scan(&seed, &version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return World{}, ErrEntityNotFound
+	}
+	if err != nil {
+		return World{}, err
+	}
+	return Generate(seed, version)
+}
+
+// GeneratedWorld reconstructs the small, deterministic world assigned to a server.
+func (store *PostgresStore) GeneratedWorld(ctx context.Context, serverID string) (World, error) {
+	return store.generatedWorld(ctx, serverID)
+}
+
+func makeAddress(entity Entity, regions map[string]string) Address {
+	district := regions[entity.RegionID]
+	city := "Lyon"
+	country := "France"
+	full := strings.Trim(strings.Join([]string{entity.Name, district, city, country}, ", "), ", ")
+	return Address{LocationID: entity.ID, Name: entity.Name, Kind: entity.LocationKind, District: district, City: city, Country: country, Full: full}
 }
 
 // SetNPCStatus appends a persistent status change scoped to one server.
@@ -406,15 +546,30 @@ func (store *PostgresStore) worldSeedAndVersion(ctx context.Context, serverID st
 	return seed, version, err
 }
 
-func execConsistent(ctx context.Context, tx pgx.Tx, query string, args ...any) error {
-	result, err := tx.Exec(ctx, query, args...)
-	if err != nil {
-		return err
+func execConsistentBatch(ctx context.Context, tx pgx.Tx, query string, rows [][]any) (int, error) {
+	if len(rows) == 0 {
+		return -1, nil
 	}
-	if result.RowsAffected() != 1 {
-		return ErrGeneratedConflict
+	var batch pgx.Batch
+	for _, args := range rows {
+		batch.Queue(query, args...)
 	}
-	return nil
+	results := tx.SendBatch(ctx, &batch)
+	for index := range rows {
+		result, err := results.Exec()
+		if err != nil {
+			_ = results.Close()
+			return index, err
+		}
+		if result.RowsAffected() != 1 {
+			_ = results.Close()
+			return index, ErrGeneratedConflict
+		}
+	}
+	if err := results.Close(); err != nil {
+		return len(rows) - 1, err
+	}
+	return -1, nil
 }
 
 func optionalString(value string) any {

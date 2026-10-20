@@ -15,11 +15,10 @@ describe("LoginPage", () => {
   it("renders required credentials and prevents form navigation", () => {
     render(<LoginPage onRegister={vi.fn()} />);
     expect(screen.getByRole("img", { name: "NOIR 1974" })).toHaveAttribute("src", "/images/logo.png");
-    expect(screen.getByLabelText("E-mail")).toBeRequired();
-    expect(screen.getByLabelText("Senha")).toBeRequired();
-    expect(screen.getByText("Máximo de 72 bytes em UTF-8.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeRequired();
+    expect(screen.getByLabelText("Password")).toBeRequired();
 
-    const form = screen.getByRole("button", { name: "Entrar" }).closest("form");
+    const form = screen.getByRole("button", { name: "Sign in" }).closest("form");
     const event = new Event("submit", { bubbles: true, cancelable: true });
     form.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
@@ -28,27 +27,30 @@ describe("LoginPage", () => {
   it("opens the registration flow", () => {
     const onRegister = vi.fn();
     render(<LoginPage onRegister={onRegister} />);
-    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     expect(onRegister).toHaveBeenCalledOnce();
   });
 
   it("submits credentials to the identity API", async () => {
-    loginAccount.mockResolvedValue({ account: { id: "1" }, character: null });
+    loginAccount.mockResolvedValue({ account: { id: "1" }, character: null, world: { serverTime: "1974-11-12T20:15:00.000Z" } });
     const onAuthenticated = vi.fn();
     render(<LoginPage onRegister={vi.fn()} onAuthenticated={onAuthenticated} />);
-    fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "agent@example.com" } });
-    fireEvent.change(screen.getByLabelText("Senha"), { target: { value: "secret-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "agent@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    await vi.waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith({ account: { id: "1" }, character: null }));
+    await vi.waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith({ account: { id: "1" }, character: null, world: { serverTime: "1974-11-12T20:15:00.000Z" } }));
     expect(loginAccount).toHaveBeenCalledWith({ email: "agent@example.com", password: "secret-password" });
   });
 
-  it("restores an existing session when the login page opens", async () => {
-    const identity = { account: { id: "1" }, character: { displayName: "Ada", portraitId: 2 } };
-    currentIdentity.mockResolvedValue(identity);
+  it("continues an existing player session after successful sign in", async () => {
+    const identity = { account: { id: "1" }, character: { displayName: "Ada", portraitId: 2 }, world: { serverTime: "1974-11-12T20:15:00.000Z" } };
+    loginAccount.mockResolvedValue(identity);
     const onAuthenticated = vi.fn();
     render(<LoginPage onRegister={vi.fn()} onAuthenticated={onAuthenticated} />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "agent@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await vi.waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith(identity));
   });
 });

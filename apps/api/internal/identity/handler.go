@@ -14,6 +14,9 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"noir-1974/apps/api/internal/cases"
+	"noir-1974/apps/api/internal/newspaper"
+	"noir-1974/apps/api/internal/world"
 )
 
 const sessionCookie = "noir_session"
@@ -26,24 +29,253 @@ type Handler struct {
 	secureCookie        bool
 	now                 func() time.Time
 	worldClockStartedAt time.Time
+	worldReader         WorldDirectoryReader
+	newspaperReader     NewspaperReader
+	caseReader          CaseAPIReader
+	worldServerID       string
+}
+
+type WorldDirectoryReader interface {
+	SearchNPCs(context.Context, string, string) ([]world.NPCProfile, error)
+	SearchCompanies(context.Context, string, string) ([]world.CompanyRecord, error)
+	SearchLocations(context.Context, string, string) ([]world.LocationRecord, error)
+}
+
+type NewspaperReader interface {
+	Issue(context.Context, string, string, string, time.Time) (newspaper.Issue, error)
+}
+
+type CaseAPIReader interface {
+	ListOpenPublicCases(context.Context, string) ([]cases.PublicCase, error)
+	GetPublicCase(context.Context, string, string) (cases.PublicCase, []cases.PublicEvidence, error)
+	GetPlayerProgress(context.Context, string, string, string) (cases.PlayerProgress, error)
+	SavePlayerProgress(context.Context, string, string, string, cases.PlayerProgress) error
 }
 
 // NewHandler creates the identity API. Cookies are secure in production deployments.
 func NewHandler(repository store, secureCookie bool) http.Handler {
+	return newHandler(repository, secureCookie, nil, "", nil, nil)
+}
+
+// NewHandlerWithWorld composes authenticated world directory routes into the identity API.
+func NewHandlerWithWorld(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string) http.Handler {
+	return newHandler(repository, secureCookie, reader, serverID, nil, nil)
+}
+
+func NewHandlerWithNewspaper(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, serverID string) http.Handler {
+	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, nil)
+}
+
+func NewHandlerWithGame(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, caseReader CaseAPIReader, serverID string) http.Handler {
+	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, caseReader)
+}
+
+func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string, newspaperReader NewspaperReader, caseReader CaseAPIReader) http.Handler {
 	now := time.Now
-	handler := &Handler{store: repository, secureCookie: secureCookie, now: now, worldClockStartedAt: now()}
+	handler := &Handler{store: repository, secureCookie: secureCookie, now: now, worldClockStartedAt: now(), worldReader: reader, newspaperReader: newspaperReader, caseReader: caseReader, worldServerID: serverID}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/auth/register", handler.register)
 	mux.HandleFunc("POST /api/auth/login", handler.login)
 	mux.HandleFunc("POST /api/auth/logout", handler.logout)
 	mux.HandleFunc("GET /api/me", handler.me)
 	mux.HandleFunc("GET /api/world", handler.world)
+	if reader != nil {
+		mux.HandleFunc("GET /api/world/npcs", handler.searchNPCs)
+		mux.HandleFunc("GET /api/world/companies", handler.searchCompanies)
+		mux.HandleFunc("GET /api/world/locations", handler.searchLocations)
+	}
+	if newspaperReader != nil {
+		mux.HandleFunc("GET /api/world/newspaper", handler.newspaper)
+	}
+	if caseReader != nil {
+		mux.HandleFunc("GET /api/cases", handler.listOpenCases)
+		mux.HandleFunc("GET /api/cases/{caseID}", handler.getCase)
+		mux.HandleFunc("POST /api/cases/{caseID}/progress", handler.saveCaseProgress)
+	}
 	mux.HandleFunc("POST /api/characters", handler.createCharacter)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+type caseDetailResponse struct {
+	Case     cases.PublicCase       `json:"case"`
+	Evidence []cases.PublicEvidence `json:"evidence"`
+	Progress cases.PlayerProgress   `json:"progress"`
+}
+
+type caseProgressRequest struct {
+	DiscoveredEvidenceIDs []string `json:"discoveredEvidenceIds"`
+}
+
+func (h *Handler) listOpenCases(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.caseAccount(w, r); !ok {
+		return
+	}
+	results, err := h.caseReader.ListOpenPublicCases(r.Context(), h.worldServerID)
+	if err != nil {
+		http.Error(w, "could not retrieve open cases", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (h *Handler) getCase(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	publicCase, evidence, err := h.caseReader.GetPublicCase(r.Context(), h.worldServerID, r.PathValue("caseID"))
+	if errors.Is(err, cases.ErrCaseNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "could not retrieve case file", http.StatusInternalServerError)
+		return
+	}
+	progress, err := h.caseReader.GetPlayerProgress(r.Context(), h.worldServerID, publicCase.ID, current.ID)
+	if err != nil {
+		http.Error(w, "could not retrieve case progress", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, caseDetailResponse{Case: publicCase, Evidence: evidence, Progress: progress})
+}
+
+func (h *Handler) saveCaseProgress(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input caseProgressRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	caseID := r.PathValue("caseID")
+	if _, _, err := h.caseReader.GetPublicCase(r.Context(), h.worldServerID, caseID); errors.Is(err, cases.ErrCaseNotFound) {
+		http.NotFound(w, r)
+		return
+	} else if err != nil {
+		http.Error(w, "could not retrieve case file", http.StatusInternalServerError)
+		return
+	}
+	progress := cases.PlayerProgress{DiscoveredEvidenceIDs: input.DiscoveredEvidenceIDs}
+	if err := h.caseReader.SavePlayerProgress(r.Context(), h.worldServerID, caseID, current.ID, progress); err != nil {
+		if errors.Is(err, cases.ErrInvalidProgress) || errors.Is(err, cases.ErrEvidenceNotFound) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "could not save case progress", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"progress": progress})
+}
+
+func (h *Handler) caseAccount(w http.ResponseWriter, r *http.Request) (account, bool) {
+	if h.caseReader == nil || h.worldServerID == "" {
+		http.Error(w, "case service unavailable", http.StatusServiceUnavailable)
+		return account{}, false
+	}
+	token, err := r.Cookie(sessionCookie)
+	if err != nil || token.Value == "" {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return account{}, false
+	}
+	current, _, err := h.store.accountForSession(r.Context(), token.Value, h.now())
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return account{}, false
+	}
+	return current, true
+}
+
+func (h *Handler) newspaper(w http.ResponseWriter, r *http.Request) {
+	if !h.authorizeWorldRequest(w, r) {
+		return
+	}
+	worldState := h.worldAt()
+	issue, err := h.newspaperReader.Issue(r.Context(), h.worldServerID, worldState.City, worldState.Country, worldState.ServerTime)
+	if err != nil {
+		http.Error(w, "could not retrieve the latest newspaper", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, issue)
+}
+
+func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
+	if !h.authorizeWorldRequest(w, r) {
+		return
+	}
+	query, ok := directoryQuery(w, r)
+	if !ok {
+		return
+	}
+	results, err := h.worldReader.SearchNPCs(r.Context(), h.worldServerID, query)
+	if err != nil {
+		http.Error(w, "could not search people", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
+	if !h.authorizeWorldRequest(w, r) {
+		return
+	}
+	query, ok := directoryQuery(w, r)
+	if !ok {
+		return
+	}
+	results, err := h.worldReader.SearchCompanies(r.Context(), h.worldServerID, query)
+	if err != nil {
+		http.Error(w, "could not search companies", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (h *Handler) searchLocations(w http.ResponseWriter, r *http.Request) {
+	if !h.authorizeWorldRequest(w, r) {
+		return
+	}
+	query, ok := directoryQuery(w, r)
+	if !ok {
+		return
+	}
+	results, err := h.worldReader.SearchLocations(r.Context(), h.worldServerID, query)
+	if err != nil {
+		http.Error(w, "could not search addresses", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (h *Handler) authorizeWorldRequest(w http.ResponseWriter, r *http.Request) bool {
+	if h.worldReader == nil || h.worldServerID == "" {
+		http.Error(w, "world directory unavailable", http.StatusServiceUnavailable)
+		return false
+	}
+	token, err := r.Cookie(sessionCookie)
+	if err != nil || token.Value == "" {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return false
+	}
+	if _, _, err := h.store.accountForSession(r.Context(), token.Value, h.now()); err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return false
+	}
+	return true
+}
+
+func directoryQuery(w http.ResponseWriter, r *http.Request) (string, bool) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if query == "" || len([]rune(query)) > 80 {
+		http.Error(w, "enter a search term of up to 80 characters", http.StatusBadRequest)
+		return "", false
+	}
+	return query, true
 }
 
 type registerRequest struct {
@@ -63,8 +295,8 @@ type characterRequest struct {
 }
 
 type identityResponse struct {
-	Account   account    `json:"account"`
-	Character *character `json:"character"`
+	Account   account       `json:"account"`
+	Character *character    `json:"character"`
 	World     worldResponse `json:"world"`
 }
 
@@ -129,9 +361,9 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, identityResponse{
-		Account: publicAccount(found),
+		Account:   publicAccount(found),
 		Character: found.Character,
-		World: h.worldAt(),
+		World:     h.worldAt(),
 	})
 }
 

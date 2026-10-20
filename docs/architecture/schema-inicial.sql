@@ -130,14 +130,13 @@ CREATE TABLE cases (
     case_id text NOT NULL CHECK (case_id <> ''),
     case_seed text NOT NULL CHECK (case_seed <> ''),
     generator_version integer NOT NULL CHECK (generator_version > 0),
-    case_type text NOT NULL,
-    status text NOT NULL DEFAULT 'open'
-        CHECK (status IN ('open', 'solved', 'archived')),
+    case_type text NOT NULL CHECK (case_type = 'homicide'),
+    archetype_id text NOT NULL CHECK (archetype_id <> ''),
+    motive text NOT NULL CHECK (motive <> ''),
     victim_entity_id text NOT NULL,
     killer_entity_id text NOT NULL,
     location_entity_id text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (server_id, case_id),
     FOREIGN KEY (server_id, victim_entity_id)
         REFERENCES world_entities(server_id, entity_id),
@@ -147,14 +146,27 @@ CREATE TABLE cases (
         REFERENCES world_entities(server_id, entity_id),
     CHECK (victim_entity_id <> killer_entity_id)
 );
-CREATE INDEX cases_by_status_idx ON cases(server_id, status, created_at);
+CREATE INDEX cases_by_server_created_idx ON cases(server_id, created_at);
+
+CREATE TABLE case_relationships (
+    server_id uuid NOT NULL,
+    case_id text NOT NULL,
+    relationship_id text NOT NULL,
+    relationship_type text NOT NULL CHECK (relationship_type IN ('employment', 'personal')),
+    relationship_role text NOT NULL CHECK (relationship_role <> ''),
+    PRIMARY KEY (server_id, case_id, relationship_id),
+    UNIQUE (server_id, case_id, relationship_role),
+    FOREIGN KEY (server_id, case_id)
+        REFERENCES cases(server_id, case_id) ON DELETE CASCADE,
+    CHECK (relationship_id <> '')
+);
 
 CREATE TABLE case_evidence (
     server_id uuid NOT NULL,
     case_id text NOT NULL,
     evidence_id text NOT NULL CHECK (evidence_id <> ''),
-    location_entity_id text,
-    evidence_type text NOT NULL,
+    location_entity_id text NOT NULL,
+    evidence_type text NOT NULL CHECK (evidence_type <> ''),
     evidence_data jsonb NOT NULL DEFAULT '{}'::jsonb,
     PRIMARY KEY (server_id, case_id, evidence_id),
     FOREIGN KEY (server_id, case_id)
@@ -165,12 +177,23 @@ CREATE TABLE case_evidence (
 CREATE INDEX case_evidence_by_location_idx
     ON case_evidence(server_id, location_entity_id);
 
+CREATE TABLE case_states (
+    server_id uuid NOT NULL,
+    case_id text NOT NULL,
+    status text NOT NULL DEFAULT 'open'
+        CHECK (status IN ('open', 'solved', 'archived')),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, case_id),
+    FOREIGN KEY (server_id, case_id)
+        REFERENCES cases(server_id, case_id) ON DELETE CASCADE
+);
+
 -- player_accounts comes from the existing identity schema.
 CREATE TABLE player_case_progress (
     server_id uuid NOT NULL,
     case_id text NOT NULL,
     account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
-    progress jsonb NOT NULL DEFAULT '{}'::jsonb,
+    progress jsonb NOT NULL DEFAULT '{"discoveredEvidenceIds":[]}'::jsonb,
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (server_id, case_id, account_id),
     FOREIGN KEY (server_id, case_id)

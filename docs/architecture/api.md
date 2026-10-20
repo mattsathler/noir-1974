@@ -1,21 +1,21 @@
-# API conceitual
+# API atual
 
-A API definitiva **ainda não** foi especificada. Os endpoints abaixo são exemplos de forma, não contrato.
+Estes são os endpoints atuais da API. Rotas de diretório, casos e progresso exigem sessão autenticada.
 
 ```http
-GET /world
-GET /npc/:id
-GET /company/:id
-GET /company/:id/employees
-GET /npc/:id/relationships
-
-GET /cases
-GET /cases/:id
-
-POST /cases/generate
-
-POST /world/mutations
-POST /cases/:id/progress
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+GET /api/me
+GET /api/world
+POST /api/characters
+GET /api/world/npcs?q=<name>
+GET /api/world/companies?q=<name-or-address>
+GET /api/world/locations?q=<name-or-address>
+GET /api/world/newspaper
+GET /api/cases
+GET /api/cases/:caseID
+POST /api/cases/:caseID/progress
 ```
 
 ## Servidor como autoridade
@@ -25,6 +25,20 @@ CLIENT → REST API → WORLD / DATABASE → PROCEDURAL GENERATOR → CURRENT ST
 ```
 
 O frontend pede “NPC #23”. O servidor verifica o servidor do jogador, recupera seed/estado, gera atributos, consulta relações, aplica mutations e devolve só o que o cliente pode ver. Jogadores do mesmo servidor leem o mesmo estado compartilhado; progresso individual pode ser separado.
+
+## Diretório do mundo
+
+As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. NPCs retornam perfil, emprego e relações pessoais; empresas retornam sede e funcionários; locais retornam endereço completo com bairro, cidade e país. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
+
+`GET /api/world/newspaper` retorna a edição determinística do dia fictício atual. A manchete usa o caso persistido mais recente e omite o culpado; seis notas leves são escolhidas de um catálogo por servidor e data. A API cria o caso inicial uma única vez no bootstrap e registra a vítima como morta no estado compartilhado.
+
+## Casos e progresso
+
+`GET /api/cases` lista os casos abertos do servidor. `GET /api/cases/:caseID` retorna os dados públicos do caso, registros narrativos sem classificações internas e o progresso daquela conta. Respostas públicas não incluem `killerId`, motivo real, tipo interno das evidências, relações usadas para gerá-las ou regras de acesso.
+
+`POST /api/cases/:caseID/progress` recebe `{ "discoveredEvidenceIds": ["…"] }`. O servidor valida que o caso existe e que cada ID de registro pertence ao caso, normaliza a lista e a salva por conta. O progresso persiste entre sessões e não altera o estado compartilhado do caso. O endpoint ainda representa o recorte mínimo de M06; ações de descoberta ficam para milestones posteriores.
+
+Cada instância da API consulta e grava apenas o `NOIR_WORLD_SERVER_ID` configurado na composição. O cliente não pode enviar um `server_id` para trocar de mundo.
 
 ## Monorepo
 

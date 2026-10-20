@@ -26,6 +26,14 @@ WORLD SEED
 8. Casos
 ```
 
+## Geografia de referência e expansão dos bairros
+
+A geografia terá duas camadas. A camada de referência será fixa e igual em todos os servidores: um catálogo curado de 50 países de diferentes partes do mundo, com suas capitais e principais cidades. Esses nomes e identidades não variam com a seed do servidor. O catálogo ainda precisa ser selecionado e registrado como dado versionado do jogo.
+
+Dentro das cidades, os bairros serão partições lógicas para distribuir detetives e ocorrências, evitando a concentração de jogadores em um único lugar. Seus nomes serão compostos deterministicamente a partir de um banco de palavras e regras de combinação, com escopo por servidor e cidade. Novos bairros serão criados sob demanda conforme a distribuição de jogadores e a necessidade de gerar ocorrências locais; uma vez criados, sua identidade permanece estável para todos os jogadores daquele servidor.
+
+Não haverá mapa físico individual dos bairros nem planejamento de coordenadas, distâncias, rotas ou vizinhança entre eles. O bairro identifica o contexto lógico de uma ocorrência e ajuda o sistema a distribuir jogadores e casos; não determina deslocamento ou proximidade física. A geração deve evitar nomes duplicados ou ambíguos dentro da mesma cidade e preservar chaves canônicas, independentemente da ordem em que bairros forem criados.
+
 ## Grafo
 
 Entidades (nós) possíveis: NPC, empresa, residência, prédio, família, local, organização, caso, evidência.
@@ -34,7 +42,7 @@ Relações (arestas) possíveis: casado com, irmão de, pai/mãe de, amigo de, r
 
 ## Versão 1 — cidade mínima
 
-O gerador da API fica em `apps/api/internal/world`. A versão `1` produz Lyon, uma região de cidade, três distritos selecionados de um catálogo fixo e, em cada distrito, duas ruas e dois edifícios. São quatro regiões e doze entidades `location` por mundo. Nomes de distritos, ruas e edifícios vêm de catálogos pequenos; a seleção varia com a seed.
+O gerador atual da API fica em `apps/api/internal/world`. A versão `1` produz Lyon, uma região de cidade, três distritos selecionados de um catálogo fixo e, em cada distrito, duas ruas e dois edifícios. São quatro regiões e doze entidades `location` por mundo. Nomes de distritos, ruas e edifícios vêm de catálogos pequenos; a seleção varia com a seed. Esse recorte descreve a implementação atual, ainda menor que a geografia de referência e a expansão de bairros definidas acima.
 
 Na versão 1, regiões representam cidade e distrito; ruas e edifícios são entidades de localização ligadas à região do distrito. Não há coordenadas, malha viária, NPCs, empresas, relações sociais, casos ou mutations. O recorte é uma estrutura consultável em memória, sem endpoints nem persistência nesta milestone.
 

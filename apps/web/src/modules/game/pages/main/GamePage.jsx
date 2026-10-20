@@ -1,5 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { ComputerSharp } from "pixelarticons/react/ComputerSharp";
+import { NotebookSharp } from "pixelarticons/react/NotebookSharp";
 import { currentIdentity } from "../../../identity/api.js";
+import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx";
+import ComputerDesktop from "./ComputerDesktop.jsx";
 
 function formatServerDateTime(timestamp, timeZone) {
   const date = new Date(timestamp);
@@ -25,6 +29,10 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [world, setWorld] = useState(initialWorld);
   const [serverTime, setServerTime] = useState(initialWorld ? new Date(initialWorld.serverTime) : null);
   const [error, setError] = useState("");
+  const [computerOpen, setComputerOpen] = useState(false);
+  const [newspaperOpen, setNewspaperOpen] = useState(false);
+  const closeComputer = useCallback(() => setComputerOpen(false), []);
+  const closeNewspaper = useCallback(() => setNewspaperOpen(false), []);
 
   useEffect(() => {
     let active = true;
@@ -62,10 +70,32 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           <p className="text-lg tracking-wide uppercase m-0 game-location__name">{location}</p>
         </div>
         {display && (
-          <aside className="server-clock surface p-4 text-right" aria-label="Local clock">
-            <p className="text-xs tracking-wide uppercase text-success m-0">Local time</p>
-            <time className="server-clock__time block text-xl font-mono" dateTime={serverTime.toISOString()}>{display.time}</time>
-            <p className="server-clock__date text-xs text-secondary m-0">{display.date}</p>
+          <aside className="computer-launch-group" aria-label="Local date and time">
+            <button
+              className="computer-launch"
+              type="button"
+              aria-label="Open computer desktop"
+              aria-haspopup="dialog"
+              aria-expanded={computerOpen}
+              onClick={() => { setNewspaperOpen(false); setComputerOpen(true); }}
+            >
+              <ComputerSharp className="computer-launch__icon" aria-hidden="true" />
+            </button>
+            <button
+              className="newspaper-launch"
+              type="button"
+              aria-label="Read the Lyon Gazette"
+              aria-haspopup="dialog"
+              aria-expanded={newspaperOpen}
+              onClick={() => { setComputerOpen(false); setNewspaperOpen(true); }}
+            >
+              <NotebookSharp className="computer-launch__icon" aria-hidden="true" />
+            </button>
+            <div className="server-clock surface p-4 text-right">
+              <p className="text-xs tracking-wide uppercase text-success m-0">Local time</p>
+              <time className="server-clock__time block text-xl font-mono" dateTime={serverTime.toISOString()}>{display.time}</time>
+              <p className="server-clock__date text-xs text-secondary m-0">{display.date}</p>
+            </div>
           </aside>
         )}
       </header>
@@ -73,6 +103,15 @@ export default function GamePage({ initialWorld = null, onLogout }) {
       <footer className="game-location pos-absolute inset-x-0 bottom-0 flex items-end justify-end gap-4 p-6">
         <button className="border-0 bg-transparent text-accent underline" type="button" onClick={onLogout}>Log out</button>
       </footer>
+      {computerOpen && (
+        <ComputerDesktop
+          location={location}
+          display={display}
+          serverTime={serverTime}
+          onClose={closeComputer}
+        />
+      )}
+      {newspaperOpen && <NewspaperWindow onClose={closeNewspaper} />}
     </main>
   );
 }

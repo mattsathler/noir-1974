@@ -43,11 +43,12 @@ describe("identity API", () => {
   });
 
   it("requests the current authenticated identity", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response('{"character":null}', {
+    const identity = { character: null, world: { country: "France", city: "Lyon", timeZone: "Europe/Paris", locationId: "lyon", serverTime: "1974-11-12T20:15:00.000Z" } };
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(identity), {
       headers: { "content-type": "application/json" },
     }));
     vi.stubGlobal("fetch", fetch);
-    await expect(currentIdentity()).resolves.toEqual({ character: null });
+    await expect(currentIdentity()).resolves.toEqual(identity);
     expect(fetch).toHaveBeenCalledWith("/api/me", expect.objectContaining({ credentials: "same-origin" }));
   });
 });

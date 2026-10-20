@@ -9,39 +9,38 @@ afterEach(cleanup);
 
 describe("RegisterPage", () => {
   function fillRequiredFields() {
-    fireEvent.change(screen.getByLabelText("Usuário"), { target: { value: "agent-01" } });
-    fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "agent@example.com" } });
-    fireEvent.change(screen.getByLabelText("Senha"), { target: { value: "first-password" } });
-    fireEvent.change(screen.getByLabelText("Confirmar senha"), { target: { value: "different-password" } });
+    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "agent-01" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "agent@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "first-password" } });
+    fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "different-password" } });
   }
 
   it("renders required account fields and prevents navigation on submit", () => {
     render(<RegisterPage onLogin={vi.fn()} />);
 
-    expect(screen.getByLabelText("Usuário")).toBeRequired();
-    expect(screen.getByLabelText("E-mail")).toHaveAttribute("type", "email");
-    expect(screen.getByLabelText("E-mail")).toBeRequired();
-    expect(screen.getByLabelText("Senha")).toBeRequired();
-    expect(screen.getByLabelText("Confirmar senha")).toBeRequired();
-    expect(screen.getByLabelText("Usuário")).toHaveAttribute("pattern", "[A-Za-z0-9_-]{3,24}");
-    expect(screen.getByText("De 12 a 72 bytes em UTF-8.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Username")).toBeRequired();
+    expect(screen.getByLabelText("Email")).toHaveAttribute("type", "email");
+    expect(screen.getByLabelText("Email")).toBeRequired();
+    expect(screen.getByLabelText("Password")).toBeRequired();
+    expect(screen.getByLabelText("Confirm password")).toBeRequired();
+    expect(screen.getByLabelText("Username")).toHaveAttribute("pattern", "[A-Za-z0-9_-]{3,24}");
 
     fillRequiredFields();
-    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent("As senhas não coincidem.");
-    expect(screen.getByLabelText("Confirmar senha")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("alert")).toHaveTextContent("Passwords do not match.");
+    expect(screen.getByLabelText("Confirm password")).toHaveAttribute("aria-invalid", "true");
   });
 
   it("explains username and password constraints before calling the API", () => {
     render(<RegisterPage onLogin={vi.fn()} onAccountCreated={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("Usuário"), { target: { value: "invalid name" } });
-    fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "agent@example.com" } });
-    fireEvent.change(screen.getByLabelText("Senha"), { target: { value: "too-short" } });
-    fireEvent.change(screen.getByLabelText("Confirmar senha"), { target: { value: "too-short" } });
-    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "invalid name" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "agent@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "too-short" } });
+    fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "too-short" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent("O usuário deve ter de 3 a 24 caracteres");
+    expect(screen.getByRole("alert")).toHaveTextContent("Username must be 3–24 characters");
     expect(registerAccount).not.toHaveBeenCalled();
   });
 
@@ -50,11 +49,11 @@ describe("RegisterPage", () => {
     const onAccountCreated = vi.fn();
     render(<RegisterPage onLogin={vi.fn()} onAccountCreated={onAccountCreated} />);
     fillRequiredFields();
-    fireEvent.change(screen.getByLabelText("Senha"), { target: { value: "same-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "same-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
-    fireEvent.change(screen.getByLabelText("Confirmar senha"), { target: { value: "same-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "same-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => expect(onAccountCreated).toHaveBeenCalledWith({ account: { id: "1" }, character: null }));
     expect(registerAccount).toHaveBeenCalledWith({ username: "agent-01", email: "agent@example.com", password: "same-password" });

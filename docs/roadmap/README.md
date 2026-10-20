@@ -2,7 +2,7 @@
 
 O desenvolvimento avança em **ciclos**. Cada ciclo tem um **milestone de sucesso** com critérios de aceite binários. O ciclo seguinte **não começa** enquanto o anterior não for aceito.
 
-**Onde estamos:** [`estado.md`](estado.md) — milestones aceitos e porcentagem até o primeiro deploy / playtest.
+**Onde estamos:** [`estado.md`](estado.md) — milestones aceitos e porcentagem do fluxo completo do crime, da geração à prisão do culpado. O M06 indica separadamente quando o primeiro recorte está pronto para playtest.
 
 Prova técnica que sustenta o restante (meta do ciclo 4):
 
@@ -24,8 +24,13 @@ Ordem e regras de entrada/saída: [`ciclos.md`](ciclos.md).
 | 4 | Mutations e reconstrução | [M04](milestones/M04-mutations-e-reconstrucao.md) |
 | 5 | Gerador de casos simples + validação | [M05](milestones/M05-gerador-de-casos.md) |
 | 6 | REST API e cliente web mínimo | [M06](milestones/M06-api-e-cliente.md) |
+| 7 | Registros bancários e histórico do GATE | [M07](milestones/M07-registros-investigativos.md) |
+| 8 | Sistema de correio eletrônico | [M08](milestones/M08-sistema-de-emails.md) |
+| 9 | Busca e apreensão | [M09](milestones/M09-busca-e-apreensao.md) |
+| 10 | Whiteboards pessoais por caso | [M10](milestones/M10-whiteboards-pessoais.md) |
+| 11 | Acusação e julgamento | [M11](milestones/M11-acusacao-e-julgamento.md) |
 
-Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável. Conteúdo, tutorial (Vesper), auth completa e simulação temporal ficam **depois** de M06 e exigirão novos milestones.
+Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável para playtest, não a conclusão do jogo. M07–M11 constroem o fluxo investigativo completo: registros, correio, busca, organização de elementos, acusação e prisão do culpado. Tutorial (Vesper), auth completa, simulação temporal geral e outros sistemas continuam exigindo milestones próprios.
 
 ## Status
 

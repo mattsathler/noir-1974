@@ -14,7 +14,7 @@ A identidade conceitual é `(server_id, entity_id)`. Um `entity_id` é estável 
 | --- | --- |
 | Servidor (`game_server`) | Escopo de isolamento e raiz do mundo compartilhado. |
 | Mundo (`world`) | Uma seed e uma `generator_version` por servidor. |
-| Região (`world_region`) | Recorte expansível sob demanda. Sua chave lógica é estável e pode apontar para uma região-pai. |
+| Região (`world_region`) | Recorte lógico. Países, capitais e principais cidades vêm de um catálogo fixo comum a todos os servidores; bairros são partições procedurais expansíveis sob demanda para distribuir detetives e ocorrências. |
 | Entidade do mundo (`world_entity`) | Âncora de identidade de um NPC, empresa ou local materializado. Guarda tipo, região e chave estável do gerador; atributos reconstruíveis não são copiados por padrão. |
 | NPC | Pessoa gerada, com identidade estável e relações consultáveis. Atributos base podem ser reconstruídos da seed. |
 | Empresa | Organização gerada, com relações próprias, incluindo localizações e vínculos de emprego. |
@@ -55,13 +55,13 @@ O schema registra mutations individualmente. No recorte M04, as mutations de sta
 
 Regiões são endereçadas por uma chave lógica canônica (`region_id`), independente da ordem em que forem solicitadas. Entidades têm uma chave de geração estável dentro da região (`generation_key`); o ID final é único dentro do servidor. A seed derivada para uma região/entidade não pode depender de outras regiões geradas antes dela.
 
-O formato exato das chaves, derivação das subseeds, geografia e limites de expansão pertencem ao M02. Neste ciclo fica definido que uma expansão não troca a identidade de conteúdo já referenciado e que a materialização é sob demanda.
+O formato exato das chaves, derivação das subseeds e limites de expansão pertencem ao M02. O catálogo geográfico e a geração lógica de bairros estão definidos em [geração do mundo](geracao-do-mundo.md). Bairros não representam áreas físicas simuladas: não possuem coordenadas, distâncias ou relações de vizinhança. Uma expansão não troca a identidade de conteúdo já referenciado e a materialização de bairros é sob demanda.
 
 ## Casos: estado comum e progresso individual
 
-`cases` contém a definição e o estado compartilhado (por exemplo, aberto ou resolvido), além das referências a vítima, culpado e local. A definição e os fatos internos são autoritativos no backend; `killer_entity_id` e classificação de evidências não são campos automaticamente expostos ao cliente.
+`cases` contém a definição compacta e as referências a vítima, culpado e local. `case_relationships` aponta para relações existentes e `case_evidence` guarda fatos internos do caso. `case_states` contém o estado compartilhado (aberto, resolvido ou arquivado). A definição e os fatos internos são autoritativos no backend; `killer_entity_id` e classificação de evidências não são campos automaticamente expostos ao cliente.
 
-`player_case_progress` contém descobertas e deduções de uma conta para aquele caso. Duas contas podem ter progresso distinto sem duplicar o caso ou alterar o estado compartilhado. A implementação concreta de progressão e concorrência fica para M05/M06.
+`player_case_progress` contém descobertas e deduções de uma conta para aquele caso. Duas contas podem ter progresso distinto sem duplicar o caso ou alterar o estado compartilhado. M05 implementa persistência mínima de evidências descobertas; progressão mais ampla permanece para marcos posteriores.
 
 ## Schema de referência
 
