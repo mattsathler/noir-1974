@@ -24,11 +24,11 @@ PRODUCT_BLURB = {
     ),
     1: (
         "Modelo de entidades e schema inicial estão escritos. "
-        "Ainda não há gerador nem mundo materializado."
+        "O gerador determinístico v1 está em curso; o mundo ainda não está materializado."
     ),
     2: (
-        "Há gerador determinístico da cidade mínima. "
-        "Sociedade (NPCs, empresas, relações) ainda não está no recorte aceito."
+        "O gerador determinístico da cidade mínima está aceito. "
+        "NPCs, empresas e relações persistidas estão em implementação."
     ),
     3: (
         "Há sociedade mínima: NPCs, empresas e relações consultáveis. "
@@ -179,7 +179,7 @@ def render(milestones: list[dict], today: date) -> str:
     elif current:
         vigente_cell = display_name(current)
         deploy_cell = (
-            "Não. Ainda não há mundo gerado nem recorte de investigação jogável."
+            "Não. Ainda não há mundo materializado nem recorte de investigação jogável."
             if last_n < 2
             else "Não. M06 ainda não foi aceito."
         )

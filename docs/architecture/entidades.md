@@ -26,6 +26,8 @@ A identidade conceitual é `(server_id, entity_id)`. Um `entity_id` é estável 
 
 `world_entity` é uma âncora, não uma exigência para materializar antecipadamente a população inteira. Um registro é criado quando a identidade precisa ser referenciada por uma relação, mutation, caso ou consulta persistida. A política exata de materialização ainda será refinada com o gerador.
 
+No recorte M03, todos os NPCs gerados têm vínculos de emprego e por isso suas âncoras são persistidas junto das relações. Atributos gerados permanecem fora da tabela; consultas os reconstroem apenas para os IDs selecionados pelas relações persistidas.
+
 ## Relações do recorte
 
 O primeiro conjunto nomeado é:
@@ -47,7 +49,7 @@ As tabelas de relação são tipadas. Chaves estrangeiras garantem que os extrem
 
 Emprego não é um atributo escalar do NPC: é uma relação. Estado atual não deve sobrescrever silenciosamente o valor base da seed.
 
-O schema registra mutations individualmente. Ordenação, replay, idempotência e escolha entre histórico de eventos e projeção de estado atual ficam para M04.
+O schema registra mutations individualmente. No recorte M04, as mutations de status são eventos sequenciados por servidor; a leitura aplica o evento mais recente sobre o estado base gerado. Idempotência de comandos fica para quando houver uma API de escrita.
 
 ## Regiões e identidade estável
 

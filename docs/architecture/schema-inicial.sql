@@ -17,6 +17,8 @@ CREATE TABLE world_regions (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
     region_id text NOT NULL CHECK (region_id <> ''),
     parent_region_id text,
+    region_kind text NOT NULL CHECK (region_kind IN ('city', 'district')),
+    display_name text NOT NULL CHECK (display_name <> ''),
     created_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (server_id, region_id),
     FOREIGN KEY (server_id, parent_region_id)
@@ -39,7 +41,8 @@ CREATE TABLE world_entities (
     FOREIGN KEY (server_id, region_id)
         REFERENCES world_regions(server_id, region_id) ON DELETE CASCADE,
     CHECK (
-        (entity_type = 'location' AND location_kind IN ('district', 'street', 'building', 'room'))
+        (entity_type = 'location' AND location_kind IS NOT NULL
+            AND location_kind IN ('district', 'street', 'building', 'room'))
         OR (entity_type <> 'location' AND location_kind IS NULL)
     )
 );
@@ -108,16 +111,19 @@ CREATE INDEX company_locations_by_location_idx
 
 CREATE TABLE world_mutations (
     mutation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    mutation_order bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
     server_id uuid NOT NULL,
     entity_id text NOT NULL,
-    field_key text NOT NULL CHECK (field_key <> ''),
-    value jsonb NOT NULL,
+    field_key text NOT NULL CHECK (field_key = 'status'),
+    value jsonb NOT NULL CHECK (
+        jsonb_typeof(value) = 'string' AND value #>> '{}' IN ('alive', 'dead')
+    ),
     created_at timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (server_id, entity_id)
         REFERENCES world_entities(server_id, entity_id)
 );
-CREATE INDEX world_mutations_by_entity_idx
-    ON world_mutations(server_id, entity_id, created_at);
+CREATE INDEX world_mutations_by_entity_order_idx
+    ON world_mutations(server_id, entity_id, mutation_order DESC);
 
 CREATE TABLE cases (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,

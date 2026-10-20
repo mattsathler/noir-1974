@@ -13,6 +13,7 @@ A arquitetura pode ser resumida nesta frase:
 | [Entidades](entidades.md) | Modelo do recorte inicial e origem dos dados |
 | [Schema inicial](schema-inicial.sql) | Tabelas e índices PostgreSQL de referência para M01 |
 | [Geração do mundo](geracao-do-mundo.md) | Camadas, grafo, entidades |
+| [Como funciona o mundo](como-funciona-o-mundo.md) | Explicação simples da seed, geração, persistência e consultas |
 | [Casos](casos.md) | Definição vs estado; crime como consequência |
 | [API conceitual](api.md) | REST, servidor autoritativo |
 | [Pontas soltas](pontas-soltas.md) | O que ainda não está fechado |

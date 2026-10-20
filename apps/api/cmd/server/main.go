@@ -14,6 +14,7 @@ import (
 	"github.com/joho/godotenv"
 	"noir-1974/apps/api/internal/health"
 	"noir-1974/apps/api/internal/identity"
+	"noir-1974/apps/api/internal/world"
 )
 
 func main() {
@@ -44,6 +45,10 @@ func main() {
 	identityStore := identity.NewPostgresStore(pool)
 	if err := identityStore.Migrate(ctx); err != nil {
 		log.Fatalf("migrate identity schema: %v", err)
+	}
+	worldStore := world.NewPostgresStore(pool)
+	if err := worldStore.Migrate(ctx); err != nil {
+		log.Fatalf("migrate world schema: %v", err)
 	}
 
 	mux := http.NewServeMux()
