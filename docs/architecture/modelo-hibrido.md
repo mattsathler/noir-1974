@@ -14,6 +14,8 @@ Cada servidor tem uma seed do mundo. Mesma seed + mesmo algoritmo/versão → me
 
 A seed do NPC pode definir nome, idade, aparência, personalidade, ocupação e outros atributos reconstruíveis. Não é obrigatório persistir esses atributos se o gerador os reproduzir.
 
+O recorte inicial e a separação de atributos gerados, relações e mutations estão definidos no [modelo de entidades](entidades.md), com tabelas em [schema-inicial.sql](schema-inicial.sql).
+
 ## O que a seed não deve fazer
 
 Relações entre entidades precisam de representação consultável.

@@ -10,13 +10,13 @@ Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadma
 
 | Campo | Valor |
 | --- | --- |
-| Data de referência | 2026-09-21 |
-| Milestone vigente | M01 — Entidades e schema |
-| Último aceito | M00 — Repositório e docs |
-| Deploy / playtest | Não. Não há servidor, cliente jogável nem mundo gerado. |
-| Caminho até o 1º playtest | **14%** (1 de 7 milestones) |
+| Data de referência | 2026-10-20 |
+| Milestone vigente | M02 — Gerador determinístico |
+| Último aceito | M01 — Entidades e schema |
+| Deploy / playtest | Não. Ainda não há mundo gerado nem recorte de investigação jogável. |
+| Caminho até o 1º playtest | **29%** (2 de 7 milestones) |
 
-O produto, hoje, é o repositório e a documentação. `apps/web` e `apps/api` existem só como fronteira do monorepo.
+Modelo de entidades e schema inicial estão escritos. Ainda não há gerador nem mundo materializado.
 
 ## Barra até o primeiro deploy e playtest
 
@@ -24,13 +24,13 @@ Playtest = recorte M06 no browser: consultar mundo, um NPC com relações e um c
 
 ```text
 M00 ████████████████████  aceito
-M01 ░░░░░░░░░░░░░░░░░░░░  não iniciado
+M01 ████████████████████  aceito
 M02 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M03 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M04 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M05 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M06 ░░░░░░░░░░░░░░░░░░░░  não iniciado   ← deploy / playtest
-     | 14%
+     | 29%
 ```
 
 Cada milestone do caminho pesa **1/7 ≈ 14,3%**. Só entra na conta com status **Aceito**. “Em curso” não soma porcentagem (evita 40% de trabalho pela metade).
@@ -38,7 +38,7 @@ Cada milestone do caminho pesa **1/7 ≈ 14,3%**. Só entra na conta com status 
 | Milestone | Peso | Status | Soma acumulada se aceito |
 | --- | ---: | --- | ---: |
 | [M00](milestones/M00-repositorio-e-docs.md) Repositório e docs | 14,3% | Aceito | 14% |
-| [M01](milestones/M01-modelo-de-entidades-e-schema.md) Entidades e schema | 14,3% | Não iniciado | 29% |
+| [M01](milestones/M01-modelo-de-entidades-e-schema.md) Entidades e schema | 14,3% | Aceito | 29% |
 | [M02](milestones/M02-gerador-deterministico.md) Gerador determinístico | 14,3% | Não iniciado | 43% |
 | [M03](milestones/M03-sociedade-e-relacoes.md) Sociedade e relações | 14,3% | Não iniciado | 57% |
 | [M04](milestones/M04-mutations-e-reconstrucao.md) Mutations e reconstrução | 14,3% | Não iniciado | 71% |

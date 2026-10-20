@@ -10,11 +10,11 @@ CASE DEFINITION + CASE STATE → CURRENT CASE
 
 Determinada por `case_seed`, `generator_version`, entidades envolvidas, relações, localização, vítima, suspeitos, culpado, método, motivo, evidências. O caso é associado ao servidor, não ao jogador que o consultou.
 
-## Case state
+## Estado do caso e progresso individual
 
-Persistido conforme o progresso do jogador (status, vítima identificada, assassino identificado, motivo descoberto, arma encontrada, etc.).
+O caso tem estado comum aos jogadores do servidor (por exemplo, aberto, resolvido ou arquivado). A definição compartilhada guarda ids, seeds, versão, estado comum e timestamps; o restante reconstrói a partir do mundo.
 
-O registro compartilhado tende a ser compacto: ids, seeds, versão, status comum e timestamps. O progresso que pertence a cada jogador é persistido separadamente. O restante reconstrói a partir do mundo.
+Descobertas e deduções (vítima identificada, assassino identificado, motivo descoberto, arma encontrada) são progresso individual, persistido por jogador. Um jogador não altera o progresso dos demais ao investigar. Ver também o [modelo de entidades](entidades.md).
 
 A definição do caso e o backend mantêm a classificação interna das pistas e suas relações com os acontecimentos. Essa informação não é exposta como tal ao jogador: a apresentação deve misturar pistas com acontecimentos cotidianos e deixar sua relevância como parte da dedução. Ver [Regra 0002](../rules/0002-pistas-sem-sinalizacao.md).
 

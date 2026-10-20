@@ -4,19 +4,17 @@ Não tratar estes itens como decididos. Cada fechamento vira um ADR em `docs/dec
 
 ## Infra e dados
 
-- Banco definitivo (direção atual: relacional, tendência PostgreSQL).
-- Schema e índices concretos.
+- Estratégia operacional de migrations para aplicar/evoluir o [schema inicial](schema-inicial.sql).
 - Cache: o que cachear.
-- Materialização: quando a entidade deixa de ser só reconstruível e ganha registro próprio.
-- Modelo de relações: tabela genérica, tabelas por tipo, ou híbrido.
-- Particionamento do mundo expansível: como identificar regiões, conectá-las e manter geração consistente entre jogadores do mesmo servidor.
+- Materialização: a âncora é criada quando uma identidade precisa ser referenciada; definir limiares e gatilhos concretos com o gerador.
+- Particionamento do mundo expansível: o `region_id` canônico e a identidade estável estão definidos; falta definir geografia, vizinhança e limites de expansão.
 - Concorrência: como serializar ou resolver ações simultâneas sobre a mesma entidade, mutation ou caso.
 - Distribuição dos casos compartilhados: quantidade, disponibilidade, atribuição ou reserva para evitar disputa excessiva.
 - Atualização dos clientes conectados quando o mundo ou um caso compartilhado muda; transporte e frequência.
 
 ## Geração
 
-- Quais atributos do NPC são seed, persistidos, materializados no primeiro contato, ou mutáveis.
+- Refinar a lista provisória de atributos do NPC (seed, persistidos, materializados ou mutáveis) durante a implementação do gerador.
 - Limites e gatilhos de expansão sob demanda; quais entidades/regiões são geradas juntas para preservar coerência.
 - Algoritmos de famílias, casamentos, parentesco, amizades, empresas, cargos, vizinhança, histórico.
 - Geração de casos: tipos de crime, suspeitos, escolha do culpado, motivos, evidências, pistas falsas, solucionabilidade, contradições.

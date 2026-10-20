@@ -4,6 +4,8 @@
 
 A ordem exata ainda pode ser refinada. O mundo é gerado por regiões sob demanda; dentro de cada recorte, o princípio não muda: **estrutura coerente primeiro; casos depois**. A geração precisa ser determinística por servidor, região e versão.
 
+O modelo inicial de entidades, identidade das regiões e chaves estáveis está em [entidades.md](entidades.md). A derivação efetiva das chaves e subseeds será definida no M02.
+
 ```text
 WORLD SEED
     ↓

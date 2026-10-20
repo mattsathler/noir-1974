@@ -19,5 +19,6 @@ Status: `Proposta` | `Aceita` | `Supersedida` | `Rejeitada`.
 | [0005](0005-casos-como-consequencia.md) | Casos como consequência do mundo | Aceita |
 | [0006](0006-versionamento-do-gerador.md) | Versionamento do gerador | Aceita |
 | [0007](0007-monorepo.md) | Monorepo frontend + backend | Aceita |
+| [0008](0008-relacoes-tipadas.md) | Relações tipadas por domínio | Aceita |
 
 Quando uma decisão nova **substitui** outra, marcar a antiga como `Supersedida` e apontar o ADR sucessor.

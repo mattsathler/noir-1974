@@ -10,6 +10,8 @@ A arquitetura pode ser resumida nesta frase:
 | --- | --- |
 | [Princípios](principios.md) | Os dez princípios consolidados |
 | [Modelo híbrido](modelo-hibrido.md) | Seed, relações, mutations, o que persistir |
+| [Entidades](entidades.md) | Modelo do recorte inicial e origem dos dados |
+| [Schema inicial](schema-inicial.sql) | Tabelas e índices PostgreSQL de referência para M01 |
 | [Geração do mundo](geracao-do-mundo.md) | Camadas, grafo, entidades |
 | [Casos](casos.md) | Definição vs estado; crime como consequência |
 | [API conceitual](api.md) | REST, servidor autoritativo |

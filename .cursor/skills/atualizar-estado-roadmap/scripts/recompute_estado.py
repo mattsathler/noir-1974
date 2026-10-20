@@ -179,7 +179,7 @@ def render(milestones: list[dict], today: date) -> str:
     elif current:
         vigente_cell = display_name(current)
         deploy_cell = (
-            "Não. Não há servidor, cliente jogável nem mundo gerado."
+            "Não. Ainda não há mundo gerado nem recorte de investigação jogável."
             if last_n < 2
             else "Não. M06 ainda não foi aceito."
         )
