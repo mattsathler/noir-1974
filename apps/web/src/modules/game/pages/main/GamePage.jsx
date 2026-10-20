@@ -21,7 +21,7 @@ function formatServerDateTime(timestamp, timeZone) {
   };
 }
 
-export default function GamePage({ initialWorld = null }) {
+export default function GamePage({ initialWorld = null, onLogout }) {
   const [world, setWorld] = useState(initialWorld);
   const [serverTime, setServerTime] = useState(initialWorld ? new Date(initialWorld.serverTime) : null);
   const [error, setError] = useState("");
@@ -70,7 +70,8 @@ export default function GamePage({ initialWorld = null }) {
         )}
       </header>
       {error && <p className="pos-relative m-6 text-sm text-danger" role="alert">{error}</p>}
-      <footer className="game-location pos-absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-6">
+      <footer className="game-location pos-absolute inset-x-0 bottom-0 flex items-end justify-end gap-4 p-6">
+        <button className="border-0 bg-transparent text-accent underline" type="button" onClick={onLogout}>Log out</button>
       </footer>
     </main>
   );

@@ -5,7 +5,7 @@ import RegisterPage from "../modules/identity/pages/register/RegisterPage.jsx";
 import CharacterCreationPage from "../modules/identity/pages/character-creation/CharacterCreationPage.jsx";
 import ArchivePage from "../modules/identity/pages/archive/ArchivePage.jsx";
 import GamePage from "../modules/game/pages/main/GamePage.jsx";
-import { currentIdentity } from "../modules/identity/api.js";
+import { currentIdentity, logoutAccount } from "../modules/identity/api.js";
 
 const COMPLETION_TRANSITION_DELAY = 2500;
 
@@ -16,6 +16,7 @@ function pageFromPath(pathname) {
   if (pathname === "/archive") return "archive";
   if (pathname === "/arrival") return "arrival";
   if (pathname === "/game") return "game";
+  if (pathname === "/logout") return "logout";
   return "intro";
 }
 
@@ -75,6 +76,17 @@ export default function App() {
     setPage(nextPage);
   }, []);
 
+  useEffect(() => {
+    if (page !== "logout") return undefined;
+    let active = true;
+    setIdentity(null);
+    setWorld(null);
+    logoutAccount().catch(() => {}).finally(() => {
+      if (active) navigate("/login", "login");
+    });
+    return () => { active = false; };
+  }, [navigate, page]);
+
   const navigateAfterCompletion = useCallback((path, nextPage, nextData = null) => {
     window.clearTimeout(completionTimer.current);
     completionTimer.current = window.setTimeout(() => {
@@ -93,7 +105,7 @@ export default function App() {
     return (
       <LoginPage
         onRegister={() => navigate("/register", "register")}
-        onAuthenticated={(authenticatedIdentity) => navigateAfterCompletion(
+        onAuthenticated={(authenticatedIdentity) => navigate(
           authenticatedIdentity.character ? "/archive" : "/character/new",
           authenticatedIdentity.character ? "archive" : "character",
           authenticatedIdentity.character ? authenticatedIdentity : null,
@@ -107,6 +119,7 @@ export default function App() {
   if (page === "character") return <CharacterCreationPage onComplete={() => navigateAfterCompletion("/archive", "archive")} />;
   if (page === "archive") return <ArchivePage initialIdentity={identity} onLoaded={(loadedWorld) => navigateAfterCompletion("/arrival", "arrival", loadedWorld)} />;
   if (page === "arrival") return <LocationIntroductionPage world={world} onComplete={(loadedWorld) => navigateAfterCompletion("/game", "game", loadedWorld)} />;
-  if (page === "game") return <GamePage initialWorld={world} />;
+  if (page === "game") return <GamePage initialWorld={world} onLogout={() => navigate("/logout", "logout")} />;
+  if (page === "logout") return <main className="min-h-screen bg-deep" aria-label="Ending session" aria-busy="true" />;
   return <IntroductionPage onComplete={() => navigateAfterCompletion("/login", "login")} />;
 }

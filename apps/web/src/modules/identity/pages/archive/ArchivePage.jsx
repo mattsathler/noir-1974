@@ -39,8 +39,7 @@ export default function ArchivePage({ initialIdentity = null, onLoaded }) {
   }, [error, identity, loading, onLoaded]);
 
   return (
-    <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-atmosphere text-primary" aria-label="Loading game" aria-busy={loading}>
-      <div className="lyon-backdrop pos-absolute inset-0" aria-hidden="true" />
+    <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-deep text-primary" aria-label="Loading game" aria-busy={loading}>
       <div className="texture-scanlines pos-absolute inset-0 pointer-events-none opacity-10" aria-hidden="true" />
       <section className="world-loader pos-relative w-full max-w-sm p-6 surface shadow-panel" aria-labelledby="dossier-title">
         <p className="text-xs tracking-wide uppercase text-success m-0 mb-3">PRIVATE FILE · LYON</p>

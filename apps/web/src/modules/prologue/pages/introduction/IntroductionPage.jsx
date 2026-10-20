@@ -8,9 +8,7 @@ export default function IntroductionPage({ onComplete }) {
   const beginBoot = useCallback(() => setBooting(true), []);
 
   return (
-    <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-atmosphere text-primary" aria-label="Introduction">
-      <div className="lyon-backdrop pos-absolute inset-0" aria-hidden="true" />
-      <div className="texture-scanlines pos-absolute inset-0 pointer-events-none opacity-10" aria-hidden="true" />
+    <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-deep text-primary" aria-label="Introduction">
       <section className="pos-relative w-full max-w-2xl text-center" aria-live="polite" aria-atomic="true">
         <h1 className="text-display tracking-widest leading-tight shadow-glow m-0">
           <Typewriter text="Interpol HQ" speed={105} startDelay={1500} />
@@ -58,9 +56,7 @@ export function LocationIntroductionPage({ world: initialWorld = null, onComplet
     : "";
 
   return (
-    <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-atmosphere text-primary" aria-label="Introduction to current location" aria-live="polite" aria-atomic="true">
-      <div className="game-backdrop pos-absolute inset-0" data-location={world?.locationId ?? "lyon"} aria-hidden="true" />
-      <div className="game-vignette pos-absolute inset-0" aria-hidden="true" />
+    <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-deep text-primary" aria-label="Introduction to current location" aria-live="polite" aria-atomic="true">
       <section className="pos-relative w-full max-w-2xl text-center">
         <p className="text-xs tracking-widest uppercase text-success m-0">CURRENT LOCATION</p>
         <h1 className="text-display tracking-widest leading-tight shadow-glow m-0 mt-4">

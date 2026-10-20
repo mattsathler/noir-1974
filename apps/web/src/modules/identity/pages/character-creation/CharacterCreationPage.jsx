@@ -31,7 +31,7 @@ export default function CharacterCreationPage({ onComplete }) {
 
   return (
     <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-atmosphere text-primary">
-      <div className="register-backdrop pos-absolute inset-0" aria-hidden="true" />
+      <div className="pd-backdrop pos-absolute inset-0" aria-hidden="true" />
       <div className="pos-relative w-full max-w-sm">
         <img className="brand-mark" src="/images/logo.png" alt="NOIR 1974" />
         <section className="w-full p-6 surface shadow-panel" aria-labelledby="character-title">
@@ -62,7 +62,7 @@ export default function CharacterCreationPage({ onComplete }) {
               <span className="text-xs text-secondary" id="portrait-note">Choose 1–6. Final artwork will follow Noir's pixel art direction.</span>
             </fieldset>
             {error && <p className="text-sm text-danger m-0" role="alert">{error}</p>}
-            <button className="min-h-11 mt-4 border-0 bg-accent text-ink tracking-wide uppercase transition hover-bg-brass" type="submit" disabled={submitting}>{submitting ? "Filing…" : "Create detective"}</button>
+            <button className="min-h-11 mt-4 border-0 bg-transparent text-accent tracking-wide uppercase transition" type="submit" disabled={submitting}>{submitting ? "Filing…" : "Create detective"}</button>
           </form>
         </section>
       </div>
