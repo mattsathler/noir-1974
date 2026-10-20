@@ -1,0 +1,14 @@
+.border { border: 1px solid var(--noir-ink-600); }
+.border-strong { border: 1px solid var(--noir-ink-500); }
+.border-accent { border: 1px solid var(--noir-brass-500); }
+.border-top { border-top: 1px solid var(--noir-ink-600); }
+.border-bottom { border-bottom: 1px solid var(--noir-ink-600); }
+.border-0 { border: 0; }
+.radius-sm { border-radius: var(--noir-radius-sm); }
+.radius-md { border-radius: var(--noir-radius-md); }
+.radius-lg { border-radius: var(--noir-radius-lg); }
+.radius-full { border-radius: var(--noir-radius-full); }
+.surface { background: var(--noir-ink-800); }
+.shadow-raised { box-shadow: var(--noir-shadow-raised); }
+.shadow-panel { box-shadow: var(--noir-shadow-panel); }
+.shadow-glow { text-shadow: 0 0 36px #c3a25120; }

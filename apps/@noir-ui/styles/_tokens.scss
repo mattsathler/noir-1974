@@ -1,0 +1,50 @@
+:root {
+  color-scheme: dark;
+
+  --noir-ink-950: #11110e;
+  --noir-ink-900: #171713;
+  --noir-ink-850: #1c1c16;
+  --noir-ink-800: #24241d;
+  --noir-ink-700: #343328;
+  --noir-ink-600: #514c38;
+  --noir-ink-500: #716b4c;
+
+  --noir-paper-100: #f0ead7;
+  --noir-paper-200: #e7dfc5;
+  --noir-paper-300: #c8c1a9;
+  --noir-paper-400: #aaa48c;
+  --noir-paper-500: #8f886e;
+
+  --noir-brass-300: #d3b565;
+  --noir-brass-400: #c3a251;
+  --noir-brass-500: #bd9f4d;
+  --noir-brass-600: #766033;
+  --noir-success: #7caa72;
+  --noir-danger: #bc6250;
+  --noir-warning: #d1aa46;
+
+  --noir-font-mono: "IBM Plex Mono", "Courier New", monospace;
+  --noir-font-sans: "Pixelify Sans", Arial, sans-serif;
+
+  --noir-space-0: 0;
+  --noir-space-1: 0.25rem;
+  --noir-space-2: 0.5rem;
+  --noir-space-3: 0.75rem;
+  --noir-space-4: 1rem;
+  --noir-space-5: 1.25rem;
+  --noir-space-6: 1.5rem;
+  --noir-space-8: 2rem;
+  --noir-space-10: 2.5rem;
+  --noir-space-12: 3rem;
+  --noir-space-16: 4rem;
+
+  --noir-radius-sm: 0.125rem;
+  --noir-radius-md: 0.25rem;
+  --noir-radius-lg: 0.5rem;
+  --noir-radius-full: 9999px;
+
+  --noir-shadow-raised: 0 4px 0 var(--noir-brass-600);
+  --noir-shadow-panel: 0 0 0 4px var(--noir-ink-950), 0 0 0 8px var(--noir-ink-700), 12px 16px 0 var(--noir-ink-950);
+  --noir-focus-ring: 0 0 0 2px var(--noir-ink-900), 0 0 0 4px var(--noir-paper-100);
+  --noir-content-width: 72rem;
+}

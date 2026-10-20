@@ -1,0 +1,208 @@
+.texture-scanlines {
+  background-image: repeating-linear-gradient(0deg, transparent 0 3px, #050503 4px 5px);
+}
+
+.brand-mark {
+  display: block;
+  width: min(100%, 22rem);
+  margin: 0 auto 1.25rem;
+  object-fit: cover;
+  object-position: center;
+}
+
+.lyon-backdrop {
+  background-image:
+    linear-gradient(180deg, rgb(17 17 14 / 38%), rgb(17 17 14 / 46%)),
+    url("/images/cities/lyon.png");
+  background-position: center;
+  background-size: cover;
+}
+
+.register-backdrop {
+  background-image:
+    linear-gradient(180deg, rgb(17 17 14 / 38%), rgb(17 17 14 / 58%)),
+    url("/images/pd.webp");
+  background-position: center;
+  background-size: cover;
+}
+
+.game-screen { min-height: 100vh; }
+
+.game-backdrop {
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+  filter: saturate(0.78);
+  transform: scale(1.015);
+}
+
+.game-backdrop[data-location="lyon"] {
+  background-image: url("/images/cities/lyon.png");
+}
+
+.game-vignette {
+  background: linear-gradient(180deg, rgb(7 8 8 / 76%), transparent 36%, rgb(7 8 8 / 72%)),
+    linear-gradient(90deg, rgb(7 8 8 / 34%), transparent 58%);
+}
+
+.game-hud { z-index: 1; }
+
+.game-title { margin-top: var(--noir-space-2); }
+
+.server-clock {
+  min-width: 11.5rem;
+  border: 1px solid var(--noir-ink-500);
+  background: rgb(17 17 14 / 82%);
+}
+
+.server-clock__time { margin-top: var(--noir-space-1); }
+
+.server-clock__date { margin-top: var(--noir-space-1); }
+
+.game-location {
+  z-index: 1;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.game-location__name { margin-top: var(--noir-space-1); }
+
+.world-loader__agent { margin-block: var(--noir-space-6); }
+
+.world-loader__track {
+  height: 0.4rem;
+  margin-top: var(--noir-space-4);
+  overflow: hidden;
+  border: 1px solid var(--noir-ink-500);
+  background: var(--noir-ink-950);
+}
+
+.world-loader__track span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  background: var(--noir-brass-400);
+  animation: dossier-loading 900ms steps(5, end) infinite alternate;
+}
+
+.world-loader__track--ready span {
+  width: 0;
+  animation: dossier-loaded 1800ms steps(8, end) forwards;
+}
+
+@keyframes dossier-loading {
+  to { width: 70%; }
+}
+
+@keyframes dossier-loaded {
+  to { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-loader__track span,
+  .world-loader__track--ready span {
+    width: 100%;
+    animation: none;
+  }
+}
+
+@media (max-width: 36rem) {
+  .game-hud { flex-direction: column; }
+  .server-clock { align-self: stretch; text-align: left; }
+}
+
+.portrait-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.portrait-slot {
+  display: grid;
+  min-height: 5.25rem;
+  align-content: center;
+  justify-items: center;
+  gap: 0.25rem;
+  border: 2px solid var(--noir-ink-500);
+  color: var(--noir-paper-300);
+  background: var(--noir-ink-900);
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+
+.portrait-slot--selected {
+  border-color: var(--noir-brass-400);
+  color: var(--noir-paper-100);
+  box-shadow: inset 0 0 0 2px var(--noir-ink-900), 0 0 0 1px var(--noir-brass-400);
+}
+
+.portrait-slot__number {
+  color: var(--noir-brass-300);
+  font-size: 1.25rem;
+}
+
+.portrait-slot__caption {
+  font-size: 0.625rem;
+}
+
+.character-summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.character-summary .portrait-slot {
+  flex: 0 0 5.25rem;
+}
+
+.boot-console {
+  width: min(100%, 34rem);
+  margin: 1.5rem auto 0;
+  overflow: hidden;
+  border: 2px solid var(--noir-ink-500);
+  color: var(--noir-paper-200);
+  background: var(--noir-ink-950);
+  box-shadow: inset 2px 2px 0 var(--noir-ink-700), 4px 4px 0 var(--noir-ink-950);
+  font-family: var(--noir-font-mono);
+  font-size: clamp(0.625rem, 2vw, 0.75rem);
+  text-align: left;
+}
+
+.boot-console__titlebar {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  color: var(--noir-paper-100);
+  background: var(--noir-brass-600);
+  letter-spacing: 0.04em;
+}
+
+.boot-console__output {
+  min-height: 7.1rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.boot-console__line {
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.boot-console__prompt {
+  color: var(--noir-brass-300);
+}
+
+.boot-console__progress {
+  height: 0.35rem;
+  margin: 0 0.75rem 0.65rem;
+  border: 1px solid var(--noir-ink-600);
+  background: var(--noir-ink-900);
+}
+
+.boot-console__progress span {
+  display: block;
+  height: 100%;
+  background: var(--noir-brass-400);
+  transition: width 180ms steps(4, end);
+}

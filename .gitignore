@@ -42,3 +42,4 @@ venv/
 # Database
 *.sqlite
 *.db
+.neon

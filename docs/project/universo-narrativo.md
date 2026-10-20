@@ -15,7 +15,7 @@ Personagem misterioso que apresenta e ensina o jogo.
 
 ## Comissário da Interpol
 
-Autoridade institucional para a qual o jogador presta serviço.
+Autoridade institucional ligada ao passado profissional do jogador na Interpol.
 
 - Figura policial, menos misteriosa que Vesper.
 - Também **não participa** da resolução dos casos na versão inicial.
@@ -23,4 +23,6 @@ Autoridade institucional para a qual o jogador presta serviço.
 
 ## Jogador
 
-Tratado pela inicial do primeiro nome. Serve para introduzir o personagem no universo, não como sistema de RPG completo.
+Detetive particular que já trabalhou com a Interpol e ainda conserva acesso a determinados recursos e informações da instituição. Não é um agente ativo da Interpol. A natureza exata desse acesso ainda será definida.
+
+Na criação do personagem, o jogador escolhe um entre seis retratos em pixel art, produzidos de acordo com a [Regra 0001](../rules/0001-direcao-artistica.md) e a direção visual de Noir 1974. Os retratos ainda serão criados.

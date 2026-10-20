@@ -1,0 +1,19 @@
+.font-mono { font-family: var(--noir-font-mono); }
+.font-sans { font-family: var(--noir-font-sans); }
+.text-xs { font-size: 0.75rem; line-height: 1rem; }
+.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.text-base { font-size: 1rem; line-height: 1.5rem; }
+.text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+.text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+.text-2xl { font-size: 1.5rem; line-height: 2rem; }
+.text-display { font-size: clamp(1.25rem, 3vw, 2rem); line-height: 1.1; }
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.uppercase { text-transform: uppercase; }
+.tracking-wide { letter-spacing: 0.08em; }
+.tracking-widest { letter-spacing: 0.16em; }
+.leading-tight { line-height: 1.1; }
+.leading-normal { line-height: 1.5; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.break-words { overflow-wrap: anywhere; }

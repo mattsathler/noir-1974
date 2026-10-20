@@ -50,8 +50,15 @@ Reservado, elegante e implacável, Voss raramente aparece em público. Não prec
 - **Voss:** sobrenome curto, seco e memorável, adequado a manchetes, documentos corporativos e rumores.
 - **Presença:** soa como alguém que não precisa levantar a voz para conseguir o que quer.
 
+## O jogador
+
+O jogador interpreta um **detetive particular**. Ele já trabalhou com a Interpol; essa relação passada explica por que ainda tem acesso a determinados recursos e informações ligados à instituição. Ele não é um agente da Interpol, e sua atuação como investigador independente deve permanecer clara na narrativa.
+
+Ao criar o personagem, o jogador poderá escolher um entre **seis retratos** para representá-lo. Os retratos devem seguir a direção de pixel art estabelecida pela [Regra 0001](../rules/0001-direcao-artistica.md): mesma escala, paleta, contraste, contorno e nível de detalhe, com roupas e aparência coerentes com o século XVIII e o estilo punk antigo de Noir. Os seis retratos ainda serão criados.
+
 ## Elementos ainda não definidos
 
 - As regras físicas, limitações, segurança e operação detalhada do GATE.
 - A história pessoal de Adrian Voss e sua relação direta com a criação do dispositivo.
 - A estrutura interna da Meridian Global e a organização de sua rede mundial.
+- A natureza exata do antigo vínculo do detetive com a Interpol e quais recursos continuam acessíveis.

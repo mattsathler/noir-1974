@@ -1,0 +1,20 @@
+.text-primary { color: var(--noir-paper-200); }
+.text-secondary { color: var(--noir-paper-300); }
+.text-muted { color: var(--noir-paper-400); }
+.text-subtle { color: var(--noir-paper-500); }
+.text-accent { color: var(--noir-brass-400); }
+.text-success { color: var(--noir-success); }
+.text-danger { color: var(--noir-danger); }
+.text-warning { color: var(--noir-warning); }
+.text-ink { color: var(--noir-ink-950); }
+
+.bg-base { background-color: var(--noir-ink-900); }
+.bg-deep { background-color: var(--noir-ink-950); }
+.bg-panel { background-color: var(--noir-ink-800); }
+.bg-raised { background-color: var(--noir-ink-700); }
+.bg-accent { background-color: var(--noir-brass-400); }
+.bg-atmosphere {
+  background:
+    radial-gradient(ellipse at 50% 46%, #25251e 0%, var(--noir-ink-900) 56%),
+    var(--noir-ink-900);
+}
