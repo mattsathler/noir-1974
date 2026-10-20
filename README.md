@@ -1,8 +1,8 @@
 # Noir 1974
 
-Jogo de investigação sandbox, 100% web. O jogador resolve casos gerados proceduralmente em um mundo próprio — uma sociedade coerente, não uma sequência linear de diálogos.
+Jogo de investigação sandbox, 100% web. Jogadores resolvem casos gerados proceduralmente em um mundo compartilhado por servidor — uma sociedade coerente, não uma sequência linear de diálogos.
 
-Cada jogador tem a sua instância: seed, NPCs, empresas, relações, mutações e casos não são compartilhados.
+Cada servidor tem um mundo compartilhado por seus jogadores. O mundo se expande sob demanda; casos e estado social são comuns a todos no servidor.
 
 ## Monorepo
 
@@ -12,7 +12,7 @@ Cada jogador tem a sua instância: seed, NPCs, empresas, relações, mutações 
 | `apps/api` | Backend autoritativo (REST API + gerador + persistência) |
 | `docs/` | Projeto, arquitetura, decisões, regras de desenvolvimento e roadmap |
 
-O cliente **não** é fonte de verdade do estado. Toda reconstrução do mundo passa pelo servidor.
+O cliente **não** é fonte de verdade do estado. Toda reconstrução e alteração do mundo compartilhado passa pelo servidor.
 
 ## Arquitetura (resumo)
 

@@ -15,7 +15,7 @@ Primeiro recorte atravessável no browser: o jogador (ainda que em modo de desen
 - [ ] Cliente em `apps/web` consome a API e mostra pelo menos: um NPC com relações e um caso aberto.
 - [ ] Cliente não recebe `killer_id` (ou equivalente) antes de o estado do caso permitir.
 - [ ] Escrita de progresso (mínima) passa pelo servidor e sobrevive a refresh.
-- [ ] Isolation: requests de um mundo não leem dados de outro (mesmo que auth ainda seja stub de `world_id`).
+- [ ] Isolamento: requests de um servidor não leem dados de outro, e jogadores do mesmo servidor consultam o mesmo mundo (mesmo que auth ainda seja stub de `server_id`).
 
 ## Fora de escopo
 

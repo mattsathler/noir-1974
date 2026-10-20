@@ -2,7 +2,7 @@
 
 A arquitetura pode ser resumida nesta frase:
 
-> **A seed cria a realidade base; as relações dão estrutura à sociedade; as mutations registram o que mudou; e os casos utilizam essa sociedade para criar investigações coerentes.**
+> **A seed cria a realidade base compartilhada por servidor; o mundo se expande sob demanda, as relações dão estrutura à sociedade, as mutations registram o que mudou e os casos utilizam essa sociedade para criar investigações comuns aos jogadores do servidor.**
 
 ## Documentos
 

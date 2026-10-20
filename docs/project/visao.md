@@ -2,15 +2,17 @@
 
 **Noir 1974** é um jogo de investigação em formato sandbox, inspirado conceitualmente em *Shadows of Doubt*.
 
-O jogador resolve **casos gerados proceduralmente** dentro de um mundo próprio. O foco não é seguir uma história linear nem uma sequência fixa de diálogos: é investigar uma sociedade gerada e descobrir relações, evidências e acontecimentos.
+Jogadores conectados ao mesmo servidor compartilham um mundo persistente e resolvem **casos gerados proceduralmente** nessa sociedade comum. O mundo se expande sob demanda, sem exigir que toda a realidade seja gerada no início. O foco não é seguir uma história linear nem uma sequência fixa de diálogos: é investigar uma sociedade gerada e descobrir relações, evidências e acontecimentos.
 
 ## Diretrizes de produto
 
 - 100% web.
 - Frontend: HTML + CSS + JavaScript.
 - Comunicação: REST API.
-- Singleplayer: cada jogador tem a própria instância/mundo.
-- Mundos **não** são sincronizados entre jogadores.
+- Multiplayer: cada servidor tem um mundo compartilhado por seus jogadores.
+- Servidores mantêm mundos e estados independentes.
+- Casos são comuns a todos os jogadores do mesmo servidor; novas ocorrências podem surgir continuamente.
+- O mundo procedural se expande sob demanda, mantendo determinismo e identidade estável dentro do servidor.
 - NPCs e casos são procedurais, não um elenco escrito à mão.
 - O banco persiste o necessário para reconstruir o mundo e o estado do jogador.
 - Geração procedural é **determinística** para a mesma seed e a mesma versão do gerador.

@@ -15,6 +15,8 @@ Definir o que é uma entidade, quais relações existem no recorte inicial, e o 
 - [ ] Decisão escrita: tabela genérica vs tabelas por tipo (ADR).
 - [ ] Schema inicial (tabelas/campos) para `worlds`, relações do recorte, `mutations`, `cases`.
 - [ ] Campos obrigatórios em world e case: seed, `generator_version`.
+- [ ] Modelo explicita servidor como escopo compartilhado e separa estado de caso comum do progresso individual do jogador.
+- [ ] Modelo registra a expansão sob demanda e a identidade estável das regiões/entidades geradas.
 - [ ] Lista explícita: o que do NPC é seed vs persistido vs mutation (pode ser provisória, mas está escrita).
 
 ## Fora de escopo

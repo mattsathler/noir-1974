@@ -1,5 +1,7 @@
 # Universo narrativo
 
+Os fatos centrais do cenário, do GATE, da Meridian Global e de Adrian Voss estão registrados em [Lore — Noir 1974](lore.md). O universo deve obedecer à [Regra 0003 — Universo governado por grandes empresas](../rules/0003-universo-corporativo.md).
+
 ## Vesper
 
 Personagem misterioso que apresenta e ensina o jogo.

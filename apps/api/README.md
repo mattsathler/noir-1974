@@ -7,7 +7,7 @@ Responsável por:
 - REST API
 - gerador procedural (mundo e casos), versionado
 - persistência de relações, mutations e estado de caso
-- autorização por mundo do jogador
+- autorização e isolamento por servidor
 
 A linguagem e o banco definitivos ainda não estão fechados — ver [pontas soltas](../../docs/architecture/pontas-soltas.md). A direção favorece banco relacional para relações consultáveis.
 

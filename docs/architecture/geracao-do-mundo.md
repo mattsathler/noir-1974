@@ -2,7 +2,7 @@
 
 ## Ordem em camadas
 
-A ordem exata ainda pode ser refinada. O princípio não muda: **estrutura coerente primeiro; casos depois**.
+A ordem exata ainda pode ser refinada. O mundo é gerado por regiões sob demanda; dentro de cada recorte, o princípio não muda: **estrutura coerente primeiro; casos depois**. A geração precisa ser determinística por servidor, região e versão.
 
 ```text
 WORLD SEED

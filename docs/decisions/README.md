@@ -12,7 +12,7 @@ Status: `Proposta` | `Aceita` | `Supersedida` | `Rejeitada`.
 
 | ADR | Título | Status |
 | --- | --- | --- |
-| [0001](0001-singleplayer-por-mundo.md) | Singleplayer: um mundo por jogador | Aceita |
+| [0001](0001-mundo-compartilhado-por-servidor.md) | Mundo compartilhado por servidor, expansível sob demanda | Aceita |
 | [0002](0002-jogo-100-web.md) | Jogo 100% web, HTML/CSS/JS, REST | Aceita |
 | [0003](0003-modelo-hibrido.md) | Seed + relações + mutations | Aceita |
 | [0004](0004-backend-autoritativo.md) | Backend autoritativo | Aceita |

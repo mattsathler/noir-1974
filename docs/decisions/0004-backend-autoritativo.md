@@ -10,10 +10,10 @@ Se o cliente gerar o mundo ou aplicar mutations por conta própria, o estado dei
 
 ## Decisão
 
-O servidor é a autoridade. O cliente solicita entidades e progresso; o backend verifica o mundo do jogador, reconstrói, aplica mutations e devolve o estado permitido.
+O servidor é a autoridade. O cliente solicita entidades e progresso; o backend verifica o servidor do jogador, reconstrói, aplica mutations e devolve o estado permitido. Mudanças compartilhadas devem ser coordenadas no backend.
 
 ## Consequências
 
 - Gerador vive no backend (ou em biblioteca usada só pelo backend, até haver motivo real para compartilhar).
 - Mutations e progresso de caso só entram via API validada.
-- Segurança (auth, `world_id`, rate limit) é requisito, ainda não detalhado.
+- Segurança (auth, `server_id`, rate limit) é requisito, ainda não detalhado.

@@ -10,7 +10,7 @@ MUTATIONS         → alterações e eventos persistentes
 
 ## Seed do mundo
 
-Cada jogador tem uma world seed. Mesma seed + mesmo algoritmo/versão → mesmos elementos determinísticos.
+Cada servidor tem uma seed do mundo. Mesma seed + mesmo algoritmo/versão → mesmos elementos determinísticos, inclusive quando regiões são geradas em momentos diferentes.
 
 A seed do NPC pode definir nome, idade, aparência, personalidade, ocupação e outros atributos reconstruíveis. Não é obrigatório persistir esses atributos se o gerador os reproduzir.
 
@@ -26,9 +26,9 @@ Consultar a Empresa #13 não deve exigir gerar todos os NPCs do mundo. Consulta-
 
 ## Identificação
 
-IDs são estáveis **dentro** do mundo. Unicidade conceitual: `(world_id, entity_id)`.
+IDs são estáveis **dentro** do servidor. Unicidade conceitual: `(server_id, entity_id)`.
 
-NPC #1 no World A pode ser Thomas Miller; no World B, Eleanor Hayes.
+NPC #1 no Server A pode ser Thomas Miller; no Server B, Eleanor Hayes. Jogadores do mesmo servidor consultam a mesma entidade.
 
 Um caso referencia `victim = npc_104`, `killer = npc_23`, `location = company_13`. O resto reconstrói.
 
@@ -38,7 +38,7 @@ Um caso referencia `victim = npc_104`, `killer = npc_23`, `location = company_13
 WORLD SEED + BASE WORLD + MUTATIONS → CURRENT WORLD
 ```
 
-Exemplo: NPC morto só naquele mundo (`field: status`, `value: dead`).
+Exemplo: NPC morto só naquele servidor (`field: status`, `value: dead`). A alteração é visível a todos os jogadores desse servidor.
 
 ## O que gerar vs o que persistir
 
@@ -60,10 +60,10 @@ O jogo pergunta: quem é casado com NPC #23? quem trabalha na Empresa #13? quem 
 
 ## Escalabilidade (conceitual)
 
-Não se armazena a cidade inteira × todos os NPCs × todos os detalhes por jogador.
+Não se armazena a cidade inteira × todos os NPCs × todos os detalhes de cada servidor antecipadamente.
 
 ```text
-1 jogador → 1 world_seed + relações + mutations + casos
+1 servidor → 1 world_seed + regiões geradas sob demanda + relações + mutations + casos compartilhados
 ```
 
-Volume de casos (ex.: 2.000 jogadores × 20 casos abertos) é administrável num relacional bem indexado se os registros forem compactos. O risco maior é geração cara, consulta ruim e reconstrução repetida — não o armazenamento bruto.
+O risco principal é geração cara, consulta ruim, reconstrução repetida e contenção em estado compartilhado — não apenas o armazenamento bruto.

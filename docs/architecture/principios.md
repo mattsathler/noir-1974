@@ -1,6 +1,6 @@
 # Princípios arquiteturais
 
-1. **Singleplayer por mundo** — cada jogador tem uma realidade independente (`world_id` + seed).
+1. **Mundo compartilhado por servidor** — jogadores no mesmo servidor compartilham uma realidade (`server_id` + seed); servidores diferentes permanecem isolados.
 2. **Geração determinística** — a mesma seed + a mesma `generator_version` reconstrói os mesmos atributos.
 3. **Relações persistentes e consultáveis** — NPCs não são ilhas; casamento, emprego e parentesco precisam ser consultáveis sem gerar o mundo inteiro.
 4. **Mutations** — alterações persistentes são mudanças sobre o mundo base, não um dump completo.
@@ -9,10 +9,8 @@
 7. **Banco como fonte de verdade** do que precisa sobreviver entre sessões.
 8. **Backend autoritativo** — o cliente não decide o estado definitivo.
 9. **Mundo como grafo** — entidades (nós) e relações (arestas).
-10. **Casos como consequência do mundo** — crimes e pistas aproveitam a estrutura social já existente.
+10. **Casos como consequência do mundo** — crimes e pistas aproveitam a estrutura social já existente e são compartilhados pelos jogadores do servidor.
 
-## Por que não um mundo global compartilhado
+## Isolamento por servidor
 
-Mundo compartilhado traria concorrência, sincronização, conflitos entre jogadores, estado global, tempo real, locks, WebSockets e persistência muito mais complexa.
-
-No modelo atual, alterar o World A não afeta B, C ou D. Isso torna a reconstrução determinística previsível.
+O isolamento ocorre entre servidores, não entre jogadores. Alterações no servidor A não afetam B, mas todos os jogadores de A observam o estado comum. Concorrência, atualização de clientes e coordenação de geração são questões arquiteturais a resolver; o backend autoritativo continua sendo a autoridade do estado.
