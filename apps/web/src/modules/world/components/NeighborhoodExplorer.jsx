@@ -60,30 +60,41 @@ export default function NeighborhoodExplorer({ world, onTravel, onClose }) {
   const buildings = selectedDestination?.locations.filter(({ address }) => address.kind === "building") ?? [];
 
   return (
-    <div className="computer-modal" role="dialog" aria-modal="true" aria-label="GATE neighborhood transit" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
-      <section className="computer-frame computer-frame--modal" aria-label="Neighborhood map">
-        <div className="computer-bezel"><div className="computer-screen">
-          <header className="computer-menubar"><p className="computer-brand">MERIDIAN GLOBAL RELAY <span className="computer-brand__divider">/</span> GATE TRANSIT</p><button ref={closeRef} className="computer-modal__close gate-transit__close" type="button" onClick={onClose} aria-label="Close GATE transit">×</button></header>
-          <main className="computer-desktop__content p-6" aria-busy={busy}>
-            <p className="text-xs tracking-widest uppercase text-accent">Lyon district relay</p>
-            {error && <p role="alert" className="text-danger">{error}</p>}
-            <section aria-label="GATE neighborhood destinations">
-              <h3>GATE destinations</h3>
-              {loadingDestinations ? <p className="gate-transit__loading" role="status" aria-live="polite">Loading destinations</p> : <div className="gate-transit__districts">
-                {destinations.map((district) => <button className="gate-transit__district" key={district.id} type="button" aria-pressed={district.id === selectedDestination?.id} aria-current={district.id === currentDistrict?.id ? "location" : undefined} disabled={busy} onClick={() => setSelectedDestination(district)}><span>{district.name}</span><small>{district.id === currentDistrict?.id ? "CURRENT DISTRICT" : "SELECT DISTRICT"}</small></button>)}
-              </div>}
-            </section>
-            {selectedDestination && <section aria-label={`Buildings in ${selectedDestination.name}`}>
-              <h3>Buildings in {selectedDestination.name}</h3>
-              {buildings.length ? <div className="gate-transit__places">
-                {buildings.map(({ address }) => <div className="gate-transit__place" key={address.locationId}><span>{address.name}</span><small>{address.kind.toUpperCase()}</small></div>)}
-              </div> : <p>No buildings listed in this district.</p>}
-            </section>}
-            <footer className="gate-transit__footer">
-              <button className="gate-transit__travel" type="button" disabled={!selectedDestination || selectedDestination.name === world?.district || busy || loadingDestinations} onClick={() => travelTo(selectedDestination)}>{busy ? "Traveling…" : "Travel"}</button>
-            </footer>
+    <div className="modal-overlay gate-interface-overlay" role="dialog" aria-modal="true" aria-label="GATE neighborhood transit" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
+      <section className="gate-interface" aria-labelledby="gate-interface-title" aria-busy={busy}>
+        <header className="gate-interface__header">
+          <div className="gate-interface__identity">
+            <span className="gate-interface__mark" aria-hidden="true">G</span>
+            <div><p>GLOBAL ACCESS TRANSIT EXCHANGE</p><h2 id="gate-interface-title">Neighborhood transit</h2></div>
+          </div>
+          <div className="gate-interface__relay"><span /> LYON RELAY ONLINE</div>
+          <button ref={closeRef} className="gate-interface__close" type="button" onClick={onClose} aria-label="Close GATE transit">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19" /></svg>
+          </button>
+        </header>
+        <div className="gate-interface__body">
+          <aside className="gate-interface__destinations" aria-label="GATE neighborhood destinations">
+            <div className="gate-interface__section-heading"><span>01 / DESTINATIONS</span><small>{loadingDestinations ? "SYNCING" : `${destinations.length} DISTRICTS`}</small></div>
+            {loadingDestinations ? <p className="gate-interface__loading" role="status" aria-live="polite">Loading destinations<span>…</span></p> : <nav className="gate-interface__districts" aria-label="Available districts">
+              {destinations.map((district) => <button className="gate-interface__district" key={district.id} type="button" aria-pressed={district.id === selectedDestination?.id} aria-current={district.id === currentDistrict?.id ? "location" : undefined} disabled={busy} onClick={() => setSelectedDestination(district)}><span>{district.name}</span><small>{district.id === currentDistrict?.id ? "CURRENT DISTRICT" : "SELECT DISTRICT"}</small></button>)}
+            </nav>}
+          </aside>
+          <main className="gate-interface__preview">
+            <div className="gate-interface__section-heading"><span>02 / DISTRICT PREVIEW</span><small>{selectedDestination ? "ROUTE DATA" : "AWAITING INPUT"}</small></div>
+            {error && <p className="gate-interface__error" role="alert">{error}</p>}
+            {selectedDestination ? <section aria-label={`Buildings in ${selectedDestination.name}`}>
+              <h3 className="gate-interface__district-name">{selectedDestination.name}</h3>
+              <p className="gate-interface__caption">BUILDINGS IN THIS DISTRICT</p>
+              {buildings.length ? <div className="gate-interface__places">
+                {buildings.map(({ address }) => <div className="gate-interface__place" key={address.locationId}><span>{address.name}</span><small>{address.kind.toUpperCase()}</small></div>)}
+              </div> : <p className="gate-interface__empty">No buildings listed in this district.</p>}
+            </section> : <div className="gate-interface__empty-state"><span aria-hidden="true">⌖</span><p>Select a district to inspect its buildings and prepare a route.</p></div>}
           </main>
-        </div></div>
+        </div>
+        <footer className="gate-interface__footer">
+          <p><span>ROUTE</span>{selectedDestination ? `CENTRAL RELAY  →  ${selectedDestination.name.toUpperCase()}` : "SELECT A DESTINATION"}</p>
+          <button className="gate-interface__travel" type="button" disabled={!selectedDestination || selectedDestination.name === world?.district || busy || loadingDestinations} onClick={() => travelTo(selectedDestination)}>{busy ? "CONNECTING…" : "TRAVEL"}<span aria-hidden="true">→</span></button>
+        </footer>
       </section>
     </div>
   );

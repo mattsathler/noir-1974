@@ -8,6 +8,10 @@ A história se passa no **século XVIII**, mas o desenvolvimento tecnológico ac
 
 O mundo é extremamente anarcocapitalista e comandado por grandes empresas. O poder corporativo organiza e controla a vida social. Tecnologia, instituições, relações, conflitos e atividades cotidianas existem dentro dessa ordem.
 
+## Moeda
+
+**Credits** são a moeda universal de Noir, usada em todas as cidades e transações. Textos, registros e sistemas do jogo devem usar Credits, sem moedas locais ou históricas.
+
 ## O GATE e a Meridian Global
 
 A virada que impulsionou o capitalismo de Noir foi a criação do **GATE**, dispositivo de teletransporte desenvolvido pela **Meridian Global**. Um GATE permite transportar qualquer ser humano, em instantes, para qualquer lugar do mundo que também tenha um GATE. A viagem tem custo médio, mas acessível.

@@ -1,17 +1,12 @@
 .newspaper-overlay {
-  position: fixed;
   z-index: 24;
-  inset: 0;
-  display: grid;
-  overflow: hidden;
   padding: clamp(0.75rem, 3vw, 2.5rem);
-  background: rgb(8 8 6 / 76%);
 }
 
 .newspaper-sheet {
   position: relative;
   width: min(100%, 76rem);
-  min-height: min(84vh, 62rem);
+  height: min(84vh, 62rem);
   max-height: 100%;
   margin: auto;
   padding: clamp(1rem, 4vw, 3.5rem);
@@ -142,7 +137,7 @@
   border-right: 1px solid rgb(41 39 31 / 55%);
 }
 
-.newspaper-article:first-child { padding-left: 0; }
+.newspaper-article:nth-child(3n + 1) { padding-left: 0; }
 .newspaper-article:nth-child(3n) { border-right: 0; }
 .newspaper-article:nth-child(n + 4) { border-top: 1px solid rgb(41 39 31 / 55%); padding-top: 1rem; }
 .newspaper-article .newspaper-section-label { color: #625c4a; font-size: 0.55rem; }
@@ -196,18 +191,20 @@
 @media (max-width: 48rem) {
   .newspaper-masthead__meta { flex-wrap: wrap; justify-content: center; }
   .newspaper-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .newspaper-article:nth-child(3n + 1) { padding-left: 1rem; }
   .newspaper-article:nth-child(3n) { border-right: 1px solid rgb(41 39 31 / 55%); }
-  .newspaper-article:nth-child(2n) { border-right: 0; }
+  .newspaper-article:nth-child(2n) { padding-left: 1rem; border-right: 0; }
+  .newspaper-article:nth-child(2n + 1) { padding-left: 0; }
   .newspaper-article:nth-child(n + 3) { border-top: 1px solid rgb(41 39 31 / 55%); padding-top: 1rem; }
 }
 
 @media (max-width: 34rem) {
   .newspaper-overlay { padding: 0; }
-  .newspaper-sheet { min-height: 100svh; max-height: 100svh; padding: 1rem; }
+  .newspaper-sheet { height: 100svh; max-height: 100svh; padding: 1rem; }
   .newspaper-utility { font-size: 0.5rem; }
   .newspaper-columns { grid-template-columns: 1fr; }
   .newspaper-article,
-  .newspaper-article:first-child,
+  .newspaper-article:nth-child(3n + 1),
   .newspaper-article:nth-child(3n) { padding: 0.8rem 0 2rem; border-right: 0; }
   .newspaper-article + .newspaper-article { border-top: 1px solid rgb(41 39 31 / 55%); }
   .newspaper-article:nth-child(n + 3) { padding-top: 0.8rem; }

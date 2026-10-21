@@ -1,0 +1,4 @@
+interface:
+  display_name: "Noir Database Reset"
+  short_description: "Safely clear Noir game data and rotate its seed"
+  default_prompt: "Reset Noir's configured game database and prepare a fresh world seed."

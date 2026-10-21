@@ -86,9 +86,21 @@ export default function GamePage({ initialWorld = null, onLogout }) {
       <div className="game-backdrop pos-absolute inset-0" data-location="lyon" aria-hidden="true" />
       <div className="game-vignette pos-absolute inset-0" aria-hidden="true" />
       <header className="game-hud pos-relative flex items-start justify-between gap-4 p-6">
-        <div>
-          <p className="text-xs tracking-widest uppercase text-accent m-0">Current location</p>
-          <p className="text-lg tracking-wide uppercase m-0 game-location__name">{location}</p>
+        <div className="game-hud__location">
+          <button
+            className="gate-transit-launch"
+            type="button"
+            aria-label="Open GATE transit"
+            aria-haspopup="dialog"
+            aria-expanded={transitOpen}
+            onClick={() => { setComputerOpen(false); setNewspaperOpen(false); setTransitOpen(true); }}
+          >
+            <Earth className="computer-launch__icon" aria-hidden="true" />
+          </button>
+          <div className="game-hud__location-copy">
+            <p className="text-xs tracking-widest uppercase text-accent m-0">Current location</p>
+            <p className="text-lg tracking-wide uppercase m-0 game-location__name">{location}</p>
+          </div>
         </div>
         {display && (
           <aside className="computer-launch-group" aria-label="Local date and time">
@@ -101,16 +113,6 @@ export default function GamePage({ initialWorld = null, onLogout }) {
               onClick={() => { setNewspaperOpen(false); setComputerOpen(true); }}
             >
               <ComputerSharp className="computer-launch__icon" aria-hidden="true" />
-            </button>
-            <button
-              className="gate-transit-launch"
-              type="button"
-              aria-label="Open GATE transit"
-              aria-haspopup="dialog"
-              aria-expanded={transitOpen}
-              onClick={() => { setComputerOpen(false); setNewspaperOpen(false); setTransitOpen(true); }}
-            >
-              <Earth className="computer-launch__icon" aria-hidden="true" />
             </button>
             <button
               className="newspaper-launch"

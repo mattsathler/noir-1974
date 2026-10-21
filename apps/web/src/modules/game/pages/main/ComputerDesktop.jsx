@@ -121,7 +121,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
 
   return (
     <div
-      className="computer-modal"
+      className="modal-overlay computer-modal"
       ref={modalRef}
       role="dialog"
       aria-modal="true"

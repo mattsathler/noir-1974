@@ -51,11 +51,11 @@ export default function NewspaperWindow({ onClose }) {
   }, [onClose]);
 
   return (
-    <div className="newspaper-overlay" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Daily newspaper" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
+    <div className="modal-overlay newspaper-overlay" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Daily newspaper" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
       <article className="newspaper-sheet">
         <header className="newspaper-utility">
           <span>LYON CITY EDITION</span>
-          <span>PRICE: 20 FRANCS</span>
+          <span>PRICE: 20 CREDITS</span>
           <button ref={closeRef} type="button" className="newspaper-close" aria-label="Close newspaper" onClick={onClose}>×</button>
         </header>
 
