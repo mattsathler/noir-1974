@@ -93,18 +93,46 @@ var archetypeGenerators = []archetypeGenerator{
 
 // Generate creates a deterministic homicide definition from existing world facts.
 func Generate(base world.World, seed string, version int) (Definition, error) {
+	return GenerateExcluding(base, seed, version, nil)
+}
+
+// GenerateExcluding creates a case without reusing NPCs assigned to prior cases.
+func GenerateExcluding(base world.World, seed string, version int, excluded map[string]struct{}) (Definition, error) {
 	if strings.TrimSpace(seed) == "" {
 		return Definition{}, ErrInvalidCaseSeed
 	}
 	if version != GeneratorVersion {
 		return Definition{}, fmt.Errorf("%w: %d", ErrUnsupportedGenerator, version)
 	}
-	available := availableArchetypes(base)
+	candidateWorld := base
+	if len(excluded) > 0 {
+		candidateWorld.NPCs = make([]world.NPC, 0, len(base.NPCs))
+		for _, npc := range base.NPCs {
+			if _, used := excluded[npc.ID]; !used {
+				candidateWorld.NPCs = append(candidateWorld.NPCs, npc)
+			}
+		}
+		candidateWorld.EmploymentRelationships = make([]world.EmploymentRelationship, 0, len(base.EmploymentRelationships))
+		for _, relation := range base.EmploymentRelationships {
+			if _, used := excluded[relation.EmployeeNPCID]; !used {
+				candidateWorld.EmploymentRelationships = append(candidateWorld.EmploymentRelationships, relation)
+			}
+		}
+		candidateWorld.PersonalRelationships = make([]world.PersonalRelationship, 0, len(base.PersonalRelationships))
+		for _, relation := range base.PersonalRelationships {
+			_, usedA := excluded[relation.PersonANPCID]
+			_, usedB := excluded[relation.PersonBNPCID]
+			if !usedA && !usedB {
+				candidateWorld.PersonalRelationships = append(candidateWorld.PersonalRelationships, relation)
+			}
+		}
+	}
+	available := availableArchetypes(candidateWorld)
 	if len(available) == 0 {
 		return Definition{}, ErrNoValidCaseCandidates
 	}
 	archetype := available[caseIndex(seed+"/archetype", version, len(available))]
-	candidates := archetype.candidates(base)
+	candidates := archetype.candidates(candidateWorld)
 	selected := candidates[caseIndex(seed+"/"+archetype.id, version, len(candidates))]
 	caseID := makeCaseID(seed, version)
 	definition := Definition{

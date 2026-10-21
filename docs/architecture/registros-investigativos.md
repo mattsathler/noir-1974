@@ -17,3 +17,5 @@ Os mesmos rótulos, estilos e ordenação são usados para eventos comuns e vinc
 ## Contrato de consulta
 
 `GET /api/world/npcs/{npcID}/records?from=YYYY-MM-DD&to=YYYY-MM-DD&source=bank|gate` exige sessão autenticada, datas válidas em ordem crescente e intervalo máximo de sete dias de calendário inclusivos. O limite também é aplicado no gerador de registros. O filtro de fonte é opcional e aceita `bank` ou `gate`. A consulta está isolada pelo `NOIR_WORLD_SERVER_ID` da API; IDs e filtros do cliente não permitem trocar de servidor. NPC inexistente retorna 404.
+
+Enquanto a visita presencial a serviços não estiver disponível no fluxo de jogo, `source=bank` não exige que o jogador esteja no Meridian Bank. Sem filtro, os resultados incluem os dois serviços. A localização do jogador não participa desta consulta.

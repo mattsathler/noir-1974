@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -83,6 +84,23 @@ func main() {
 	if err := caseStore.Migrate(ctx); err != nil {
 		log.Fatalf("migrate cases schema: %v", err)
 	}
+	caseInterval := 30 * time.Minute
+	if configured := os.Getenv("NOIR_CASE_GENERATION_INTERVAL"); configured != "" {
+		caseInterval, err = time.ParseDuration(configured)
+		if err != nil || caseInterval < time.Minute {
+			log.Fatalf("NOIR_CASE_GENERATION_INTERVAL must be a duration of at least 1m")
+		}
+	}
+	maxOpenCases := 10
+	if configured := os.Getenv("NOIR_MAX_OPEN_CASES"); configured != "" {
+		maxOpenCases, err = strconv.Atoi(configured)
+		if err != nil || maxOpenCases < 1 {
+			log.Fatalf("NOIR_MAX_OPEN_CASES must be a positive integer")
+		}
+	}
+	if err := caseStore.EnsureGenerationSchedule(ctx, worldServerID, caseInterval); err != nil {
+		log.Fatalf("initialize recurring case schedule: %v", err)
+	}
 	generatedWorld, err := world.Generate(worldSeed, worldVersion)
 	if err != nil {
 		log.Fatalf("generate shared world: %v", err)
@@ -128,6 +146,8 @@ func main() {
 
 	serverCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	recurring := cases.NewRecurringGenerator(databaseURL, worldServerID, caseStore, worldStore, caseInterval, maxOpenCases)
+	go recurring.Run(serverCtx)
 
 	go func() {
 		<-serverCtx.Done()

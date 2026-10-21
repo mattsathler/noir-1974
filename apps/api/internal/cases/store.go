@@ -99,6 +99,57 @@ func NewPostgresStore(db caseDatabase) *PostgresStore {
 	return &PostgresStore{db: db}
 }
 
+func (store *PostgresStore) EnsureGenerationSchedule(ctx context.Context, serverID string, interval time.Duration) error {
+	_, err := store.db.Exec(ctx, `INSERT INTO case_generation_schedule(server_id,next_run_at) VALUES($1::uuid,now()+make_interval(secs=>$2::double precision)) ON CONFLICT(server_id) DO NOTHING`, serverID, interval.Seconds())
+	return err
+}
+
+func (store *PostgresStore) DueGeneration(ctx context.Context, serverID string) (int64, bool, error) {
+	var slot int64
+	var due bool
+	err := store.db.QueryRow(ctx, `SELECT next_slot,next_run_at<=now() FROM case_generation_schedule WHERE server_id=$1::uuid`, serverID).Scan(&slot, &due)
+	return slot, due, err
+}
+
+func (store *PostgresStore) CountOpenCases(ctx context.Context, serverID string) (int, error) {
+	var count int
+	err := store.db.QueryRow(ctx, `SELECT count(*) FROM case_states WHERE server_id=$1::uuid AND status='open'`, serverID).Scan(&count)
+	return count, err
+}
+
+func (store *PostgresStore) UsedNPCIDs(ctx context.Context, serverID, currentSeed string) (map[string]struct{}, error) {
+	rows, err := store.db.Query(ctx, `SELECT victim_entity_id FROM cases WHERE server_id=$1::uuid AND case_seed<>$2 UNION SELECT killer_entity_id FROM cases WHERE server_id=$1::uuid AND case_seed<>$2`, serverID, currentSeed)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	used := map[string]struct{}{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		used[id] = struct{}{}
+	}
+	return used, rows.Err()
+}
+
+func (store *PostgresStore) AdvanceGeneration(ctx context.Context, serverID string, slot int64, interval time.Duration) error {
+	result, err := store.db.Exec(ctx, `UPDATE case_generation_schedule SET next_slot=next_slot+1,next_run_at=GREATEST(next_run_at+make_interval(secs=>$3::double precision),now()+make_interval(secs=>$3::double precision)),updated_at=now() WHERE server_id=$1::uuid AND next_slot=$2`, serverID, slot, interval.Seconds())
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return errors.New("case generation slot changed")
+	}
+	return nil
+}
+
+func (store *PostgresStore) DeferGeneration(ctx context.Context, serverID string, slot int64, interval time.Duration) error {
+	_, err := store.db.Exec(ctx, `UPDATE case_generation_schedule SET next_run_at=now()+make_interval(secs=>$3::double precision),updated_at=now() WHERE server_id=$1::uuid AND next_slot=$2`, serverID, slot, interval.Seconds())
+	return err
+}
+
 func (store *PostgresStore) Migrate(ctx context.Context) error {
 	contents, err := caseSchema.ReadFile("schema.sql")
 	if err != nil {
@@ -270,12 +321,18 @@ func persistCaseEmails(ctx context.Context, tx pgx.Tx, serverID string, definiti
 
 // NPCRecords loads only the selected person's case-related entries within the
 // requested interval. It deliberately omits the internal relationship label.
-func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID string, from, through time.Time) ([]records.Record, error) {
-	rows, err := store.db.Query(ctx,
-		`SELECT record_data FROM case_activity_records
+func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID string, from, through time.Time, source string) ([]records.Record, error) {
+	query := `SELECT record_data FROM case_activity_records
 		 WHERE server_id = $1::uuid AND npc_entity_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-		 ORDER BY occurred_at, record_id`, serverID, npcID, from, through,
-	)
+		 ORDER BY occurred_at, record_id`
+	args := []any{serverID, npcID, from, through}
+	if source != "" {
+		query = `SELECT record_data FROM case_activity_records
+			 WHERE server_id = $1::uuid AND npc_entity_id = $2 AND source = $5 AND occurred_at >= $3 AND occurred_at <= $4
+			 ORDER BY occurred_at, record_id`
+		args = append(args, source)
+	}
+	rows, err := store.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

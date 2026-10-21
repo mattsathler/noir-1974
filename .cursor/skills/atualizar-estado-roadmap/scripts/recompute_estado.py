@@ -57,7 +57,7 @@ PRODUCT_BLURB = {
     ),
     9: (
         "O jogador já pode consultar registros e correspondências e se deslocar "
-        "entre cidades e pontos de serviço. Whiteboards pessoais e identidade visual modular estão em implementação."
+        "entre cidades e pontos de serviço. Whiteboards, identidade visual modular e geração recorrente de casos estão em implementação."
     ),
     10: (
         "O jogador já pode organizar elementos por caso e personalizar identidades visuais. "
@@ -84,7 +84,7 @@ TABLE_LABELS = {
     7: "Registros bancários e GATE",
     8: "Correio eletrônico",
     9: "Deslocamento e pontos de serviço",
-    10: "Whiteboards e identidade visual",
+    10: "Mundo compartilhado e investigação",
     11: "Busca e apreensão",
     12: "Acusação e julgamento",
 }

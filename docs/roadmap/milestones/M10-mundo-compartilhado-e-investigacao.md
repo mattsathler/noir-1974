@@ -1,4 +1,4 @@
-# M10 — Whiteboards e identidade visual de personagens
+# M10 — Mundo compartilhado e investigação do detetive
 
 **Ciclo:** 10  
 **Status:** Em andamento  
@@ -6,7 +6,7 @@
 
 ## Objetivo
 
-Dar ao jogador um espaço pessoal de investigação dentro do computador, onde possa reunir e organizar informações que encontrou em emails, registros bancários, logs do GATE e outras fontes. Cada jogador pode manter vários boards, organizar os registros e relacioná-los visualmente. O milestone também prevê uma identidade visual modular para NPCs e personagens de jogadores.
+Dar ao jogador um espaço pessoal de investigação dentro do computador, onde possa reunir e organizar informações que encontrou em emails, registros bancários, logs do GATE e outras fontes; oferecer identidade visual modular para NPCs e personagens de jogadores; e manter novas ocorrências surgindo automaticamente no mundo compartilhado enquanto a API estiver ativa.
 
 ## Critérios de aceite
 
@@ -33,6 +33,17 @@ Dar ao jogador um espaço pessoal de investigação dentro do computador, onde p
 - [ ] A seed e a versão de mundos existentes não são sobrescritas; a nova versão é usada para mundos novos, e a reconstrução de um mundo existente exige processo explícito.
 - [ ] Testes cobrem determinismo visual de NPCs, consistência entre jogadores, validação e persistência da aparência do personagem, além da reconstrução de versões antigas do gerador.
 
+### Geração recorrente de casos
+
+- [x] Um agendador no backend tenta gerar casos em intervalos configuráveis enquanto o serviço está ativo, sem depender de requisições dos jogadores.
+- [x] O agendador para junto com a API e recupera o cursor persistido após reinício; repetir uma criação usa o mesmo seed e a criação do caso é idempotente.
+- [x] Um advisory lock transacional por servidor coordena múltiplas instâncias da API para evitar disparos simultâneos.
+- [x] Cada caso criado é compartilhado por todos os jogadores do servidor, sem alterar o progresso privado deles.
+- [x] A cadência, o limite de casos abertos e o comportamento ao atingir o limite são configuráveis; se não houver candidatos, o mundo ganha novos NPCs antes da próxima seleção.
+- [x] A expansão populacional seleciona o bairro existente menos povoado, com desempate determinístico pelo identificador.
+- [ ] Gerar novos bairros sob demanda a partir do banco de palavras, além de expandir a população dos bairros existentes.
+- [ ] Testes cobrem disparo recorrente, concorrência entre instâncias, recuperação após reinício, limites e visibilidade compartilhada dos casos.
+
 ## Fora de escopo
 
-Veredito, pontuação de provas, prisão de NPC, animações corporais, roupas com atributos de jogo, editor livre de pixels, compartilhamento de aparências e mudanças visuais de NPC causadas por mutations.
+Veredito, pontuação de provas e prisão de NPC; animações corporais, roupas com atributos de jogo, editor livre de pixels, compartilhamento de aparências e mudanças visuais de NPC causadas por mutations; simulação temporal completa dos NPCs.

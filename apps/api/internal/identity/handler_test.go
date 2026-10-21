@@ -75,7 +75,7 @@ type fakeRecordReader struct {
 	to    time.Time
 }
 
-func (reader *fakeRecordReader) NPCRecords(_ context.Context, _, npcID string, from, to time.Time) ([]records.Record, error) {
+func (reader *fakeRecordReader) NPCRecords(_ context.Context, _, npcID string, from, to time.Time, _ string) ([]records.Record, error) {
 	reader.npcID, reader.from, reader.to = npcID, from, to
 	return reader.items, nil
 }
@@ -191,7 +191,7 @@ func TestNPCRecordsRequiresSessionAndReturnsSelectedIntervalWithoutClassificatio
 	}
 }
 
-func TestBankRecordsRequirePhysicalPresenceAndUnfilteredRequestsHideBankEntries(t *testing.T) {
+func TestBankRecordsAreAvailableBeforePhysicalVisitsAreEnabled(t *testing.T) {
 	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid"}
 	reader := &fakeRecordReader{items: []records.Record{
 		{ID: "bank:1", Source: "bank", Description: "A remittance was recorded."},
@@ -206,19 +206,13 @@ func TestBankRecordsRequirePhysicalPresenceAndUnfilteredRequestsHideBankEntries(
 		return recorder
 	}
 
-	denied := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12&source=bank")
-	if denied.Code != http.StatusForbidden || reader.npcID != "" {
-		t.Fatalf("bank query away from Meridian Bank: status=%d readerNPC=%q", denied.Code, reader.npcID)
+	bank := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12&source=bank")
+	if bank.Code != http.StatusOK || !strings.Contains(bank.Body.String(), "A remittance") {
+		t.Fatalf("bank query without a physical visit: status=%d body=%s", bank.Code, bank.Body.String())
 	}
 	mixed := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12")
-	if mixed.Code != http.StatusOK || strings.Contains(mixed.Body.String(), "bank:1") || strings.Contains(mixed.Body.String(), "A remittance") {
-		t.Fatalf("unfiltered records exposed bank entries away from the bank: status=%d body=%s", mixed.Code, mixed.Body.String())
-	}
-
-	repository.locationID = "service:lyon/meridian-bank"
-	allowed := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12&source=bank")
-	if allowed.Code != http.StatusOK || !strings.Contains(allowed.Body.String(), "A remittance") {
-		t.Fatalf("bank query at Meridian Bank: status=%d body=%s", allowed.Code, allowed.Body.String())
+	if mixed.Code != http.StatusOK || !strings.Contains(mixed.Body.String(), "bank:1") || !strings.Contains(mixed.Body.String(), "gate:1") {
+		t.Fatalf("unfiltered records should include both sources: status=%d body=%s", mixed.Code, mixed.Body.String())
 	}
 }
 

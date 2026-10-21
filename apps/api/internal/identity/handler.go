@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/mail"
 	"regexp"
@@ -60,7 +61,7 @@ type CaseAPIReader interface {
 }
 
 type RecordsAPIReader interface {
-	NPCRecords(context.Context, string, string, time.Time, time.Time) ([]records.Record, error)
+	NPCRecords(context.Context, string, string, time.Time, time.Time, string) ([]records.Record, error)
 }
 
 type EmailsAPIReader interface {
@@ -151,7 +152,7 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 	}
 	mux.HandleFunc("POST /api/characters", handler.createCharacter)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
 		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -181,20 +182,14 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "source must be bank or gate", http.StatusBadRequest)
 		return
 	}
-	locationID, err := h.store.playerLocation(r.Context(), current.ID)
-	if err != nil {
-		http.Error(w, "could not retrieve current location", http.StatusInternalServerError)
-		return
-	}
-	playerAtBank := h.playerAtService(r.Context(), locationID, "meridian-bank")
-	if source == "bank" && !playerAtBank {
-		http.Error(w, "visit Meridian Bank to consult financial records", http.StatusForbidden)
-		return
-	}
 	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
-	results, err := h.recordsReader.NPCRecords(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through)
+	results, err := h.recordsReader.NPCRecords(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through, source)
 	if errors.Is(err, world.ErrEntityNotFound) {
 		http.NotFound(w, r)
+		return
+	}
+	if errors.Is(err, records.ErrInvalidSource) {
+		http.Error(w, "source must be bank or gate", http.StatusBadRequest)
 		return
 	}
 	if errors.Is(err, records.ErrInvalidQuery) || errors.Is(err, records.ErrRangeTooLarge) {
@@ -202,6 +197,7 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		log.Printf("retrieve personal records for NPC %q: %v", r.PathValue("npcID"), err)
 		http.Error(w, "could not retrieve personal records", http.StatusInternalServerError)
 		return
 	}
@@ -209,14 +205,6 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		filtered := make([]records.Record, 0, len(results))
 		for _, result := range results {
 			if result.Source == source {
-				filtered = append(filtered, result)
-			}
-		}
-		results = filtered
-	} else if !playerAtBank {
-		filtered := make([]records.Record, 0, len(results))
-		for _, result := range results {
-			if result.Source != "bank" {
 				filtered = append(filtered, result)
 			}
 		}
@@ -240,6 +228,7 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.whiteboardReader != nil {
 		if err := h.whiteboardReader.RecordDiscoveredItems(r.Context(), h.worldServerID, current.ID, items); err != nil {
+			log.Printf("record discovered personal records for NPC %q: %v", r.PathValue("npcID"), err)
 			http.Error(w, "could not save retrieved records", http.StatusInternalServerError)
 			return
 		}
@@ -277,6 +266,7 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		log.Printf("retrieve correspondence for NPC %q: %v", r.PathValue("npcID"), err)
 		http.Error(w, "could not retrieve correspondence", http.StatusInternalServerError)
 		return
 	}
@@ -287,6 +277,7 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.whiteboardReader != nil {
 		if err := h.whiteboardReader.RecordDiscoveredItems(r.Context(), h.worldServerID, current.ID, items); err != nil {
+			log.Printf("record discovered correspondence for NPC %q: %v", r.PathValue("npcID"), err)
 			http.Error(w, "could not save retrieved correspondence", http.StatusInternalServerError)
 			return
 		}
@@ -818,25 +809,6 @@ func (h *Handler) visit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"locationId": input.LocationID, "districtId": currentDistrictID})
-}
-
-func (h *Handler) playerAtService(ctx context.Context, locationID, serviceSuffix string) bool {
-	reader, ok := h.worldReader.(transitReader)
-	if !ok {
-		return false
-	}
-	destinations, err := reader.TransitDistricts(ctx, h.worldServerID)
-	if err != nil {
-		return false
-	}
-	for _, destination := range destinations {
-		for _, place := range destination.Locations {
-			if place.Address.LocationID == locationID && strings.HasSuffix(locationID, "/"+serviceSuffix) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func districtForLocation(destinations []world.DistrictDestination, locationID string) string {

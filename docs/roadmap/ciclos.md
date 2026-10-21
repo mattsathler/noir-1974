@@ -32,11 +32,11 @@ M00 docs + monorepo
                 → M07 registros bancários + histórico do GATE
                   → M08 correio eletrônico
                     → M09 deslocamento + pontos de serviço
-                      → M10 whiteboards pessoais + identidade visual de personagens
+                      → M10 mundo compartilhado + investigação do detetive
                         → M11 busca e apreensão
-                          → M12 acusação + julgamento (fluxo criminal completo)
+                            → M12 acusação + julgamento (fluxo criminal completo)
 ```
 
-M06 é o primeiro recorte atravessável para playtest. A porcentagem geral acompanha o fluxo criminal completo até o aceite do M12, quando uma acusação válida pode levar à prisão do culpado. M10 entrega o whiteboard pessoal e a identidade visual modular antes da busca e apreensão do M11; M09 é pré-requisito da busca, cuja solicitação é feita presencialmente na Delegacia. M12 depende do M11, garantindo que whiteboard e busca estejam disponíveis para acusação.
+M06 é o primeiro recorte atravessável para playtest. A porcentagem geral acompanha o fluxo criminal completo até o aceite do M12, quando uma acusação válida pode levar à prisão do culpado. M10 reúne whiteboards, identidade visual modular e geração recorrente de casos compartilhados. A busca e apreensão do M11 requer presença na Delegacia; M12 depende do M11 para garantir que whiteboard e busca estejam disponíveis para acusação.
 
 Pular um ciclo só com ADR explicando por que o critério deixou de ser necessário.

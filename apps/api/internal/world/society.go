@@ -8,11 +8,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"noir-1974/apps/api/internal/world/names"
 )
 
 var ErrInvalidGenerationKey = errors.New("invalid generated entity key")
+
+var personNameOrderCache sync.Map
 
 type NPC struct {
 	ID            string `json:"id"`
@@ -133,7 +136,7 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 		return NPC{}, ErrUnsupportedGeneratorVersion
 	}
 	slot, err := strconv.Atoi(slotPart)
-	if err != nil || slot < 1 || slot > 8 {
+	if err != nil || slot < 1 {
 		return NPC{}, ErrInvalidGenerationKey
 	}
 
@@ -148,17 +151,72 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 	if districtIndex < 0 {
 		return NPC{}, ErrInvalidGenerationKey
 	}
-	nameIndex := districtIndex*8 + slot - 1
 	personNames, err := personNamesForVersion(version, countrySlug, citySlug)
 	if err != nil {
 		return NPC{}, err
 	}
-	names := shuffledCopy(personNames, newStream(seed, version, personNameScope(version, countrySlug, citySlug)))
+	nameIndex := districtIndex*8 + slot - 1
+	if slot > 8 {
+		nameIndex = len(districts)*8 + (slot-9)*len(districts) + districtIndex
+	}
+	cacheKey := fmt.Sprintf("%d:%s:%s", version, seed, personNameScope(version, countrySlug, citySlug))
+	namesValue, ok := personNameOrderCache.Load(cacheKey)
+	if !ok {
+		namesValue, _ = personNameOrderCache.LoadOrStore(cacheKey, shuffledCopy(personNames, newStream(seed, version, personNameScope(version, countrySlug, citySlug))))
+	}
+	names := namesValue.([]personName)
 	if nameIndex >= len(names) {
 		return NPC{}, ErrInvalidGenerationKey
 	}
 	regionID := "fr/lyon/district/" + districtSlug
 	return npcFor(seed, version, regionID, generationKey, names[nameIndex]), nil
+}
+
+// GenerateNPCPair creates two deterministic new residents in an existing
+// district and connects them to that district's company and to each other.
+func GenerateNPCPair(seed string, version int, districtID string, firstSlot int, company Company) ([]NPC, []EmploymentRelationship, PersonalRelationship, error) {
+	if firstSlot < 9 || company.ID == "" || company.RegionID != districtID {
+		return nil, nil, PersonalRelationship{}, ErrInvalidGenerationKey
+	}
+	districtSlug := strings.TrimPrefix(districtID, "fr/lyon/district/")
+	if districtSlug == districtID || strings.Contains(districtSlug, "/") {
+		return nil, nil, PersonalRelationship{}, ErrInvalidGenerationKey
+	}
+	npcs := make([]NPC, 0, 2)
+	employment := make([]EmploymentRelationship, 0, 2)
+	for slot := firstSlot; slot < firstSlot+2; slot++ {
+		key := npcGenerationKey(seed, version, districtSlug, slot)
+		npc, err := GenerateNPC(seed, version, key)
+		if err != nil {
+			return nil, nil, PersonalRelationship{}, err
+		}
+		npcs = append(npcs, npc)
+		employment = append(employment, EmploymentRelationship{
+			ID:                "employment:" + npc.ID + ":" + company.ID,
+			EmployeeNPCID:     npc.ID,
+			EmployerCompanyID: company.ID,
+			Role:              employmentRoles[(slot-1)%len(employmentRoles)],
+		})
+	}
+	personAID, personBID := npcs[0].ID, npcs[1].ID
+	if personBID < personAID {
+		personAID, personBID = personBID, personAID
+	}
+	marriage := PersonalRelationship{
+		ID:               "personal:marriage:" + personAID + ":" + personBID,
+		PersonANPCID:     personAID,
+		PersonBNPCID:     personBID,
+		RelationshipType: "marriage",
+	}
+	return npcs, employment, marriage, nil
+}
+
+func npcGenerationKey(seed string, version int, districtSlug string, slot int) string {
+	fingerprint := seedFingerprint(seed, version)
+	if version == GeneratorVersion2 {
+		return fmt.Sprintf("lyon/people/%s/district/%s/person/%02d", fingerprint, districtSlug, slot)
+	}
+	return fmt.Sprintf("fr/lyon/people/%s/district/%s/person/%02d", fingerprint, districtSlug, slot)
 }
 
 // GenerateCompany reconstructs one company directly from its stable generation key.

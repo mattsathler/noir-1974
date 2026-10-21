@@ -51,6 +51,14 @@ type NPCProfile struct {
 	PersonalRelationships []PersonalRelationshipView `json:"personalRelationships"`
 }
 
+// NPCRecordsProfile contains only the generated facts needed for a records query.
+type NPCRecordsProfile struct {
+	NPC              NPC
+	WorldSeed        string
+	GeneratorVersion int
+	Employer         string
+}
+
 type PersonSearchRecord struct {
 	NPC           PersonSearchNPC         `json:"npc"`
 	Workplaces    []PersonSearchWorkplace `json:"workplaces"`
@@ -280,9 +288,57 @@ func (store *PostgresStore) GetNPC(ctx context.Context, serverID, npcID string) 
 	return profile, nil
 }
 
+// GetNPCForRecords reconstructs the requested NPC and optional employer with a
+// single indexed query, without loading unrelated relationships or mutations.
+func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcID string, includeEmployer bool) (NPCRecordsProfile, error) {
+	var result NPCRecordsProfile
+	var generationKey, companyID, companyKey string
+	err := store.db.QueryRow(ctx,
+		`SELECT w.world_seed, w.generator_version, e.generation_key,
+		        COALESCE(employer.entity_id, ''), COALESCE(employer.generation_key, '')
+		 FROM world_entities e
+		 JOIN worlds w ON w.server_id = e.server_id
+		 LEFT JOIN LATERAL (
+		     SELECT c.entity_id, c.generation_key
+		     FROM employment_relationships r
+		     JOIN world_entities c
+		       ON c.server_id = r.server_id AND c.entity_id = r.employer_company_id
+		     WHERE r.server_id = e.server_id AND r.employee_npc_id = e.entity_id AND $3::boolean
+		     ORDER BY r.relationship_id
+		     LIMIT 1
+		 ) employer ON true
+		 WHERE e.server_id = $1::uuid AND e.entity_id = $2 AND e.entity_type = 'npc'`,
+		serverID, npcID, includeEmployer,
+	).Scan(&result.WorldSeed, &result.GeneratorVersion, &generationKey, &companyID, &companyKey)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return NPCRecordsProfile{}, ErrEntityNotFound
+	}
+	if err != nil {
+		return NPCRecordsProfile{}, err
+	}
+	result.NPC, err = GenerateNPC(result.WorldSeed, result.GeneratorVersion, generationKey)
+	if err != nil {
+		return NPCRecordsProfile{}, err
+	}
+	if result.NPC.ID != npcID {
+		return NPCRecordsProfile{}, ErrGeneratedConflict
+	}
+	if companyKey != "" {
+		company, err := GenerateCompany(result.WorldSeed, result.GeneratorVersion, companyKey)
+		if err != nil {
+			return NPCRecordsProfile{}, err
+		}
+		if company.ID != companyID {
+			return NPCRecordsProfile{}, ErrGeneratedConflict
+		}
+		result.Employer = company.Name
+	}
+	return result, nil
+}
+
 // SearchNPCs reconstructs matching NPCs and their persisted relations from the server's world seed.
 func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query string) ([]PersonSearchRecord, error) {
-	base, err := store.generatedWorld(ctx, serverID)
+	base, err := store.WorldForCases(ctx, serverID)
 	if err != nil {
 		return nil, err
 	}
@@ -521,6 +577,143 @@ func (store *PostgresStore) generatedWorld(ctx context.Context, serverID string)
 // GeneratedWorld reconstructs the small, deterministic world assigned to a server.
 func (store *PostgresStore) GeneratedWorld(ctx context.Context, serverID string) (World, error) {
 	return store.generatedWorld(ctx, serverID)
+}
+
+// WorldForCases reconstructs the seeded world plus NPCs added by on-demand growth.
+func (store *PostgresStore) WorldForCases(ctx context.Context, serverID string) (World, error) {
+	base, err := store.generatedWorld(ctx, serverID)
+	if err != nil {
+		return World{}, err
+	}
+	seed, version, err := store.worldSeedAndVersion(ctx, serverID)
+	if err != nil {
+		return World{}, err
+	}
+	known := make(map[string]bool, len(base.NPCs))
+	for _, npc := range base.NPCs {
+		known[npc.ID] = true
+	}
+	rows, err := store.db.Query(ctx, `SELECT entity_id, generation_key FROM world_entities WHERE server_id=$1::uuid AND entity_type='npc' ORDER BY entity_id`, serverID)
+	if err != nil {
+		return World{}, err
+	}
+	for rows.Next() {
+		var id, key string
+		if err := rows.Scan(&id, &key); err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		if known[id] {
+			continue
+		}
+		npc, err := GenerateNPC(seed, version, key)
+		if err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		if npc.ID != id {
+			rows.Close()
+			return World{}, ErrGeneratedConflict
+		}
+		if err := store.applyNPCStatus(ctx, serverID, id, &npc); err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		base.NPCs = append(base.NPCs, npc)
+		known[id] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return World{}, err
+	}
+	rows, err = store.db.Query(ctx, `SELECT relationship_id, employee_npc_id, employer_company_id, role FROM employment_relationships WHERE server_id=$1::uuid ORDER BY relationship_id`, serverID)
+	if err != nil {
+		return World{}, err
+	}
+	base.EmploymentRelationships = base.EmploymentRelationships[:0]
+	for rows.Next() {
+		var r EmploymentRelationship
+		if err := rows.Scan(&r.ID, &r.EmployeeNPCID, &r.EmployerCompanyID, &r.Role); err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		base.EmploymentRelationships = append(base.EmploymentRelationships, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return World{}, err
+	}
+	rows, err = store.db.Query(ctx, `SELECT relationship_id, person_a_npc_id, person_b_npc_id, relationship_type FROM personal_relationships WHERE server_id=$1::uuid ORDER BY relationship_id`, serverID)
+	if err != nil {
+		return World{}, err
+	}
+	base.PersonalRelationships = base.PersonalRelationships[:0]
+	for rows.Next() {
+		var r PersonalRelationship
+		if err := rows.Scan(&r.ID, &r.PersonANPCID, &r.PersonBNPCID, &r.RelationshipType); err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		base.PersonalRelationships = append(base.PersonalRelationships, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return World{}, err
+	}
+	sort.Slice(base.NPCs, func(i, j int) bool { return base.NPCs[i].ID < base.NPCs[j].ID })
+	return base, nil
+}
+
+// ExpandDistrictSociety adds a deterministic pair to an existing district under a row lock.
+func (store *PostgresStore) ExpandDistrictSociety(ctx context.Context, serverID, districtID string) error {
+	seed, version, err := store.worldSeedAndVersion(ctx, serverID)
+	if err != nil {
+		return err
+	}
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	var districtExists int
+	if err := tx.QueryRow(ctx, `SELECT 1 FROM world_regions WHERE server_id=$1::uuid AND region_id=$2 AND region_kind='district' FOR UPDATE`, serverID, districtID).Scan(&districtExists); err != nil {
+		return err
+	}
+	var companyKey string
+	if err := tx.QueryRow(ctx, `SELECT generation_key FROM world_entities WHERE server_id=$1::uuid AND region_id=$2 AND entity_type='company' ORDER BY entity_id LIMIT 1`, serverID, districtID).Scan(&companyKey); err != nil {
+		return err
+	}
+	company, err := GenerateCompany(seed, version, companyKey)
+	if err != nil {
+		return err
+	}
+	var slot int
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(split_part(generation_key,'/person/',2)::int),8) FROM world_entities WHERE server_id=$1::uuid AND region_id=$2 AND entity_type='npc'`, serverID, districtID).Scan(&slot); err != nil {
+		return err
+	}
+	npcs, jobs, marriage, err := GenerateNPCPair(seed, version, districtID, slot+1, company)
+	if err != nil {
+		return err
+	}
+	entityRows := make([][]any, 0, len(npcs))
+	for _, n := range npcs {
+		entityRows = append(entityRows, []any{serverID, n.ID, "npc", n.RegionID, n.GenerationKey, nil})
+	}
+	if _, err := execConsistentBatch(ctx, tx, `INSERT INTO world_entities(server_id,entity_id,entity_type,region_id,generation_key,location_kind) VALUES($1::uuid,$2,$3,$4,$5,$6) ON CONFLICT(server_id,entity_id) DO UPDATE SET generation_key=EXCLUDED.generation_key WHERE world_entities.entity_type=EXCLUDED.entity_type AND world_entities.region_id=EXCLUDED.region_id AND world_entities.generation_key=EXCLUDED.generation_key`, entityRows); err != nil {
+		return err
+	}
+	jobRows := make([][]any, 0, len(jobs))
+	for _, r := range jobs {
+		jobRows = append(jobRows, []any{serverID, r.ID, r.EmployeeNPCID, r.EmployerCompanyID, r.Role})
+	}
+	if _, err := execConsistentBatch(ctx, tx, `INSERT INTO employment_relationships(server_id,relationship_id,employee_npc_id,employer_company_id,role) VALUES($1::uuid,$2,$3,$4,$5) ON CONFLICT(server_id,relationship_id) DO UPDATE SET role=EXCLUDED.role WHERE employment_relationships.employee_npc_id=EXCLUDED.employee_npc_id AND employment_relationships.employer_company_id=EXCLUDED.employer_company_id AND employment_relationships.role=EXCLUDED.role`, jobRows); err != nil {
+		return err
+	}
+	if _, err := execConsistentBatch(ctx, tx, `INSERT INTO personal_relationships(server_id,relationship_id,person_a_npc_id,person_b_npc_id,relationship_type) VALUES($1::uuid,$2,$3,$4,$5) ON CONFLICT(server_id,relationship_id) DO UPDATE SET relationship_type=EXCLUDED.relationship_type WHERE personal_relationships.person_a_npc_id=EXCLUDED.person_a_npc_id AND personal_relationships.person_b_npc_id=EXCLUDED.person_b_npc_id AND personal_relationships.relationship_type=EXCLUDED.relationship_type`, [][]any{{serverID, marriage.ID, marriage.PersonANPCID, marriage.PersonBNPCID, marriage.RelationshipType}}); err != nil {
+		return err
+	}
+	_ = districtExists
+	return tx.Commit(ctx)
 }
 
 // WorldConfig returns the seed and generator version for one server's world.

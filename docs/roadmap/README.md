@@ -27,11 +27,11 @@ Ordem e regras de entrada/saída: [`ciclos.md`](ciclos.md).
 | 7 | Registros bancários e histórico do GATE | [M07](milestones/M07-registros-investigativos.md) |
 | 8 | Sistema de correio eletrônico | [M08](milestones/M08-sistema-de-emails.md) |
 | 9 | Deslocamento e pontos de serviço | [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) |
-| 10 | Whiteboards e identidade visual de personagens | [M10](milestones/M10-whiteboards-e-identidade-visual.md) |
+| 10 | Mundo compartilhado e investigação do detetive | [M10](milestones/M10-mundo-compartilhado-e-investigacao.md) |
 | 11 | Busca e apreensão | [M11](milestones/M11-busca-e-apreensao.md) |
 | 12 | Acusação e julgamento | [M12](milestones/M12-acusacao-e-julgamento.md) |
 
-Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável para playtest, não a conclusão do jogo. M07–M12 constroem o fluxo investigativo completo: registros, correio, deslocamento, organização de elementos, busca, acusação e prisão do culpado. O M10 também entrega identidades visuais modulares para NPCs e para o personagem do jogador. Tutorial (Vesper), auth completa, simulação temporal geral e outros sistemas continuam exigindo milestones próprios.
+Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável para playtest, não a conclusão do jogo. M07–M12 constroem o fluxo investigativo completo: registros, correio, deslocamento, organização de elementos, busca, acusação e prisão do culpado. O M10 também entrega identidades visuais modulares para personagens e geração recorrente de casos compartilhados. Tutorial (Vesper), auth completa, simulação temporal geral e outros sistemas continuam exigindo milestones próprios.
 
 ## Status
 

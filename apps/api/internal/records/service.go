@@ -8,13 +8,11 @@ import (
 )
 
 type worldReader interface {
-	WorldConfig(context.Context, string) (string, int, error)
-	GeneratedWorld(context.Context, string) (world.World, error)
-	GetNPC(context.Context, string, string) (world.NPCProfile, error)
+	GetNPCForRecords(context.Context, string, string, bool) (world.NPCRecordsProfile, error)
 }
 
 type caseReader interface {
-	NPCRecords(context.Context, string, string, time.Time, time.Time) ([]Record, error)
+	NPCRecords(context.Context, string, string, time.Time, time.Time, string) ([]Record, error)
 }
 
 type Service struct {
@@ -28,38 +26,38 @@ func NewService(worlds worldReader, cases caseReader) *Service {
 
 // NPCRecords creates routine activity on demand and mixes in the person's
 // case-related ledger entries before sorting the complete, unmarked timeline.
-func (service *Service) NPCRecords(ctx context.Context, serverID, npcID string, from, through time.Time) ([]Record, error) {
-	seed, version, err := service.worlds.WorldConfig(ctx, serverID)
+func (service *Service) NPCRecords(ctx context.Context, serverID, npcID string, from, through time.Time, source string) ([]Record, error) {
+	profile, err := service.worlds.GetNPCForRecords(ctx, serverID, npcID, source != "gate")
 	if err != nil {
 		return nil, err
 	}
-	profile, err := service.worlds.GetNPC(ctx, serverID, npcID)
-	if err != nil {
-		return nil, err
-	}
-	base, err := service.worlds.GeneratedWorld(ctx, serverID)
-	if err != nil {
-		return nil, err
-	}
-	regionName := "Lyon"
-	districts := make([]string, 0, len(base.Regions))
-	for _, region := range base.Regions {
-		if region.ID == profile.NPC.RegionID {
-			regionName = region.Name
+	regionName := ""
+	districts := []string(nil)
+	if source != "bank" {
+		base, err := world.Generate(profile.WorldSeed, profile.GeneratorVersion)
+		if err != nil {
+			return nil, err
 		}
-		if region.Kind == "district" {
-			districts = append(districts, region.Name)
+		regionName = "Lyon"
+		districts = make([]string, 0, len(base.Regions))
+		for _, region := range base.Regions {
+			if region.ID == profile.NPC.RegionID {
+				regionName = region.Name
+			}
+			if region.Kind == "district" {
+				districts = append(districts, region.Name)
+			}
 		}
 	}
-	employer := "Independent account"
-	if len(profile.Employment) > 0 {
-		employer = profile.Employment[0].Company.Name
+	employer := profile.Employer
+	if employer == "" {
+		employer = "Independent account"
 	}
-	ordinary, err := Generate(seed, version, npcID, Context{RegionName: "Lyon", HomeDistrict: regionName, Employer: employer, Districts: districts}, from, through)
+	ordinary, err := GenerateForSource(profile.WorldSeed, profile.GeneratorVersion, npcID, Context{RegionName: "Lyon", HomeDistrict: regionName, Employer: employer, Districts: districts}, from, through, source)
 	if err != nil {
 		return nil, err
 	}
-	linked, err := service.cases.NPCRecords(ctx, serverID, npcID, from, through)
+	linked, err := service.cases.NPCRecords(ctx, serverID, npcID, from, through, source)
 	if err != nil {
 		return nil, err
 	}

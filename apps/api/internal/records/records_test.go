@@ -12,22 +12,16 @@ import (
 
 type fixtureWorldReader struct {
 	base    world.World
-	profile world.NPCProfile
+	profile world.NPCRecordsProfile
 }
 
-func (reader fixtureWorldReader) WorldConfig(context.Context, string) (string, int, error) {
-	return "records-seed", world.GeneratorVersion2, nil
-}
-func (reader fixtureWorldReader) GeneratedWorld(context.Context, string) (world.World, error) {
-	return reader.base, nil
-}
-func (reader fixtureWorldReader) GetNPC(context.Context, string, string) (world.NPCProfile, error) {
+func (reader fixtureWorldReader) GetNPCForRecords(context.Context, string, string, bool) (world.NPCRecordsProfile, error) {
 	return reader.profile, nil
 }
 
 type fixtureCaseReader struct{ items []Record }
 
-func (reader fixtureCaseReader) NPCRecords(context.Context, string, string, time.Time, time.Time) ([]Record, error) {
+func (reader fixtureCaseReader) NPCRecords(context.Context, string, string, time.Time, time.Time, string) ([]Record, error) {
 	return reader.items, nil
 }
 
@@ -109,7 +103,7 @@ func TestServiceMergesAndSortsRoutineAndCaseEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	npc := base.NPCs[0]
-	profile := world.NPCProfile{NPC: npc, Employment: []world.EmploymentView{{Company: base.Companies[0]}}}
+	profile := world.NPCRecordsProfile{NPC: npc, WorldSeed: "records-seed", GeneratorVersion: world.GeneratorVersion2, Employer: base.Companies[0].Name}
 	linked := Record{
 		ID: "record:linked", NPCID: npc.ID, Source: "bank",
 		OccurredAt:  time.Date(1974, 11, 6, 12, 0, 0, 0, time.UTC),
@@ -118,7 +112,7 @@ func TestServiceMergesAndSortsRoutineAndCaseEvents(t *testing.T) {
 	service := NewService(fixtureWorldReader{base: base, profile: profile}, fixtureCaseReader{items: []Record{linked}})
 	from := time.Date(1974, 11, 6, 0, 0, 0, 0, time.UTC)
 	through := time.Date(1974, 11, 12, 23, 59, 0, 0, time.UTC)
-	result, err := service.NPCRecords(context.Background(), "server", npc.ID, from, through)
+	result, err := service.NPCRecords(context.Background(), "server", npc.ID, from, through, "")
 	if err != nil {
 		t.Fatalf("NPCRecords() error = %v", err)
 	}

@@ -17,6 +17,7 @@ const MaxRangeDays = 7
 var (
 	ErrInvalidQuery       = errors.New("records query requires an NPC and a valid date range")
 	ErrUnsupportedVersion = errors.New("unsupported records generator version")
+	ErrInvalidSource      = errors.New("records source must be bank or gate")
 	ErrRangeTooLarge      = errors.New("records query cannot exceed 7 calendar days")
 )
 
@@ -69,8 +70,17 @@ var gateActivities = []string{
 // Generate returns routine records for one NPC and one inclusive interval.
 // It never enumerates other residents or materializes a city's activity.
 func Generate(seed string, worldVersion int, npcID string, context Context, from, through time.Time) ([]Record, error) {
+	return GenerateForSource(seed, worldVersion, npcID, context, from, through, "")
+}
+
+// GenerateForSource creates only the requested service's routine activity when
+// source is set. Empty source retains the combined timeline behavior.
+func GenerateForSource(seed string, worldVersion int, npcID string, context Context, from, through time.Time, source string) ([]Record, error) {
 	if seed == "" || npcID == "" || from.IsZero() || through.IsZero() || through.Before(from) {
 		return nil, ErrInvalidQuery
+	}
+	if source != "" && source != "bank" && source != "gate" {
+		return nil, ErrInvalidSource
 	}
 	if worldVersion <= 0 {
 		return nil, ErrUnsupportedVersion
@@ -97,6 +107,9 @@ func Generate(seed string, worldVersion int, npcID string, context Context, from
 	result := make([]Record, 0)
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
 		for slot := 0; slot < 2; slot++ {
+			if source == "bank" && slot != 0 || source == "gate" && slot != 1 {
+				continue
+			}
 			rng := newStream(seed, worldVersion, npcID, date, slot)
 			// Each source has a quiet day, so an interval contains ordinary gaps
 			// as well as entries without every NPC appearing constantly online.

@@ -12,12 +12,12 @@ Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadma
 | Campo | Valor |
 | --- | --- |
 | Data de referência | 2026-10-21 |
-| Milestone vigente | M10 — Whiteboards e identidade visual |
+| Milestone vigente | M10 — Mundo compartilhado e investigação |
 | Último aceito | M09 — Deslocamento e pontos de serviço |
 | Primeiro playtest | M06 aceito; recorte mínimo pronto para playtest interno. |
 | Fluxo do crime até a prisão | **77%** (10 de 13 milestones) |
 
-O jogador já pode consultar registros e correspondências e se deslocar entre cidades e pontos de serviço. Whiteboards pessoais e identidade visual modular estão em implementação.
+O jogador já pode consultar registros e correspondências e se deslocar entre cidades e pontos de serviço. Whiteboards, identidade visual modular e geração recorrente de casos estão em implementação.
 
 ## Barra do fluxo criminal completo
 
@@ -54,7 +54,7 @@ Cada milestone do fluxo pesa **1/13 ≈ 7,7%**. Só entra na conta com status **
 | [M07](milestones/M07-registros-investigativos.md) Registros bancários e GATE | 7,7% | Aceito | 62% |
 | [M08](milestones/M08-sistema-de-emails.md) Correio eletrônico | 7,7% | Aceito | 69% |
 | [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,7% | Aceito | 77% |
-| [M10](milestones/M10-whiteboards-e-identidade-visual.md) Whiteboards e identidade visual | 7,7% | Em curso | 85% |
+| [M10](milestones/M10-mundo-compartilhado-e-investigacao.md) Mundo compartilhado e investigação | 7,7% | Em curso | 85% |
 | [M11](milestones/M11-busca-e-apreensao.md) Busca e apreensão | 7,7% | Não iniciado | 92% |
 | [M12](milestones/M12-acusacao-e-julgamento.md) Acusação e julgamento | 7,7% | Não iniciado | **100%** |
 

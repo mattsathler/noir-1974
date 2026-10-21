@@ -88,6 +88,8 @@ ALTER TABLE case_activity_records ADD CONSTRAINT case_activity_records_server_id
     REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS case_activity_records_by_npc_date_idx
     ON case_activity_records(server_id, npc_entity_id, occurred_at, record_id);
+CREATE INDEX IF NOT EXISTS case_activity_records_by_npc_source_date_idx
+    ON case_activity_records(server_id, npc_entity_id, source, occurred_at, record_id);
 
 CREATE TABLE IF NOT EXISTS case_mail_messages (
     server_id uuid NOT NULL,
@@ -183,4 +185,10 @@ CREATE TABLE IF NOT EXISTS player_whiteboard_connections (
     FOREIGN KEY (server_id, account_id, whiteboard_id, to_item_id)
         REFERENCES player_whiteboard_pins(server_id, account_id, whiteboard_id, item_id) ON DELETE CASCADE,
     CHECK (from_item_id < to_item_id)
+);
+CREATE TABLE IF NOT EXISTS case_generation_schedule (
+    server_id uuid PRIMARY KEY REFERENCES worlds(server_id) ON DELETE CASCADE,
+    next_slot bigint NOT NULL DEFAULT 1,
+    next_run_at timestamptz NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
 );

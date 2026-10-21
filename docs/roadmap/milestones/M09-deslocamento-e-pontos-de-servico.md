@@ -25,7 +25,7 @@ Esses pontos existem em toda cidade e não são bairros procedurais. Sua identid
 - [x] O jogador consegue viajar entre os bairros disponíveis pela rede GATE, com validação autoritativa no backend.
 - [x] O jogador consegue abrir fichas e entrar nas construções do bairro atual; nomes de construções de outros bairros só aparecem após viajar pela GATE.
 - [x] O cliente informa a localização atual, bairros de destino e construções disponíveis no bairro.
-- [x] Consultas bancárias exigem presença no ponto Meridian Bank correspondente; o backend recusa consultas feitas de outro local.
+- [x] Consultas bancárias permanecem disponíveis sem visita presencial até o fluxo de visita a serviços estar disponível ao jogador; a exigência de presença pode ser ativada quando esse fluxo for integrado ao gameplay.
 - [x] A Delegacia é um ponto fixo visitável e sua presença é registrada com a localização exata; o protocolo e a validação do pedido de busca são implementados no M11.
 - [x] Dois jogadores do mesmo servidor veem os mesmos pontos fixos, embora possam estar em bairros diferentes.
 - [x] Testes cobrem identidade dos pontos fixos, persistência de localização, viagem, visita, escopo de construções por bairro e bloqueio de serviços fora do local exigido.

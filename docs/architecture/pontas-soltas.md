@@ -9,6 +9,7 @@ Não tratar estes itens como decididos. Cada fechamento vira um ADR em `docs/dec
 - Materialização: a âncora é criada quando uma identidade precisa ser referenciada; definir limiares e gatilhos concretos com o gerador.
 - Definir a seleção dos 50 países e o catálogo fixo de capitais e principais cidades; especificar o banco de palavras e as regras de composição dos nomes de bairros.
 - Definir critérios de distribuição de detetives e ocorrências entre bairros lógicos, gatilhos de criação sob demanda e limites operacionais, preservando a identidade estável por servidor.
+- Definir a cadência padrão da geração contínua de casos, o limite de casos abertos por servidor e o comportamento do agendador quando a API reinicia ou opera em múltiplas instâncias; a implementação está prevista no [M10](../roadmap/milestones/M10-mundo-compartilhado-e-investigacao.md).
 - Concorrência: como serializar ou resolver ações simultâneas sobre a mesma entidade, mutation ou caso.
 - Distribuição dos casos compartilhados: quantidade, disponibilidade, atribuição ou reserva para evitar disputa excessiva.
 - Atualização dos clientes conectados quando o mundo ou um caso compartilhado muda; transporte e frequência.
