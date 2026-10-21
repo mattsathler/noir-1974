@@ -13,6 +13,7 @@ O módulo `internal/identity` mantém contas de jogador, sessões e personagens.
 - `POST /api/auth/logout` encerra a sessão.
 - `GET /api/me` retorna a conta e o personagem da sessão.
 - `GET /api/world` retorna a localização atual e o horário do servidor para a sessão autenticada. O horário é UTC em ISO 8601; o cliente o exibe no fuso local do mundo.
+- `GET /api/world/transit` lista destinos GATE e pontos fixos de serviço. `POST /api/world/travel` valida e persiste a chegada a um bairro; `POST /api/world/visit` registra a visita a um edifício somente no bairro atual. As respostas de mundo incluem a localização e o bairro atuais.
 - `POST /api/characters` cria o personagem, uma única vez por conta.
 - `GET /api/health` verifica a API e a conexão com o banco.
 
@@ -28,7 +29,7 @@ O schema inicial de identidade é aplicado de forma idempotente quando a API ini
 
 `internal/cases` gera homicídios determinísticos por arquétipos (conflito de trabalho, ciúmes e extorsão financeira) a partir de relações das versões 2 e 3 do mundo. O gerador de casos está na versão 3; o gerador de registros possui versão própria. Casos de extorsão vinculam uma remessa financeira da vítima e uma passagem GATE do culpado à definição interna do caso. As rotas autenticadas `GET /api/cases`, `GET /api/cases/{caseID}` e `POST /api/cases/{caseID}/progress` continuam omitindo o culpado e classificações internas.
 
-`GET /api/world/npcs/{npcID}/records?from=YYYY-MM-DD&to=YYYY-MM-DD` consulta uma janela inclusiva de até 366 dias. O serviço calcula atividade cotidiana apenas para aquele NPC e intervalo e mistura os registros ligados a casos antes de ordenar tudo por horário e ID. A API não sinaliza quais eventos se relacionam a um crime. Consulte [`docs/architecture/registros-investigativos.md`](../../docs/architecture/registros-investigativos.md) e [`docs/architecture/api.md`](../../docs/architecture/api.md).
+`GET /api/world/npcs/{npcID}/records?from=YYYY-MM-DD&to=YYYY-MM-DD` consulta uma janela inclusiva de até sete dias. Consultas `source=bank` exigem presença no Meridian Bank da cidade; fora dele, a API as recusa e também omite registros bancários de consultas sem filtro. O serviço calcula atividade cotidiana apenas para aquele NPC e intervalo e mistura os registros ligados a casos antes de ordenar tudo por horário e ID. A API não sinaliza quais eventos se relacionam a um crime. Consulte [`docs/architecture/registros-investigativos.md`](../../docs/architecture/registros-investigativos.md) e [`docs/architecture/api.md`](../../docs/architecture/api.md).
 
 ## Diretório do mundo
 

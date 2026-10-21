@@ -12,12 +12,12 @@ Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadma
 | Campo | Valor |
 | --- | --- |
 | Data de referência | 2026-10-21 |
-| Milestone vigente | M09 — Deslocamento e pontos de serviço |
-| Último aceito | M08 — Correio eletrônico |
+| Milestone vigente | M10 — Whiteboards pessoais |
+| Último aceito | M09 — Deslocamento e pontos de serviço |
 | Primeiro playtest | M06 aceito; recorte mínimo pronto para playtest interno. |
-| Fluxo do crime até a prisão | **69%** (9 de 13 milestones) |
+| Fluxo do crime até a prisão | **77%** (10 de 13 milestones) |
 
-Registros financeiros, históricos do GATE e correspondências procedurais estão aceitos. Busca e apreensão ainda precisa conectar objetos do mundo aos casos.
+O jogador já pode consultar registros e correspondências e se deslocar entre cidades e pontos de serviço. Busca e apreensão ainda precisa conectar objetos aos casos.
 
 ## Barra do fluxo criminal completo
 
@@ -33,11 +33,11 @@ M05 ████████████████████  aceito
 M06 ████████████████████  aceito   ← primeiro recorte de playtest
 M07 ████████████████████  aceito
 M08 ████████████████████  aceito
-M09 ░░░░░░░░░░░░░░░░░░░░  em curso
+M09 ████████████████████  aceito
 M10 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M11 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M12 ░░░░░░░░░░░░░░░░░░░░  não iniciado   ← fluxo completo até a prisão
-     | 69%
+     | 77%
 ```
 
 Cada milestone do fluxo pesa **1/13 ≈ 7,7%**. Só entra na conta com status **Aceito**. “Em curso” não soma porcentagem; a porcentagem mede ciclos aceitos do percurso completo.
@@ -53,9 +53,9 @@ Cada milestone do fluxo pesa **1/13 ≈ 7,7%**. Só entra na conta com status **
 | [M06](milestones/M06-api-e-cliente.md) API e cliente web | 7,7% | Aceito | 54% |
 | [M07](milestones/M07-registros-investigativos.md) Registros bancários e GATE | 7,7% | Aceito | 62% |
 | [M08](milestones/M08-sistema-de-emails.md) Correio eletrônico | 7,7% | Aceito | 69% |
-| [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,7% | Em curso | 77% |
-| [M10](milestones/M10-busca-e-apreensao.md) Busca e apreensão | 7,7% | Não iniciado | 85% |
-| [M11](milestones/M11-whiteboards-pessoais.md) Whiteboards pessoais | 7,7% | Não iniciado | 92% |
+| [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,7% | Aceito | 77% |
+| [M10](milestones/M10-whiteboards-pessoais.md) Whiteboards pessoais | 7,7% | Não iniciado | 85% |
+| [M11](milestones/M11-busca-e-apreensao.md) Busca e apreensão | 7,7% | Não iniciado | 92% |
 | [M12](milestones/M12-acusacao-e-julgamento.md) Acusação e julgamento | 7,7% | Não iniciado | **100%** |
 
 Fórmula: `milestones_aceitos_M00_a_M12 / 13`, arredondado para inteiro. O primeiro playtest continua identificado pelo aceite do M06, em campo separado.

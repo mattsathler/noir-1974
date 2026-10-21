@@ -1,12 +1,12 @@
 # M09 — Deslocamento e pontos de serviço
 
 **Ciclo:** 9  
-**Status:** Em curso
+**Status:** Aceito
 **Depende de:** M08 aceito
 
 ## Objetivo
 
-Permitir que o detetive use a rede GATE para viajar entre bairros da cidade e visitar locais gerados em cada bairro. A posição atual é individual e persistente por jogador; bairros e locais são compartilhados e determinísticos para todos no servidor. Pontos de serviço fixos e restrições de serviços presenciais completam este milestone.
+Permitir que o detetive use a rede GATE para viajar entre bairros da cidade e visitar locais gerados em cada bairro. A localização exata é individual e persistente por jogador; bairros, edifícios e pontos de serviço são compartilhados e determinísticos para todos no servidor. Abrir a ficha de um edifício mantém o bairro atual; entrar nele registra o ponto visitado.
 
 ## Pontos fixos de cada cidade
 
@@ -21,15 +21,15 @@ Esses pontos existem em toda cidade e não são bairros procedurais. Sua identid
 ## Critérios de aceite
 
 - [x] Cada cidade possui um bairro Central com Banco, Delegacia e Central da GATE estáveis e compartilhados no servidor.
-- [x] O jogador tem uma localização atual persistente, atualizada ao viajar entre bairros; abrir a ficha de uma construção não muda o bairro.
+- [x] O jogador tem uma localização atual persistente, atualizada ao viajar entre bairros e ao entrar em um edifício; a visita preserva o bairro atual.
 - [x] O jogador consegue viajar entre os bairros disponíveis pela rede GATE, com validação autoritativa no backend.
-- [x] O jogador consegue abrir a ficha das construções do bairro atual; construções de outros bairros só aparecem após viajar pela GATE.
+- [x] O jogador consegue abrir fichas e entrar nas construções do bairro atual; nomes de construções de outros bairros só aparecem após viajar pela GATE.
 - [x] O cliente informa a localização atual, bairros de destino e construções disponíveis no bairro.
-- [ ] Serviços marcados como presenciais só podem ser consultados quando o jogador está no ponto correspondente; tentar acessá-los de outro local é recusado pelo backend.
-- [ ] A consulta de informações de conta bancária exige que o jogador esteja no Banco da cidade pertinente; solicitar uma busca e apreensão exige que esteja na Delegacia.
+- [x] Consultas bancárias exigem presença no ponto Meridian Bank correspondente; o backend recusa consultas feitas de outro local.
+- [x] A Delegacia é um ponto fixo visitável e sua presença é registrada com a localização exata; o protocolo e a validação do pedido de busca são implementados no M11.
 - [x] Dois jogadores do mesmo servidor veem os mesmos pontos fixos, embora possam estar em bairros diferentes.
-- [ ] Testes cobrem identidade dos pontos fixos, persistência de localização, viagem, visita e bloqueio de serviços fora do local exigido.
+- [x] Testes cobrem identidade dos pontos fixos, persistência de localização, viagem, visita, escopo de construções por bairro e bloqueio de serviços fora do local exigido.
 
 ## Fora de escopo
 
-Mapa físico de bairros, coordenadas, distâncias entre bairros, rotas locais, combate durante viagens e economia detalhada de tarifas ou tempo de deslocamento. Regras de custo, duração, disponibilidade de destinos e quais serviços serão presenciais permanecem para detalhamento antes da implementação.
+Mapa físico de bairros, coordenadas, distâncias entre bairros, rotas locais, combate durante viagens e economia detalhada de tarifas ou tempo de deslocamento. A busca e apreensão em si permanece no M11; este ciclo registra e valida presença na Delegacia para permitir que o serviço seguinte imponha a exigência presencial.

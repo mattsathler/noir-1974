@@ -24,6 +24,8 @@ type fakeStore struct {
 	characterErr     error
 	deleteSessionErr error
 	character        *character
+	locationID       string
+	locationErr      error
 	createdName      string
 	createdPortrait  int
 	sessionToken     string
@@ -33,14 +35,37 @@ type fakeStore struct {
 
 type fakeDirectory struct{}
 
+type locationDirectory struct {
+	fakeDirectory
+	queriedDistrict string
+}
+
+func (directory *locationDirectory) SearchLocations(_ context.Context, _, districtID, _ string) ([]world.LocationRecord, error) {
+	directory.queriedDistrict = districtID
+	return nil, nil
+}
+
 func (fakeDirectory) SearchNPCs(context.Context, string, string) ([]world.PersonSearchRecord, error) {
 	return nil, nil
 }
 func (fakeDirectory) SearchCompanies(context.Context, string, string) ([]world.CompanyRecord, error) {
 	return nil, nil
 }
-func (fakeDirectory) SearchLocations(context.Context, string, string) ([]world.LocationRecord, error) {
+func (fakeDirectory) SearchLocations(context.Context, string, string, string) ([]world.LocationRecord, error) {
 	return nil, nil
+}
+func (fakeDirectory) TransitDistricts(context.Context, string) ([]world.DistrictDestination, error) {
+	return []world.DistrictDestination{
+		{ID: "fr/lyon/district/central", Name: "Central", Locations: []world.LocationRecord{
+			{Address: world.Address{LocationID: "service:lyon/police-station", Name: "Lyon Police Station"}},
+			{Address: world.Address{LocationID: "service:lyon/meridian-bank", Name: "Meridian Bank"}},
+			{Address: world.Address{LocationID: "service:lyon/gate-station", Name: "Central GATE Station"}},
+			{Address: world.Address{LocationID: "location:central-office", Name: "Central Office"}},
+		}},
+		{ID: "fr/lyon/district/bellecour", Name: "Bellecour", Locations: []world.LocationRecord{
+			{Address: world.Address{LocationID: "location:bellecour-office", Name: "Bellecour Office"}},
+		}},
+	}, nil
 }
 
 type fakeRecordReader struct {
@@ -90,8 +115,19 @@ func (f *fakeStore) createCharacter(_ context.Context, _, name string, portraitI
 	return character{DisplayName: name, PortraitID: portraitID}, nil
 }
 
-func (f *fakeStore) playerLocation(context.Context, string) (string, error)  { return "lyon", nil }
-func (f *fakeStore) setPlayerLocation(context.Context, string, string) error { return nil }
+func (f *fakeStore) playerLocation(context.Context, string) (string, error) {
+	if f.locationErr != nil {
+		return "", f.locationErr
+	}
+	if f.locationID != "" {
+		return f.locationID, nil
+	}
+	return "fr/lyon/district/central", nil
+}
+func (f *fakeStore) setPlayerLocation(_ context.Context, _ string, locationID string) error {
+	f.locationID = locationID
+	return nil
+}
 
 func (f *fakeStore) deleteSession(_ context.Context, token string) error {
 	f.deletedToken = token
@@ -128,7 +164,7 @@ func TestRegisterCreatesAccountAndHttpOnlySession(t *testing.T) {
 }
 
 func TestNPCRecordsRequiresSessionAndReturnsSelectedIntervalWithoutClassification(t *testing.T) {
-	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid"}
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid", locationID: "service:lyon/meridian-bank"}
 	reader := &fakeRecordReader{items: []records.Record{{
 		ID: "record:1", NPCID: "npc:one", Source: "bank", OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
 		Operator: "Meridian Global Settlement Office", Description: "A private remittance cleared.", CaseID: "case:hidden", InternalRelation: "extortion_payment",
@@ -152,6 +188,99 @@ func TestNPCRecordsRequiresSessionAndReturnsSelectedIntervalWithoutClassificatio
 	}
 	if strings.Contains(recorder.Body.String(), "record:2") || strings.Contains(recorder.Body.String(), "passenger entry") {
 		t.Fatalf("bank app returned a GATE record: %s", recorder.Body.String())
+	}
+}
+
+func TestBankRecordsRequirePhysicalPresenceAndUnfilteredRequestsHideBankEntries(t *testing.T) {
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid"}
+	reader := &fakeRecordReader{items: []records.Record{
+		{ID: "bank:1", Source: "bank", Description: "A remittance was recorded."},
+		{ID: "gate:1", Source: "gate", Description: "A GATE entry was recorded."},
+	}}
+	handler := NewHandlerWithGame(repository, false, fakeDirectory{}, fakeNews{}, nil, reader, "server-1")
+	request := func(path string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
+		return recorder
+	}
+
+	denied := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12&source=bank")
+	if denied.Code != http.StatusForbidden || reader.npcID != "" {
+		t.Fatalf("bank query away from Meridian Bank: status=%d readerNPC=%q", denied.Code, reader.npcID)
+	}
+	mixed := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12")
+	if mixed.Code != http.StatusOK || strings.Contains(mixed.Body.String(), "bank:1") || strings.Contains(mixed.Body.String(), "A remittance") {
+		t.Fatalf("unfiltered records exposed bank entries away from the bank: status=%d body=%s", mixed.Code, mixed.Body.String())
+	}
+
+	repository.locationID = "service:lyon/meridian-bank"
+	allowed := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12&source=bank")
+	if allowed.Code != http.StatusOK || !strings.Contains(allowed.Body.String(), "A remittance") {
+		t.Fatalf("bank query at Meridian Bank: status=%d body=%s", allowed.Code, allowed.Body.String())
+	}
+}
+
+func TestTravelAndVisitPersistValidatedPlayerLocation(t *testing.T) {
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid"}
+	handler := NewHandlerWithWorld(repository, false, fakeDirectory{}, "server-1")
+	request := func(method, path, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
+		return recorder
+	}
+
+	if got := request(http.MethodPost, "/api/world/travel", `{"districtId":"fr/lyon/district/missing"}`); got.Code != http.StatusBadRequest {
+		t.Fatalf("unknown travel destination status = %d, want 400", got.Code)
+	}
+	if got := request(http.MethodPost, "/api/world/travel", `{"districtId":"fr/lyon/district/bellecour"}`); got.Code != http.StatusOK || repository.locationID != "fr/lyon/district/bellecour" {
+		t.Fatalf("travel did not persist valid district: status=%d location=%q body=%s", got.Code, repository.locationID, got.Body.String())
+	}
+
+	if got := request(http.MethodPost, "/api/world/visit", `{"locationId":"service:lyon/meridian-bank"}`); got.Code != http.StatusBadRequest || repository.locationID != "fr/lyon/district/bellecour" {
+		t.Fatalf("visit allowed a building from another district: status=%d location=%q", got.Code, repository.locationID)
+	}
+	if got := request(http.MethodPost, "/api/world/travel", `{"districtId":"fr/lyon/district/central"}`); got.Code != http.StatusOK {
+		t.Fatalf("return to Central status = %d body=%s", got.Code, got.Body.String())
+	}
+	if got := request(http.MethodPost, "/api/world/visit", `{"locationId":"service:lyon/meridian-bank"}`); got.Code != http.StatusOK || repository.locationID != "service:lyon/meridian-bank" {
+		t.Fatalf("visit did not persist current service location: status=%d location=%q body=%s", got.Code, repository.locationID, got.Body.String())
+	}
+
+	worldRequest := httptest.NewRequest(http.MethodGet, "/api/world", nil)
+	worldRequest.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+	worldResponseRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(worldResponseRecorder, worldRequest)
+	var state worldResponse
+	if err := json.Unmarshal(worldResponseRecorder.Body.Bytes(), &state); err != nil {
+		t.Fatal(err)
+	}
+	if worldResponseRecorder.Code != http.StatusOK || state.DistrictID != "fr/lyon/district/central" || state.District != "Central" || state.LocationID != "service:lyon/meridian-bank" || state.PlaceName != "Meridian Bank" {
+		t.Fatalf("world response lost current place or district: status=%d state=%+v", worldResponseRecorder.Code, state)
+	}
+}
+
+func TestLocationSearchUsesPlayersCurrentDistrict(t *testing.T) {
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid", locationID: "service:lyon/meridian-bank"}
+	directory := &locationDirectory{}
+	handler := NewHandlerWithWorld(repository, false, directory, "server-1")
+	search := func() *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodGet, "/api/world/locations?q=office", nil)
+		request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		return recorder
+	}
+
+	if got := search(); got.Code != http.StatusOK || directory.queriedDistrict != "fr/lyon/district/central" {
+		t.Fatalf("search from a service point used wrong district: status=%d district=%q", got.Code, directory.queriedDistrict)
+	}
+	repository.locationID = "fr/lyon/district/bellecour"
+	if got := search(); got.Code != http.StatusOK || directory.queriedDistrict != "fr/lyon/district/bellecour" {
+		t.Fatalf("search after travel used wrong district: status=%d district=%q", got.Code, directory.queriedDistrict)
 	}
 }
 

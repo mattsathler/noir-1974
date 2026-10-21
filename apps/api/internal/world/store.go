@@ -390,7 +390,7 @@ func (store *PostgresStore) SearchCompanies(ctx context.Context, serverID, query
 }
 
 // SearchLocations finds persisted city locations by name or their complete address.
-func (store *PostgresStore) SearchLocations(ctx context.Context, serverID, query string) ([]LocationRecord, error) {
+func (store *PostgresStore) SearchLocations(ctx context.Context, serverID, districtID, query string) ([]LocationRecord, error) {
 	base, err := store.generatedWorld(ctx, serverID)
 	if err != nil {
 		return nil, err
@@ -402,12 +402,23 @@ func (store *PostgresStore) SearchLocations(ctx context.Context, serverID, query
 	}
 	results := make([]LocationRecord, 0)
 	for _, entity := range base.Entities {
-		if entity.EntityType != "location" {
+		if entity.EntityType != "location" || entity.RegionID != districtID {
 			continue
 		}
 		address := makeAddress(entity, regions)
 		if strings.Contains(strings.ToLower(address.Full+" "+entity.LocationKind), query) {
 			results = append(results, LocationRecord{Address: address})
+		}
+	}
+	for _, region := range base.Regions {
+		if region.Kind != "city" || districtID != region.ID+"/district/central" {
+			continue
+		}
+		for _, service := range centralServiceLocations(region) {
+			address := service.Address
+			if strings.Contains(strings.ToLower(address.Full+" "+address.Kind), query) {
+				results = append(results, service)
+			}
 		}
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].Address.Full < results[j].Address.Full })
@@ -430,25 +441,8 @@ func (store *PostgresStore) TransitDistricts(ctx context.Context, serverID strin
 		if region.Kind != "city" {
 			continue
 		}
-		cityKey := strings.TrimPrefix(region.ID, "fr/")
 		centralID := region.ID + "/district/central"
-		central := &DistrictDestination{ID: centralID, Name: "Central", Locations: []LocationRecord{}}
-		for _, service := range []struct{ id, name string }{
-			{"police-station", region.Name + " Police Station"},
-			{"meridian-bank", "Meridian Bank"},
-			{"gate-station", "Central GATE Station"},
-		} {
-			fullAddress := strings.Join([]string{service.name, "Central", region.Name, "France"}, ", ")
-			central.Locations = append(central.Locations, LocationRecord{Address: Address{
-				LocationID: "service:" + cityKey + "/" + service.id,
-				Name:       service.name,
-				Kind:       "building",
-				District:   "Central",
-				City:       region.Name,
-				Country:    "France",
-				Full:       fullAddress,
-			}})
-		}
+		central := &DistrictDestination{ID: centralID, Name: "Central", Locations: centralServiceLocations(region)}
 		byID[centralID] = central
 		centralIDs = append(centralIDs, centralID)
 	}
@@ -476,6 +470,29 @@ func (store *PostgresStore) TransitDistricts(ctx context.Context, serverID strin
 		}
 	}
 	return result, nil
+}
+
+func centralServiceLocations(city Region) []LocationRecord {
+	cityKey := strings.TrimPrefix(city.ID, "fr/")
+	services := []struct{ id, name string }{
+		{"police-station", city.Name + " Police Station"},
+		{"meridian-bank", "Meridian Bank"},
+		{"gate-station", "Central GATE Station"},
+	}
+	locations := make([]LocationRecord, 0, len(services))
+	for _, service := range services {
+		fullAddress := strings.Join([]string{service.name, "Central", city.Name, "France"}, ", ")
+		locations = append(locations, LocationRecord{Address: Address{
+			LocationID: "service:" + cityKey + "/" + service.id,
+			Name:       service.name,
+			Kind:       "building",
+			District:   "Central",
+			City:       city.Name,
+			Country:    "France",
+			Full:       fullAddress,
+		}})
+	}
+	return locations
 }
 
 func regionNames(regions map[string]Region) map[string]string {

@@ -1,8 +1,8 @@
-# M10 — Busca e apreensão
+# M11 — Busca e apreensão
 
-**Ciclo:** 10  
+**Ciclo:** 11  
 **Status:** Não iniciado  
-**Depende de:** M09 aceito
+**Depende de:** M10 aceito
 
 ## Objetivo
 
@@ -21,4 +21,4 @@ Permitir que o jogador solicite uma autorização de busca na Delegacia da cidad
 
 ## Fora de escopo
 
-Arbitragem da acusação e whiteboards para organizar elementos coletados.
+Arbitragem da acusação. A organização dos elementos em whiteboards é coberta pelo M10.

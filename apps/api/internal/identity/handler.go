@@ -42,7 +42,7 @@ type Handler struct {
 type WorldDirectoryReader interface {
 	SearchNPCs(context.Context, string, string) ([]world.PersonSearchRecord, error)
 	SearchCompanies(context.Context, string, string) ([]world.CompanyRecord, error)
-	SearchLocations(context.Context, string, string) ([]world.LocationRecord, error)
+	SearchLocations(context.Context, string, string, string) ([]world.LocationRecord, error)
 }
 
 type NewspaperReader interface {
@@ -101,6 +101,7 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/world/locations", handler.searchLocations)
 		mux.HandleFunc("GET /api/world/transit", handler.transitDistricts)
 		mux.HandleFunc("POST /api/world/travel", handler.travel)
+		mux.HandleFunc("POST /api/world/visit", handler.visit)
 	}
 	if recordsReader != nil {
 		mux.HandleFunc("GET /api/world/npcs/{npcID}/records", handler.npcRecords)
@@ -125,7 +126,8 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 }
 
 func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
-	if !h.authorizeWorldRequest(w, r) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
 		return
 	}
 	from, err := time.Parse("2006-01-02", r.URL.Query().Get("from"))
@@ -147,6 +149,16 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "source must be bank or gate", http.StatusBadRequest)
 		return
 	}
+	locationID, err := h.store.playerLocation(r.Context(), current.ID)
+	if err != nil {
+		http.Error(w, "could not retrieve current location", http.StatusInternalServerError)
+		return
+	}
+	playerAtBank := h.playerAtService(r.Context(), locationID, "meridian-bank")
+	if source == "bank" && !playerAtBank {
+		http.Error(w, "visit Meridian Bank to consult financial records", http.StatusForbidden)
+		return
+	}
 	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
 	results, err := h.recordsReader.NPCRecords(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through)
 	if errors.Is(err, world.ErrEntityNotFound) {
@@ -162,9 +174,17 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if source != "" {
-		filtered := results[:0]
+		filtered := make([]records.Record, 0, len(results))
 		for _, result := range results {
 			if result.Source == source {
+				filtered = append(filtered, result)
+			}
+		}
+		results = filtered
+	} else if !playerAtBank {
+		filtered := make([]records.Record, 0, len(results))
+		for _, result := range results {
+			if result.Source != "bank" {
 				filtered = append(filtered, result)
 			}
 		}
@@ -345,14 +365,35 @@ func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) searchLocations(w http.ResponseWriter, r *http.Request) {
-	if !h.authorizeWorldRequest(w, r) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
 		return
 	}
 	query, ok := directoryQuery(w, r)
 	if !ok {
 		return
 	}
-	results, err := h.worldReader.SearchLocations(r.Context(), h.worldServerID, query)
+	reader, ok := h.worldReader.(transitReader)
+	if !ok {
+		http.Error(w, "GATE transit unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	destinations, err := reader.TransitDistricts(r.Context(), h.worldServerID)
+	if err != nil {
+		http.Error(w, "could not retrieve current district", http.StatusInternalServerError)
+		return
+	}
+	locationID, err := h.store.playerLocation(r.Context(), current.ID)
+	if err != nil {
+		http.Error(w, "could not retrieve current location", http.StatusInternalServerError)
+		return
+	}
+	districtID := districtForLocation(destinations, locationID)
+	if districtID == "" {
+		http.Error(w, "current location is unavailable", http.StatusConflict)
+		return
+	}
+	results, err := h.worldReader.SearchLocations(r.Context(), h.worldServerID, districtID, query)
 	if err != nil {
 		http.Error(w, "could not search addresses", http.StatusInternalServerError)
 		return
@@ -418,6 +459,93 @@ func (h *Handler) travel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"locationId": input.DistrictID})
+}
+
+func (h *Handler) visit(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.worldReader.(transitReader)
+	if !ok {
+		http.Error(w, "GATE transit unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var input struct {
+		LocationID string `json:"locationId"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	destinations, err := reader.TransitDistricts(r.Context(), h.worldServerID)
+	if err != nil {
+		http.Error(w, "could not retrieve current district", http.StatusInternalServerError)
+		return
+	}
+	currentLocation, err := h.store.playerLocation(r.Context(), current.ID)
+	if err != nil {
+		http.Error(w, "could not retrieve current location", http.StatusInternalServerError)
+		return
+	}
+	currentDistrictID := districtForLocation(destinations, currentLocation)
+	if currentDistrictID == "" {
+		http.Error(w, "current location is unavailable", http.StatusConflict)
+		return
+	}
+	valid := input.LocationID == currentDistrictID
+	for _, destination := range destinations {
+		if destination.ID != currentDistrictID {
+			continue
+		}
+		for _, place := range destination.Locations {
+			if place.Address.LocationID == input.LocationID {
+				valid = true
+				break
+			}
+		}
+	}
+	if !valid {
+		http.Error(w, "location is not in the current district", http.StatusBadRequest)
+		return
+	}
+	if err := h.store.setPlayerLocation(r.Context(), current.ID, input.LocationID); err != nil {
+		http.Error(w, "could not save player location", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"locationId": input.LocationID, "districtId": currentDistrictID})
+}
+
+func (h *Handler) playerAtService(ctx context.Context, locationID, serviceSuffix string) bool {
+	reader, ok := h.worldReader.(transitReader)
+	if !ok {
+		return false
+	}
+	destinations, err := reader.TransitDistricts(ctx, h.worldServerID)
+	if err != nil {
+		return false
+	}
+	for _, destination := range destinations {
+		for _, place := range destination.Locations {
+			if place.Address.LocationID == locationID && strings.HasSuffix(locationID, "/"+serviceSuffix) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func districtForLocation(destinations []world.DistrictDestination, locationID string) string {
+	for _, destination := range destinations {
+		if destination.ID == locationID {
+			return destination.ID
+		}
+		for _, place := range destination.Locations {
+			if place.Address.LocationID == locationID {
+				return destination.ID
+			}
+		}
+	}
+	return ""
 }
 
 func (h *Handler) authorizedPlayer(w http.ResponseWriter, r *http.Request) (account, bool) {
@@ -567,7 +695,9 @@ type worldResponse struct {
 	Country    string    `json:"country"`
 	TimeZone   string    `json:"timeZone"`
 	LocationID string    `json:"locationId"`
+	DistrictID string    `json:"districtId"`
 	District   string    `json:"district,omitempty"`
+	PlaceName  string    `json:"placeName,omitempty"`
 	ServerTime time.Time `json:"serverTime"`
 }
 
@@ -608,12 +738,12 @@ func (h *Handler) worldFor(ctx context.Context, accountID string) worldResponse 
 		if destinations, err := reader.TransitDistricts(ctx, h.worldServerID); err == nil {
 			for _, district := range destinations {
 				if district.ID == locationID {
-					state.District = district.Name
+					state.DistrictID, state.District = district.ID, district.Name
 				}
 				for _, place := range district.Locations {
 					if place.Address.LocationID == locationID {
-						state.LocationID, state.District = district.ID, district.Name
-						_ = h.store.setPlayerLocation(ctx, accountID, district.ID)
+						state.DistrictID, state.District = district.ID, district.Name
+						state.PlaceName = place.Address.Name
 					}
 				}
 			}

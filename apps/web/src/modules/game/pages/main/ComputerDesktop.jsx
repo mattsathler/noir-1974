@@ -10,6 +10,13 @@ import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
 
+const BOOT_LINES = [
+  "NOIR PERSONAL TERMINAL · 1974",
+  "CHECKING RELAY CONNECTION…",
+  "LYON NODE FOUND",
+  "PRIVATE SYSTEM READY",
+];
+
 const programs = [
   { id: "interpol", label: "PERSON SEARCH", Icon: Globe, state: "ONLINE", available: true },
   { id: "case-files", label: "CASE FILES", Icon: Files, state: "ONLINE", available: true },
@@ -30,11 +37,15 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const closeButtonRef = useRef(null);
   const windowRef = useRef(null);
   const dragRef = useRef(null);
+  const bootTimerRef = useRef(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setBooting(false), 2900);
-    return () => window.clearTimeout(timer);
+    return () => window.clearTimeout(bootTimerRef.current);
   }, []);
+
+  function finishBoot() {
+    bootTimerRef.current = window.setTimeout(() => setBooting(false), 650);
+  }
 
   const runHack = useCallback(async (loadRequest) => {
     setHacking(true);
@@ -133,10 +144,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
         <div className="computer-screen">
           <div className="computer-screen__glass texture-scanlines" aria-hidden="true" />
           {booting && <div className="computer-sequence computer-sequence--boot" role="status">
-            <span><Typewriter text="NOIR PERSONAL TERMINAL · 1974" speed={32} /></span>
-            <span><Typewriter text="CHECKING RELAY CONNECTION…" speed={32} startDelay={220} /></span>
-            <span><Typewriter text="LYON NODE FOUND" speed={32} startDelay={460} /></span>
-            <span><Typewriter text="PRIVATE SYSTEM READY" speed={32} startDelay={700} /> <i>_</i></span>
+            <Typewriter className="computer-sequence__typewriter" texts={BOOT_LINES} speed={26} lineDelay={220} onComplete={finishBoot} />
           </div>}
           <header className="computer-menubar">
             <p className="computer-brand"><span className="computer-brand__mark">N</span> NOIR TERMINAL <span className="computer-brand__divider">/</span> MERIDIAN GLOBAL RELAY</p>

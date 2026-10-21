@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ComputerSharp } from "pixelarticons/react/ComputerSharp";
+import { MonitorSharp } from "pixelarticons/react/MonitorSharp";
 import { Earth } from "pixelarticons/react/Earth";
 import { NotebookSharp } from "pixelarticons/react/NotebookSharp";
 import { currentIdentity } from "../../../identity/api.js";
@@ -52,6 +52,12 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     setServerTime(new Date(nextWorld.serverTime));
     closeTransit();
   }, [closeTransit]);
+  const visitPlace = useCallback(async (place) => {
+    await movePlayer("/api/world/visit", { locationId: place.locationId });
+    const nextWorld = await getCurrentWorld();
+    setWorld(nextWorld);
+    setServerTime(new Date(nextWorld.serverTime));
+  }, []);
   const completeGateTransition = useCallback(() => setGateTransition(null), []);
   const failGateTransition = useCallback((requestError) => setError(requestError.message), []);
 
@@ -79,7 +85,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   }, [world]);
 
   const display = world && serverTime ? formatServerDateTime(serverTime, world.timeZone) : null;
-  const location = world ? [world.district, world.city, world.country].filter(Boolean).join(", ") : "";
+  const location = world ? [world.placeName || world.district, world.city, world.country].filter(Boolean).join(", ") : "";
 
   return (
     <main className="game-screen pos-relative min-h-screen overflow-hidden bg-atmosphere text-primary" aria-label="Main game screen">
@@ -112,7 +118,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
               aria-expanded={computerOpen}
               onClick={() => { setNewspaperOpen(false); setComputerOpen(true); }}
             >
-              <ComputerSharp className="computer-launch__icon" aria-hidden="true" />
+              <MonitorSharp className="computer-launch__icon" aria-hidden="true" />
             </button>
             <button
               className="newspaper-launch"
@@ -146,7 +152,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
         />
       )}
       {newspaperOpen && <NewspaperWindow onClose={closeNewspaper} />}
-      {transitOpen && <NeighborhoodExplorer world={world} onTravel={travelViaGate} onClose={closeTransit} />}
+      {transitOpen && <NeighborhoodExplorer world={world} onTravel={travelViaGate} onVisit={visitPlace} onClose={closeTransit} />}
       {gateTransition && <GateTransition destination={gateTransition} onArrive={arriveAtDistrict} onComplete={completeGateTransition} onError={failGateTransition} />}
     </main>
   );

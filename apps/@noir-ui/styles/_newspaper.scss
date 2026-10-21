@@ -35,9 +35,12 @@
 }
 
 .newspaper-utility {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   padding-bottom: 0.5rem;
   border-bottom: 1px solid rgb(41 39 31 / 55%);
 }
+.newspaper-utility > :last-child { justify-self: end; }
 
 .newspaper-close {
   padding: 0;

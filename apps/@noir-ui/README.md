@@ -20,7 +20,7 @@ Base visual compartilhada do frontend Noir 1974. Os estilos vivem em `styles/` e
 
 O SCSS é a fonte do sistema. A aplicação deve importar `styles/index.scss` uma vez no ponto de entrada do frontend e compilar Sass na etapa de build. Componentes devem combinar classes utilitárias genéricas e tokens CSS (`--noir-*`); não devem replicar helpers em folhas locais nem criar classes vinculadas a uma página.
 
-`Typewriter` aceita `text`, `speed` (intervalo entre caracteres, em milissegundos), `startDelay`, `onComplete` e `className`. A animação é reduzida a texto imediato quando o sistema pede movimento reduzido.
+`Typewriter` aceita `text` para uma mensagem ou `texts` para uma sequência de mensagens. Em sequência, digita uma linha por vez e mantém as anteriores visíveis; `lineDelay` define a pausa entre linhas. Também aceita `speed` (intervalo entre caracteres, em milissegundos), `startDelay`, `onComplete` e `className`. A animação é reduzida a texto imediato quando o sistema pede movimento reduzido.
 
 ## Convenções
 

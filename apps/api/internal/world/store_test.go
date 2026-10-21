@@ -313,6 +313,61 @@ func TestPostgresStoreReconstructsNPCProfilesAndIndexedRelations(t *testing.T) {
 	}
 }
 
+func TestCentralServicePointsAreStableAcrossWorldSeedsAndSearchIsDistrictScoped(t *testing.T) {
+	loadStore := func(seed string) *PostgresStore {
+		database := &fixtureDatabase{}
+		database.queryRow = func(query string, _ []any) pgx.Row {
+			if strings.Contains(query, "SELECT world_seed, generator_version FROM worlds") {
+				return fixtureRow{values: []any{seed, LatestGeneratorVersion}}
+			}
+			return fixtureRow{err: pgx.ErrNoRows}
+		}
+		database.query = func(string, []any) pgx.Rows { return &fixtureRows{} }
+		return NewPostgresStore(database)
+	}
+	firstStore, secondStore := loadStore("m09-service-seed-a"), loadStore("m09-service-seed-b")
+	first, err := firstStore.TransitDistricts(context.Background(), "server-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := secondStore.TransitDistricts(context.Background(), "server-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	serviceIDs := []string{"service:lyon/police-station", "service:lyon/meridian-bank", "service:lyon/gate-station"}
+	var firstCentral, secondCentral *DistrictDestination
+	for i := range first {
+		if first[i].Name == "Central" {
+			firstCentral = &first[i]
+		}
+	}
+	for i := range second {
+		if second[i].Name == "Central" {
+			secondCentral = &second[i]
+		}
+	}
+	if firstCentral == nil || secondCentral == nil {
+		t.Fatal("Central service district is missing")
+	}
+	for i, id := range serviceIDs {
+		if firstCentral.Locations[i].Address.LocationID != id || secondCentral.Locations[i].Address.LocationID != id {
+			t.Fatalf("service %d changed between worlds: first=%+v second=%+v", i, firstCentral.Locations[i], secondCentral.Locations[i])
+		}
+		if firstCentral.Locations[i].Address.Name != secondCentral.Locations[i].Address.Name {
+			t.Fatalf("service %q name changed between worlds", id)
+		}
+	}
+
+	central, err := firstStore.SearchLocations(context.Background(), "server-a", firstCentral.ID, "meridian bank")
+	if err != nil || len(central) != 1 || central[0].Address.LocationID != "service:lyon/meridian-bank" {
+		t.Fatalf("central location search = %+v, error = %v", central, err)
+	}
+	remote, err := firstStore.SearchLocations(context.Background(), "server-a", "fr/lyon/district/bellecour", "meridian bank")
+	if err != nil || len(remote) != 0 {
+		t.Fatalf("remote district exposed central bank: results=%+v error=%v", remote, err)
+	}
+}
+
 func TestPersonMaritalStatusUsesCurrentMarriageAndSupportsPriorStatus(t *testing.T) {
 	for _, test := range []struct {
 		name    string

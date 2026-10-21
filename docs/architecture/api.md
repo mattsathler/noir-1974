@@ -16,6 +16,7 @@ GET /api/world/companies?q=<name-or-address>
 GET /api/world/locations?q=<name-or-address>
 GET /api/world/transit
 POST /api/world/travel
+POST /api/world/visit
 GET /api/world/newspaper
 GET /api/cases
 GET /api/cases/:caseID
@@ -32,13 +33,13 @@ O frontend pede “NPC #23”. O servidor verifica o servidor do jogador, recupe
 
 ## Diretório do mundo
 
-As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. A busca de pessoas retorna nome, idade, aparência, local de trabalho e estado civil; não retorna cargo nem identidade do parceiro. A busca de empresas retorna sede e funcionários com seus cargos, oferecendo uma fonte separada para descobrir funções dentro da empresa. Locais retornam endereço completo com bairro, cidade e país. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
+As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. A busca de pessoas retorna nome, idade, aparência, local de trabalho e estado civil; não retorna cargo nem identidade do parceiro. A busca de empresas retorna sede e funcionários com seus cargos, oferecendo uma fonte separada para descobrir funções dentro da empresa. A busca de locais retorna apenas endereços do bairro atual, incluindo os pontos fixos de serviço quando o jogador está em Central. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
 
 `GET /api/world/newspaper` retorna a edição determinística do dia fictício atual. A manchete usa o caso persistido mais recente e omite o culpado; seis notas leves são escolhidas de um catálogo por servidor e data. A API cria o caso inicial uma única vez no bootstrap e registra a vítima como morta no estado compartilhado.
 
-`GET /api/world/transit` retorna o bairro Central, seus pontos fixos de serviço e os bairros procedurais com suas construções. `POST /api/world/travel` recebe `districtId` e persiste a chegada do jogador ao bairro após validar o destino; construções abrem uma ficha sem alterar a localização do jogador. `GET /api/world` e `GET /api/me` incluem o bairro atual persistido por conta.
+`GET /api/world/transit` retorna o bairro Central, seus pontos fixos de serviço e os bairros procedurais. Os nomes de edifícios de outro bairro só são exibidos após a viagem. `POST /api/world/travel` recebe `districtId` e persiste a chegada após validar o destino. `POST /api/world/visit` recebe `locationId` e aceita apenas um ponto do bairro atual; a visita preserva o bairro e registra a localização exata do jogador. `GET /api/world` e `GET /api/me` incluem `locationId`, `districtId`, o nome do bairro e, quando aplicável, `placeName`.
 
-`GET /api/world/npcs/:npcID/records` retorna registros do NPC no intervalo inclusivo informado. `source=bank` seleciona o ledger bancário e `source=gate` seleciona o histórico GATE; sem o filtro, retorna ambos. As datas usam `YYYY-MM-DD` e aceitam no máximo sete dias de calendário inclusivos. Os resultados são ordenados por horário e ID. A consulta gera apenas os registros cotidianos daquela pessoa e intervalo e mistura registros associados a casos. O JSON público não contém `caseId` nem a classificação interna.
+`GET /api/world/npcs/:npcID/records` retorna registros do NPC no intervalo inclusivo informado. `source=bank` seleciona o ledger bancário e exige que o jogador esteja no Meridian Bank da cidade atual; uma requisição remota recebe `403`. `source=gate` seleciona o histórico GATE. Sem filtro, registros bancários são omitidos fora do banco. As datas usam `YYYY-MM-DD` e aceitam no máximo sete dias de calendário inclusivos. Os resultados são ordenados por horário e ID. A consulta gera apenas os registros cotidianos daquela pessoa e intervalo e mistura registros associados a casos. O JSON público não contém `caseId` nem a classificação interna.
 
 No desktop, banco e GATE são aplicativos distintos. Cada um apresenta o acesso pelas credenciais do protagonista como etapa narrativa e consulta apenas sua própria fonte. O endpoint continua exigindo a sessão autenticada do jogador; o passo de credenciais não é um novo mecanismo de autenticação do servidor.
 

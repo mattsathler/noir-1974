@@ -1,20 +1,26 @@
 .typewriter {
-  &[data-complete="false"]::after {
-    display: inline-block;
-    width: 0.55em;
-    height: 1em;
-    margin-left: 0.16em;
-    vertical-align: -0.12em;
-    background: currentColor;
-    content: "";
-    animation: caret-blink 1s steps(2, start) infinite;
-  }
+  &[data-multiple="true"] { display: block; }
 }
+
+.typewriter[data-complete="false"]::after,
+.typewriter__line[data-complete="false"]::after {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 0.16em;
+  vertical-align: -0.12em;
+  background: currentColor;
+  content: "";
+  animation: caret-blink 1s steps(2, start) infinite;
+}
+.typewriter[data-multiple="true"][data-complete="false"]::after { content: none; }
+.typewriter__line { display: block; min-height: 1em; }
 
 @keyframes caret-blink {
   to { visibility: hidden; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .typewriter::after { animation: none; }
+  .typewriter::after,
+  .typewriter__line::after { animation: none; }
 }

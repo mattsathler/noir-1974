@@ -1,8 +1,8 @@
-# M11 — Whiteboards pessoais por caso
+# M10 — Whiteboards pessoais por caso
 
-**Ciclo:** 11  
+**Ciclo:** 10  
 **Status:** Não iniciado  
-**Depende de:** M10 aceito
+**Depende de:** M09 aceito
 
 ## Objetivo
 

@@ -60,11 +60,11 @@ PRODUCT_BLURB = {
         "entre cidades e pontos de serviço. Busca e apreensão ainda precisa conectar objetos aos casos."
     ),
     10: (
-        "As fontes investigativas, deslocamento e buscas estão aceitos. O jogador ainda "
-        "precisa guardar e organizar os elementos por caso."
+        "O jogador já pode guardar e organizar elementos por caso em whiteboards privados. "
+        "A busca e apreensão e a acusação ainda precisam fechar o fluxo investigativo."
     ),
     11: (
-        "O jogador já pode organizar elementos por caso em whiteboards privados. "
+        "Whiteboards e busca e apreensão estão aceitos. "
         "Acusação e julgamento ainda precisam fechar o fluxo criminal."
     ),
     12: (
@@ -84,8 +84,8 @@ TABLE_LABELS = {
     7: "Registros bancários e GATE",
     8: "Correio eletrônico",
     9: "Deslocamento e pontos de serviço",
-    10: "Busca e apreensão",
-    11: "Whiteboards pessoais",
+    10: "Whiteboards pessoais",
+    11: "Busca e apreensão",
     12: "Acusação e julgamento",
 }
 

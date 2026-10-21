@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getGateDestinations } from "../api.js";
 
-export default function NeighborhoodExplorer({ world, onTravel, onClose }) {
+export default function NeighborhoodExplorer({ world, onTravel, onVisit, onClose }) {
   const [destinations, setDestinations] = useState([]);
   const [loadingDestinations, setLoadingDestinations] = useState(true);
   const [error, setError] = useState("");
@@ -56,8 +56,25 @@ export default function NeighborhoodExplorer({ world, onTravel, onClose }) {
     }
   }
 
-  const currentDistrict = destinations.find((district) => district.name === world?.district);
-  const buildings = selectedDestination?.locations.filter(({ address }) => address.kind === "building") ?? [];
+  async function visitPlace(place) {
+    setBusy(true);
+    setError("");
+    try {
+      await onVisit?.(place);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const currentDistrict = destinations.find((district) => district.id === world?.districtId)
+    ?? destinations.find((district) => district.name === world?.district);
+  const isCurrentDistrict = Boolean(selectedDestination && currentDistrict && selectedDestination.id === currentDistrict.id);
+  const buildings = isCurrentDistrict
+    ? selectedDestination?.locations.filter(({ address }) => address.kind === "building") ?? []
+    : [];
+  const returningToDistrict = isCurrentDistrict && world?.locationId !== currentDistrict?.id;
 
   return (
     <div className="modal-overlay gate-interface-overlay" role="dialog" aria-modal="true" aria-label="GATE neighborhood transit" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
@@ -85,15 +102,22 @@ export default function NeighborhoodExplorer({ world, onTravel, onClose }) {
             {selectedDestination ? <section aria-label={`Buildings in ${selectedDestination.name}`}>
               <h3 className="gate-interface__district-name">{selectedDestination.name}</h3>
               <p className="gate-interface__caption">BUILDINGS IN THIS DISTRICT</p>
-              {buildings.length ? <div className="gate-interface__places">
-                {buildings.map(({ address }) => <div className="gate-interface__place" key={address.locationId}><span>{address.name}</span><small>{address.kind.toUpperCase()}</small></div>)}
+              {!isCurrentDistrict ? <p className="gate-interface__empty">Building records are available after arriving in this district.</p> : buildings.length ? <div className="gate-interface__places">
+                {buildings.map(({ address }) => <div className="gate-interface__place" key={address.locationId}>
+                  <span>{address.name}</span>
+                  {world?.locationId === address.locationId
+                    ? <small>CURRENT LOCATION</small>
+                    : <button className="gate-interface__visit" type="button" disabled={busy} onClick={() => visitPlace(address)}>ENTER</button>}
+                </div>)}
               </div> : <p className="gate-interface__empty">No buildings listed in this district.</p>}
             </section> : <div className="gate-interface__empty-state"><span aria-hidden="true">⌖</span><p>Select a district to inspect its buildings and prepare a route.</p></div>}
           </main>
         </div>
         <footer className="gate-interface__footer">
-          <p><span>ROUTE</span>{selectedDestination ? `CENTRAL RELAY  →  ${selectedDestination.name.toUpperCase()}` : "SELECT A DESTINATION"}</p>
-          <button className="gate-interface__travel" type="button" disabled={!selectedDestination || selectedDestination.name === world?.district || busy || loadingDestinations} onClick={() => travelTo(selectedDestination)}>{busy ? "CONNECTING…" : "TRAVEL"}<span aria-hidden="true">→</span></button>
+          <p><span>{returningToDistrict ? "LOCATION" : "ROUTE"}</span>{returningToDistrict ? `RETURN TO ${currentDistrict.name.toUpperCase()}` : selectedDestination ? `CENTRAL RELAY  →  ${selectedDestination.name.toUpperCase()}` : "SELECT A DESTINATION"}</p>
+          {returningToDistrict
+            ? <button className="gate-interface__travel" type="button" disabled={busy} onClick={() => visitPlace({ locationId: currentDistrict.id })}>{busy ? "CONNECTING…" : "RETURN TO DISTRICT"}<span aria-hidden="true">↗</span></button>
+            : <button className="gate-interface__travel" type="button" disabled={!selectedDestination || selectedDestination.id === currentDistrict?.id || busy || loadingDestinations} onClick={() => travelTo(selectedDestination)}>{busy ? "CONNECTING…" : "TRAVEL"}<span aria-hidden="true">→</span></button>}
         </footer>
       </section>
     </div>
