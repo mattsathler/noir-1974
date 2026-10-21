@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { MapPin } from "pixelarticons/react/MapPin";
 import { getNPCEmails, searchPeople } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
 
@@ -18,7 +19,7 @@ function displayDate(value, timeZone) {
   }).format(date);
 }
 
-export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z"), timeZone = "Europe/Paris", runHack }) {
+export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z"), timeZone = "Europe/Paris", runHack, onPin }) {
   const throughToday = serverTime.toISOString().slice(0, 10);
   const rangeStart = `${throughToday.slice(0, 4)}-01-01`;
   const [authorized, setAuthorized] = useState(false);
@@ -158,6 +159,7 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
               <div className="email-message__body">
                 <p className="email-message__service">{item.service}</p>
                 <p>{item.body}</p>
+                <button className="whiteboard-pin-button" type="button" aria-label={`Pin email: ${item.subject}`} onClick={() => onPin?.({ id: item.id, source: "email", title: item.subject || "EMAIL", content: `${item.sender} → ${item.recipient}\n${item.body}`, metadata: item })}><MapPin aria-hidden="true" /></button>
               </div>
             </details>
           ))}

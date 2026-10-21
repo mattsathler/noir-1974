@@ -87,10 +87,163 @@ export function getCaseFile(caseId) {
   return requestCase(`/api/cases/${encodeURIComponent(caseId)}`);
 }
 
-export function saveCaseProgress(caseId, discoveredEvidenceIds) {
+export function saveCaseProgress(caseId, progress) {
   return requestCase(`/api/cases/${encodeURIComponent(caseId)}/progress`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ discoveredEvidenceIds }),
+    body: JSON.stringify(progress),
   });
+}
+
+async function whiteboardRequest(path, options) {
+  const response = await fetch(path, { credentials: "same-origin", ...options });
+  const payload = await responsePayload(response);
+  if (!response.ok) throw new Error(payload.message?.trim() || "The whiteboard could not be reached.");
+  return payload;
+}
+
+function readWhiteboardCache(key) {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(`noir:whiteboards:${key}`) || "null");
+    return cached?.value ?? null;
+  } catch { return null; }
+}
+function writeWhiteboardCache(key, value) {
+  try { sessionStorage.setItem(`noir:whiteboards:${key}`, JSON.stringify({ savedAt: Date.now(), value })); } catch { /* Storage may be disabled. */ }
+  return value;
+}
+const whiteboardSaveStates = new Map();
+function announceWhiteboardUpdate(boardId, status) {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("noir:whiteboard-updated", { detail: { boardId, status } }));
+}
+function updateWhiteboardCache(boardId, update) {
+  const board = readWhiteboardCache(boardId);
+  if (board) {
+    writeWhiteboardCache(boardId, update(board));
+    setWhiteboardSaveState(boardId, "saved");
+  }
+}
+
+export function getCachedWhiteboard(boardId) {
+  return readWhiteboardCache(boardId);
+}
+
+export function cachePinnedWhiteboardItem(boardId, item, x, y, fallbackBoard = null) {
+  const board = readWhiteboardCache(boardId) ?? fallbackBoard ?? { id: boardId, title: "INVESTIGATION BOARD", pins: [], connections: [] };
+  writeWhiteboardCache(boardId, ({
+    ...board,
+    pins: [...(board.pins ?? []).filter((pin) => pin.id !== item.id), { ...item, x, y }],
+  }));
+  setWhiteboardSaveState(boardId, "saving");
+}
+
+export function getWhiteboardSaveState(boardId) { return whiteboardSaveStates.get(boardId) ?? "saved"; }
+export function setWhiteboardSaveState(boardId, status) {
+  whiteboardSaveStates.set(boardId, status);
+  announceWhiteboardUpdate(boardId, status);
+}
+
+export async function getWhiteboards() {
+  const cached = readWhiteboardCache("list");
+  if (cached) return cached;
+  const payload = await whiteboardRequest("/api/whiteboards");
+  return writeWhiteboardCache("list", payload.results ?? []);
+}
+
+export function createWhiteboardDraft(index = 0) {
+  const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return { id: `board_${nonce}`, title: `INVESTIGATION ${index + 1}`, createdAt: new Date().toISOString(), pins: [], connections: [] };
+}
+
+export function cacheWhiteboardDraft(board) {
+  const boards = readWhiteboardCache("list") ?? [];
+  writeWhiteboardCache("list", [...boards.filter((item) => item.id !== board.id), board]);
+  writeWhiteboardCache(board.id, board);
+}
+export function discardWhiteboardDraft(boardId) {
+  const boards = readWhiteboardCache("list");
+  if (boards) writeWhiteboardCache("list", boards.filter((board) => board.id !== boardId));
+  try { sessionStorage.removeItem(`noir:whiteboards:${boardId}`); } catch { /* Storage may be disabled. */ }
+  whiteboardSaveStates.delete(boardId);
+}
+
+export function createWhiteboard(title = "", boardId = null) {
+  const id = boardId ?? createWhiteboardDraft().id;
+  return whiteboardRequest("/api/whiteboards", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, id }),
+  }).then((payload) => {
+    const board = payload.whiteboard;
+    const boards = readWhiteboardCache("list");
+    if (boards) writeWhiteboardCache("list", [...boards.filter((item) => item.id !== board.id), board]);
+    writeWhiteboardCache(board.id, board);
+    setWhiteboardSaveState(board.id, "saved");
+    return board;
+  });
+}
+
+export function renameWhiteboard(boardId, title) {
+  const previousBoard = readWhiteboardCache(boardId);
+  const previousList = readWhiteboardCache("list");
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  }).then((result) => {
+    if (previousBoard) writeWhiteboardCache(boardId, { ...previousBoard, title });
+    if (previousList) writeWhiteboardCache("list", previousList.map((board) => board.id === boardId ? { ...board, title } : board));
+    setWhiteboardSaveState(boardId, "saved");
+    return result;
+  });
+}
+
+export function deleteWhiteboard(boardId) {
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`, { method: "DELETE" }).then((result) => {
+    const boards = readWhiteboardCache("list");
+    if (boards) writeWhiteboardCache("list", boards.filter((board) => board.id !== boardId));
+    try { sessionStorage.removeItem(`noir:whiteboards:${boardId}`); } catch { /* Storage may be disabled. */ }
+    whiteboardSaveStates.delete(boardId);
+    announceWhiteboardUpdate(boardId, "deleted");
+    return result;
+  });
+}
+
+export async function getWhiteboard(boardId) {
+  const cached = readWhiteboardCache(boardId);
+  if (cached) return cached;
+  const payload = await whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`);
+  return writeWhiteboardCache(boardId, payload.whiteboard);
+}
+
+export function pinWhiteboardItem(boardId, itemId, x = 700, y = 700) {
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/pins`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ itemId, x, y }),
+  });
+}
+
+export function moveWhiteboardPin(boardId, itemId, x, y) {
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/pins/${encodeURIComponent(itemId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ x, y }),
+  }).then((result) => { updateWhiteboardCache(boardId, (board) => ({ ...board, pins: board.pins.map((pin) => pin.id === itemId ? { ...pin, x, y } : pin) })); return result; });
+}
+
+export function removeWhiteboardPin(boardId, itemId) {
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/pins/${encodeURIComponent(itemId)}`, { method: "DELETE" }).then((result) => { updateWhiteboardCache(boardId, (board) => ({ ...board, pins: board.pins.filter((pin) => pin.id !== itemId), connections: board.connections.filter((edge) => edge.fromId !== itemId && edge.toId !== itemId) })); return result; });
+}
+
+export function connectWhiteboardPins(boardId, fromId, toId) {
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/connections`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fromId, toId }),
+  }).then((result) => { updateWhiteboardCache(boardId, (board) => ({ ...board, connections: board.connections.some((edge) => edge.fromId === fromId && edge.toId === toId || edge.fromId === toId && edge.toId === fromId) ? board.connections : [...board.connections, { fromId, toId }] })); return result; });
+}
+
+export function disconnectWhiteboardPins(boardId, fromId, toId) {
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/connections/${encodeURIComponent(fromId)}/${encodeURIComponent(toId)}`, { method: "DELETE" }).then((result) => { updateWhiteboardCache(boardId, (board) => ({ ...board, connections: board.connections.filter((edge) => !(edge.fromId === fromId && edge.toId === toId || edge.fromId === toId && edge.toId === fromId)) })); return result; });
 }

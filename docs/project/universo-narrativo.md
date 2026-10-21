@@ -25,4 +25,4 @@ Autoridade institucional ligada ao passado profissional do jogador na Interpol.
 
 Detetive particular que já trabalhou com a Interpol e ainda conserva acesso a determinados recursos e informações da instituição. Não é um agente ativo da Interpol. A natureza exata desse acesso ainda será definida.
 
-Na criação do personagem, o jogador escolhe um entre seis retratos em pixel art, produzidos de acordo com a [Regra 0001](../rules/0001-direcao-artistica.md) e a direção visual de Noir 1974. Os retratos ainda serão criados.
+Na criação do personagem, o jogador monta sua aparência com peças modulares em pixel art — como rosto, cabelo, tom de pele, características visuais e acessórios — produzidas de acordo com a [Regra 0001](../rules/0001-direcao-artistica.md) e a direção visual de Noir 1974. A seleção fica salva na conta do jogador. NPCs também recebem aparências compostas pelo mesmo catálogo, geradas deterministicamente pela seed versionada do servidor.

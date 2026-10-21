@@ -133,3 +133,54 @@ CREATE TABLE IF NOT EXISTS player_case_progress (
 );
 CREATE INDEX IF NOT EXISTS player_case_progress_by_account_idx
     ON player_case_progress(account_id, server_id, updated_at);
+
+CREATE TABLE IF NOT EXISTS player_discovered_items (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    item_id text NOT NULL CHECK (item_id <> ''),
+    item_source text NOT NULL CHECK (item_source IN ('email', 'bank', 'gate', 'case')),
+    item_data jsonb NOT NULL,
+    discovered_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, item_id)
+);
+
+CREATE TABLE IF NOT EXISTS player_whiteboards (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    whiteboard_id text NOT NULL CHECK (whiteboard_id <> ''),
+    title text NOT NULL CHECK (title <> ''),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, whiteboard_id)
+);
+CREATE INDEX IF NOT EXISTS player_whiteboards_by_owner_idx
+    ON player_whiteboards(server_id, account_id, created_at, whiteboard_id);
+
+CREATE TABLE IF NOT EXISTS player_whiteboard_pins (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL,
+    whiteboard_id text NOT NULL,
+    item_id text NOT NULL,
+    position_x integer NOT NULL DEFAULT 80 CHECK (position_x >= 0),
+    position_y integer NOT NULL DEFAULT 80 CHECK (position_y >= 0),
+    pinned_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, whiteboard_id, item_id),
+    FOREIGN KEY (server_id, account_id, whiteboard_id)
+        REFERENCES player_whiteboards(server_id, account_id, whiteboard_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, account_id, item_id)
+        REFERENCES player_discovered_items(server_id, account_id, item_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS player_whiteboard_connections (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL,
+    whiteboard_id text NOT NULL,
+    from_item_id text NOT NULL,
+    to_item_id text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, whiteboard_id, from_item_id, to_item_id),
+    FOREIGN KEY (server_id, account_id, whiteboard_id, from_item_id)
+        REFERENCES player_whiteboard_pins(server_id, account_id, whiteboard_id, item_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, account_id, whiteboard_id, to_item_id)
+        REFERENCES player_whiteboard_pins(server_id, account_id, whiteboard_id, item_id) ON DELETE CASCADE,
+    CHECK (from_item_id < to_item_id)
+);

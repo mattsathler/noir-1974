@@ -21,6 +21,7 @@ import (
 var envCandidates = []string{".env.local", ".env", "../../.env.local", "../../.env"}
 
 var gameTables = []string{
+	"player_whiteboard_connections", "player_whiteboard_pins", "player_whiteboards", "player_discovered_items",
 	"player_case_progress", "case_states", "case_activity_records", "case_mail_messages",
 	"case_evidence", "case_relationships", "cases", "player_locations", "player_characters",
 	"player_sessions", "player_accounts", "world_mutations", "company_locations",
@@ -29,6 +30,10 @@ var gameTables = []string{
 }
 
 const truncateSQL = `TRUNCATE TABLE
+	player_whiteboard_connections,
+	player_whiteboard_pins,
+	player_whiteboards,
+	player_discovered_items,
 	player_case_progress,
 	case_states,
 	case_activity_records,

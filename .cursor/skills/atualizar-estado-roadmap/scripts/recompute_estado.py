@@ -57,10 +57,10 @@ PRODUCT_BLURB = {
     ),
     9: (
         "O jogador já pode consultar registros e correspondências e se deslocar "
-        "entre cidades e pontos de serviço. Busca e apreensão ainda precisa conectar objetos aos casos."
+        "entre cidades e pontos de serviço. Whiteboards pessoais e identidade visual modular estão em implementação."
     ),
     10: (
-        "O jogador já pode guardar e organizar elementos por caso em whiteboards privados. "
+        "O jogador já pode organizar elementos por caso e personalizar identidades visuais. "
         "A busca e apreensão e a acusação ainda precisam fechar o fluxo investigativo."
     ),
     11: (
@@ -84,7 +84,7 @@ TABLE_LABELS = {
     7: "Registros bancários e GATE",
     8: "Correio eletrônico",
     9: "Deslocamento e pontos de serviço",
-    10: "Whiteboards pessoais",
+    10: "Whiteboards e identidade visual",
     11: "Busca e apreensão",
     12: "Acusação e julgamento",
 }

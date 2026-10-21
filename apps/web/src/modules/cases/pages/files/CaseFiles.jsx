@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { MapPin } from "pixelarticons/react/MapPin";
 import { getCaseFile, getNewspaperIssue, getOpenCases, saveCaseProgress } from "../../../world/api.js";
 
-export default function CaseFiles() {
+export default function CaseFiles({ onPin }) {
   const [cases, setCases] = useState([]);
   const [issue, setIssue] = useState(null);
   const [activeCase, setActiveCase] = useState(null);
@@ -38,12 +39,17 @@ export default function CaseFiles() {
   async function toggleEvidence(evidenceID) {
     if (!detail || savingEvidence) return;
     const current = detail.progress.discoveredEvidenceIds ?? [];
-    const next = current.includes(evidenceID)
-      ? current.filter((id) => id !== evidenceID)
-      : [...current, evidenceID];
+    const removing = current.includes(evidenceID);
+    const next = removing ? current.filter((id) => id !== evidenceID) : [...current, evidenceID];
+    const whiteboardPins = removing
+      ? (detail.progress.whiteboardPins ?? []).filter((id) => id !== evidenceID)
+      : (detail.progress.whiteboardPins ?? []);
+    const whiteboardConnections = removing
+      ? (detail.progress.whiteboardConnections ?? []).filter((edge) => edge.fromId !== evidenceID && edge.toId !== evidenceID)
+      : (detail.progress.whiteboardConnections ?? []);
     setSavingEvidence(evidenceID);
     try {
-      const saved = await saveCaseProgress(detail.case.id, next);
+      const saved = await saveCaseProgress(detail.case.id, { discoveredEvidenceIds: next, whiteboardPins, whiteboardConnections });
       setDetail((previous) => previous ? { ...previous, progress: saved.progress } : previous);
     } catch (error) {
       setMessage(error.message || "CASE NOTES COULD NOT BE SAVED");
@@ -53,8 +59,9 @@ export default function CaseFiles() {
   }
 
   const lead = issue?.lead;
-  const selectedHeadline = lead?.caseId === activeCase?.id ? lead.headline : "OPEN HOMICIDE INQUIRY";
-  const selectedSummary = lead?.caseId === activeCase?.id ? lead.summary : "The investigation remains open.";
+  const matchingLead = Boolean(lead && lead.caseId === activeCase?.id);
+  const selectedHeadline = matchingLead ? lead.headline || "OPEN HOMICIDE INQUIRY" : "OPEN HOMICIDE INQUIRY";
+  const selectedSummary = matchingLead ? lead.summary || "The investigation remains open." : "The investigation remains open.";
   const filedIDs = detail?.progress?.discoveredEvidenceIds ?? [];
 
   return (
@@ -100,6 +107,7 @@ export default function CaseFiles() {
                 <button type="button" disabled={Boolean(savingEvidence)} onClick={() => toggleEvidence(item.id)}>
                   {savingEvidence === item.id ? "SAVING…" : filed ? "REMOVE FROM NOTES" : "FILE IN PERSONAL NOTES"}
                 </button>
+                <button className="whiteboard-pin-button" type="button" aria-label={`Pin ${item.presentation}`} onClick={() => onPin?.({ id: item.id, source: ["email", "bank", "gate"].includes(item.type) ? item.type : "case", title: item.presentation, content: item.content, metadata: item })}><MapPin aria-hidden="true" /></button>
               </article>
             );
           })}

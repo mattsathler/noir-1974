@@ -60,6 +60,14 @@ A versão `3` mantém o formato da sociedade inicial e escolhe nomes de catálog
 
 A versão `2` e seus catálogos pequenos continuam disponíveis para reconstruir mundos existentes sem alterar nomes. Cada servidor conserva a versão de gerador registrada na criação; mundos novos usam a versão mais recente. Ao adicionar cidades, deve-se acrescentar um arquivo de catálogo e registrá-lo com seu país e cidade canônicos.
 
+## Próxima versão — identidade visual procedural
+
+O M10 adicionará uma composição visual modular para NPCs. A nova versão do gerador derivará, em um fluxo independente por NPC, IDs de peças compatíveis para rosto, tom de pele, cabelo, características visuais e acessórios. A composição depende da seed mundial, da versão do gerador, da versão do catálogo visual e da chave estável do NPC; não depende da ordem em que entidades forem consultadas. Assim, todos os jogadores do mesmo servidor verão a mesma composição para cada NPC.
+
+Esta mudança exige incrementar a versão do gerador (planejada como versão `4`), mantendo as versões `1` a `3` reconstruíveis. Mundos existentes continuam usando a versão gravada; trocar sua seed ou versão não é uma migração automática e só pode ocorrer por reconstrução explícita. Novos mundos passam a usar a versão mais recente.
+
+A aparência escolhida para o personagem do jogador tem outra origem: é uma preferência individual, validada contra o catálogo de peças e persistida na conta. Ela não é derivada da seed mundial e não altera os personagens vistos por outros jogadores.
+
 ## Determinismo e identidade
 
 O gerador recebe uma seed opaca e uma versão explícita. A versão 1 deriva fluxos independentes usando SHA-256 sobre campos com comprimento prefixado: domínio do gerador, versão, seed e escopo (cidade ou catálogo de uma região). Cada fluxo usa SHA-256 com contador para produzir valores aleatórios sem depender de `math/rand`, relógio, estado global ou ordem de execução de outras regiões.

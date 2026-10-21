@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/mail"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,6 +26,7 @@ const sessionCookie = "noir_session"
 const sessionDuration = 30 * 24 * time.Hour
 
 var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{3,24}$`)
+var whiteboardIDPattern = regexp.MustCompile(`^board_[A-Za-z0-9_-]+$`)
 
 type Handler struct {
 	store               store
@@ -34,6 +36,7 @@ type Handler struct {
 	worldReader         WorldDirectoryReader
 	newspaperReader     NewspaperReader
 	caseReader          CaseAPIReader
+	whiteboardReader    WhiteboardAPIReader
 	recordsReader       RecordsAPIReader
 	emailsReader        EmailsAPIReader
 	worldServerID       string
@@ -64,6 +67,20 @@ type EmailsAPIReader interface {
 	NPCEmails(context.Context, string, string, time.Time, time.Time) ([]correspondence.Message, error)
 }
 
+type WhiteboardAPIReader interface {
+	RecordDiscoveredItems(context.Context, string, string, []cases.DiscoveredItem) error
+	ListWhiteboards(context.Context, string, string) ([]cases.Whiteboard, error)
+	CreateWhiteboard(context.Context, string, string, string, string) (cases.Whiteboard, error)
+	RenameWhiteboard(context.Context, string, string, string, string) error
+	DeleteWhiteboard(context.Context, string, string, string) error
+	GetWhiteboard(context.Context, string, string, string) (cases.Whiteboard, error)
+	PinDiscoveredItem(context.Context, string, string, string, string, int, int) error
+	MoveWhiteboardPin(context.Context, string, string, string, string, int, int) error
+	RemoveWhiteboardPin(context.Context, string, string, string, string) error
+	ConnectWhiteboardPins(context.Context, string, string, string, string, string) error
+	DisconnectWhiteboardPins(context.Context, string, string, string, string, string) error
+}
+
 // NewHandler creates the identity API. Cookies are secure in production deployments.
 func NewHandler(repository store, secureCookie bool) http.Handler {
 	return newHandler(repository, secureCookie, nil, "", nil, nil, nil, nil)
@@ -89,6 +106,9 @@ func NewHandlerWithGameAndMail(repository store, secureCookie bool, reader World
 func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, emailsReader EmailsAPIReader) http.Handler {
 	now := time.Now
 	handler := &Handler{store: repository, secureCookie: secureCookie, now: now, worldClockStartedAt: now(), worldReader: reader, newspaperReader: newspaperReader, caseReader: caseReader, recordsReader: recordsReader, emailsReader: emailsReader, worldServerID: serverID}
+	if whiteboardReader, ok := caseReader.(WhiteboardAPIReader); ok {
+		handler.whiteboardReader = whiteboardReader
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/auth/register", handler.register)
 	mux.HandleFunc("POST /api/auth/login", handler.login)
@@ -116,6 +136,18 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/cases", handler.listOpenCases)
 		mux.HandleFunc("GET /api/cases/{caseID}", handler.getCase)
 		mux.HandleFunc("POST /api/cases/{caseID}/progress", handler.saveCaseProgress)
+	}
+	if handler.whiteboardReader != nil {
+		mux.HandleFunc("GET /api/whiteboards", handler.listWhiteboards)
+		mux.HandleFunc("POST /api/whiteboards", handler.createWhiteboard)
+		mux.HandleFunc("GET /api/whiteboards/{boardID}", handler.getWhiteboard)
+		mux.HandleFunc("PATCH /api/whiteboards/{boardID}", handler.renameWhiteboard)
+		mux.HandleFunc("DELETE /api/whiteboards/{boardID}", handler.deleteWhiteboard)
+		mux.HandleFunc("POST /api/whiteboards/{boardID}/pins", handler.pinWhiteboardItem)
+		mux.HandleFunc("PATCH /api/whiteboards/{boardID}/pins/{itemID}", handler.moveWhiteboardPin)
+		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/pins/{itemID}", handler.removeWhiteboardPin)
+		mux.HandleFunc("POST /api/whiteboards/{boardID}/connections", handler.connectWhiteboardPins)
+		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/connections/{fromID}/{toID}", handler.disconnectWhiteboardPins)
 	}
 	mux.HandleFunc("POST /api/characters", handler.createCharacter)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -190,11 +222,34 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		}
 		results = filtered
 	}
+	items := make([]cases.DiscoveredItem, 0, len(results))
+	for _, result := range results {
+		metadata, _ := json.Marshal(result)
+		title := "GATE ACCESS LOG"
+		if result.Source == "bank" {
+			title = "FINANCIAL RECORD"
+		}
+		content := result.Description
+		if result.Amount > 0 {
+			content += " · " + strconv.Itoa(result.Amount) + " Credits"
+		}
+		if result.Origin != "" || result.Destination != "" {
+			content += " · " + result.Origin + " → " + result.Destination
+		}
+		items = append(items, cases.DiscoveredItem{ID: result.ID, Source: result.Source, Title: title, Content: content, Metadata: metadata})
+	}
+	if h.whiteboardReader != nil {
+		if err := h.whiteboardReader.RecordDiscoveredItems(r.Context(), h.worldServerID, current.ID, items); err != nil {
+			http.Error(w, "could not save retrieved records", http.StatusInternalServerError)
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
 func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
-	if !h.authorizeWorldRequest(w, r) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
 		return
 	}
 	from, err := time.Parse("2006-01-02", r.URL.Query().Get("from"))
@@ -225,6 +280,17 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not retrieve correspondence", http.StatusInternalServerError)
 		return
 	}
+	items := make([]cases.DiscoveredItem, 0, len(results))
+	for _, result := range results {
+		metadata, _ := json.Marshal(result)
+		items = append(items, cases.DiscoveredItem{ID: result.ID, Source: "email", Title: result.Subject, Content: result.Sender + " → " + result.Recipient + "\n" + result.Body, Metadata: metadata})
+	}
+	if h.whiteboardReader != nil {
+		if err := h.whiteboardReader.RecordDiscoveredItems(r.Context(), h.worldServerID, current.ID, items); err != nil {
+			http.Error(w, "could not save retrieved correspondence", http.StatusInternalServerError)
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
@@ -235,7 +301,9 @@ type caseDetailResponse struct {
 }
 
 type caseProgressRequest struct {
-	DiscoveredEvidenceIDs []string `json:"discoveredEvidenceIds"`
+	DiscoveredEvidenceIDs []string                     `json:"discoveredEvidenceIds"`
+	WhiteboardPins        []string                     `json:"whiteboardPins"`
+	WhiteboardConnections []cases.WhiteboardConnection `json:"whiteboardConnections"`
 }
 
 func (h *Handler) listOpenCases(w http.ResponseWriter, r *http.Request) {
@@ -269,7 +337,244 @@ func (h *Handler) getCase(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not retrieve case progress", http.StatusInternalServerError)
 		return
 	}
+	if h.whiteboardReader != nil {
+		items := make([]cases.DiscoveredItem, 0, len(evidence))
+		for _, item := range evidence {
+			metadata, _ := json.Marshal(item)
+			source := item.Type
+			if source != "email" && source != "bank" && source != "gate" {
+				source = "case"
+			}
+			items = append(items, cases.DiscoveredItem{ID: item.ID, Source: source, Title: item.Presentation, Content: item.Content, Metadata: metadata})
+		}
+		if err := h.whiteboardReader.RecordDiscoveredItems(r.Context(), h.worldServerID, current.ID, items); err != nil {
+			http.Error(w, "could not record case details", http.StatusInternalServerError)
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, caseDetailResponse{Case: publicCase, Evidence: evidence, Progress: progress})
+}
+
+type whiteboardCreateRequest struct {
+	Title string `json:"title"`
+	ID    string `json:"id"`
+}
+type whiteboardRenameRequest struct {
+	Title string `json:"title"`
+}
+type whiteboardPinRequest struct {
+	ItemID string `json:"itemId"`
+	X      int    `json:"x"`
+	Y      int    `json:"y"`
+}
+type whiteboardPositionRequest struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
+type whiteboardConnectionRequest struct {
+	FromID string `json:"fromId"`
+	ToID   string `json:"toId"`
+}
+
+func (h *Handler) listWhiteboards(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	boards, err := h.whiteboardReader.ListWhiteboards(r.Context(), h.worldServerID, current.ID)
+	if err != nil {
+		http.Error(w, "could not retrieve whiteboards", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": boards})
+}
+
+func (h *Handler) createWhiteboard(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input whiteboardCreateRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	title := strings.TrimSpace(input.Title)
+	if len([]rune(title)) > 64 {
+		http.Error(w, "whiteboard title cannot exceed 64 characters", http.StatusBadRequest)
+		return
+	}
+	boardID := strings.TrimSpace(input.ID)
+	if boardID == "" {
+		identifier := make([]byte, 18)
+		if _, err := rand.Read(identifier); err != nil {
+			http.Error(w, "could not create whiteboard", http.StatusInternalServerError)
+			return
+		}
+		boardID = "board_" + base64.RawURLEncoding.EncodeToString(identifier)
+	} else if len(boardID) > 80 || !whiteboardIDPattern.MatchString(boardID) {
+		http.Error(w, "invalid whiteboard id", http.StatusBadRequest)
+		return
+	}
+	board, err := h.whiteboardReader.CreateWhiteboard(r.Context(), h.worldServerID, current.ID, boardID, title)
+	if err != nil {
+		http.Error(w, "could not create whiteboard", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"whiteboard": board})
+}
+
+func (h *Handler) renameWhiteboard(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input whiteboardRenameRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	title := strings.TrimSpace(input.Title)
+	if title == "" || len([]rune(title)) > 64 {
+		http.Error(w, "whiteboard title must contain 1 to 64 characters", http.StatusBadRequest)
+		return
+	}
+	if err := h.whiteboardReader.RenameWhiteboard(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"), title); err != nil {
+		if errors.Is(err, cases.ErrCaseNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "could not rename whiteboard", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) deleteWhiteboard(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	if err := h.whiteboardReader.DeleteWhiteboard(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID")); err != nil {
+		if errors.Is(err, cases.ErrCaseNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "could not delete whiteboard", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) getWhiteboard(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	board, err := h.whiteboardReader.GetWhiteboard(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"))
+	if errors.Is(err, cases.ErrCaseNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "could not retrieve whiteboard", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"whiteboard": board})
+}
+
+func (h *Handler) pinWhiteboardItem(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input whiteboardPinRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if err := h.whiteboardReader.PinDiscoveredItem(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"), input.ItemID, input.X, input.Y); err != nil {
+		if errors.Is(err, cases.ErrEvidenceNotFound) || errors.Is(err, cases.ErrInvalidProgress) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "could not pin discovered item", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) moveWhiteboardPin(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input whiteboardPositionRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if err := h.whiteboardReader.MoveWhiteboardPin(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"), r.PathValue("itemID"), input.X, input.Y); err != nil {
+		if errors.Is(err, cases.ErrInvalidProgress) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, cases.ErrEvidenceNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "could not move whiteboard pin", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) removeWhiteboardPin(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	if err := h.whiteboardReader.RemoveWhiteboardPin(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"), r.PathValue("itemID")); err != nil {
+		if errors.Is(err, cases.ErrEvidenceNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "could not remove whiteboard pin", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) connectWhiteboardPins(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input whiteboardConnectionRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if err := h.whiteboardReader.ConnectWhiteboardPins(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"), input.FromID, input.ToID); err != nil {
+		if errors.Is(err, cases.ErrInvalidProgress) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, cases.ErrEvidenceNotFound) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "could not connect whiteboard pins", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) disconnectWhiteboardPins(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	if err := h.whiteboardReader.DisconnectWhiteboardPins(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"), r.PathValue("fromID"), r.PathValue("toID")); err != nil {
+		http.Error(w, "could not remove whiteboard connection", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) saveCaseProgress(w http.ResponseWriter, r *http.Request) {
@@ -289,7 +594,7 @@ func (h *Handler) saveCaseProgress(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not retrieve case file", http.StatusInternalServerError)
 		return
 	}
-	progress := cases.PlayerProgress{DiscoveredEvidenceIDs: input.DiscoveredEvidenceIDs}
+	progress := cases.PlayerProgress{DiscoveredEvidenceIDs: input.DiscoveredEvidenceIDs, WhiteboardPins: input.WhiteboardPins, WhiteboardConnections: input.WhiteboardConnections}
 	if err := h.caseReader.SavePlayerProgress(r.Context(), h.worldServerID, caseID, current.ID, progress); err != nil {
 		if errors.Is(err, cases.ErrInvalidProgress) || errors.Is(err, cases.ErrEvidenceNotFound) {
 			http.Error(w, err.Error(), http.StatusBadRequest)

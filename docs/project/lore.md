@@ -58,7 +58,9 @@ Reservado, elegante e implacável, Voss raramente aparece em público. Não prec
 
 O jogador interpreta um **detetive particular**. Ele já trabalhou com a Interpol; essa relação passada explica por que ainda tem acesso a determinados recursos e informações ligados à instituição. Ele não é um agente da Interpol, e sua atuação como investigador independente deve permanecer clara na narrativa.
 
-Ao criar o personagem, o jogador poderá escolher um entre **seis retratos** para representá-lo. Os retratos devem seguir a direção de pixel art estabelecida pela [Regra 0001](../rules/0001-direcao-artistica.md): mesma escala, paleta, contraste, contorno e nível de detalhe, com roupas e aparência coerentes com o século XVIII e o estilo punk antigo de Noir. Os seis retratos ainda serão criados.
+Ao criar o personagem, o jogador poderá montar sua aparência com peças visuais modulares em pixel art — rosto, cabelo, tom de pele, características e acessórios. A composição deve seguir a [Regra 0001](../rules/0001-direcao-artistica.md): escala, paleta, contraste, contorno e nível de detalhe consistentes, com roupas e aparência coerentes com o século XVIII e o estilo punk antigo de Noir. A escolha é individual e persiste na conta.
+
+NPCs também terão representação visual modular. Suas peças serão escolhidas deterministicamente pela seed e pela versão do gerador do servidor, tornando cada composição estável e compartilhada entre os jogadores daquele servidor.
 
 ## Elementos ainda não definidos
 

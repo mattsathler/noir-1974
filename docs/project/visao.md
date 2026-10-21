@@ -22,3 +22,5 @@ Jogadores conectados ao mesmo servidor compartilham um mundo persistente e resol
 No cadastro, o jogador informa o primeiro nome. O jogo passa a se referir ao personagem pela **inicial**.
 
 Exemplo: nome `Victor` → identidade `V`.
+
+O jogador também poderá montar a aparência do personagem com peças visuais compatíveis. A composição será salva na conta, independente da seed do mundo. NPCs terão composições próprias reconstruídas deterministicamente para que todos no mesmo servidor vejam a mesma aparência.

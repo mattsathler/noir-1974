@@ -6,7 +6,7 @@ Na raiz do projeto, `npm run dev:api` inicia a API em modo de desenvolvimento. O
 
 ## Identidade
 
-O módulo `internal/identity` mantém contas de jogador, sessões e personagens. A conta guarda usuário, e-mail e hash de senha; cada conta pode ter um personagem, criado no primeiro acesso com nome e uma das seis opções de retrato.
+O módulo `internal/identity` mantém contas de jogador, sessões e personagens. A conta guarda usuário, e-mail e hash de senha; cada conta pode ter um personagem, criado no primeiro acesso. A escolha atual de retrato fixo será substituída pelo editor de aparência modular previsto no M10, com as peças escolhidas persistidas na conta.
 
 - `POST /api/auth/register` cria a conta e inicia uma sessão.
 - `POST /api/auth/login` autentica por e-mail e senha.

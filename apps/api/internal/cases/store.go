@@ -45,7 +45,36 @@ type SharedState struct {
 }
 
 type PlayerProgress struct {
-	DiscoveredEvidenceIDs []string `json:"discoveredEvidenceIds"`
+	DiscoveredEvidenceIDs []string               `json:"discoveredEvidenceIds"`
+	WhiteboardPins        []string               `json:"whiteboardPins"`
+	WhiteboardConnections []WhiteboardConnection `json:"whiteboardConnections"`
+}
+
+type WhiteboardConnection struct {
+	FromID string `json:"fromId"`
+	ToID   string `json:"toId"`
+}
+
+type DiscoveredItem struct {
+	ID       string          `json:"id"`
+	Source   string          `json:"source"`
+	Title    string          `json:"title"`
+	Content  string          `json:"content"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
+}
+
+type WhiteboardPin struct {
+	DiscoveredItem
+	X int `json:"x"`
+	Y int `json:"y"`
+}
+
+type Whiteboard struct {
+	ID          string                 `json:"id"`
+	Title       string                 `json:"title"`
+	CreatedAt   time.Time              `json:"createdAt"`
+	Pins        []WhiteboardPin        `json:"pins"`
+	Connections []WhiteboardConnection `json:"connections"`
 }
 
 // PublicCase contains only facts safe for the newspaper headline.
@@ -60,6 +89,7 @@ type PublicCase struct {
 
 type PublicEvidence struct {
 	ID           string `json:"id"`
+	Type         string `json:"type"`
 	Presentation string `json:"presentation"`
 	Content      string `json:"content"`
 	LocationID   string `json:"locationId"`
@@ -369,6 +399,7 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 			return PublicCase{}, nil, fmt.Errorf("decode public evidence: %w", err)
 		}
 		item.Presentation, item.Content = narrative.Presentation, narrative.Content
+		item.Type = "record"
 		if item.Presentation == "" {
 			item.Presentation = "CASE RECORD"
 		}
@@ -380,6 +411,69 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 	if err := rows.Err(); err != nil {
 		return PublicCase{}, nil, err
 	}
+	activityRows, err := store.db.Query(ctx,
+		`SELECT record_id, record_data FROM case_activity_records
+		 WHERE server_id = $1::uuid AND case_id = $2 ORDER BY occurred_at, record_id`, serverID, caseID,
+	)
+	if err != nil {
+		return PublicCase{}, nil, err
+	}
+	for activityRows.Next() {
+		var id string
+		var data []byte
+		if err := activityRows.Scan(&id, &data); err != nil {
+			activityRows.Close()
+			return PublicCase{}, nil, err
+		}
+		var record records.Record
+		if err := json.Unmarshal(data, &record); err != nil {
+			activityRows.Close()
+			return PublicCase{}, nil, fmt.Errorf("decode public activity record: %w", err)
+		}
+		kind, presentation := "gate", "GATE ACCESS LOG"
+		content := record.Description
+		if record.Source == "bank" {
+			kind, presentation = "bank", "FINANCIAL RECORD"
+			if record.Amount > 0 {
+				content += fmt.Sprintf(" Amount: %d Credits.", record.Amount)
+			}
+		}
+		if record.Origin != "" || record.Destination != "" {
+			content += fmt.Sprintf(" Recorded passage: %s to %s.", record.Origin, record.Destination)
+		}
+		evidence = append(evidence, PublicEvidence{ID: id, Type: kind, Presentation: presentation, Content: content})
+	}
+	if err := activityRows.Err(); err != nil {
+		activityRows.Close()
+		return PublicCase{}, nil, err
+	}
+	activityRows.Close()
+	mailRows, err := store.db.Query(ctx,
+		`SELECT message_id, message_data FROM case_mail_messages
+		 WHERE server_id = $1::uuid AND case_id = $2 ORDER BY sent_at, message_id`, serverID, caseID,
+	)
+	if err != nil {
+		return PublicCase{}, nil, err
+	}
+	for mailRows.Next() {
+		var id string
+		var data []byte
+		if err := mailRows.Scan(&id, &data); err != nil {
+			mailRows.Close()
+			return PublicCase{}, nil, err
+		}
+		var message mail.Message
+		if err := json.Unmarshal(data, &message); err != nil {
+			mailRows.Close()
+			return PublicCase{}, nil, fmt.Errorf("decode public case correspondence: %w", err)
+		}
+		evidence = append(evidence, PublicEvidence{ID: id, Type: "email", Presentation: "EMAIL · " + message.Subject, Content: message.Body})
+	}
+	if err := mailRows.Err(); err != nil {
+		mailRows.Close()
+		return PublicCase{}, nil, err
+	}
+	mailRows.Close()
 	return result, evidence, nil
 }
 
@@ -415,7 +509,7 @@ func (store *PostgresStore) SetSharedStatus(ctx context.Context, serverID, caseI
 }
 
 func (store *PostgresStore) GetPlayerProgress(ctx context.Context, serverID, caseID, accountID string) (PlayerProgress, error) {
-	progress := PlayerProgress{DiscoveredEvidenceIDs: make([]string, 0)}
+	progress := PlayerProgress{DiscoveredEvidenceIDs: make([]string, 0), WhiteboardPins: make([]string, 0), WhiteboardConnections: make([]WhiteboardConnection, 0)}
 	var data []byte
 	err := store.db.QueryRow(ctx,
 		`SELECT progress FROM player_case_progress
@@ -434,6 +528,12 @@ func (store *PostgresStore) GetPlayerProgress(ctx context.Context, serverID, cas
 	if progress.DiscoveredEvidenceIDs == nil {
 		progress.DiscoveredEvidenceIDs = make([]string, 0)
 	}
+	if progress.WhiteboardPins == nil {
+		progress.WhiteboardPins = make([]string, 0)
+	}
+	if progress.WhiteboardConnections == nil {
+		progress.WhiteboardConnections = make([]WhiteboardConnection, 0)
+	}
 	return progress, nil
 }
 
@@ -445,13 +545,34 @@ func (store *PostgresStore) SavePlayerProgress(ctx context.Context, serverID, ca
 	if len(normalized.DiscoveredEvidenceIDs) > 0 {
 		var count int
 		if err := store.db.QueryRow(ctx,
-			`SELECT COUNT(*) FROM case_evidence
-			 WHERE server_id = $1::uuid AND case_id = $2 AND evidence_id = ANY($3::text[])`,
+			`SELECT COUNT(*) FROM (
+				SELECT evidence_id AS item_id FROM case_evidence WHERE server_id = $1::uuid AND case_id = $2
+				UNION ALL SELECT record_id FROM case_activity_records WHERE server_id = $1::uuid AND case_id = $2
+				UNION ALL SELECT message_id FROM case_mail_messages WHERE server_id = $1::uuid AND case_id = $2
+			) AS case_items WHERE item_id = ANY($3::text[])`,
 			serverID, caseID, normalized.DiscoveredEvidenceIDs,
 		).Scan(&count); err != nil {
 			return err
 		}
 		if count != len(normalized.DiscoveredEvidenceIDs) {
+			return ErrEvidenceNotFound
+		}
+	}
+	discovered := make(map[string]bool, len(normalized.DiscoveredEvidenceIDs))
+	for _, id := range normalized.DiscoveredEvidenceIDs {
+		discovered[id] = true
+	}
+	for _, id := range normalized.WhiteboardPins {
+		if !discovered[id] {
+			return ErrEvidenceNotFound
+		}
+	}
+	pinned := make(map[string]bool, len(normalized.WhiteboardPins))
+	for _, id := range normalized.WhiteboardPins {
+		pinned[id] = true
+	}
+	for _, connection := range normalized.WhiteboardConnections {
+		if !pinned[connection.FromID] || !pinned[connection.ToID] {
 			return ErrEvidenceNotFound
 		}
 	}
@@ -470,18 +591,267 @@ func (store *PostgresStore) SavePlayerProgress(ctx context.Context, serverID, ca
 }
 
 func normalizeProgress(progress PlayerProgress) (PlayerProgress, error) {
-	ids := append([]string(nil), progress.DiscoveredEvidenceIDs...)
-	for _, id := range ids {
-		if strings.TrimSpace(id) == "" {
+	normalizeIDs := func(source []string) ([]string, error) {
+		ids := append([]string(nil), source...)
+		for _, id := range ids {
+			if strings.TrimSpace(id) == "" {
+				return nil, ErrInvalidProgress
+			}
+		}
+		sort.Strings(ids)
+		unique := ids[:0]
+		for _, id := range ids {
+			if len(unique) == 0 || unique[len(unique)-1] != id {
+				unique = append(unique, id)
+			}
+		}
+		return unique, nil
+	}
+	discovered, err := normalizeIDs(progress.DiscoveredEvidenceIDs)
+	if err != nil {
+		return PlayerProgress{}, err
+	}
+	pins, err := normalizeIDs(progress.WhiteboardPins)
+	if err != nil {
+		return PlayerProgress{}, err
+	}
+	connections := append([]WhiteboardConnection(nil), progress.WhiteboardConnections...)
+	for index := range connections {
+		connection := &connections[index]
+		if strings.TrimSpace(connection.FromID) == "" || strings.TrimSpace(connection.ToID) == "" || connection.FromID == connection.ToID {
 			return PlayerProgress{}, ErrInvalidProgress
 		}
-	}
-	sort.Strings(ids)
-	unique := ids[:0]
-	for _, id := range ids {
-		if len(unique) == 0 || unique[len(unique)-1] != id {
-			unique = append(unique, id)
+		if connection.ToID < connection.FromID {
+			connection.FromID, connection.ToID = connection.ToID, connection.FromID
 		}
 	}
-	return PlayerProgress{DiscoveredEvidenceIDs: unique}, nil
+	sort.Slice(connections, func(i, j int) bool {
+		if connections[i].FromID == connections[j].FromID {
+			return connections[i].ToID < connections[j].ToID
+		}
+		return connections[i].FromID < connections[j].FromID
+	})
+	uniqueConnections := connections[:0]
+	for _, connection := range connections {
+		if len(uniqueConnections) == 0 || uniqueConnections[len(uniqueConnections)-1] != connection {
+			uniqueConnections = append(uniqueConnections, connection)
+		}
+	}
+	return PlayerProgress{DiscoveredEvidenceIDs: discovered, WhiteboardPins: pins, WhiteboardConnections: uniqueConnections}, nil
+}
+
+func (store *PostgresStore) RecordDiscoveredItems(ctx context.Context, serverID, accountID string, items []DiscoveredItem) error {
+	valid := make([]DiscoveredItem, 0, len(items))
+	for _, item := range items {
+		if item.ID == "" || item.Title == "" || (item.Source != "email" && item.Source != "bank" && item.Source != "gate" && item.Source != "case") {
+			continue
+		}
+		valid = append(valid, item)
+	}
+	if len(valid) == 0 {
+		return nil
+	}
+	data, err := json.Marshal(valid)
+	if err != nil {
+		return err
+	}
+	if _, err := store.db.Exec(ctx,
+		`INSERT INTO player_discovered_items (server_id, account_id, item_id, item_source, item_data)
+		 SELECT $1::uuid, $2::uuid, item->>'id', item->>'source', item
+		 FROM jsonb_array_elements($3::jsonb) AS items(item)
+		 ON CONFLICT (server_id, account_id, item_id) DO UPDATE
+		 SET item_source = EXCLUDED.item_source, item_data = EXCLUDED.item_data`,
+		serverID, accountID, string(data)); err != nil {
+		return fmt.Errorf("record discovered items: %w", err)
+	}
+	return nil
+}
+
+func (store *PostgresStore) ListWhiteboards(ctx context.Context, serverID, accountID string) ([]Whiteboard, error) {
+	rows, err := store.db.Query(ctx,
+		`SELECT whiteboard_id, title, created_at FROM player_whiteboards
+		 WHERE server_id = $1::uuid AND account_id = $2::uuid ORDER BY created_at, whiteboard_id`, serverID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	boards := make([]Whiteboard, 0)
+	for rows.Next() {
+		var board Whiteboard
+		if err := rows.Scan(&board.ID, &board.Title, &board.CreatedAt); err != nil {
+			return nil, err
+		}
+		board.Pins = []WhiteboardPin{}
+		board.Connections = []WhiteboardConnection{}
+		boards = append(boards, board)
+	}
+	return boards, rows.Err()
+}
+
+func (store *PostgresStore) CreateWhiteboard(ctx context.Context, serverID, accountID, boardID, title string) (Whiteboard, error) {
+	var board Whiteboard
+	err := store.db.QueryRow(ctx,
+		`INSERT INTO player_whiteboards (server_id, account_id, whiteboard_id, title)
+		 VALUES (
+		   $1::uuid, $2::uuid, $3,
+		   COALESCE(NULLIF($4, ''), 'INVESTIGATION ' || (
+		     SELECT (COUNT(*) + 1)::text FROM player_whiteboards
+		     WHERE server_id = $1::uuid AND account_id = $2::uuid
+		   ))
+		 ) RETURNING whiteboard_id, title, created_at`,
+		serverID, accountID, boardID, title).Scan(&board.ID, &board.Title, &board.CreatedAt)
+	if err != nil {
+		return Whiteboard{}, err
+	}
+	board.Pins = []WhiteboardPin{}
+	board.Connections = []WhiteboardConnection{}
+	return board, nil
+}
+
+func (store *PostgresStore) RenameWhiteboard(ctx context.Context, serverID, accountID, boardID, title string) error {
+	tag, err := store.db.Exec(ctx,
+		`UPDATE player_whiteboards SET title = $4
+		 WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3`,
+		serverID, accountID, boardID, title)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrCaseNotFound
+	}
+	return nil
+}
+
+func (store *PostgresStore) DeleteWhiteboard(ctx context.Context, serverID, accountID, boardID string) error {
+	tag, err := store.db.Exec(ctx,
+		`DELETE FROM player_whiteboards
+		 WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3`,
+		serverID, accountID, boardID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrCaseNotFound
+	}
+	return nil
+}
+
+func (store *PostgresStore) GetWhiteboard(ctx context.Context, serverID, accountID, boardID string) (Whiteboard, error) {
+	var board Whiteboard
+	var pinsJSON, connectionsJSON []byte
+	err := store.db.QueryRow(ctx,
+		`SELECT board.title, board.created_at,
+		        COALESCE((
+		          SELECT jsonb_agg(item.item_data || jsonb_build_object('x', pin.position_x, 'y', pin.position_y)
+		                           ORDER BY pin.pinned_at, pin.item_id)
+		          FROM player_whiteboard_pins pin
+		          JOIN player_discovered_items item USING (server_id, account_id, item_id)
+		          WHERE pin.server_id = board.server_id AND pin.account_id = board.account_id AND pin.whiteboard_id = board.whiteboard_id
+		        ), '[]'::jsonb),
+		        COALESCE((
+		          SELECT jsonb_agg(jsonb_build_object('fromId', edge.from_item_id, 'toId', edge.to_item_id)
+		                           ORDER BY edge.from_item_id, edge.to_item_id)
+		          FROM player_whiteboard_connections edge
+		          WHERE edge.server_id = board.server_id AND edge.account_id = board.account_id AND edge.whiteboard_id = board.whiteboard_id
+		        ), '[]'::jsonb)
+		 FROM player_whiteboards board
+		 WHERE board.server_id = $1::uuid AND board.account_id = $2::uuid AND board.whiteboard_id = $3`,
+		serverID, accountID, boardID).Scan(&board.Title, &board.CreatedAt, &pinsJSON, &connectionsJSON)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Whiteboard{}, ErrCaseNotFound
+	}
+	if err != nil {
+		return Whiteboard{}, err
+	}
+	board.ID = boardID
+	if err := json.Unmarshal(pinsJSON, &board.Pins); err != nil {
+		return Whiteboard{}, fmt.Errorf("decode whiteboard pins: %w", err)
+	}
+	if err := json.Unmarshal(connectionsJSON, &board.Connections); err != nil {
+		return Whiteboard{}, fmt.Errorf("decode whiteboard connections: %w", err)
+	}
+	return board, nil
+}
+
+func (store *PostgresStore) PinDiscoveredItem(ctx context.Context, serverID, accountID, boardID, itemID string, x, y int) error {
+	if x < 0 || y < 0 || x > 10000 || y > 10000 {
+		return ErrInvalidProgress
+	}
+	var exists bool
+	if err := store.db.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM player_whiteboards WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3)
+		 AND EXISTS (SELECT 1 FROM player_discovered_items WHERE server_id = $1::uuid AND account_id = $2::uuid AND item_id = $4)`,
+		serverID, accountID, boardID, itemID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return ErrEvidenceNotFound
+	}
+	_, err := store.db.Exec(ctx,
+		`INSERT INTO player_whiteboard_pins (server_id, account_id, whiteboard_id, item_id, position_x, position_y)
+		 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6) ON CONFLICT DO NOTHING`, serverID, accountID, boardID, itemID, x, y)
+	return err
+}
+
+func (store *PostgresStore) MoveWhiteboardPin(ctx context.Context, serverID, accountID, boardID, itemID string, x, y int) error {
+	if x < 0 || y < 0 || x > 10000 || y > 10000 {
+		return ErrInvalidProgress
+	}
+	result, err := store.db.Exec(ctx,
+		`UPDATE player_whiteboard_pins SET position_x = $5, position_y = $6
+		 WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3 AND item_id = $4`,
+		serverID, accountID, boardID, itemID, x, y)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrEvidenceNotFound
+	}
+	return nil
+}
+
+func (store *PostgresStore) RemoveWhiteboardPin(ctx context.Context, serverID, accountID, boardID, itemID string) error {
+	result, err := store.db.Exec(ctx,
+		`DELETE FROM player_whiteboard_pins WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3 AND item_id = $4`,
+		serverID, accountID, boardID, itemID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrEvidenceNotFound
+	}
+	return nil
+}
+
+func (store *PostgresStore) ConnectWhiteboardPins(ctx context.Context, serverID, accountID, boardID, fromID, toID string) error {
+	if fromID == toID || fromID == "" || toID == "" {
+		return ErrInvalidProgress
+	}
+	var count int
+	if err := store.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM player_whiteboard_pins
+		 WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3 AND item_id = ANY($4::text[])`,
+		serverID, accountID, boardID, []string{fromID, toID}).Scan(&count); err != nil {
+		return err
+	}
+	if count != 2 {
+		return ErrEvidenceNotFound
+	}
+	if toID < fromID {
+		fromID, toID = toID, fromID
+	}
+	_, err := store.db.Exec(ctx,
+		`INSERT INTO player_whiteboard_connections (server_id, account_id, whiteboard_id, from_item_id, to_item_id)
+		 VALUES ($1::uuid, $2::uuid, $3, $4, $5) ON CONFLICT DO NOTHING`, serverID, accountID, boardID, fromID, toID)
+	return err
+}
+
+func (store *PostgresStore) DisconnectWhiteboardPins(ctx context.Context, serverID, accountID, boardID, fromID, toID string) error {
+	if toID < fromID {
+		fromID, toID = toID, fromID
+	}
+	_, err := store.db.Exec(ctx,
+		`DELETE FROM player_whiteboard_connections WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3 AND from_item_id = $4 AND to_item_id = $5`,
+		serverID, accountID, boardID, fromID, toID)
+	return err
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { MapPin } from "pixelarticons/react/MapPin";
 import { getNPCRecords, searchCompanies, searchLocations, searchPeople } from "../../api.js";
 import DatePicker from "../../components/DatePicker.jsx";
 
@@ -36,7 +37,7 @@ function displayRecordDate(value, timeZone) {
   }).format(date);
 }
 
-export default function WorldDirectory({ program, serverTime = new Date("1974-11-12T20:15:00Z"), timeZone = "Europe/Paris", runHack }) {
+export default function WorldDirectory({ program, serverTime = new Date("1974-11-12T20:15:00Z"), timeZone = "Europe/Paris", runHack, onPin }) {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -219,6 +220,7 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
                     <span>RECORDED PASSAGE</span>
                     <div><strong>{record.origin || "UNKNOWN ORIGIN"}</strong><b aria-hidden="true">→</b><strong>{record.destination || "UNKNOWN DESTINATION"}</strong></div>
                   </div>}
+                  <button className="whiteboard-pin-button" type="button" aria-label={`Pin ${isGateRecords ? "GATE log" : "financial record"}`} onClick={() => onPin?.({ id: record.id, source: record.source, title: isGateRecords ? "GATE ACCESS LOG" : "FINANCIAL RECORD", content: `${record.description}${record.amount > 0 ? ` · ${record.amount} Credits` : ""}${record.origin || record.destination ? ` · ${record.origin || "UNKNOWN"} → ${record.destination || "UNKNOWN"}` : ""}`, metadata: record })}><MapPin aria-hidden="true" /></button>
                 </article>
               ))}
             </section>

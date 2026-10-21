@@ -24,6 +24,7 @@ A identidade conceitual é `(server_id, entity_id)`. Um `entity_id` é estável 
 | Evidência (`case_evidence`) | Fato associado a um caso. Sua classificação e ligação com a solução são internas ao backend. |
 | Registro de atividade de caso (`case_activity_records`) | Evento bancário ou GATE persistido para um NPC e relacionado internamente a um caso; a resposta pública contém somente os dados narrativos do registro. |
 | Progresso do jogador | Descobertas individuais de uma conta sobre um caso compartilhado. Não altera a definição nem o estado comum do caso. |
+| Aparência do personagem do jogador | Seleção individual de IDs de peças visuais, validada pelo catálogo e persistida na conta; não deriva da seed do mundo. |
 
 `world_entity` é uma âncora, não uma exigência para materializar antecipadamente a população inteira. Um registro é criado quando a identidade precisa ser referenciada por uma relação, mutation, caso ou consulta persistida. A política exata de materialização ainda será refinada com o gerador.
 
@@ -43,7 +44,7 @@ As tabelas de relação são tipadas. Chaves estrangeiras garantem que os extrem
 
 | Categoria | Campos / fatos | Regra |
 | --- | --- | --- |
-| Reconstruídos da seed | Nome, idade, aparência, personalidade e outros atributos base estáveis | São reproduzidos com a seed do mundo, `generator_version` e a chave estável do NPC. Não são persistidos por padrão. |
+| Reconstruídos da seed | Nome, idade, aparência, personalidade e outros atributos base estáveis | São reproduzidos com a seed do mundo, `generator_version` e a chave estável do NPC. A aparência visual modular será adicionada numa nova versão do gerador. Não são persistidos por padrão. |
 | Persistidos como relações | Emprego, relações pessoais e localização | São fatos consultáveis e compartilhados no servidor; não ficam embutidos no registro de atributos do NPC. |
 | Persistidos como mutation | Estado alterado (por exemplo, morto ou detido), mudança relevante de relação ou outro fato que substitui a base gerada | A mutation aponta para entidade e campo/fato; o gerador continua definindo o estado base. |
 | Persistidos como identidade | `entity_id`, tipo, região e chave estável de geração | Só materializa a âncora quando algum fato persistente precisa referenciar o NPC. |
