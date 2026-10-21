@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { currentIdentity, loginAccount } from "../../api.js";
 
 export default function LoginPage({ onRegister, onAuthenticated }) {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const submissionLocked = useRef(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (submissionLocked.current) return;
     const fields = new FormData(event.currentTarget);
     const email = String(fields.get("email")).trim();
     const password = String(fields.get("password"));
@@ -20,6 +22,7 @@ export default function LoginPage({ onRegister, onAuthenticated }) {
       return;
     }
     setError("");
+    submissionLocked.current = true;
     setSubmitting(true);
     try {
       const loginIdentity = await loginAccount({ email, password });
@@ -28,9 +31,9 @@ export default function LoginPage({ onRegister, onAuthenticated }) {
         : await currentIdentity();
       onAuthenticated(identity);
     } catch (requestError) {
-      setError(requestError.message);
-    } finally {
+      submissionLocked.current = false;
       setSubmitting(false);
+      setError(requestError.message);
     }
   }
 

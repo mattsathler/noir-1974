@@ -3,7 +3,7 @@
 Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadmap`
 (script `scripts/recompute_estado.py`). Não editar a porcentagem à mão.
 
-- **Alvo desta barra:** fluxo criminal completo, da geração do caso à prisão do culpado = **M11 aceito**.
+- **Alvo desta barra:** fluxo criminal completo, da geração do caso à prisão do culpado = **M12 aceito**.
 - **Marco de playtest:** M06 libera o primeiro recorte atravessável no browser; ele não representa o fluxo investigativo completo.
 - **Fora desta barra:** Vesper, auth completa, simulação temporal geral e mapa rico — entram em milestones posteriores.
 
@@ -11,13 +11,13 @@ Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadma
 
 | Campo | Valor |
 | --- | --- |
-| Data de referência | 2026-10-20 |
-| Milestone vigente | M08 — Correio eletrônico |
-| Último aceito | M07 — Registros bancários e GATE |
+| Data de referência | 2026-10-21 |
+| Milestone vigente | M09 — Deslocamento e pontos de serviço |
+| Último aceito | M08 — Correio eletrônico |
 | Primeiro playtest | M06 aceito; recorte mínimo pronto para playtest interno. |
-| Fluxo do crime até a prisão | **67%** (8 de 12 milestones) |
+| Fluxo do crime até a prisão | **69%** (9 de 13 milestones) |
 
-O recorte web, a API e os registros bancários e do GATE estão aceitos. O M08 está em andamento: correspondências procedurais e mensagens associadas a arquétipos de caso estão sendo integradas ao ciclo investigativo.
+Registros financeiros, históricos do GATE e correspondências procedurais estão aceitos. Busca e apreensão ainda precisa conectar objetos do mundo aos casos.
 
 ## Barra do fluxo criminal completo
 
@@ -32,34 +32,36 @@ M04 ████████████████████  aceito
 M05 ████████████████████  aceito
 M06 ████████████████████  aceito   ← primeiro recorte de playtest
 M07 ████████████████████  aceito
-M08 ░░░░░░░░░░░░░░░░░░░░  não iniciado
+M08 ████████████████████  aceito
 M09 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M10 ░░░░░░░░░░░░░░░░░░░░  não iniciado
-M11 ░░░░░░░░░░░░░░░░░░░░  não iniciado   ← fluxo completo até a prisão
-     | 67%
+M11 ░░░░░░░░░░░░░░░░░░░░  não iniciado
+M12 ░░░░░░░░░░░░░░░░░░░░  não iniciado   ← fluxo completo até a prisão
+     | 69%
 ```
 
-Cada milestone do fluxo pesa **1/12 ≈ 8,3%**. Só entra na conta com status **Aceito**. “Em curso” não soma porcentagem; a porcentagem mede ciclos aceitos do percurso completo.
+Cada milestone do fluxo pesa **1/13 ≈ 7,7%**. Só entra na conta com status **Aceito**. “Em curso” não soma porcentagem; a porcentagem mede ciclos aceitos do percurso completo.
 
 | Milestone | Peso | Status | Soma acumulada se aceito |
 | --- | ---: | --- | ---: |
-| [M00](milestones/M00-repositorio-e-docs.md) Repositório e docs | 8,3% | Aceito | 8% |
-| [M01](milestones/M01-modelo-de-entidades-e-schema.md) Entidades e schema | 8,3% | Aceito | 17% |
-| [M02](milestones/M02-gerador-deterministico.md) Gerador determinístico | 8,3% | Aceito | 25% |
-| [M03](milestones/M03-sociedade-e-relacoes.md) Sociedade e relações | 8,3% | Aceito | 33% |
-| [M04](milestones/M04-mutations-e-reconstrucao.md) Mutations e reconstrução | 8,3% | Aceito | 42% |
-| [M05](milestones/M05-gerador-de-casos.md) Casos e validação | 8,3% | Aceito | 50% |
-| [M06](milestones/M06-api-e-cliente.md) API e cliente web | 8,3% | Aceito | 58% |
-| [M07](milestones/M07-registros-investigativos.md) Registros bancários e GATE | 8,3% | Aceito | 67% |
-| [M08](milestones/M08-sistema-de-emails.md) Correio eletrônico | 8,3% | Não iniciado | 75% |
-| [M09](milestones/M09-busca-e-apreensao.md) Busca e apreensão | 8,3% | Não iniciado | 83% |
-| [M10](milestones/M10-whiteboards-pessoais.md) Whiteboards pessoais | 8,3% | Não iniciado | 92% |
-| [M11](milestones/M11-acusacao-e-julgamento.md) Acusação e julgamento | 8,3% | Não iniciado | **100%** |
+| [M00](milestones/M00-repositorio-e-docs.md) Repositório e docs | 7,7% | Aceito | 8% |
+| [M01](milestones/M01-modelo-de-entidades-e-schema.md) Entidades e schema | 7,7% | Aceito | 15% |
+| [M02](milestones/M02-gerador-deterministico.md) Gerador determinístico | 7,7% | Aceito | 23% |
+| [M03](milestones/M03-sociedade-e-relacoes.md) Sociedade e relações | 7,7% | Aceito | 31% |
+| [M04](milestones/M04-mutations-e-reconstrucao.md) Mutations e reconstrução | 7,7% | Aceito | 38% |
+| [M05](milestones/M05-gerador-de-casos.md) Casos e validação | 7,7% | Aceito | 46% |
+| [M06](milestones/M06-api-e-cliente.md) API e cliente web | 7,7% | Aceito | 54% |
+| [M07](milestones/M07-registros-investigativos.md) Registros bancários e GATE | 7,7% | Aceito | 62% |
+| [M08](milestones/M08-sistema-de-emails.md) Correio eletrônico | 7,7% | Aceito | 69% |
+| [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,7% | Não iniciado | 77% |
+| [M10](milestones/M10-busca-e-apreensao.md) Busca e apreensão | 7,7% | Não iniciado | 85% |
+| [M11](milestones/M11-whiteboards-pessoais.md) Whiteboards pessoais | 7,7% | Não iniciado | 92% |
+| [M12](milestones/M12-acusacao-e-julgamento.md) Acusação e julgamento | 7,7% | Não iniciado | **100%** |
 
-Fórmula: `milestones_aceitos_M00_a_M11 / 12`, arredondado para inteiro. O primeiro playtest continua identificado pelo aceite do M06, em campo separado.
+Fórmula: `milestones_aceitos_M00_a_M12 / 13`, arredondado para inteiro. O primeiro playtest continua identificado pelo aceite do M06, em campo separado.
 
 ## Como atualizar
 
 1. Marcar o milestone no próprio arquivo (`**Status:**` + checkboxes de aceite).
 2. Rodar a skill / `python3 .cursor/skills/atualizar-estado-roadmap/scripts/recompute_estado.py`.
-3. Se novos milestones entrarem no fluxo entre M00 e M11, atualizar `CRIME_FLOW_THROUGH`, a sequência em [`ciclos.md`](ciclos.md) e os rótulos/blurb deste script.
+3. Se novos milestones entrarem no fluxo, atualizar `CRIME_FLOW_THROUGH`, a sequência em [`ciclos.md`](ciclos.md) e os rótulos/blurb deste script.

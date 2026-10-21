@@ -58,4 +58,25 @@ describe("RegisterPage", () => {
     await waitFor(() => expect(onAccountCreated).toHaveBeenCalledWith({ account: { id: "1" }, character: null }));
     expect(registerAccount).toHaveBeenCalledWith({ username: "agent-01", email: "agent@example.com", password: "same-password" });
   });
+
+  it("ignores repeated submits and stays locked after account creation", async () => {
+    let resolveRegistration;
+    registerAccount.mockReturnValue(new Promise((resolve) => { resolveRegistration = resolve; }));
+    const onAccountCreated = vi.fn();
+    render(<RegisterPage onLogin={vi.fn()} onAccountCreated={onAccountCreated} />);
+    fillRequiredFields();
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "same-password" } });
+    fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "same-password" } });
+    const form = screen.getByRole("button", { name: "Create account" }).closest("form");
+
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(registerAccount).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Registering…" })).toBeDisabled();
+
+    const account = { account: { id: "1" }, character: null };
+    resolveRegistration(account);
+    await waitFor(() => expect(onAccountCreated).toHaveBeenCalledWith(account));
+    expect(screen.getByRole("button", { name: "Registering…" })).toBeDisabled();
+  });
 });

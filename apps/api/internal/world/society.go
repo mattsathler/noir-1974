@@ -21,6 +21,7 @@ type NPC struct {
 	Appearance    string `json:"appearance"`
 	Personality   string `json:"personality"`
 	Status        string `json:"status"`
+	MaritalStatus string `json:"-"`
 }
 
 type Company struct {
@@ -275,6 +276,14 @@ func generateSociety(seed string) (World, error) {
 
 func npcFor(seed string, version int, regionID, generationKey string, name personName) NPC {
 	stream := newStream(seed, version, "npc/attributes/"+generationKey)
+	maritalStream := newStream(seed, version, "npc/marital-status/"+generationKey)
+	maritalStatus := "single"
+	switch maritalStream.intn(10) {
+	case 0:
+		maritalStatus = "widowed"
+	case 1, 2:
+		maritalStatus = "divorced"
+	}
 	return NPC{
 		ID:            "npc:" + generationKey,
 		GenerationKey: generationKey,
@@ -284,6 +293,7 @@ func npcFor(seed string, version int, regionID, generationKey string, name perso
 		Appearance:    appearances[stream.intn(len(appearances))],
 		Personality:   personalities[stream.intn(len(personalities))],
 		Status:        "alive",
+		MaritalStatus: maritalStatus,
 	}
 }
 

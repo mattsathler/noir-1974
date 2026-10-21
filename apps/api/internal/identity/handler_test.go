@@ -33,7 +33,7 @@ type fakeStore struct {
 
 type fakeDirectory struct{}
 
-func (fakeDirectory) SearchNPCs(context.Context, string, string) ([]world.NPCProfile, error) {
+func (fakeDirectory) SearchNPCs(context.Context, string, string) ([]world.PersonSearchRecord, error) {
 	return nil, nil
 }
 func (fakeDirectory) SearchCompanies(context.Context, string, string) ([]world.CompanyRecord, error) {

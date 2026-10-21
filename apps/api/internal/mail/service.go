@@ -10,6 +10,7 @@ import (
 type worldReader interface {
 	WorldConfig(context.Context, string) (string, int, error)
 	GetNPC(context.Context, string, string) (world.NPCProfile, error)
+	EmployeesOfCompany(context.Context, string, string) ([]world.CompanyEmployee, error)
 }
 
 type caseReader interface {
@@ -39,9 +40,27 @@ func (service *Service) NPCEmails(ctx context.Context, serverID, npcID string, f
 	context := Context{NPCName: profile.NPC.Name}
 	if len(profile.Employment) > 0 {
 		context.Employer = profile.Employment[0].Company.Name
+		context.EmploymentRole = profile.Employment[0].Role
+		for _, job := range profile.Employment {
+			employees, err := service.worlds.EmployeesOfCompany(ctx, serverID, job.Company.ID)
+			if err != nil {
+				return nil, err
+			}
+			for _, employee := range employees {
+				if employee.ID == npcID {
+					continue
+				}
+				context.Colleagues = append(context.Colleagues, Correspondent{
+					ID: employee.ID, Name: employee.Name, Role: employee.Role,
+					CompanyID: job.Company.ID,
+				})
+			}
+		}
 	}
-	if len(profile.PersonalRelationships) > 0 {
-		context.PersonalContact = profile.PersonalRelationships[0].NPC.Name
+	for _, relation := range profile.PersonalRelationships {
+		context.Personal = append(context.Personal, Correspondent{
+			ID: relation.NPC.ID, Name: relation.NPC.Name, RelationshipType: relation.RelationshipType,
+		})
 	}
 	ordinary, err := Generate(seed, version, npcID, context, from, through)
 	if err != nil {

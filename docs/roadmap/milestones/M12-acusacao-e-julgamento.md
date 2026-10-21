@@ -1,8 +1,8 @@
-# M11 — Acusação e julgamento
+# M12 — Acusação e julgamento
 
-**Ciclo:** 11  
+**Ciclo:** 12  
 **Status:** Não iniciado  
-**Depende de:** M10 aceito
+**Depende de:** M11 aceito
 
 ## Objetivo
 

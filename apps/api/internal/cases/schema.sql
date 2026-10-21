@@ -108,6 +108,8 @@ CREATE TABLE IF NOT EXISTS case_mail_messages (
 );
 CREATE INDEX IF NOT EXISTS case_mail_messages_by_mailbox_date_idx
     ON case_mail_messages(server_id, mailbox_npc_entity_id, sent_at, message_id);
+CREATE INDEX IF NOT EXISTS case_mail_messages_by_related_date_idx
+    ON case_mail_messages(server_id, related_npc_entity_id, sent_at, message_id);
 
 CREATE TABLE IF NOT EXISTS case_states (
     server_id uuid NOT NULL,

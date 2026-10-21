@@ -30,7 +30,7 @@ O frontend pede “NPC #23”. O servidor verifica o servidor do jogador, recupe
 
 ## Diretório do mundo
 
-As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. NPCs retornam perfil, emprego e relações pessoais; empresas retornam sede e funcionários com seus cargos, sem o estado de vida ou morte; locais retornam endereço completo com bairro, cidade e país. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
+As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. A busca de pessoas retorna nome, idade, aparência, local de trabalho e estado civil; não retorna cargo nem identidade do parceiro. A busca de empresas retorna sede e funcionários com seus cargos, oferecendo uma fonte separada para descobrir funções dentro da empresa. Locais retornam endereço completo com bairro, cidade e país. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
 
 `GET /api/world/newspaper` retorna a edição determinística do dia fictício atual. A manchete usa o caso persistido mais recente e omite o culpado; seis notas leves são escolhidas de um catálogo por servidor e data. A API cria o caso inicial uma única vez no bootstrap e registra a vítima como morta no estado compartilhado.
 

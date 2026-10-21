@@ -54,10 +54,9 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
   const [activityMessage, setActivityMessage] = useState("");
   const [activityBusy, setActivityBusy] = useState(false);
   const [privilegedAccess, setPrivilegedAccess] = useState(false);
+  const [accessBusy, setAccessBusy] = useState(false);
   const requestId = useRef(0);
   const activityRequestId = useRef(0);
-  const confidentialReadStarted = useRef(false);
-  const personSearchHackUsed = useRef(false);
   const isInterpol = program === "interpol";
   const isCityRecords = program === "city-records";
   const isBankRecords = program === "bank-records";
@@ -93,13 +92,7 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
     try {
       const source = isBankRecords ? "bank" : "gate";
       const loadRecords = () => getNPCRecords(npcID, recordRange.from, recordRange.to, source);
-      let results;
-      if (runHack && !confidentialReadStarted.current) {
-        confidentialReadStarted.current = true;
-        results = await runHack(loadRecords);
-      } else {
-        results = await loadRecords();
-      }
+      const results = runHack ? await runHack(loadRecords) : await loadRecords();
       if (request !== activityRequestId.current) return;
       setActivity(results);
       setActivityMessage(results.length ? "ACTIVITY RECORDS RETRIEVED" : "NO ACTIVITY ON FILE FOR THIS INTERVAL");
@@ -111,8 +104,16 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
     }
   }
 
-  function authorizeConfidentialAccess() {
-    setPrivilegedAccess(true);
+  async function authorizeConfidentialAccess() {
+    setAccessBusy(true);
+    try {
+      if (runHack) await runHack(() => Promise.resolve(true));
+      setPrivilegedAccess(true);
+    } catch (error) {
+      setActivityMessage(error.message || "THE SECURE CONNECTION FAILED.");
+    } finally {
+      setAccessBusy(false);
+    }
   }
 
   async function submitSearch(event) {
@@ -131,18 +132,17 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
     try {
       if (isPeopleSearch) {
         const loadPeople = () => searchPeople(term);
-        let results;
-        if (isInterpol && runHack && !personSearchHackUsed.current) {
-          personSearchHackUsed.current = true;
-          results = await runHack(loadPeople);
-        } else {
-          results = await loadPeople();
-        }
+        const results = (isInterpol || isPrivilegedSystem) && runHack
+          ? await runHack(loadPeople)
+          : await loadPeople();
         if (currentRequest !== requestId.current) return;
         setPeople(results);
         setMessage(results.length ? "PERSONNEL FILES RETRIEVED" : "NO MATCHING PERSONNEL FILES");
       } else {
-        const [companyResults, locationResults] = await Promise.all([searchCompanies(term), searchLocations(term)]);
+        const loadRecords = () => Promise.all([searchCompanies(term), searchLocations(term)]);
+        const [companyResults, locationResults] = isPrivilegedSystem && runHack
+          ? await runHack(loadRecords)
+          : await loadRecords();
         if (currentRequest !== requestId.current) return;
         setCompanies(companyResults);
         setLocations(locationResults);
@@ -159,11 +159,11 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
     <div className="world-directory">
       <p className="computer-window__eyebrow">{isInterpol ? "FORMER INTERPOL AFFILIATION · LEGACY ACCESS" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? `MERIDIAN GLOBAL SETTLEMENT OFFICE · ${privilegedAccess ? "PRIVILEGED SESSION" : "RESTRICTED ACCESS"}` : `MERIDIAN GLOBAL · GATE CONTROL ARCHIVE · ${privilegedAccess ? "PRIVILEGED SESSION" : "RESTRICTED ACCESS"}`}</p>
       <h1>{isInterpol ? "PERSON SEARCH" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE MOVEMENT SEARCH"}</h1>
-      {isPrivilegedSystem && !privilegedAccess ? (
+      {(isPrivilegedSystem || isInterpol) && !privilegedAccess ? (
         <section className="world-directory__credential-access" aria-label="Privileged system access">
-          <p>MERIDIAN INTERNAL CREDENTIALS DETECTED</p>
-          <p>Use the operative credentials to establish a privileged connection to this system.</p>
-          <button type="button" onClick={authorizeConfidentialAccess}>USE OPERATIVE CREDENTIALS</button>
+          <p>CREDENTIALS REQUIRED · RESTRICTED SYSTEM</p>
+          <p>Establish an unauthorized connection with the operative's legacy access tools.</p>
+          <button type="button" disabled={accessBusy} onClick={authorizeConfidentialAccess}>{accessBusy ? "HACKING SYSTEM…" : "HACK SYSTEM"}</button>
         </section>
       ) : <>
       <form className="world-directory__search" onSubmit={submitSearch}>
@@ -175,12 +175,13 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
       </form>
       <p className="world-directory__message" role="status" aria-live="polite">{message}</p>
 
-      {people.map(({ npc, employment, personalRelationships }) => (
+      {people.map(({ npc, workplaces, maritalStatus }) => (
         <article className="world-record" key={npc.id}>
-          <header className="world-record__header"><h2>{npc.name}</h2><span>{npc.status?.toUpperCase() || "PERSON OF INTEREST"}</span></header>
+          <header className="world-record__header"><h2>{npc.name}</h2><span>PERSONNEL FILE</span></header>
           <p>{npc.age} YEARS · {npc.appearance}</p>
-          {employment.map(({ company, role }) => <p key={company.id}>EMPLOYMENT · {role.toUpperCase()} AT {company.name}</p>)}
-          {personalRelationships.map(({ npc: related, relationshipType }) => <p key={`${related.id}-${relationshipType}`}>ASSOCIATION · {relationshipType.replaceAll("_", " ").toUpperCase()} — {related.name}</p>)}
+          {workplaces.map(({ company, address }) => <p key={`${company}-${address}`}>WORKPLACE · {company} — {address}</p>)}
+          {!workplaces.length && <p>WORKPLACE · NOT LISTED</p>}
+          <p>MARITAL STATUS · {maritalStatus?.toUpperCase() || "UNKNOWN"}</p>
           {(isBankRecords || isGateRecords) && <button
             className="world-record__activity-toggle"
             type="button"

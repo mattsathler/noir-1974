@@ -40,7 +40,7 @@ type Handler struct {
 }
 
 type WorldDirectoryReader interface {
-	SearchNPCs(context.Context, string, string) ([]world.NPCProfile, error)
+	SearchNPCs(context.Context, string, string) ([]world.PersonSearchRecord, error)
 	SearchCompanies(context.Context, string, string) ([]world.CompanyRecord, error)
 	SearchLocations(context.Context, string, string) ([]world.LocationRecord, error)
 }

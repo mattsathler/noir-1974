@@ -31,7 +31,22 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
   const [message, setMessage] = useState("Search for a name to consult a correspondence file.");
   const [busy, setBusy] = useState(false);
   const requestId = useRef(0);
-  const confidentialReadStarted = useRef(false);
+
+  async function hackRequest(loadRequest) {
+    return runHack ? runHack(loadRequest) : loadRequest();
+  }
+
+  async function authorizeMailbox() {
+    setBusy(true);
+    try {
+      if (runHack) await runHack(() => Promise.resolve(true));
+      setAuthorized(true);
+    } catch (error) {
+      setMessage(error.message || "THE SECURE CONNECTION FAILED.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function updateFrom(nextFrom) {
     setFrom(nextFrom);
@@ -63,7 +78,7 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
     setMessages([]);
     setMessage("");
     try {
-      const results = await searchPeople(term);
+      const results = await hackRequest(() => searchPeople(term));
       if (request !== requestId.current) return;
       setPeople(results);
       setMessage(results.length ? "CORRESPONDENCE FILES LOCATED" : "NO CORRESPONDENCE FILES LOCATED");
@@ -83,13 +98,7 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
     setMessage("REQUESTING PRIVATE CORRESPONDENCE…");
     try {
       const loadMessages = () => getNPCEmails(mailbox.id, from, through);
-      let results;
-      if (runHack && !confidentialReadStarted.current) {
-        confidentialReadStarted.current = true;
-        results = await runHack(loadMessages);
-      } else {
-        results = await loadMessages();
-      }
+      const results = await hackRequest(loadMessages);
       if (request !== requestId.current) return;
       setMessages(results);
       setMessage(results.length ? "CORRESPONDENCE RETRIEVED" : "NO MESSAGES ON FILE FOR THIS INTERVAL");
@@ -106,9 +115,9 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
       <h1>MAILROOM ARCHIVE</h1>
       {!authorized ? (
         <section className="email-inbox__access" aria-label="Correspondence access">
-          <p>PRIVATE EXCHANGE · ACCESS CHARGES APPLY</p>
-          <p>Legacy operative credentials are accepted by this Meridian relay.</p>
-          <button type="button" onClick={() => setAuthorized(true)}>USE OPERATIVE CREDENTIALS</button>
+          <p>CREDENTIALS REQUIRED · RESTRICTED EXCHANGE</p>
+          <p>Legacy operative credentials can establish a connection through this Meridian relay.</p>
+          <button type="button" disabled={busy} onClick={authorizeMailbox}>{busy ? "HACKING SYSTEM…" : "HACK SYSTEM"}</button>
         </section>
       ) : <>
         <form className="world-directory__search" onSubmit={searchMailbox}>

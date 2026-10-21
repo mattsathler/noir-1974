@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n API,WEB \"npm:dev:api\" \"npm:dev:web\"",
-    "dev:api": "cd apps/api && CGO_ENABLED=0 go run ./cmd/server",
+    "dev:api": "node scripts/dev-api.mjs",
     "dev:web": "vite --host 127.0.0.1",
     "build": "vite build",
     "test": "vitest run",
@@ -23,6 +23,7 @@
     "@testing-library/react": "^16.3.0",
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^3.2.4",
+    "chokidar": "^5.0.0",
     "concurrently": "^9.2.1",
     "jsdom": "^26.1.0",
     "sass": "^1.105.2",

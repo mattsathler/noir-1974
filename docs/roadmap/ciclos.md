@@ -31,11 +31,12 @@ M00 docs + monorepo
               → M06 API + web mínimo
                 → M07 registros bancários + histórico do GATE
                   → M08 correio eletrônico
-                    → M09 busca e apreensão
-                      → M10 whiteboards pessoais
-                        → M11 acusação + julgamento
+                    → M09 deslocamento + pontos de serviço
+                      → M10 busca e apreensão
+                        → M11 whiteboards pessoais
+                          → M12 acusação + julgamento (fluxo criminal completo)
 ```
 
-M06 é o primeiro recorte atravessável para playtest. A porcentagem geral não termina nele: ela acompanha o fluxo criminal completo até o aceite do M11, quando uma acusação válida pode levar à prisão do culpado.
+M06 é o primeiro recorte atravessável para playtest. A porcentagem geral acompanha o fluxo criminal completo até o aceite do M12, quando uma acusação válida pode levar à prisão do culpado. M09 passa a ser pré-requisito da busca e apreensão: a solicitação é feita presencialmente na Delegacia.
 
 Pular um ciclo só com ADR explicando por que o critério deixou de ser necessário.

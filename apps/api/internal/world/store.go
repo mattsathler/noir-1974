@@ -51,6 +51,24 @@ type NPCProfile struct {
 	PersonalRelationships []PersonalRelationshipView `json:"personalRelationships"`
 }
 
+type PersonSearchRecord struct {
+	NPC           PersonSearchNPC         `json:"npc"`
+	Workplaces    []PersonSearchWorkplace `json:"workplaces"`
+	MaritalStatus string                  `json:"maritalStatus"`
+}
+
+type PersonSearchNPC struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Age        int    `json:"age"`
+	Appearance string `json:"appearance"`
+}
+
+type PersonSearchWorkplace struct {
+	Company string `json:"company"`
+	Address string `json:"address"`
+}
+
 type Address struct {
 	LocationID string `json:"locationId"`
 	Name       string `json:"name"`
@@ -257,13 +275,30 @@ func (store *PostgresStore) GetNPC(ctx context.Context, serverID, npcID string) 
 }
 
 // SearchNPCs reconstructs matching NPCs and their persisted relations from the server's world seed.
-func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query string) ([]NPCProfile, error) {
+func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query string) ([]PersonSearchRecord, error) {
 	base, err := store.generatedWorld(ctx, serverID)
 	if err != nil {
 		return nil, err
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
-	results := make([]NPCProfile, 0)
+	regions := make(map[string]string, len(base.Regions))
+	entities := make(map[string]Entity, len(base.Entities))
+	for _, region := range base.Regions {
+		regions[region.ID] = region.Name
+	}
+	for _, entity := range base.Entities {
+		entities[entity.ID] = entity
+	}
+	workplacesByCompany := make(map[string]PersonSearchWorkplace, len(base.CompanyLocations))
+	for _, relation := range base.CompanyLocations {
+		if relation.LocationRole == "headquarters" {
+			workplacesByCompany[relation.CompanyID] = PersonSearchWorkplace{
+				Company: companyName(base.Companies, relation.CompanyID),
+				Address: makeAddress(entities[relation.LocationID], regions).Full,
+			}
+		}
+	}
+	results := make([]PersonSearchRecord, 0)
 	for _, npc := range base.NPCs {
 		if !strings.Contains(strings.ToLower(npc.Name), query) {
 			continue
@@ -272,10 +307,43 @@ func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query stri
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, profile)
+		workplaces := make([]PersonSearchWorkplace, 0, len(profile.Employment))
+		maritalStatus := personMaritalStatus(profile)
+		for _, employment := range profile.Employment {
+			if workplace, ok := workplacesByCompany[employment.Company.ID]; ok {
+				workplaces = append(workplaces, workplace)
+			}
+		}
+		results = append(results, PersonSearchRecord{
+			NPC:        PersonSearchNPC{ID: profile.NPC.ID, Name: profile.NPC.Name, Age: profile.NPC.Age, Appearance: profile.NPC.Appearance},
+			Workplaces: workplaces, MaritalStatus: maritalStatus,
+		})
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].NPC.Name < results[j].NPC.Name })
 	return results, nil
+}
+
+func personMaritalStatus(profile NPCProfile) string {
+	for _, relation := range profile.PersonalRelationships {
+		if relation.RelationshipType == "marriage" {
+			return "married"
+		}
+	}
+	switch profile.NPC.MaritalStatus {
+	case "single", "divorced", "widowed":
+		return profile.NPC.MaritalStatus
+	default:
+		return "single"
+	}
+}
+
+func companyName(companies []Company, companyID string) string {
+	for _, company := range companies {
+		if company.ID == companyID {
+			return company.Name
+		}
+	}
+	return ""
 }
 
 // SearchCompanies finds companies by name or headquarters address and includes their employees.

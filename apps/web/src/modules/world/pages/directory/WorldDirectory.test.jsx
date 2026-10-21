@@ -15,20 +15,23 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 describe("WorldDirectory activity records", () => {
   it("queries and presents only the bank app's unmarked ledger", async () => {
     searchPeople.mockResolvedValue([{
-      npc: { id: "npc:ada", name: "Ada Morel", age: 41, appearance: "dark hair", status: "alive" },
-      employment: [],
-      personalRelationships: [],
+      npc: { id: "npc:ada", name: "Ada Morel", age: 41, appearance: "dark hair" },
+      workplaces: [{ company: "Aurore Industries", address: "Aurore Industries, Bellecour, Lyon, France" }],
+      maritalStatus: "married",
     }]);
     getNPCRecords.mockResolvedValue([
       { id: "record:other", source: "bank", occurredAt: "1974-11-10T16:42:00.000Z", operator: "Meridian Global Settlement Office", description: "A private remittance cleared.", amount: 68, direction: "outgoing" },
     ]);
     render(<div className="computer-window"><WorldDirectory program="bank-records" serverTime={new Date("1974-11-12T20:15:00Z")} /></div>);
-    expect(screen.getByText("MERIDIAN INTERNAL CREDENTIALS DETECTED")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "USE OPERATIVE CREDENTIALS" }));
+    expect(screen.getByText("CREDENTIALS REQUIRED · RESTRICTED SYSTEM")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "HACK SYSTEM" }));
     await screen.findByLabelText("PERSON NAME");
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));
     await screen.findByText("Ada Morel");
+    expect(screen.getByText("WORKPLACE · Aurore Industries — Aurore Industries, Bellecour, Lyon, France")).toBeInTheDocument();
+    expect(screen.getByText("MARITAL STATUS · MARRIED")).toBeInTheDocument();
+    expect(screen.queryByText(/manager|accountant|partner|spouse/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "OPEN FINANCIAL LEDGER" }));
     fireEvent.click(screen.getByRole("button", { name: "Select date FROM" }));
     fireEvent.click(screen.getByRole("button", { name: "1974-11-08" }));
@@ -47,15 +50,15 @@ describe("WorldDirectory activity records", () => {
 
   it("requests only GATE records in the GATE app", async () => {
     searchPeople.mockResolvedValue([{
-      npc: { id: "npc:ada", name: "Ada Morel", age: 41, appearance: "dark hair", status: "alive" },
-      employment: [],
-      personalRelationships: [],
+      npc: { id: "npc:ada", name: "Ada Morel", age: 41, appearance: "dark hair" },
+      workplaces: [],
+      maritalStatus: "single",
     }]);
     getNPCRecords.mockResolvedValue([
       { id: "record:gate", source: "gate", occurredAt: "1974-11-10T13:00:00.000Z", operator: "Meridian Global · GATE Network", description: "A public terminal session ended.", origin: "Bellecour", destination: "Part-Dieu" },
     ]);
     render(<div className="computer-window"><WorldDirectory program="gate-records" serverTime={new Date("1974-11-12T20:15:00Z")} /></div>);
-    fireEvent.click(screen.getByRole("button", { name: "USE OPERATIVE CREDENTIALS" }));
+    fireEvent.click(screen.getByRole("button", { name: "HACK SYSTEM" }));
     await screen.findByLabelText("PERSON NAME");
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));

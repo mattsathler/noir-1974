@@ -1,16 +1,18 @@
-# M09 — Busca e apreensão
+# M10 — Busca e apreensão
 
-**Ciclo:** 9  
+**Ciclo:** 10  
 **Status:** Não iniciado  
-**Depende de:** M08 aceito
+**Depende de:** M09 aceito
 
 ## Objetivo
 
-Permitir que o jogador investigue uma residência associada a um NPC e encontre objetos que podem ser relacionados a um caso ou fazer parte da vida comum.
+Permitir que o jogador solicite uma autorização de busca na Delegacia da cidade e investigue uma residência associada a um NPC. A solicitação exige presença física na Delegacia; depois de autorizada, a busca pode revelar objetos relacionados a um caso ou à vida comum.
 
 ## Critérios de aceite
 
 - [ ] API valida o alvo, o local, a sessão do jogador e as condições de acesso antes de executar uma busca.
+- [ ] O jogador precisa estar na Delegacia da cidade para protocolar a solicitação de busca e apreensão; o backend valida a localização atual e registra a autorização concedida ou negada.
+- [ ] Uma autorização concedida identifica o local residencial e permite ao jogador viajar até lá para realizar a busca.
 - [ ] O inventário de cada residência é procedural, estável e consultado por local; a cidade inteira não é materializada para responder à ação.
 - [ ] Crime Generator pode incluir objetos ligados ao crime no inventário do local correto.
 - [ ] Objetos relevantes e cotidianos são apresentados sem distinção visual, textual ou comportamental.

@@ -43,6 +43,26 @@ describe("LoginPage", () => {
     expect(loginAccount).toHaveBeenCalledWith({ email: "agent@example.com", password: "secret-password" });
   });
 
+  it("ignores duplicate submits and stays locked until navigation", async () => {
+    let resolveLogin;
+    loginAccount.mockReturnValue(new Promise((resolve) => { resolveLogin = resolve; }));
+    const onAuthenticated = vi.fn();
+    render(<LoginPage onRegister={vi.fn()} onAuthenticated={onAuthenticated} />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "agent@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret-password" } });
+    const form = screen.getByRole("button", { name: "Sign in" }).closest("form");
+
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(loginAccount).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Verifying…" })).toBeDisabled();
+
+    const identity = { account: { id: "1" }, character: { displayName: "Ada" }, world: { serverTime: "1974-11-12T20:15:00.000Z" } };
+    resolveLogin(identity);
+    await vi.waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith(identity));
+    expect(screen.getByRole("button", { name: "Verifying…" })).toBeDisabled();
+  });
+
   it("continues an existing player session after successful sign in", async () => {
     const identity = { account: { id: "1" }, character: { displayName: "Ada", portraitId: 2 }, world: { serverTime: "1974-11-12T20:15:00.000Z" } };
     loginAccount.mockResolvedValue(identity);

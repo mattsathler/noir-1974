@@ -7,7 +7,7 @@ import re
 from datetime import date
 from pathlib import Path
 
-CRIME_FLOW_THROUGH = 11  # M00..M11 = geração do caso até prisão do culpado
+CRIME_FLOW_THROUGH = 12  # M00..M12 = geração do caso até prisão do culpado
 PLAYTEST_MILESTONE = 6  # M06 = primeiro recorte de playtest, não fim do jogo
 BAR_WIDTH = 20
 
@@ -52,18 +52,22 @@ PRODUCT_BLURB = {
         "Correspondências procedurais ainda precisam entrar no ciclo investigativo."
     ),
     8: (
-        "Registros financeiros e do GATE estão aceitos. Correspondências "
-        "procedurais ainda precisam entrar no ciclo investigativo."
+        "Registros financeiros, históricos do GATE e correspondências procedurais "
+        "estão aceitos. Busca e apreensão ainda precisa conectar objetos do mundo aos casos."
     ),
     9: (
-        "O jogador já pode consultar registros e correspondências. Busca e "
-        "apreensão ainda precisa conectar objetos do mundo aos casos."
+        "O jogador já pode consultar registros e correspondências e se deslocar "
+        "entre cidades e pontos de serviço. Busca e apreensão ainda precisa conectar objetos aos casos."
     ),
     10: (
-        "As fontes investigativas e buscas estão aceitas. O jogador ainda "
+        "As fontes investigativas, deslocamento e buscas estão aceitos. O jogador ainda "
         "precisa guardar e organizar os elementos por caso."
     ),
     11: (
+        "O jogador já pode organizar elementos por caso em whiteboards privados. "
+        "Acusação e julgamento ainda precisam fechar o fluxo criminal."
+    ),
+    12: (
         "O fluxo criminal completo está aceito: o caso é gerado, investigado, "
         "organizado e pode terminar na prisão do culpado."
     ),
@@ -79,9 +83,10 @@ TABLE_LABELS = {
     6: "API e cliente web",
     7: "Registros bancários e GATE",
     8: "Correio eletrônico",
-    9: "Busca e apreensão",
-    10: "Whiteboards pessoais",
-    11: "Acusação e julgamento",
+    9: "Deslocamento e pontos de serviço",
+    10: "Busca e apreensão",
+    11: "Whiteboards pessoais",
+    12: "Acusação e julgamento",
 }
 
 HEADING_RE = re.compile(
@@ -268,13 +273,13 @@ Cada milestone do fluxo pesa **1/{total} ≈ {weight}**. Só entra na conta com 
 
 {table}
 
-Fórmula: `milestones_aceitos_M00_a_M11 / 12`, arredondado para inteiro. O primeiro playtest continua identificado pelo aceite do M06, em campo separado.
+Fórmula: `milestones_aceitos_M00_a_M{CRIME_FLOW_THROUGH:02d} / {CRIME_FLOW_THROUGH + 1}`, arredondado para inteiro. O primeiro playtest continua identificado pelo aceite do M06, em campo separado.
 
 ## Como atualizar
 
 1. Marcar o milestone no próprio arquivo (`**Status:**` + checkboxes de aceite).
 2. Rodar a skill / `python3 .cursor/skills/atualizar-estado-roadmap/scripts/recompute_estado.py`.
-3. Se novos milestones entrarem no fluxo entre M00 e M11, atualizar `CRIME_FLOW_THROUGH`, a sequência em [`ciclos.md`](ciclos.md) e os rótulos/blurb deste script.
+3. Se novos milestones entrarem no fluxo, atualizar `CRIME_FLOW_THROUGH`, a sequência em [`ciclos.md`](ciclos.md) e os rótulos/blurb deste script.
 """
 
 

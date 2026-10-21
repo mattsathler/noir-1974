@@ -4,9 +4,11 @@
 
 O Meridian Global Correspondence Exchange é a infraestrutura corporativa de mensagens pessoais e comerciais. A aparência de um serviço de correio privado convive com o controle da Meridian sobre a rede, os arquivos e o acesso. O aplicativo Mailroom Archive representa o uso das credenciais antigas do detetive; a API continua exigindo a sessão autenticada normal.
 
-Mensagens cotidianas são geradas sob demanda para uma única caixa de NPC e um intervalo inclusivo. A geração usa seed, versão do mundo, ID do NPC e data para manter IDs, remetentes, assuntos, conteúdo e horários determinísticos, sem materializar correspondência de toda a cidade. O contexto vem dos vínculos pessoais e de emprego daquele NPC. Consultas aceitam até sete dias de calendário.
+Mensagens cotidianas são geradas sob demanda para uma única caixa de NPC e um intervalo inclusivo. A geração usa seed, versão do gerador, versão do mundo e data; mensagens entre NPCs também usam IDs do par. IDs, remetentes, assuntos, conteúdo e horários permanecem determinísticos, sem materializar correspondência de toda a cidade. Cada conversa pessoal ou entre colegas é reconstruída a partir da mesma chave nos dois participantes; por isso a mensagem aparece como enviada em uma caixa e recebida na outra, com os mesmos campos. Colegas são selecionados entre os funcionários da mesma empresa. Mensagens da empresa são comunicados formais sobre tarefas, horários, prazos e conduta, personalizados pelo cargo, e só aparecem na caixa do funcionário destinatário. Consultas aceitam até sete dias de calendário.
 
-O Crime Generator também cria mensagens para caixas específicas, de acordo com o arquétipo do caso — por exemplo, conversa conjugal marcada por ciúme ou cobrança de extorsão. Elas são persistidas em `case_mail_messages`, relacionadas ao caso, ao destinatário e ao outro participante. Mensagens comuns são geradas na leitura e misturadas cronologicamente às mensagens persistidas.
+Os padrões editáveis ficam em [`apps/api/internal/mail/templates.json`](../../apps/api/internal/mail/templates.json), separados nas listas `personal`, `workplace` e `colleague`. Cada item tem `subject` e `body`; para acrescentar variações basta incluir novos objetos na lista correspondente. O arquivo é embutido no binário da API.
+
+O Crime Generator também cria mensagens de caso — por exemplo, conversa conjugal marcada por ciúme ou cobrança de extorsão. Elas são persistidas em `case_mail_messages`, relacionadas ao caso, ao destinatário e ao remetente. A consulta inclui a mesma mensagem na caixa de quem a recebeu e na caixa de quem a enviou. Mensagens comuns são geradas na leitura e misturadas cronologicamente às mensagens persistidas.
 
 ## Separação da classificação interna
 

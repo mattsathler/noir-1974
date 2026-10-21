@@ -265,13 +265,14 @@ func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID stri
 	return result, rows.Err()
 }
 
-// NPCEmails loads messages for only the requested mailbox and interval while
-// retaining case classification as backend-only metadata.
+// NPCEmails loads messages sent or received by the requested NPC and interval
+// while retaining case classification as backend-only metadata.
 func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID string, from, through time.Time) ([]mail.Message, error) {
 	rows, err := store.db.Query(ctx,
 		`SELECT case_id, related_npc_entity_id, internal_relation, message_data
 		 FROM case_mail_messages
-		 WHERE server_id = $1::uuid AND mailbox_npc_entity_id = $2 AND sent_at >= $3 AND sent_at <= $4
+		 WHERE server_id = $1::uuid AND (mailbox_npc_entity_id = $2 OR related_npc_entity_id = $2)
+		   AND sent_at >= $3 AND sent_at <= $4
 		 ORDER BY sent_at, message_id`, serverID, npcID, from, through,
 	)
 	if err != nil {

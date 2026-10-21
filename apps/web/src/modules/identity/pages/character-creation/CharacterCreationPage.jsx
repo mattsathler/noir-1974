@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createCharacter } from "../../api.js";
 
 const portraits = [1, 2, 3, 4, 5, 6];
@@ -7,9 +7,11 @@ export default function CharacterCreationPage({ onComplete }) {
   const [portraitId, setPortraitId] = useState(1);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const submissionLocked = useRef(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (submissionLocked.current) return;
     const fields = new FormData(event.currentTarget);
     const displayName = String(fields.get("displayName")).trim();
     const displayNameLength = Array.from(displayName).length;
@@ -17,15 +19,16 @@ export default function CharacterCreationPage({ onComplete }) {
       setError("Detective name must be 2–40 characters long.");
       return;
     }
+    submissionLocked.current = true;
     setSubmitting(true);
     setError("");
     try {
       await createCharacter({ displayName, portraitId });
       onComplete();
     } catch (requestError) {
-      setError(requestError.message);
-    } finally {
+      submissionLocked.current = false;
       setSubmitting(false);
+      setError(requestError.message);
     }
   }
 

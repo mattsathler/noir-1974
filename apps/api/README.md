@@ -2,6 +2,8 @@
 
 API autoritativa de Noir 1974, escrita em Go e conectada ao PostgreSQL do Neon pela variável `DATABASE_URL`.
 
+Na raiz do projeto, `npm run dev:api` inicia a API em modo de desenvolvimento. O processo observa `apps/api` e recompila/reinicia a API quando arquivos Go, JSON, SQL, YAML ou TOML mudam. `npm run dev` inicia esse watcher junto com o Vite.
+
 ## Identidade
 
 O módulo `internal/identity` mantém contas de jogador, sessões e personagens. A conta guarda usuário, e-mail e hash de senha; cada conta pode ter um personagem, criado no primeiro acesso com nome e uma das seis opções de retrato.

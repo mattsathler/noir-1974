@@ -312,3 +312,22 @@ func TestPostgresStoreReconstructsNPCProfilesAndIndexedRelations(t *testing.T) {
 		t.Fatal("employee query is not filtered by company relationship")
 	}
 }
+
+func TestPersonMaritalStatusUsesCurrentMarriageAndSupportsPriorStatus(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		profile NPCProfile
+		want    string
+	}{
+		{name: "married relationship overrides prior status", profile: NPCProfile{NPC: NPC{MaritalStatus: "widowed"}, PersonalRelationships: []PersonalRelationshipView{{RelationshipType: "marriage"}}}, want: "married"},
+		{name: "single", profile: NPCProfile{NPC: NPC{MaritalStatus: "single"}}, want: "single"},
+		{name: "divorced", profile: NPCProfile{NPC: NPC{MaritalStatus: "divorced"}}, want: "divorced"},
+		{name: "widowed", profile: NPCProfile{NPC: NPC{MaritalStatus: "widowed"}}, want: "widowed"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := personMaritalStatus(test.profile); got != test.want {
+				t.Fatalf("personMaritalStatus() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}

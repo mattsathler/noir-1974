@@ -29,4 +29,22 @@ describe("CharacterCreationPage", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Session expired.");
   });
+
+  it("ignores repeated submits and stays locked after character creation", async () => {
+    let resolveCharacter;
+    createCharacter.mockReturnValue(new Promise((resolve) => { resolveCharacter = resolve; }));
+    const onComplete = vi.fn();
+    render(<CharacterCreationPage onComplete={onComplete} />);
+    fireEvent.change(screen.getByLabelText("Detective name"), { target: { value: "Ada" } });
+    const form = screen.getByRole("button", { name: "Create detective" }).closest("form");
+
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(createCharacter).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Filing…" })).toBeDisabled();
+
+    resolveCharacter({ character: { displayName: "Ada", portraitId: 1 } });
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+    expect(screen.getByRole("button", { name: "Filing…" })).toBeDisabled();
+  });
 });
