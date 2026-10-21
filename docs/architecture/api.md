@@ -14,6 +14,8 @@ GET /api/world/npcs/:npcID/records?from=YYYY-MM-DD&to=YYYY-MM-DD
 GET /api/world/npcs/:npcID/emails?from=YYYY-MM-DD&to=YYYY-MM-DD
 GET /api/world/companies?q=<name-or-address>
 GET /api/world/locations?q=<name-or-address>
+GET /api/world/transit
+POST /api/world/travel
 GET /api/world/newspaper
 GET /api/cases
 GET /api/cases/:caseID
@@ -33,6 +35,8 @@ O frontend pede “NPC #23”. O servidor verifica o servidor do jogador, recupe
 As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. A busca de pessoas retorna nome, idade, aparência, local de trabalho e estado civil; não retorna cargo nem identidade do parceiro. A busca de empresas retorna sede e funcionários com seus cargos, oferecendo uma fonte separada para descobrir funções dentro da empresa. Locais retornam endereço completo com bairro, cidade e país. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
 
 `GET /api/world/newspaper` retorna a edição determinística do dia fictício atual. A manchete usa o caso persistido mais recente e omite o culpado; seis notas leves são escolhidas de um catálogo por servidor e data. A API cria o caso inicial uma única vez no bootstrap e registra a vítima como morta no estado compartilhado.
+
+`GET /api/world/transit` retorna o bairro Central, seus pontos fixos de serviço e os bairros procedurais com suas construções. `POST /api/world/travel` recebe `districtId` e persiste a chegada do jogador ao bairro após validar o destino; construções abrem uma ficha sem alterar a localização do jogador. `GET /api/world` e `GET /api/me` incluem o bairro atual persistido por conta.
 
 `GET /api/world/npcs/:npcID/records` retorna registros do NPC no intervalo inclusivo informado. `source=bank` seleciona o ledger bancário e `source=gate` seleciona o histórico GATE; sem o filtro, retorna ambos. As datas usam `YYYY-MM-DD` e aceitam no máximo sete dias de calendário inclusivos. Os resultados são ordenados por horário e ID. A consulta gera apenas os registros cotidianos daquela pessoa e intervalo e mistura registros associados a casos. O JSON público não contém `caseId` nem a classificação interna.
 

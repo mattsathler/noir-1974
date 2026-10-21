@@ -99,6 +99,8 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/world/npcs", handler.searchNPCs)
 		mux.HandleFunc("GET /api/world/companies", handler.searchCompanies)
 		mux.HandleFunc("GET /api/world/locations", handler.searchLocations)
+		mux.HandleFunc("GET /api/world/transit", handler.transitDistricts)
+		mux.HandleFunc("POST /api/world/travel", handler.travel)
 	}
 	if recordsReader != nil {
 		mux.HandleFunc("GET /api/world/npcs/{npcID}/records", handler.npcRecords)
@@ -358,6 +360,79 @@ func (h *Handler) searchLocations(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
+type transitReader interface {
+	TransitDistricts(context.Context, string) ([]world.DistrictDestination, error)
+}
+
+func (h *Handler) transitDistricts(w http.ResponseWriter, r *http.Request) {
+	if !h.authorizeWorldRequest(w, r) {
+		return
+	}
+	reader, ok := h.worldReader.(transitReader)
+	if !ok {
+		http.Error(w, "GATE transit unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	districts, err := reader.TransitDistricts(r.Context(), h.worldServerID)
+	if err != nil {
+		http.Error(w, "could not retrieve GATE destinations", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"destinations": districts})
+}
+
+func (h *Handler) travel(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.worldReader.(transitReader)
+	if !ok {
+		http.Error(w, "GATE transit unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var input struct {
+		DistrictID string `json:"districtId"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	destinations, err := reader.TransitDistricts(r.Context(), h.worldServerID)
+	if err != nil {
+		http.Error(w, "could not retrieve GATE destinations", http.StatusInternalServerError)
+		return
+	}
+	valid := false
+	for _, destination := range destinations {
+		if destination.ID == input.DistrictID {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		http.Error(w, "unknown GATE destination", http.StatusBadRequest)
+		return
+	}
+	if err := h.store.setPlayerLocation(r.Context(), current.ID, input.DistrictID); err != nil {
+		http.Error(w, "could not save player location", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"locationId": input.DistrictID})
+}
+
+func (h *Handler) authorizedPlayer(w http.ResponseWriter, r *http.Request) (account, bool) {
+	if !h.authorizeWorldRequest(w, r) {
+		return account{}, false
+	}
+	token, _ := r.Cookie(sessionCookie)
+	current, _, err := h.store.accountForSession(r.Context(), token.Value, h.now())
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return account{}, false
+	}
+	return current, true
+}
+
 func (h *Handler) authorizeWorldRequest(w http.ResponseWriter, r *http.Request) bool {
 	if h.worldReader == nil || h.worldServerID == "" {
 		http.Error(w, "world directory unavailable", http.StatusServiceUnavailable)
@@ -469,7 +544,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, identityResponse{
 		Account:   publicAccount(found),
 		Character: found.Character,
-		World:     h.worldAt(),
+		World:     h.worldFor(r.Context(), found.ID),
 	})
 }
 
@@ -484,7 +559,7 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	writeJSON(w, http.StatusOK, identityResponse{Account: publicAccount(current), Character: character, World: h.worldAt()})
+	writeJSON(w, http.StatusOK, identityResponse{Account: publicAccount(current), Character: character, World: h.worldFor(r.Context(), current.ID)})
 }
 
 type worldResponse struct {
@@ -492,6 +567,7 @@ type worldResponse struct {
 	Country    string    `json:"country"`
 	TimeZone   string    `json:"timeZone"`
 	LocationID string    `json:"locationId"`
+	District   string    `json:"district,omitempty"`
 	ServerTime time.Time `json:"serverTime"`
 }
 
@@ -501,12 +577,12 @@ func (h *Handler) world(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	if _, _, err := h.store.accountForSession(r.Context(), token.Value, h.now()); err != nil {
+	current, _, err := h.store.accountForSession(r.Context(), token.Value, h.now())
+	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-
-	writeJSON(w, http.StatusOK, h.worldAt())
+	writeJSON(w, http.StatusOK, h.worldFor(r.Context(), current.ID))
 }
 
 func (h *Handler) worldAt() worldResponse {
@@ -519,6 +595,31 @@ func (h *Handler) worldAt() worldResponse {
 		LocationID: "lyon",
 		ServerTime: gameTime.UTC(),
 	}
+}
+
+func (h *Handler) worldFor(ctx context.Context, accountID string) worldResponse {
+	state := h.worldAt()
+	locationID, err := h.store.playerLocation(ctx, accountID)
+	if err != nil {
+		return state
+	}
+	state.LocationID = locationID
+	if reader, ok := h.worldReader.(transitReader); ok {
+		if destinations, err := reader.TransitDistricts(ctx, h.worldServerID); err == nil {
+			for _, district := range destinations {
+				if district.ID == locationID {
+					state.District = district.Name
+				}
+				for _, place := range district.Locations {
+					if place.Address.LocationID == locationID {
+						state.LocationID, state.District = district.ID, district.Name
+						_ = h.store.setPlayerLocation(ctx, accountID, district.ID)
+					}
+				}
+			}
+		}
+	}
+	return state
 }
 
 func (h *Handler) createCharacter(w http.ResponseWriter, r *http.Request) {

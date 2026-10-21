@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"noir-1974/apps/api/internal/world/names"
 )
 
 var ErrInvalidGenerationKey = errors.New("invalid generated entity key")
@@ -109,15 +111,28 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 	if strings.TrimSpace(seed) == "" {
 		return NPC{}, errors.New("world seed is required")
 	}
-	if version != GeneratorVersion2 {
+	if !SupportsSocietyVersion(version) {
 		return NPC{}, fmt.Errorf("%w: %d", ErrUnsupportedGeneratorVersion, version)
 	}
 
 	parts := strings.Split(generationKey, "/")
-	if len(parts) != 7 || parts[0] != "lyon" || parts[1] != "people" || parts[3] != "district" || parts[5] != "person" || parts[2] != seedFingerprint(seed, version) {
-		return NPC{}, ErrInvalidGenerationKey
+	countrySlug, citySlug, districtSlug := "fr", "lyon", ""
+	var slotPart string
+	switch version {
+	case GeneratorVersion2:
+		if len(parts) != 7 || parts[0] != "lyon" || parts[1] != "people" || parts[3] != "district" || parts[5] != "person" || parts[2] != seedFingerprint(seed, version) {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		districtSlug, slotPart = parts[4], parts[6]
+	case GeneratorVersion3:
+		if len(parts) != 8 || parts[0] != "fr" || parts[1] != "lyon" || parts[2] != "people" || parts[4] != "district" || parts[6] != "person" || parts[3] != seedFingerprint(seed, version) {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		districtSlug, slotPart = parts[5], parts[7]
+	default:
+		return NPC{}, ErrUnsupportedGeneratorVersion
 	}
-	slot, err := strconv.Atoi(parts[6])
+	slot, err := strconv.Atoi(slotPart)
 	if err != nil || slot < 1 || slot > 8 {
 		return NPC{}, ErrInvalidGenerationKey
 	}
@@ -125,7 +140,7 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 	districts := selectedDistricts(seed, version)
 	districtIndex := -1
 	for index, district := range districts {
-		if district.slug == parts[4] {
+		if district.slug == districtSlug {
 			districtIndex = index
 			break
 		}
@@ -134,11 +149,15 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 		return NPC{}, ErrInvalidGenerationKey
 	}
 	nameIndex := districtIndex*8 + slot - 1
-	names := shuffledCopy(allPersonNames(), newStream(seed, version, "people/names"))
+	personNames, err := personNamesForVersion(version, countrySlug, citySlug)
+	if err != nil {
+		return NPC{}, err
+	}
+	names := shuffledCopy(personNames, newStream(seed, version, personNameScope(version, countrySlug, citySlug)))
 	if nameIndex >= len(names) {
 		return NPC{}, ErrInvalidGenerationKey
 	}
-	regionID := "fr/lyon/district/" + parts[4]
+	regionID := "fr/lyon/district/" + districtSlug
 	return npcFor(seed, version, regionID, generationKey, names[nameIndex]), nil
 }
 
@@ -147,18 +166,30 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 	if strings.TrimSpace(seed) == "" {
 		return Company{}, errors.New("world seed is required")
 	}
-	if version != GeneratorVersion2 {
+	if !SupportsSocietyVersion(version) {
 		return Company{}, fmt.Errorf("%w: %d", ErrUnsupportedGeneratorVersion, version)
 	}
 
 	parts := strings.Split(generationKey, "/")
-	if len(parts) != 6 || parts[0] != "lyon" || parts[1] != "companies" || parts[2] != seedFingerprint(seed, version) || parts[3] != "district" || parts[5] != "company" {
-		return Company{}, ErrInvalidGenerationKey
+	districtSlug := ""
+	switch version {
+	case GeneratorVersion2:
+		if len(parts) != 6 || parts[0] != "lyon" || parts[1] != "companies" || parts[2] != seedFingerprint(seed, version) || parts[3] != "district" || parts[5] != "company" {
+			return Company{}, ErrInvalidGenerationKey
+		}
+		districtSlug = parts[4]
+	case GeneratorVersion3:
+		if len(parts) != 7 || parts[0] != "fr" || parts[1] != "lyon" || parts[2] != "companies" || parts[3] != seedFingerprint(seed, version) || parts[4] != "district" || parts[6] != "company" {
+			return Company{}, ErrInvalidGenerationKey
+		}
+		districtSlug = parts[5]
+	default:
+		return Company{}, ErrUnsupportedGeneratorVersion
 	}
 	districts := selectedDistricts(seed, version)
 	districtIndex := -1
 	for index, district := range districts {
-		if district.slug == parts[4] {
+		if district.slug == districtSlug {
 			districtIndex = index
 			break
 		}
@@ -173,14 +204,14 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 	return Company{
 		ID:            "company:" + generationKey,
 		GenerationKey: generationKey,
-		RegionID:      "fr/lyon/district/" + parts[4],
+		RegionID:      "fr/lyon/district/" + districtSlug,
 		Name:          names[districtIndex],
 	}, nil
 }
 
-func generateSociety(seed string) (World, error) {
-	world := generateCity(seed, GeneratorVersion2)
-	districts := selectedDistricts(seed, GeneratorVersion2)
+func generateSociety(seed string, version int) (World, error) {
+	world := generateCity(seed, version)
+	districts := selectedDistricts(seed, version)
 	world.NPCs = make([]NPC, 0, len(districts)*8)
 	world.Companies = make([]Company, 0, len(districts))
 	world.EmploymentRelationships = make([]EmploymentRelationship, 0, len(districts)*8)
@@ -189,8 +220,11 @@ func generateSociety(seed string) (World, error) {
 
 	for _, district := range districts {
 		regionID := "fr/lyon/district/" + district.slug
-		companyKey := "lyon/companies/" + seedFingerprint(seed, GeneratorVersion2) + "/district/" + district.slug + "/company"
-		company, err := GenerateCompany(seed, GeneratorVersion2, companyKey)
+		companyKey := "lyon/companies/" + seedFingerprint(seed, version) + "/district/" + district.slug + "/company"
+		if version == GeneratorVersion3 {
+			companyKey = "fr/lyon/companies/" + seedFingerprint(seed, version) + "/district/" + district.slug + "/company"
+		}
+		company, err := GenerateCompany(seed, version, companyKey)
 		if err != nil {
 			return World{}, err
 		}
@@ -223,8 +257,11 @@ func generateSociety(seed string) (World, error) {
 
 		peopleBySlot := make([]NPC, 8)
 		for slot := 1; slot <= len(peopleBySlot); slot++ {
-			personKey := fmt.Sprintf("lyon/people/%s/district/%s/person/%02d", seedFingerprint(seed, GeneratorVersion2), district.slug, slot)
-			person, err := GenerateNPC(seed, GeneratorVersion2, personKey)
+			personKey := fmt.Sprintf("lyon/people/%s/district/%s/person/%02d", seedFingerprint(seed, version), district.slug, slot)
+			if version == GeneratorVersion3 {
+				personKey = fmt.Sprintf("fr/lyon/people/%s/district/%s/person/%02d", seedFingerprint(seed, version), district.slug, slot)
+			}
+			person, err := GenerateNPC(seed, version, personKey)
 			if err != nil {
 				return World{}, err
 			}
@@ -305,6 +342,33 @@ func allPersonNames() []personName {
 		}
 	}
 	return result
+}
+
+func personNamesForVersion(version int, countrySlug, citySlug string) ([]personName, error) {
+	if version == GeneratorVersion2 {
+		return allPersonNames(), nil
+	}
+	if version != GeneratorVersion3 {
+		return nil, ErrUnsupportedGeneratorVersion
+	}
+	catalog, ok := names.ForCity(countrySlug, citySlug)
+	if !ok || len(catalog.GivenNames) == 0 || len(catalog.FamilyNames) == 0 {
+		return nil, ErrInvalidGenerationKey
+	}
+	result := make([]personName, 0, len(catalog.GivenNames)*len(catalog.FamilyNames))
+	for _, first := range catalog.GivenNames {
+		for _, last := range catalog.FamilyNames {
+			result = append(result, personName{first: first, last: last})
+		}
+	}
+	return result, nil
+}
+
+func personNameScope(version int, countrySlug, citySlug string) string {
+	if version == GeneratorVersion2 {
+		return "people/names"
+	}
+	return "people/names/" + countrySlug + "/" + citySlug
 }
 
 func selectedDistricts(seed string, version int) []namedPlace {

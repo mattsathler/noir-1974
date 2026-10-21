@@ -43,6 +43,8 @@ type store interface {
 	createSession(context.Context, string, string, time.Time) error
 	accountForSession(context.Context, string, time.Time) (account, *character, error)
 	createCharacter(context.Context, string, string, int) (character, error)
+	playerLocation(context.Context, string) (string, error)
+	setPlayerLocation(context.Context, string, string) error
 	deleteSession(context.Context, string) error
 }
 
@@ -152,6 +154,21 @@ func (s *postgresStore) createCharacter(ctx context.Context, accountID, name str
 		return character{}, err
 	}
 	return result, nil
+}
+
+func (s *postgresStore) playerLocation(ctx context.Context, accountID string) (string, error) {
+	var locationID string
+	err := s.db.QueryRow(ctx, `SELECT location_id FROM player_locations WHERE account_id = $1::uuid`, accountID).Scan(&locationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "fr/lyon/district/central", nil
+	}
+	return locationID, err
+}
+
+func (s *postgresStore) setPlayerLocation(ctx context.Context, accountID, locationID string) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO player_locations (account_id, location_id) VALUES ($1::uuid, $2)
+		ON CONFLICT (account_id) DO UPDATE SET location_id = EXCLUDED.location_id, updated_at = now()`, accountID, locationID)
+	return err
 }
 
 func (s *postgresStore) deleteSession(ctx context.Context, token string) error {

@@ -33,7 +33,7 @@ M05 ████████████████████  aceito
 M06 ████████████████████  aceito   ← primeiro recorte de playtest
 M07 ████████████████████  aceito
 M08 ████████████████████  aceito
-M09 ░░░░░░░░░░░░░░░░░░░░  não iniciado
+M09 ░░░░░░░░░░░░░░░░░░░░  em curso
 M10 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M11 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M12 ░░░░░░░░░░░░░░░░░░░░  não iniciado   ← fluxo completo até a prisão
@@ -53,7 +53,7 @@ Cada milestone do fluxo pesa **1/13 ≈ 7,7%**. Só entra na conta com status **
 | [M06](milestones/M06-api-e-cliente.md) API e cliente web | 7,7% | Aceito | 54% |
 | [M07](milestones/M07-registros-investigativos.md) Registros bancários e GATE | 7,7% | Aceito | 62% |
 | [M08](milestones/M08-sistema-de-emails.md) Correio eletrônico | 7,7% | Aceito | 69% |
-| [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,7% | Não iniciado | 77% |
+| [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,7% | Em curso | 77% |
 | [M10](milestones/M10-busca-e-apreensao.md) Busca e apreensão | 7,7% | Não iniciado | 85% |
 | [M11](milestones/M11-whiteboards-pessoais.md) Whiteboards pessoais | 7,7% | Não iniciado | 92% |
 | [M12](milestones/M12-acusacao-e-julgamento.md) Acusação e julgamento | 7,7% | Não iniciado | **100%** |

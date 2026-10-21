@@ -23,7 +23,8 @@ describe("WorldDirectory activity records", () => {
       { id: "record:other", source: "bank", occurredAt: "1974-11-10T16:42:00.000Z", operator: "Meridian Global Settlement Office", description: "A private remittance cleared.", amount: 68, direction: "outgoing" },
     ]);
     render(<div className="computer-window"><WorldDirectory program="bank-records" serverTime={new Date("1974-11-12T20:15:00Z")} /></div>);
-    expect(screen.getByText("CREDENTIALS REQUIRED · RESTRICTED SYSTEM")).toBeInTheDocument();
+    expect(await screen.findByText("CREDENTIALS REQUIRED · RESTRICTED SYSTEM")).toBeInTheDocument();
+    await screen.findByRole("button", { name: "HACK SYSTEM" });
     fireEvent.click(screen.getByRole("button", { name: "HACK SYSTEM" }));
     await screen.findByLabelText("PERSON NAME");
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ada" } });
@@ -58,6 +59,7 @@ describe("WorldDirectory activity records", () => {
       { id: "record:gate", source: "gate", occurredAt: "1974-11-10T13:00:00.000Z", operator: "Meridian Global · GATE Network", description: "A public terminal session ended.", origin: "Bellecour", destination: "Part-Dieu" },
     ]);
     render(<div className="computer-window"><WorldDirectory program="gate-records" serverTime={new Date("1974-11-12T20:15:00Z")} /></div>);
+    await screen.findByText("CREDENTIALS REQUIRED · RESTRICTED SYSTEM");
     fireEvent.click(screen.getByRole("button", { name: "HACK SYSTEM" }));
     await screen.findByLabelText("PERSON NAME");
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ada" } });

@@ -5,6 +5,7 @@ import { Map } from "pixelarticons/react/Map";
 import { Mail } from "pixelarticons/react/Mail";
 import { Phone } from "pixelarticons/react/Phone";
 import { Globe } from "pixelarticons/react/Globe";
+import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
@@ -31,7 +32,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const dragRef = useRef(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setBooting(false), 1900);
+    const timer = window.setTimeout(() => setBooting(false), 2900);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -131,7 +132,12 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       <div className="computer-bezel">
         <div className="computer-screen">
           <div className="computer-screen__glass texture-scanlines" aria-hidden="true" />
-          {booting && <div className="computer-sequence computer-sequence--boot" role="status"><span>NOIR PERSONAL TERMINAL · 1974</span><span>CHECKING RELAY CONNECTION…</span><span>LYON NODE FOUND</span><span>PRIVATE SYSTEM READY <i>_</i></span></div>}
+          {booting && <div className="computer-sequence computer-sequence--boot" role="status">
+            <span><Typewriter text="NOIR PERSONAL TERMINAL · 1974" speed={32} /></span>
+            <span><Typewriter text="CHECKING RELAY CONNECTION…" speed={32} startDelay={220} /></span>
+            <span><Typewriter text="LYON NODE FOUND" speed={32} startDelay={460} /></span>
+            <span><Typewriter text="PRIVATE SYSTEM READY" speed={32} startDelay={700} /> <i>_</i></span>
+          </div>}
           <header className="computer-menubar">
             <p className="computer-brand"><span className="computer-brand__mark">N</span> NOIR TERMINAL <span className="computer-brand__divider">/</span> MERIDIAN GLOBAL RELAY</p>
             <div className="computer-menubar__status">
@@ -146,7 +152,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             <button ref={closeButtonRef} className="computer-modal__close" type="button" aria-label="Close computer" onClick={onClose}>×</button>
           </header>
 
-          <div className="computer-desktop__content">
+          {!booting && <div className="computer-desktop__content">
             <div className="computer-desktop__heading">
               <p>PRIVATE INVESTIGATION SYSTEM</p>
               <span>PRIVATE LINE · ACCOUNT CHARGED</span>
@@ -189,7 +195,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               <header><span>MERIDIAN SECURE LINK</span><span className="computer-status-light" /></header>
               <div><p>ESTABLISHING SECURE TUNNEL</p><p>ROUTING THROUGH PRIVATE RELAY…</p><p>DECRYPTING REQUESTED FILE</p><div className="computer-sequence__progress"><i /></div></div>
             </section>}
-          </div>
+          </div>}
 
           <footer className="computer-taskbar">
             <div className="computer-taskbar__left">

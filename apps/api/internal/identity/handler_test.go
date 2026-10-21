@@ -90,6 +90,9 @@ func (f *fakeStore) createCharacter(_ context.Context, _, name string, portraitI
 	return character{DisplayName: name, PortraitID: portraitID}, nil
 }
 
+func (f *fakeStore) playerLocation(context.Context, string) (string, error)  { return "lyon", nil }
+func (f *fakeStore) setPlayerLocation(context.Context, string, string) error { return nil }
+
 func (f *fakeStore) deleteSession(_ context.Context, token string) error {
 	f.deletedToken = token
 	return f.deleteSessionErr

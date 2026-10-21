@@ -10,6 +10,39 @@ export const searchPeople = (query) => search("/api/world/npcs", query);
 export const searchCompanies = (query) => search("/api/world/companies", query);
 export const searchLocations = (query) => search("/api/world/locations", query);
 
+export async function getGateDestinations() {
+  const response = await fetch("/api/world/transit", { credentials: "same-origin" });
+  const payload = await responsePayload(response);
+  if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve GATE destinations.");
+  return payload.destinations ?? [];
+}
+
+export async function movePlayer(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = await responsePayload(response);
+  if (!response.ok) throw new Error(payload.message?.trim() || "Could not change location.");
+  return payload;
+}
+
+export async function getCurrentWorld() {
+  const response = await fetch("/api/world", { credentials: "same-origin" });
+  const payload = await responsePayload(response);
+  if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve current location.");
+  return payload;
+}
+
+async function responsePayload(response) {
+  const contentType = response.headers.get("content-type") ?? "";
+  return contentType.includes("application/json")
+    ? response.json()
+    : { message: await response.text() };
+}
+
 export async function getNPCEmails(npcId, from, to) {
   const params = new URLSearchParams({ from, to });
   const response = await fetch(`/api/world/npcs/${encodeURIComponent(npcId)}/emails?${params}`, { credentials: "same-origin" });

@@ -25,3 +25,9 @@ CREATE TABLE IF NOT EXISTS player_characters (
     portrait_id smallint NOT NULL CHECK (portrait_id BETWEEN 1 AND 6),
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS player_locations (
+    account_id uuid PRIMARY KEY REFERENCES player_accounts(id) ON DELETE CASCADE,
+    location_id text NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);

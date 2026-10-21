@@ -156,7 +156,7 @@ func buildCaseEmails(seed string, worldVersion int, caseID string, selected cand
 
 // Validate checks the case archetype, world references, and reachable clues.
 func Validate(definition Definition, base world.World) error {
-	if base.GeneratorVersion != world.GeneratorVersion2 {
+	if !world.SupportsSocietyVersion(base.GeneratorVersion) {
 		return ErrInvalidDefinition
 	}
 	if strings.TrimSpace(definition.Seed) == "" || definition.GeneratorVersion != GeneratorVersion || definition.ID != makeCaseID(definition.Seed, definition.GeneratorVersion) || definition.CaseType != "homicide" || definition.ArchetypeID == "" || definition.Motive == "" {
@@ -210,7 +210,7 @@ func availableArchetypes(base world.World) []archetypeGenerator {
 }
 
 func workplaceCandidates(base world.World) []candidate {
-	if base.GeneratorVersion != world.GeneratorVersion2 {
+	if !world.SupportsSocietyVersion(base.GeneratorVersion) {
 		return nil
 	}
 	entities := make(map[string]string, len(base.Entities))

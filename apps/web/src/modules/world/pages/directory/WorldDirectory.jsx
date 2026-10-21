@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getNPCRecords, searchCompanies, searchLocations, searchPeople } from "../../api.js";
 import DatePicker from "../../components/DatePicker.jsx";
 
@@ -54,6 +54,7 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
   const [activityMessage, setActivityMessage] = useState("");
   const [activityBusy, setActivityBusy] = useState(false);
   const [privilegedAccess, setPrivilegedAccess] = useState(false);
+  const [accessReady, setAccessReady] = useState(false);
   const [accessBusy, setAccessBusy] = useState(false);
   const requestId = useRef(0);
   const activityRequestId = useRef(0);
@@ -63,6 +64,16 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
   const isGateRecords = program === "gate-records";
   const isPeopleSearch = !isCityRecords;
   const isPrivilegedSystem = isBankRecords || isGateRecords;
+
+  useEffect(() => {
+    if (!(isInterpol || isPrivilegedSystem)) {
+      setAccessReady(true);
+      return undefined;
+    }
+    setAccessReady(false);
+    const timer = window.setTimeout(() => setAccessReady(true), 850);
+    return () => window.clearTimeout(timer);
+  }, [isInterpol, isPrivilegedSystem]);
 
   function updateRecordFrom(from) {
     setRecordRange((previous) => ({
@@ -160,11 +171,11 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
       <p className="computer-window__eyebrow">{isInterpol ? "FORMER INTERPOL AFFILIATION · LEGACY ACCESS" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? `MERIDIAN GLOBAL SETTLEMENT OFFICE · ${privilegedAccess ? "PRIVILEGED SESSION" : "RESTRICTED ACCESS"}` : `MERIDIAN GLOBAL · GATE CONTROL ARCHIVE · ${privilegedAccess ? "PRIVILEGED SESSION" : "RESTRICTED ACCESS"}`}</p>
       <h1>{isInterpol ? "PERSON SEARCH" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE MOVEMENT SEARCH"}</h1>
       {(isPrivilegedSystem || isInterpol) && !privilegedAccess ? (
-        <section className="world-directory__credential-access" aria-label="Privileged system access">
+        accessReady ? <section className="world-directory__credential-access" aria-label="Privileged system access">
           <p>CREDENTIALS REQUIRED · RESTRICTED SYSTEM</p>
           <p>Establish an unauthorized connection with the operative's legacy access tools.</p>
           <button type="button" disabled={accessBusy} onClick={authorizeConfidentialAccess}>{accessBusy ? "HACKING SYSTEM…" : "HACK SYSTEM"}</button>
-        </section>
+        </section> : <p className="world-directory__message" role="status" aria-live="polite">ESTABLISHING SECURE CONNECTION…</p>
       ) : <>
       <form className="world-directory__search" onSubmit={submitSearch}>
         <label className="world-directory__label" htmlFor="world-directory-query">{isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>

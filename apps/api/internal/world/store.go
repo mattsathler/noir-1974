@@ -95,6 +95,12 @@ type LocationRecord struct {
 	Address Address `json:"address"`
 }
 
+type DistrictDestination struct {
+	ID        string           `json:"id"`
+	Name      string           `json:"name"`
+	Locations []LocationRecord `json:"locations"`
+}
+
 func NewPostgresStore(db worldDatabase) *PostgresStore {
 	return &PostgresStore{db: db}
 }
@@ -406,6 +412,78 @@ func (store *PostgresStore) SearchLocations(ctx context.Context, serverID, query
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].Address.Full < results[j].Address.Full })
 	return results, nil
+}
+
+// TransitDistricts returns the generated neighborhoods and visitable locations for the GATE map.
+func (store *PostgresStore) TransitDistricts(ctx context.Context, serverID string) ([]DistrictDestination, error) {
+	base, err := store.generatedWorld(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	regions := make(map[string]Region, len(base.Regions))
+	for _, region := range base.Regions {
+		regions[region.ID] = region
+	}
+	byID := make(map[string]*DistrictDestination)
+	centralIDs := make([]string, 0)
+	for _, region := range base.Regions {
+		if region.Kind != "city" {
+			continue
+		}
+		cityKey := strings.TrimPrefix(region.ID, "fr/")
+		centralID := region.ID + "/district/central"
+		central := &DistrictDestination{ID: centralID, Name: "Central", Locations: []LocationRecord{}}
+		for _, service := range []struct{ id, name string }{
+			{"police-station", region.Name + " Police Station"},
+			{"meridian-bank", "Meridian Bank"},
+			{"gate-station", "Central GATE Station"},
+		} {
+			fullAddress := strings.Join([]string{service.name, "Central", region.Name, "France"}, ", ")
+			central.Locations = append(central.Locations, LocationRecord{Address: Address{
+				LocationID: "service:" + cityKey + "/" + service.id,
+				Name:       service.name,
+				Kind:       "building",
+				District:   "Central",
+				City:       region.Name,
+				Country:    "France",
+				Full:       fullAddress,
+			}})
+		}
+		byID[centralID] = central
+		centralIDs = append(centralIDs, centralID)
+	}
+	for _, region := range base.Regions {
+		if region.Kind == "district" {
+			byID[region.ID] = &DistrictDestination{ID: region.ID, Name: region.Name, Locations: []LocationRecord{}}
+		}
+	}
+	for _, entity := range base.Entities {
+		if entity.EntityType != "location" {
+			continue
+		}
+		if district, ok := byID[entity.RegionID]; ok {
+			district.Locations = append(district.Locations, LocationRecord{Address: makeAddress(entity, regionNames(regions))})
+		}
+	}
+	result := make([]DistrictDestination, 0, len(byID))
+	for _, centralID := range centralIDs {
+		result = append(result, *byID[centralID])
+	}
+	for _, region := range base.Regions {
+		if district := byID[region.ID]; district != nil && region.Kind == "district" {
+			sort.Slice(district.Locations, func(i, j int) bool { return district.Locations[i].Address.Full < district.Locations[j].Address.Full })
+			result = append(result, *district)
+		}
+	}
+	return result, nil
+}
+
+func regionNames(regions map[string]Region) map[string]string {
+	names := make(map[string]string, len(regions))
+	for id, region := range regions {
+		names[id] = region.Name
+	}
+	return names
 }
 
 func (store *PostgresStore) generatedWorld(ctx context.Context, serverID string) (World, error) {

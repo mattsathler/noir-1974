@@ -12,11 +12,11 @@ Isso significa que o mundo não depende de sorteio novo a cada acesso: os jogado
 
 1. O servidor recebe uma seed e uma versão do gerador.
 2. Um catálogo fixo comum a todos os servidores define 50 países e suas capitais e principais cidades; bairros lógicos são compostos proceduralmente a partir de um banco de palavras e criados sob demanda para distribuir detetives e ocorrências.
-3. Na versão 2, também cria 24 pessoas, três empresas e os vínculos entre elas.
+3. Nas versões 2 e 3, também cria 24 pessoas, três empresas e os vínculos entre elas.
 4. Cada pessoa trabalha em uma empresa; alguns pares também têm uma relação pessoal. Cada empresa tem um edifício como sede.
-5. O resultado pode ser gravado no banco para que suas relações sejam consultadas rapidamente.
+5. Na versão 3, nomes de pessoas vêm de catálogos específicos da cidade e são combinados deterministicamente; o resultado pode ser gravado no banco para que suas relações sejam consultadas rapidamente.
 
-Na implementação atual, o gerador ainda produz apenas Lyon e escolhe três distritos de uma lista pequena, além de ruas e edifícios. O catálogo mundial de 50 países e cidades e a geração procedural expansível de bairros são o modelo documentado para a evolução do sistema, ainda não implementado.
+Na implementação atual, o gerador ainda produz apenas Lyon e escolhe três distritos de uma lista pequena, além de ruas e edifícios. Lyon já tem um catálogo versionado de 300 prenomes e 300 sobrenomes. O catálogo mundial de 50 países e cidades e a geração procedural expansível de bairros são o modelo documentado para a evolução do sistema, ainda não implementado.
 
 ## O que fica salvo e o que é reconstruído
 
@@ -36,7 +36,7 @@ Para listar funcionários, o banco procura os vínculos da empresa e o sistema r
 
 ## Por que a versão do gerador importa
 
-Alterações nas regras de geração podem mudar o mundo. Por isso, cada mundo guarda a versão usada na criação. A versão 1 representa a cidade mínima; a versão 2 acrescenta a sociedade inicial. Manter as versões permite reconstruir mundos antigos sem aplicar as regras novas por engano.
+Alterações nas regras de geração podem mudar o mundo. Por isso, cada mundo guarda a versão usada na criação. A versão 1 representa a cidade mínima; a versão 2 acrescenta a sociedade inicial; a versão 3 usa catálogos de nomes específicos para cada cidade. Manter as versões permite reconstruir mundos antigos sem aplicar as regras novas por engano.
 
 ## Onde isso está no projeto
 

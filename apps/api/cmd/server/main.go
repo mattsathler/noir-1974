@@ -66,14 +66,24 @@ func main() {
 	if worldSeed == "" {
 		worldSeed = "noir-1974-shared-city"
 	}
-	if err := worldStore.Materialize(ctx, worldServerID, worldSeed, world.LatestGeneratorVersion); err != nil {
+	worldVersion := world.LatestGeneratorVersion
+	storedSeed, storedVersion, configErr := worldStore.WorldConfig(ctx, worldServerID)
+	if configErr == nil {
+		if storedSeed != worldSeed {
+			log.Fatalf("configured world seed conflicts with the existing server world")
+		}
+		worldVersion = storedVersion
+	} else if !errors.Is(configErr, world.ErrEntityNotFound) {
+		log.Fatalf("read shared world configuration: %v", configErr)
+	}
+	if err := worldStore.Materialize(ctx, worldServerID, worldSeed, worldVersion); err != nil {
 		log.Fatalf("materialize shared world: %v", err)
 	}
 	caseStore := cases.NewPostgresStore(pool)
 	if err := caseStore.Migrate(ctx); err != nil {
 		log.Fatalf("migrate cases schema: %v", err)
 	}
-	generatedWorld, err := world.Generate(worldSeed, world.LatestGeneratorVersion)
+	generatedWorld, err := world.Generate(worldSeed, worldVersion)
 	if err != nil {
 		log.Fatalf("generate shared world: %v", err)
 	}

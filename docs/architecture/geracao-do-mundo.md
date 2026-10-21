@@ -54,6 +54,12 @@ O nome, a idade, a aparência e a personalidade do NPC são reconstruíveis da s
 
 As funções `GenerateNPC` e `GenerateCompany` reconstroem um registro específico sem gerar a população inteira. A API HTTP e a interface de investigação permanecem fora de M03.
 
+## Versão 3 — catálogos de nomes por cidade
+
+A versão `3` mantém o formato da sociedade inicial e escolhe nomes de catálogos próprios para cada cidade. Os catálogos ficam em arquivos por país e cidade em `apps/api/internal/world/names`; o registro de cidades liga o código geográfico canônico ao catálogo. Lyon, França, possui 300 prenomes e 300 sobrenomes, combinados e embaralhados deterministicamente por mundo. A amostra de combinações de um mundo não repete nomes completos.
+
+A versão `2` e seus catálogos pequenos continuam disponíveis para reconstruir mundos existentes sem alterar nomes. Cada servidor conserva a versão de gerador registrada na criação; mundos novos usam a versão mais recente. Ao adicionar cidades, deve-se acrescentar um arquivo de catálogo e registrá-lo com seu país e cidade canônicos.
+
 ## Determinismo e identidade
 
 O gerador recebe uma seed opaca e uma versão explícita. A versão 1 deriva fluxos independentes usando SHA-256 sobre campos com comprimento prefixado: domínio do gerador, versão, seed e escopo (cidade ou catálogo de uma região). Cada fluxo usa SHA-256 com contador para produzir valores aleatórios sem depender de `math/rand`, relógio, estado global ou ordem de execução de outras regiões.

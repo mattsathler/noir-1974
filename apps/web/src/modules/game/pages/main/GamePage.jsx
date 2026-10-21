@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { ComputerSharp } from "pixelarticons/react/ComputerSharp";
+import { Earth } from "pixelarticons/react/Earth";
 import { NotebookSharp } from "pixelarticons/react/NotebookSharp";
 import { currentIdentity } from "../../../identity/api.js";
 import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx";
 import ComputerDesktop from "./ComputerDesktop.jsx";
+import NeighborhoodExplorer from "../../../world/components/NeighborhoodExplorer.jsx";
+import { getCurrentWorld, movePlayer } from "../../../world/api.js";
+import GateTransition from "../../components/GateTransition.jsx";
 
 function formatServerDateTime(timestamp, timeZone) {
   const date = new Date(timestamp);
@@ -31,8 +35,25 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [error, setError] = useState("");
   const [computerOpen, setComputerOpen] = useState(false);
   const [newspaperOpen, setNewspaperOpen] = useState(false);
+  const [transitOpen, setTransitOpen] = useState(false);
+  const [gateTransition, setGateTransition] = useState(null);
   const closeComputer = useCallback(() => setComputerOpen(false), []);
   const closeNewspaper = useCallback(() => setNewspaperOpen(false), []);
+  const closeTransit = useCallback(() => setTransitOpen(false), []);
+
+  const travelViaGate = useCallback((destination) => {
+    setError("");
+    setGateTransition(destination);
+  }, []);
+  const arriveAtDistrict = useCallback(async (destination) => {
+    await movePlayer("/api/world/travel", { districtId: destination.id });
+    const nextWorld = await getCurrentWorld();
+    setWorld(nextWorld);
+    setServerTime(new Date(nextWorld.serverTime));
+    closeTransit();
+  }, [closeTransit]);
+  const completeGateTransition = useCallback(() => setGateTransition(null), []);
+  const failGateTransition = useCallback((requestError) => setError(requestError.message), []);
 
   useEffect(() => {
     let active = true;
@@ -58,11 +79,11 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   }, [world]);
 
   const display = world && serverTime ? formatServerDateTime(serverTime, world.timeZone) : null;
-  const location = world ? `${world.city}, ${world.country}` : "";
+  const location = world ? [world.district, world.city, world.country].filter(Boolean).join(", ") : "";
 
   return (
     <main className="game-screen pos-relative min-h-screen overflow-hidden bg-atmosphere text-primary" aria-label="Main game screen">
-      <div className="game-backdrop pos-absolute inset-0" data-location={world?.locationId ?? "lyon"} aria-hidden="true" />
+      <div className="game-backdrop pos-absolute inset-0" data-location="lyon" aria-hidden="true" />
       <div className="game-vignette pos-absolute inset-0" aria-hidden="true" />
       <header className="game-hud pos-relative flex items-start justify-between gap-4 p-6">
         <div>
@@ -80,6 +101,16 @@ export default function GamePage({ initialWorld = null, onLogout }) {
               onClick={() => { setNewspaperOpen(false); setComputerOpen(true); }}
             >
               <ComputerSharp className="computer-launch__icon" aria-hidden="true" />
+            </button>
+            <button
+              className="gate-transit-launch"
+              type="button"
+              aria-label="Open GATE transit"
+              aria-haspopup="dialog"
+              aria-expanded={transitOpen}
+              onClick={() => { setComputerOpen(false); setNewspaperOpen(false); setTransitOpen(true); }}
+            >
+              <Earth className="computer-launch__icon" aria-hidden="true" />
             </button>
             <button
               className="newspaper-launch"
@@ -113,6 +144,8 @@ export default function GamePage({ initialWorld = null, onLogout }) {
         />
       )}
       {newspaperOpen && <NewspaperWindow onClose={closeNewspaper} />}
+      {transitOpen && <NeighborhoodExplorer world={world} onTravel={travelViaGate} onClose={closeTransit} />}
+      {gateTransition && <GateTransition destination={gateTransition} onArrive={arriveAtDistrict} onComplete={completeGateTransition} onError={failGateTransition} />}
     </main>
   );
 }
