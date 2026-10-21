@@ -12,12 +12,12 @@ Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadma
 | Campo | Valor |
 | --- | --- |
 | Data de referência | 2026-10-20 |
-| Milestone vigente | M07 — Registros bancários e GATE |
-| Último aceito | M06 — API e cliente web |
+| Milestone vigente | M08 — Correio eletrônico |
+| Último aceito | M07 — Registros bancários e GATE |
 | Primeiro playtest | M06 aceito; recorte mínimo pronto para playtest interno. |
-| Fluxo do crime até a prisão | **58%** (7 de 12 milestones) |
+| Fluxo do crime até a prisão | **67%** (8 de 12 milestones) |
 
-Primeiro recorte atravessável no browser: mundo, NPC/relações e caso, com o servidor como autoridade. O fluxo investigativo completo ainda está em construção.
+O recorte web, a API e os registros bancários e do GATE estão aceitos. O M08 está em andamento: correspondências procedurais e mensagens associadas a arquétipos de caso estão sendo integradas ao ciclo investigativo.
 
 ## Barra do fluxo criminal completo
 
@@ -31,12 +31,12 @@ M03 ████████████████████  aceito
 M04 ████████████████████  aceito
 M05 ████████████████████  aceito
 M06 ████████████████████  aceito   ← primeiro recorte de playtest
-M07 ░░░░░░░░░░░░░░░░░░░░  em curso
+M07 ████████████████████  aceito
 M08 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M09 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M10 ░░░░░░░░░░░░░░░░░░░░  não iniciado
 M11 ░░░░░░░░░░░░░░░░░░░░  não iniciado   ← fluxo completo até a prisão
-     | 58%
+     | 67%
 ```
 
 Cada milestone do fluxo pesa **1/12 ≈ 8,3%**. Só entra na conta com status **Aceito**. “Em curso” não soma porcentagem; a porcentagem mede ciclos aceitos do percurso completo.
@@ -50,7 +50,7 @@ Cada milestone do fluxo pesa **1/12 ≈ 8,3%**. Só entra na conta com status **
 | [M04](milestones/M04-mutations-e-reconstrucao.md) Mutations e reconstrução | 8,3% | Aceito | 42% |
 | [M05](milestones/M05-gerador-de-casos.md) Casos e validação | 8,3% | Aceito | 50% |
 | [M06](milestones/M06-api-e-cliente.md) API e cliente web | 8,3% | Aceito | 58% |
-| [M07](milestones/M07-registros-investigativos.md) Registros bancários e GATE | 8,3% | Em curso | 67% |
+| [M07](milestones/M07-registros-investigativos.md) Registros bancários e GATE | 8,3% | Aceito | 67% |
 | [M08](milestones/M08-sistema-de-emails.md) Correio eletrônico | 8,3% | Não iniciado | 75% |
 | [M09](milestones/M09-busca-e-apreensao.md) Busca e apreensão | 8,3% | Não iniciado | 83% |
 | [M10](milestones/M10-whiteboards-pessoais.md) Whiteboards pessoais | 8,3% | Não iniciado | 92% |

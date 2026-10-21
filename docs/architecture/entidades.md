@@ -22,6 +22,7 @@ A identidade conceitual é `(server_id, entity_id)`. Um `entity_id` é estável 
 | Mutation | Alteração persistente aplicada a uma entidade do mundo, isolada por servidor. |
 | Caso (`case`) | Definição compartilhada pelo servidor, criada a partir de seed e versão próprias e referenciando entidades do mundo. |
 | Evidência (`case_evidence`) | Fato associado a um caso. Sua classificação e ligação com a solução são internas ao backend. |
+| Registro de atividade de caso (`case_activity_records`) | Evento bancário ou GATE persistido para um NPC e relacionado internamente a um caso; a resposta pública contém somente os dados narrativos do registro. |
 | Progresso do jogador | Descobertas individuais de uma conta sobre um caso compartilhado. Não altera a definição nem o estado comum do caso. |
 
 `world_entity` é uma âncora, não uma exigência para materializar antecipadamente a população inteira. Um registro é criado quando a identidade precisa ser referenciada por uma relação, mutation, caso ou consulta persistida. A política exata de materialização ainda será refinada com o gerador.

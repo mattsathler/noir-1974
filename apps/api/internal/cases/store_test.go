@@ -2,12 +2,15 @@ package cases
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"noir-1974/apps/api/internal/records"
 )
 
 type testCaseRow struct {
@@ -38,9 +41,12 @@ func (row testCaseRow) Scan(destinations ...any) error {
 }
 
 type casePersistenceFixture struct {
-	sharedState map[string]string
-	progress    map[string][]byte
-	evidence    map[string]map[string]bool
+	sharedState   map[string]string
+	progress      map[string][]byte
+	evidence      map[string]map[string]bool
+	activityRows  [][]any
+	activityQuery string
+	activityArgs  []any
 }
 
 func newCasePersistenceFixture() *casePersistenceFixture {
@@ -99,12 +105,42 @@ func (fixture *casePersistenceFixture) QueryRow(_ context.Context, query string,
 	}
 }
 
-func (fixture *casePersistenceFixture) Query(context.Context, string, ...any) (pgx.Rows, error) {
-	return nil, errors.New("case fixture does not support row queries")
+func (fixture *casePersistenceFixture) Query(_ context.Context, query string, args ...any) (pgx.Rows, error) {
+	if strings.Contains(query, "FROM case_activity_records") {
+		fixture.activityQuery = query
+		fixture.activityArgs = args
+		return &caseFixtureRows{rows: fixture.activityRows}, nil
+	}
+	return nil, errors.New("unexpected case row query")
 }
 
 func (fixture *casePersistenceFixture) Begin(context.Context) (pgx.Tx, error) {
 	return nil, errors.New("case fixture does not create definitions")
+}
+
+type caseFixtureRows struct {
+	rows    [][]any
+	current []any
+	index   int
+}
+
+func (rows *caseFixtureRows) Close()                                       {}
+func (rows *caseFixtureRows) Err() error                                   { return nil }
+func (rows *caseFixtureRows) CommandTag() pgconn.CommandTag                { return pgconn.NewCommandTag("SELECT") }
+func (rows *caseFixtureRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
+func (rows *caseFixtureRows) RawValues() [][]byte                          { return nil }
+func (rows *caseFixtureRows) Conn() *pgx.Conn                              { return nil }
+func (rows *caseFixtureRows) Values() ([]any, error)                       { return rows.current, nil }
+func (rows *caseFixtureRows) Next() bool {
+	if rows.index >= len(rows.rows) {
+		return false
+	}
+	rows.current = rows.rows[rows.index]
+	rows.index++
+	return true
+}
+func (rows *caseFixtureRows) Scan(destinations ...any) error {
+	return testCaseRow{values: rows.current}.Scan(destinations...)
 }
 
 func TestSharedCaseStateAndPlayerProgressPersistSeparately(t *testing.T) {
@@ -169,5 +205,35 @@ func TestCaseStoreRejectsInvalidSharedStateAndEvidence(t *testing.T) {
 	}
 	if err := store.SavePlayerProgress(context.Background(), "server", "case-1", "account-a", PlayerProgress{DiscoveredEvidenceIDs: []string{" "}}); !errors.Is(err, ErrInvalidProgress) {
 		t.Fatalf("blank evidence ID error = %v, want ErrInvalidProgress", err)
+	}
+}
+
+func TestNPCRecordsQueryIsScopedAndOmitsBackendClassification(t *testing.T) {
+	fixture := newCasePersistenceFixture()
+	publicRecord := records.Record{
+		ID: "record:extortion", NPCID: "npc:victim", Source: "bank",
+		OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
+		Operator:   "Meridian Global Settlement Office", Description: "A private remittance cleared.",
+	}
+	data, err := json.Marshal(publicRecord)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.activityRows = [][]any{{data}}
+	store := NewPostgresStore(fixture)
+	from := time.Date(1974, 11, 1, 0, 0, 0, 0, time.UTC)
+	through := time.Date(1974, 11, 12, 23, 59, 0, 0, time.UTC)
+	result, err := store.NPCRecords(context.Background(), "server-1", "npc:victim", from, through)
+	if err != nil {
+		t.Fatalf("NPCRecords() error = %v", err)
+	}
+	if len(result) != 1 || result[0].ID != publicRecord.ID {
+		t.Fatalf("NPCRecords() = %+v", result)
+	}
+	if strings.Contains(fixture.activityQuery, "internal_relation") || strings.Contains(fixture.activityQuery, "case_id") {
+		t.Fatalf("public query selects internal case metadata: %s", fixture.activityQuery)
+	}
+	if len(fixture.activityArgs) != 4 || fixture.activityArgs[0] != "server-1" || fixture.activityArgs[1] != "npc:victim" || fixture.activityArgs[2] != from || fixture.activityArgs[3] != through {
+		t.Fatalf("query did not constrain server, NPC and interval: %#v", fixture.activityArgs)
 	}
 }

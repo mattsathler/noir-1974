@@ -15,6 +15,7 @@ A arquitetura pode ser resumida nesta frase:
 | [Geração do mundo](geracao-do-mundo.md) | Camadas, grafo, entidades |
 | [Como funciona o mundo](como-funciona-o-mundo.md) | Explicação simples da seed, geração, persistência e consultas |
 | [Casos](casos.md) | Definição vs estado; crime como consequência |
+| [Correio eletrônico](correio-eletronico.md) | Geração de mensagens, caixas consultáveis e separação de classificação interna |
 | [API conceitual](api.md) | REST, servidor autoritativo |
 | [Pontas soltas](pontas-soltas.md) | O que ainda não está fechado |
 

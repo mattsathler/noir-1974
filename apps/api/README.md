@@ -24,7 +24,9 @@ O schema inicial de identidade é aplicado de forma idempotente quando a API ini
 
 ## Casos
 
-`internal/cases` gera homicídios determinísticos por arquétipos (atualmente conflito de trabalho e ciúmes) a partir de relações da versão 2 do mundo. A definição referencia IDs do servidor, e um validador rejeita referências inválidas ou sem evidências alcançáveis. O schema separa definição, estado compartilhado do caso e progresso individual. As rotas autenticadas `GET /api/cases`, `GET /api/cases/{caseID}` e `POST /api/cases/{caseID}/progress` expõem dados públicos do caso e persistem o progresso da conta sem retornar o culpado. As tabelas são migradas na inicialização depois dos schemas de identidade e mundo. Consulte [`docs/architecture/casos.md`](../../docs/architecture/casos.md).
+`internal/cases` gera homicídios determinísticos por arquétipos (conflito de trabalho, ciúmes e extorsão financeira) a partir de relações da versão 2 do mundo. O gerador de casos está na versão 3; o gerador de registros possui versão própria. Casos de extorsão vinculam uma remessa financeira da vítima e uma passagem GATE do culpado à definição interna do caso. As rotas autenticadas `GET /api/cases`, `GET /api/cases/{caseID}` e `POST /api/cases/{caseID}/progress` continuam omitindo o culpado e classificações internas.
+
+`GET /api/world/npcs/{npcID}/records?from=YYYY-MM-DD&to=YYYY-MM-DD` consulta uma janela inclusiva de até 366 dias. O serviço calcula atividade cotidiana apenas para aquele NPC e intervalo e mistura os registros ligados a casos antes de ordenar tudo por horário e ID. A API não sinaliza quais eventos se relacionam a um crime. Consulte [`docs/architecture/registros-investigativos.md`](../../docs/architecture/registros-investigativos.md) e [`docs/architecture/api.md`](../../docs/architecture/api.md).
 
 ## Diretório do mundo
 

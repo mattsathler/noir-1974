@@ -10,6 +10,8 @@ GET /api/me
 GET /api/world
 POST /api/characters
 GET /api/world/npcs?q=<name>
+GET /api/world/npcs/:npcID/records?from=YYYY-MM-DD&to=YYYY-MM-DD
+GET /api/world/npcs/:npcID/emails?from=YYYY-MM-DD&to=YYYY-MM-DD
 GET /api/world/companies?q=<name-or-address>
 GET /api/world/locations?q=<name-or-address>
 GET /api/world/newspaper
@@ -28,9 +30,17 @@ O frontend pede “NPC #23”. O servidor verifica o servidor do jogador, recupe
 
 ## Diretório do mundo
 
-As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. NPCs retornam perfil, emprego e relações pessoais; empresas retornam sede e funcionários; locais retornam endereço completo com bairro, cidade e país. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
+As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. NPCs retornam perfil, emprego e relações pessoais; empresas retornam sede e funcionários com seus cargos, sem o estado de vida ou morte; locais retornam endereço completo com bairro, cidade e país. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
 
 `GET /api/world/newspaper` retorna a edição determinística do dia fictício atual. A manchete usa o caso persistido mais recente e omite o culpado; seis notas leves são escolhidas de um catálogo por servidor e data. A API cria o caso inicial uma única vez no bootstrap e registra a vítima como morta no estado compartilhado.
+
+`GET /api/world/npcs/:npcID/records` retorna registros do NPC no intervalo inclusivo informado. `source=bank` seleciona o ledger bancário e `source=gate` seleciona o histórico GATE; sem o filtro, retorna ambos. As datas usam `YYYY-MM-DD` e aceitam no máximo sete dias de calendário inclusivos. Os resultados são ordenados por horário e ID. A consulta gera apenas os registros cotidianos daquela pessoa e intervalo e mistura registros associados a casos. O JSON público não contém `caseId` nem a classificação interna.
+
+No desktop, banco e GATE são aplicativos distintos. Cada um apresenta o acesso pelas credenciais do protagonista como etapa narrativa e consulta apenas sua própria fonte. O endpoint continua exigindo a sessão autenticada do jogador; o passo de credenciais não é um novo mecanismo de autenticação do servidor.
+
+O serviço bancário é operado pelo Meridian Global Settlement Office e a infraestrutura GATE pela Meridian Global. A classificação e a relação dos registros de caso ficam em `case_activity_records`; a API expõe os eventos sem revelar essa relação. A versão do gerador de registros é independente da versão da seed do mundo e ambas participam da derivação determinística.
+
+`GET /api/world/npcs/:npcID/emails` retorna a correspondência daquela caixa no intervalo inclusivo, com limite de sete dias de calendário. Mensagens cotidianas são geradas sob demanda para o NPC consultado e misturadas às mensagens de caso persistidas. A API expõe serviço, remetente, destinatário, assunto, corpo e data; nunca expõe relação com caso ou classificação interna. O app Meridian Mail apresenta o acesso ao arquivo sob a infraestrutura corporativa da Meridian Global. Detalhes em [Correio eletrônico](correio-eletronico.md).
 
 ## Casos e progresso
 

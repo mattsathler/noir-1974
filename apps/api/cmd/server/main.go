@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +16,9 @@ import (
 	"noir-1974/apps/api/internal/cases"
 	"noir-1974/apps/api/internal/health"
 	"noir-1974/apps/api/internal/identity"
+	"noir-1974/apps/api/internal/mail"
 	"noir-1974/apps/api/internal/newspaper"
+	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
 )
 
@@ -81,19 +84,31 @@ func main() {
 	if err := caseStore.Create(ctx, worldServerID, generatedWorld, openingCase); err != nil {
 		log.Fatalf("persist opening case: %v", err)
 	}
-	victim, err := worldStore.GetNPC(ctx, worldServerID, openingCase.VictimID)
-	if err != nil {
-		log.Fatalf("load opening case victim: %v", err)
+	openingCases := []cases.Definition{openingCase}
+	if openingCase.ArchetypeID != "financial_extortion" {
+		extortionCase, err := ensureExtortionCase(ctx, caseStore, worldServerID, worldSeed, generatedWorld)
+		if err != nil {
+			log.Fatalf("persist opening extortion case: %v", err)
+		}
+		openingCases = append(openingCases, extortionCase)
 	}
-	if victim.NPC.Status != "dead" {
-		if err := worldStore.SetNPCStatus(ctx, worldServerID, openingCase.VictimID, "dead"); err != nil {
-			log.Fatalf("record opening case victim status: %v", err)
+	for _, definition := range openingCases {
+		victim, err := worldStore.GetNPC(ctx, worldServerID, definition.VictimID)
+		if err != nil {
+			log.Fatalf("load opening case victim: %v", err)
+		}
+		if victim.NPC.Status != "dead" {
+			if err := worldStore.SetNPCStatus(ctx, worldServerID, definition.VictimID, "dead"); err != nil {
+				log.Fatalf("record opening case victim status: %v", err)
+			}
 		}
 	}
 
 	mux := http.NewServeMux()
 	newsService := newspaper.NewService(worldStore, caseStore)
-	mux.Handle("/api/", identity.NewHandlerWithGame(identityStore, os.Getenv("APP_ENV") == "production", worldStore, newsService, caseStore, worldServerID))
+	recordsService := records.NewService(worldStore, caseStore)
+	mailService := mail.NewService(worldStore, caseStore)
+	mux.Handle("/api/", identity.NewHandlerWithGameAndMail(identityStore, os.Getenv("APP_ENV") == "production", worldStore, newsService, caseStore, recordsService, mailService, worldServerID))
 	mux.Handle("GET /api/health", health.NewHandler(pool))
 	server := &http.Server{
 		Addr:              ":8080",
@@ -117,4 +132,22 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("serve API: %v", err)
 	}
+}
+
+func ensureExtortionCase(ctx context.Context, store *cases.PostgresStore, serverID, worldSeed string, base world.World) (cases.Definition, error) {
+	for attempt := 0; attempt < 128; attempt++ {
+		seed := fmt.Sprintf("%s/opening-extortion-%d", worldSeed, attempt)
+		definition, err := cases.Generate(base, seed, cases.GeneratorVersion)
+		if err != nil {
+			return cases.Definition{}, err
+		}
+		if definition.ArchetypeID != "financial_extortion" {
+			continue
+		}
+		if err := store.Create(ctx, serverID, base, definition); err != nil {
+			return cases.Definition{}, err
+		}
+		return definition, nil
+	}
+	return cases.Definition{}, errors.New("could not derive an extortion case from the generated world")
 }

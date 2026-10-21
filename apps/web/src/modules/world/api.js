@@ -10,6 +10,25 @@ export const searchPeople = (query) => search("/api/world/npcs", query);
 export const searchCompanies = (query) => search("/api/world/companies", query);
 export const searchLocations = (query) => search("/api/world/locations", query);
 
+export async function getNPCEmails(npcId, from, to) {
+  const params = new URLSearchParams({ from, to });
+  const response = await fetch(`/api/world/npcs/${encodeURIComponent(npcId)}/emails?${params}`, { credentials: "same-origin" });
+  const contentType = response.headers.get("content-type") ?? "";
+  const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
+  if (!response.ok) throw new Error(payload.message?.trim() || "The correspondence office could not be reached.");
+  return payload.results ?? [];
+}
+
+export async function getNPCRecords(npcId, from, to, source) {
+  const params = new URLSearchParams({ from, to });
+  if (source) params.set("source", source);
+  const response = await fetch(`/api/world/npcs/${encodeURIComponent(npcId)}/records?${params}`, { credentials: "same-origin" });
+  const contentType = response.headers.get("content-type") ?? "";
+  const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
+  if (!response.ok) throw new Error(payload.message?.trim() || "The records office could not be reached.");
+  return payload.results ?? [];
+}
+
 export async function getNewspaperIssue() {
   const response = await fetch("/api/world/newspaper", { credentials: "same-origin" });
   const contentType = response.headers.get("content-type") ?? "";

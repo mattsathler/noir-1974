@@ -108,6 +108,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           location={location}
           display={display}
           serverTime={serverTime}
+          timeZone={world?.timeZone}
           onClose={closeComputer}
         />
       )}

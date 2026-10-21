@@ -1,0 +1,100 @@
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+function dateKey(year, month, day) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function monthLabel(month) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" })
+    .format(new Date(Date.UTC(1974, month - 1, 1)));
+}
+
+export default function DatePicker({ label, value, onChange, minDate, maxDate }) {
+  const [open, setOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => `${value.slice(0, 7)}-01`);
+  const [position, setPosition] = useState(null);
+  const triggerRef = useRef(null);
+  const calendarRef = useRef(null);
+  const selected = new Date(`${value}T00:00:00Z`);
+  const visible = new Date(`${visibleMonth}T00:00:00Z`);
+  const year = visible.getUTCFullYear();
+  const month = visible.getUTCMonth();
+  const monthDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const offset = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7;
+  const days = [...Array(offset).fill(null), ...Array.from({ length: monthDays }, (_, index) => index + 1)];
+  const modal = triggerRef.current?.closest(".computer-window");
+
+  useEffect(() => setVisibleMonth(`${value.slice(0, 7)}-01`), [value]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function closeOnOutsidePointer(event) {
+      if (triggerRef.current?.contains(event.target) || calendarRef.current?.contains(event.target)) return;
+      setOpen(false);
+    }
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  function toggleCalendar() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const trigger = triggerRef.current;
+    const parent = trigger?.closest(".computer-window");
+    if (trigger && parent) {
+      const triggerRect = trigger.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
+      const popupWidth = Math.min(256, parent.clientWidth - 16);
+      const popupHeight = 260;
+      const below = triggerRect.bottom - parentRect.top;
+      const above = triggerRect.top - parentRect.top - popupHeight;
+      const top = below + popupHeight <= parent.clientHeight ? below : Math.max(0, above);
+      const left = Math.max(8, Math.min(parent.clientWidth - popupWidth - 8, triggerRect.left - parentRect.left));
+      setPosition({ left, top, width: popupWidth });
+    }
+    setOpen(true);
+  }
+
+  function moveMonth(amount) {
+    const next = new Date(Date.UTC(year, month + amount, 1));
+    setVisibleMonth(dateKey(next.getUTCFullYear(), next.getUTCMonth() + 1, 1));
+  }
+
+  const calendar = open && position && modal ? createPortal(
+    <section ref={calendarRef} className="world-calendar" style={position} aria-label={`Choose ${label} date`}>
+      <header className="world-calendar__header">
+        <button type="button" aria-label="Previous month" onClick={() => moveMonth(-1)}>‹</button>
+        <strong>{monthLabel(month + 1)}</strong>
+        <button type="button" aria-label="Next month" onClick={() => moveMonth(1)}>›</button>
+      </header>
+      <div className="world-calendar__grid" role="group" aria-label={`${monthLabel(month + 1)} ${year}`}>
+        {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <span className="world-calendar__weekday" key={`${day}-${index}`}>{day}</span>)}
+        {days.map((day, index) => {
+          if (day === null) return <span className="world-calendar__blank" key={`blank-${index}`} />;
+          const candidate = dateKey(year, month + 1, day);
+          return <button key={candidate} type="button" aria-label={candidate} aria-pressed={candidate === value} disabled={candidate < minDate || candidate > maxDate} className={candidate === value ? "world-calendar__day world-calendar__day--selected" : "world-calendar__day"} onClick={() => { onChange(candidate); setOpen(false); }}>{day}</button>;
+        })}
+      </div>
+    </section>, modal,
+  ) : null;
+
+  return (
+    <div className="world-record__date-picker">
+      <span className="world-record__date-label">{label}</span>
+      <button ref={triggerRef} className="world-record__date-trigger" type="button" aria-label={`Select date ${label}`} aria-expanded={open} onClick={toggleCalendar}>
+        {new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "UTC" }).format(selected)} <span aria-hidden="true">▾</span>
+      </button>
+      {calendar}
+    </div>
+  );
+}

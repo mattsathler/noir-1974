@@ -9,6 +9,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"noir-1974/apps/api/internal/newspaper"
+	"noir-1974/apps/api/internal/records"
+	"noir-1974/apps/api/internal/world"
 )
 
 type fakeStore struct {
@@ -25,6 +29,36 @@ type fakeStore struct {
 	sessionToken     string
 	sessionAccountID string
 	deletedToken     string
+}
+
+type fakeDirectory struct{}
+
+func (fakeDirectory) SearchNPCs(context.Context, string, string) ([]world.NPCProfile, error) {
+	return nil, nil
+}
+func (fakeDirectory) SearchCompanies(context.Context, string, string) ([]world.CompanyRecord, error) {
+	return nil, nil
+}
+func (fakeDirectory) SearchLocations(context.Context, string, string) ([]world.LocationRecord, error) {
+	return nil, nil
+}
+
+type fakeRecordReader struct {
+	items []records.Record
+	npcID string
+	from  time.Time
+	to    time.Time
+}
+
+func (reader *fakeRecordReader) NPCRecords(_ context.Context, _, npcID string, from, to time.Time) ([]records.Record, error) {
+	reader.npcID, reader.from, reader.to = npcID, from, to
+	return reader.items, nil
+}
+
+type fakeNews struct{}
+
+func (fakeNews) Issue(context.Context, string, string, string, time.Time) (newspaper.Issue, error) {
+	return newspaper.Issue{}, nil
 }
 
 func (f *fakeStore) createAccount(_ context.Context, username, email, hash string) (account, error) {
@@ -87,6 +121,54 @@ func TestRegisterCreatesAccountAndHttpOnlySession(t *testing.T) {
 	}
 	if response.Account.PasswordHash != "" || response.Character != nil {
 		t.Fatalf("sensitive or unexpected registration response: %+v", response)
+	}
+}
+
+func TestNPCRecordsRequiresSessionAndReturnsSelectedIntervalWithoutClassification(t *testing.T) {
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid"}
+	reader := &fakeRecordReader{items: []records.Record{{
+		ID: "record:1", NPCID: "npc:one", Source: "bank", OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
+		Operator: "Meridian Global Settlement Office", Description: "A private remittance cleared.", CaseID: "case:hidden", InternalRelation: "extortion_payment",
+	}, {
+		ID: "record:2", NPCID: "npc:one", Source: "gate", OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
+		Operator: "Meridian Global · GATE Network", Description: "A passenger entry was recorded.",
+	}}}
+	handler := NewHandlerWithGame(repository, false, fakeDirectory{}, fakeNews{}, nil, reader, "server-1")
+	request := httptest.NewRequest(http.MethodGet, "/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12&source=bank", nil)
+	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	if reader.npcID != "npc:one" || reader.from.Format("2006-01-02") != "1974-11-06" || reader.to.Format("2006-01-02") != "1974-11-12" {
+		t.Fatalf("query forwarded wrong target or interval: %+v", reader)
+	}
+	if strings.Contains(recorder.Body.String(), "case:hidden") || strings.Contains(recorder.Body.String(), "extortion_payment") {
+		t.Fatalf("API leaked internal crime classification: %s", recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "record:2") || strings.Contains(recorder.Body.String(), "passenger entry") {
+		t.Fatalf("bank app returned a GATE record: %s", recorder.Body.String())
+	}
+}
+
+func TestNPCRecordsRejectsMissingOrOversizedDateRange(t *testing.T) {
+	repository := &fakeStore{account: account{ID: "account-1"}}
+	reader := &fakeRecordReader{}
+	handler := NewHandlerWithGame(repository, false, fakeDirectory{}, fakeNews{}, nil, reader, "server-1")
+	for _, path := range []string{
+		"/api/world/npcs/npc:one/records",
+		"/api/world/npcs/npc:one/records?from=1974-01-01&to=1976-01-01",
+		"/api/world/npcs/npc:one/records?from=1974-01-01&to=1974-01-08",
+		"/api/world/npcs/npc:one/records?from=1974-01-01&to=1974-01-02&source=unknown",
+	} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusBadRequest {
+			t.Errorf("GET %s status = %d, want 400", path, recorder.Code)
+		}
 	}
 }
 

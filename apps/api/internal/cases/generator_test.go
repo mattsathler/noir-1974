@@ -2,9 +2,11 @@ package cases
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
+	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
 )
 
@@ -47,6 +49,45 @@ func TestGenerateHomicideIsDeterministicAndUsesWorldRelationships(t *testing.T) 
 	}
 	if first.ID == other.ID {
 		t.Fatal("different case seeds produced the same case ID")
+	}
+}
+
+func TestFinancialExtortionIncludesMixedBankAndGATECaseRecords(t *testing.T) {
+	base, err := world.Generate("m07-world-fixture", world.GeneratorVersion2)
+	if err != nil {
+		t.Fatalf("world.Generate() error = %v", err)
+	}
+	var definition Definition
+	for index := 0; index < 200; index++ {
+		definition, err = Generate(base, fmt.Sprintf("m07-case-seed-%d", index), GeneratorVersion)
+		if err != nil {
+			t.Fatalf("Generate() error = %v", err)
+		}
+		if definition.ArchetypeID == "financial_extortion" {
+			break
+		}
+	}
+	if definition.ArchetypeID != "financial_extortion" {
+		t.Fatal("no deterministic seed selected the financial extortion archetype")
+	}
+	if err := Validate(definition, base); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+	if len(definition.Records) != 2 {
+		t.Fatalf("case has %d linked activity records, want transfer and GATE movement", len(definition.Records))
+	}
+	bySource := map[string]records.Record{}
+	for _, item := range definition.Records {
+		bySource[item.Source] = item
+	}
+	if bySource["bank"].InternalRelation != "extortion_payment" || bySource["bank"].NPCID != definition.VictimID {
+		t.Fatalf("extortion transfer is not linked to the victim: %+v", bySource["bank"])
+	}
+	if bySource["gate"].InternalRelation != "precrime_route" || bySource["gate"].NPCID != definition.KillerID {
+		t.Fatalf("GATE movement is not linked to the killer: %+v", bySource["gate"])
+	}
+	if !bySource["bank"].OccurredAt.Before(bySource["gate"].OccurredAt) {
+		t.Fatal("extortion transfer should precede the investigated GATE movement")
 	}
 }
 

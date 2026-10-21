@@ -63,6 +63,52 @@ ALTER TABLE case_evidence ADD CONSTRAINT case_evidence_evidence_type_check CHECK
 CREATE INDEX IF NOT EXISTS case_evidence_by_location_idx
     ON case_evidence(server_id, location_entity_id);
 
+CREATE TABLE IF NOT EXISTS case_activity_records (
+    server_id uuid NOT NULL,
+    case_id text NOT NULL,
+    record_id text NOT NULL CHECK (record_id <> ''),
+    npc_entity_id text NOT NULL,
+    related_npc_entity_id text,
+    source text NOT NULL CHECK (source IN ('bank', 'gate')),
+    occurred_at timestamptz NOT NULL,
+    internal_relation text NOT NULL CHECK (internal_relation <> ''),
+    record_data jsonb NOT NULL,
+    PRIMARY KEY (server_id, record_id),
+    FOREIGN KEY (server_id, case_id)
+        REFERENCES cases(server_id, case_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, npc_entity_id)
+        REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, related_npc_entity_id)
+        REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE
+);
+ALTER TABLE case_activity_records ADD COLUMN IF NOT EXISTS related_npc_entity_id text;
+ALTER TABLE case_activity_records DROP CONSTRAINT IF EXISTS case_activity_records_server_id_related_npc_entity_id_fkey;
+ALTER TABLE case_activity_records ADD CONSTRAINT case_activity_records_server_id_related_npc_entity_id_fkey
+    FOREIGN KEY (server_id, related_npc_entity_id)
+    REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS case_activity_records_by_npc_date_idx
+    ON case_activity_records(server_id, npc_entity_id, occurred_at, record_id);
+
+CREATE TABLE IF NOT EXISTS case_mail_messages (
+    server_id uuid NOT NULL,
+    case_id text NOT NULL,
+    message_id text NOT NULL CHECK (message_id <> ''),
+    mailbox_npc_entity_id text NOT NULL,
+    related_npc_entity_id text NOT NULL,
+    sent_at timestamptz NOT NULL,
+    internal_relation text NOT NULL CHECK (internal_relation <> ''),
+    message_data jsonb NOT NULL,
+    PRIMARY KEY (server_id, message_id),
+    FOREIGN KEY (server_id, case_id)
+        REFERENCES cases(server_id, case_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, mailbox_npc_entity_id)
+        REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, related_npc_entity_id)
+        REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS case_mail_messages_by_mailbox_date_idx
+    ON case_mail_messages(server_id, mailbox_npc_entity_id, sent_at, message_id);
+
 CREATE TABLE IF NOT EXISTS case_states (
     server_id uuid NOT NULL,
     case_id text NOT NULL,

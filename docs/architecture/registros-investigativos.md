@@ -1,0 +1,19 @@
+# Registros investigativos
+
+## Geração cotidiana
+
+`internal/records` gera atividade sob demanda para um NPC e um intervalo inclusivo. A saída não depende da ordem das consultas: cada evento é derivado da seed e versão do mundo, versão do gerador de registros, ID do NPC, data e posição do evento naquele dia. A mesma consulta reconstrói os mesmos IDs, horários, descrições e valores.
+
+Cada dia consulta duas fontes independentes: o Meridian Global Settlement Office e a rede GATE, operada pela Meridian Global. Dias sem atividade aparecem naturalmente; pagamentos rotineiros, remessas pessoais e acessos de viagem são misturados aos eventos vinculados a casos. A consulta não gera a atividade dos outros NPCs nem lê uma coleção global de registros.
+
+## Registros de caso
+
+O arquétipo `financial_extortion` do Crime Generator associa um pagamento da vítima ao culpado e uma passagem GATE do culpado ao distrito da cena. `case_activity_records` persiste esses eventos com a relação interna ao caso e ao papel que exercem na trama. O corpo JSON persistido e a resposta pública omitem esses campos internos.
+
+O endpoint de NPC combina a rotina determinística com os eventos persistidos para aquele NPC e intervalo, aplica o filtro de fonte e ordena por data e ID. No desktop, o jogador acessa os registros por dois apps: Meridian Bank para o ledger financeiro e GATE Network para os deslocamentos. Cada app apresenta o uso das credenciais do protagonista como uma etapa narrativa de acesso privilegiado; a autorização real da API continua baseada na sessão autenticada.
+
+Os mesmos rótulos, estilos e ordenação são usados para eventos comuns e vinculados. Não há categoria de “pista”, indicador, destaque, `caseId` ou resposta de relevância. Assim, a relação serve à validação futura no backend sem resolver a dedução para o jogador, conforme a [Regra 0002](../rules/0002-pistas-sem-sinalizacao.md).
+
+## Contrato de consulta
+
+`GET /api/world/npcs/{npcID}/records?from=YYYY-MM-DD&to=YYYY-MM-DD&source=bank|gate` exige sessão autenticada, datas válidas em ordem crescente e intervalo máximo de sete dias de calendário inclusivos. O limite também é aplicado no gerador de registros. O filtro de fonte é opcional e aceita `bank` ou `gate`. A consulta está isolada pelo `NOIR_WORLD_SERVER_ID` da API; IDs e filtros do cliente não permitem trocar de servidor. NPC inexistente retorna 404.

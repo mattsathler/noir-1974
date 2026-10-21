@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
+	"noir-1974/apps/api/internal/mail"
+	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
 )
 
-const GeneratorVersion = 2
+const GeneratorVersion = 3
 
 var (
 	ErrInvalidCaseSeed       = errors.New("case seed is required")
@@ -34,6 +37,8 @@ type Definition struct {
 	LocationID       string                  `json:"locationId"`
 	Relationships    []RelationshipReference `json:"relationships"`
 	Evidence         []EvidenceDefinition    `json:"evidence"`
+	Records          []records.Record        `json:"records,omitempty"`
+	Emails           []mail.Message          `json:"-"`
 }
 
 type RelationshipReference struct {
@@ -83,6 +88,7 @@ type archetypeGenerator struct {
 var archetypeGenerators = []archetypeGenerator{
 	{id: "workplace_conflict", candidates: workplaceCandidates, validate: validateWorkplaceConflict, evidenceTypes: []string{"employment_record", "meeting_minutes", "office_log"}},
 	{id: "jealousy", candidates: jealousyCandidates, validate: validateJealousy, evidenceTypes: []string{"civil_record", "letter_fragment", "witness_statement"}},
+	{id: "financial_extortion", candidates: extortionCandidates, validate: validateExtortion, evidenceTypes: []string{"account_record", "travel_register", "personnel_record"}},
 }
 
 // Generate creates a deterministic homicide definition from existing world facts.
@@ -114,10 +120,38 @@ func Generate(base world.World, seed string, version int) (Definition, error) {
 		Relationships:    selected.relationships,
 		Evidence:         buildEvidence(caseID, selected),
 	}
+	if selected.archetypeID == "financial_extortion" {
+		region := regionName(base, npcByID(base.NPCs, selected.killerID).RegionID)
+		definition.Records = records.ExtortionEvents(seed, base.GeneratorVersion, caseID, selected.killerID, selected.victimID, region)
+	}
+	definition.Emails = buildCaseEmails(seed, base.GeneratorVersion, caseID, selected, base)
 	if err := Validate(definition, base); err != nil {
 		return Definition{}, err
 	}
 	return definition, nil
+}
+
+func buildCaseEmails(seed string, worldVersion int, caseID string, selected candidate, base world.World) []mail.Message {
+	killer := npcByID(base.NPCs, selected.killerID)
+	victim := npcByID(base.NPCs, selected.victimID)
+	subject, body, relation := "Office allocation", "The revised figures are still under your name. I expect the registry to correct them before the next settlement.", "workplace_dispute"
+	switch selected.archetypeID {
+	case "jealousy":
+		subject = "A question about last evening"
+		body = "You said the late passage was for office work. Someone from the relay saw you leave with the same clerk again. I will wait for an explanation at home."
+		relation = "jealousy_correspondence"
+	case "financial_extortion":
+		subject = "Private account notice"
+		body = "The weekly remittance is due before Friday. I still have the duplicate settlement copy, and I would prefer your household name not appear in a company inquiry."
+		relation = "extortion_message"
+	}
+	messageDay := 3 + caseIndex(seed+"/correspondence/day", 1, 8)
+	messageMinute := 7*60 + caseIndex(seed+"/correspondence/minute", 1, 13*60)
+	return []mail.Message{mail.CaseMessage(
+		seed, worldVersion, caseID, victim.ID, killer.ID, killer.Name, victim.Name,
+		subject, body, relation,
+		time.Date(1974, time.November, messageDay, 0, 0, 0, 0, time.UTC).Add(time.Duration(messageMinute)*time.Minute),
+	)}
 }
 
 // Validate checks the case archetype, world references, and reachable clues.
@@ -159,7 +193,7 @@ func Validate(definition Definition, base world.World) error {
 	if !exists || !archetype.validate(definition, base) {
 		return ErrInvalidDefinition
 	}
-	if !hasReachableEvidence(definition.Evidence, definition, links, entities) || !hasEvidenceTypes(definition.Evidence, archetype.evidenceTypes...) {
+	if !hasReachableEvidence(definition.Evidence, definition, links, entities) || !hasEvidenceTypes(definition.Evidence, archetype.evidenceTypes...) || !validateCaseRecords(definition) {
 		return ErrUnsolvableCase
 	}
 	return nil
@@ -240,6 +274,22 @@ func workplaceCandidate(killerID, victimID, locationID, killerLinkID, victimLink
 			{typeID: "office_log", presentation: "After-hours register", content: "Two familiar signatures appear on a late entry; the time has been corrected by hand."},
 		},
 	}
+}
+
+func extortionCandidates(base world.World) []candidate {
+	workplace := workplaceCandidates(base)
+	result := make([]candidate, 0, len(workplace))
+	for _, possibility := range workplace {
+		possibility.archetypeID = "financial_extortion"
+		possibility.motive = "Financial extortion escalated after the victim threatened to expose a private arrangement."
+		possibility.evidence = []evidencePlan{
+			{typeID: "account_record", presentation: "Settlement statement", content: "A private remittance appears among routine account activity. The counterparty is listed only by ledger reference."},
+			{typeID: "travel_register", presentation: "Passenger register", content: "A GATE passage was recorded shortly before the reported time of death."},
+			{typeID: "personnel_record", presentation: "Personnel file", content: "Two staff records place the names within the same corporate office."},
+		}
+		result = append(result, possibility)
+	}
+	return result
 }
 
 func jealousyCandidates(base world.World) []candidate {
@@ -373,6 +423,48 @@ func validateJealousy(definition Definition, base world.World) bool {
 		}
 	}
 	return false
+}
+
+func validateExtortion(definition Definition, base world.World) bool {
+	if !validateWorkplaceConflict(definition, base) || len(definition.Records) != 2 {
+		return false
+	}
+	hasTransfer, hasTravel := false, false
+	for _, item := range definition.Records {
+		switch item.InternalRelation {
+		case "extortion_payment":
+			hasTransfer = item.CaseID == definition.ID && item.NPCID == definition.VictimID && item.RelatedNPCID == definition.KillerID && item.Source == "bank" && item.Amount > 0
+		case "precrime_route":
+			hasTravel = item.CaseID == definition.ID && item.NPCID == definition.KillerID && item.Source == "gate" && item.Destination != ""
+		}
+	}
+	return hasTransfer && hasTravel
+}
+
+func validateCaseRecords(definition Definition) bool {
+	if definition.ArchetypeID != "financial_extortion" {
+		return len(definition.Records) == 0
+	}
+	if len(definition.Records) != 2 {
+		return false
+	}
+	seen := make(map[string]bool, len(definition.Records))
+	for _, item := range definition.Records {
+		if item.ID == "" || item.NPCID == "" || item.OccurredAt.IsZero() || item.CaseID != definition.ID || seen[item.ID] {
+			return false
+		}
+		seen[item.ID] = true
+	}
+	return true
+}
+
+func regionName(base world.World, regionID string) string {
+	for _, region := range base.Regions {
+		if region.ID == regionID {
+			return region.Name
+		}
+	}
+	return "Lyon"
 }
 
 func hasEvidenceTypes(evidence []EvidenceDefinition, required ...string) bool {

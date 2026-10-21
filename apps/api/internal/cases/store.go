@@ -12,6 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"noir-1974/apps/api/internal/mail"
+	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
 )
 
@@ -104,6 +106,9 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 		if existingSeed != definition.Seed || existingVersion != definition.GeneratorVersion || existingType != definition.CaseType || existingArchetype != definition.ArchetypeID || existingMotive != definition.Motive || existingVictim != definition.VictimID || existingKiller != definition.KillerID || existingLocation != definition.LocationID {
 			return ErrPersistedConflict
 		}
+		if err := persistCaseEmails(ctx, tx, serverID, definition); err != nil {
+			return err
+		}
 		if err := tx.Commit(ctx); err != nil {
 			return fmt.Errorf("commit existing case check: %w", err)
 		}
@@ -187,6 +192,22 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 			return fmt.Errorf("persist case evidence: %w", err)
 		}
 	}
+	for _, record := range definition.Records {
+		data, err := json.Marshal(record)
+		if err != nil {
+			return fmt.Errorf("encode case activity record: %w", err)
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO case_activity_records (server_id, case_id, record_id, npc_entity_id, related_npc_entity_id, source, occurred_at, internal_relation, record_data)
+			 VALUES ($1::uuid, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, $9::jsonb)`,
+			serverID, definition.ID, record.ID, record.NPCID, record.RelatedNPCID, record.Source, record.OccurredAt, record.InternalRelation, string(data),
+		); err != nil {
+			return fmt.Errorf("persist case activity record %s: %w", record.ID, err)
+		}
+	}
+	if err := persistCaseEmails(ctx, tx, serverID, definition); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO case_states (server_id, case_id, status) VALUES ($1::uuid, $2, 'open')`,
 		serverID, definition.ID,
@@ -197,6 +218,80 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 		return fmt.Errorf("commit case creation: %w", err)
 	}
 	return nil
+}
+
+func persistCaseEmails(ctx context.Context, tx pgx.Tx, serverID string, definition Definition) error {
+	for _, message := range definition.Emails {
+		data, err := json.Marshal(message)
+		if err != nil {
+			return fmt.Errorf("encode case email: %w", err)
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO case_mail_messages (server_id, case_id, message_id, mailbox_npc_entity_id, related_npc_entity_id, sent_at, internal_relation, message_data)
+			 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8::jsonb)
+			 ON CONFLICT (server_id, message_id) DO NOTHING`,
+			serverID, definition.ID, message.ID, message.MailboxNPCID, message.RelatedNPCID, message.SentAt, message.InternalRelation, string(data),
+		); err != nil {
+			return fmt.Errorf("persist case email %s: %w", message.ID, err)
+		}
+	}
+	return nil
+}
+
+// NPCRecords loads only the selected person's case-related entries within the
+// requested interval. It deliberately omits the internal relationship label.
+func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID string, from, through time.Time) ([]records.Record, error) {
+	rows, err := store.db.Query(ctx,
+		`SELECT record_data FROM case_activity_records
+		 WHERE server_id = $1::uuid AND npc_entity_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
+		 ORDER BY occurred_at, record_id`, serverID, npcID, from, through,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]records.Record, 0)
+	for rows.Next() {
+		var data []byte
+		var item records.Record
+		if err := rows.Scan(&data); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(data, &item); err != nil {
+			return nil, fmt.Errorf("decode case activity record: %w", err)
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
+
+// NPCEmails loads messages for only the requested mailbox and interval while
+// retaining case classification as backend-only metadata.
+func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID string, from, through time.Time) ([]mail.Message, error) {
+	rows, err := store.db.Query(ctx,
+		`SELECT case_id, related_npc_entity_id, internal_relation, message_data
+		 FROM case_mail_messages
+		 WHERE server_id = $1::uuid AND mailbox_npc_entity_id = $2 AND sent_at >= $3 AND sent_at <= $4
+		 ORDER BY sent_at, message_id`, serverID, npcID, from, through,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]mail.Message, 0)
+	for rows.Next() {
+		var item mail.Message
+		var data []byte
+		if err := rows.Scan(&item.CaseID, &item.RelatedNPCID, &item.InternalRelation, &data); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(data, &item); err != nil {
+			return nil, fmt.Errorf("decode case email: %w", err)
+		}
+		item.MailboxNPCID = npcID
+		result = append(result, item)
+	}
+	return result, rows.Err()
 }
 
 // LatestPublicCase returns the newest case without disclosing its killer.

@@ -62,9 +62,15 @@ type Address struct {
 }
 
 type CompanyRecord struct {
-	Company   Company `json:"company"`
-	Address   Address `json:"address"`
-	Employees []NPC   `json:"employees"`
+	Company   Company           `json:"company"`
+	Address   Address           `json:"address"`
+	Employees []CompanyEmployee `json:"employees"`
+}
+
+type CompanyEmployee struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Role string `json:"role"`
 }
 
 type LocationRecord struct {
@@ -354,6 +360,11 @@ func (store *PostgresStore) GeneratedWorld(ctx context.Context, serverID string)
 	return store.generatedWorld(ctx, serverID)
 }
 
+// WorldConfig returns the seed and generator version for one server's world.
+func (store *PostgresStore) WorldConfig(ctx context.Context, serverID string) (string, int, error) {
+	return store.worldSeedAndVersion(ctx, serverID)
+}
+
 func makeAddress(entity Entity, regions map[string]string) Address {
 	district := regions[entity.RegionID]
 	city := "Lyon"
@@ -409,7 +420,7 @@ func (store *PostgresStore) applyNPCStatus(ctx context.Context, serverID, npcID 
 }
 
 // EmployeesOfCompany uses the employer relationship index and reconstructs only matching NPCs.
-func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, companyID string) ([]NPC, error) {
+func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, companyID string) ([]CompanyEmployee, error) {
 	seed, version, err := store.worldSeedAndVersion(ctx, serverID)
 	if err != nil {
 		return nil, err
@@ -435,7 +446,7 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 	}
 
 	rows, err := store.db.Query(ctx,
-		`SELECT e.generation_key
+		`SELECT e.entity_id, e.generation_key, r.role
 		 FROM employment_relationships r
 		 JOIN world_entities e
 		   ON e.server_id = r.server_id AND e.entity_id = r.employee_npc_id
@@ -448,17 +459,17 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 	}
 	defer rows.Close()
 
-	employees := make([]NPC, 0)
+	employees := make([]CompanyEmployee, 0)
 	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
+		var employeeID, key, role string
+		if err := rows.Scan(&employeeID, &key, &role); err != nil {
 			return nil, err
 		}
 		npc, err := GenerateNPC(seed, version, key)
 		if err != nil {
 			return nil, err
 		}
-		employees = append(employees, npc)
+		employees = append(employees, CompanyEmployee{ID: employeeID, Name: npc.Name, Role: role})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

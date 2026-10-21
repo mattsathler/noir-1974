@@ -1,7 +1,7 @@
 # M08 — Sistema de correio eletrônico
 
 **Ciclo:** 8  
-**Status:** Não iniciado  
+**Status:** Em andamento
 **Depende de:** M07 aceito
 
 ## Objetivo
@@ -16,6 +16,7 @@ Permitir consultar correspondências eletrônicas associadas a NPCs. O Crime Gen
 - [ ] Consultas são limitadas às caixas de entrada, participantes e intervalos permitidos; o sistema não gera nem carrega todas as mensagens do mundo para uma consulta.
 - [ ] Backend mantém a relação interna entre mensagem e crime; cliente, API e interface não expõem essa classificação, conforme a [Regra 0002](../../rules/0002-pistas-sem-sinalizacao.md).
 - [ ] Acesso e infraestrutura de mensagens refletem o controle corporativo e a tensão entre tecnologia avançada e costumes antigos, conforme as [Regras 0001 e 0003](../../rules/README.md).
+- [ ] O desktop do detetive oferece um aplicativo para pesquisar caixas de correio e consultar mensagens por intervalo.
 
 ## Fora de escopo
 

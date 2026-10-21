@@ -48,8 +48,8 @@ PRODUCT_BLURB = {
         "com o servidor como autoridade. O fluxo investigativo completo ainda está em construção."
     ),
     7: (
-        "O recorte web e a API estão aceitos. Registros bancários e do GATE "
-        "estão em implementação para ampliar as fontes de investigação."
+        "O recorte web, a API e os registros bancários e do GATE estão aceitos. "
+        "Correspondências procedurais ainda precisam entrar no ciclo investigativo."
     ),
     8: (
         "Registros financeiros e do GATE estão aceitos. Correspondências "

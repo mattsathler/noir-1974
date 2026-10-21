@@ -15,7 +15,9 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"noir-1974/apps/api/internal/cases"
+	correspondence "noir-1974/apps/api/internal/mail"
 	"noir-1974/apps/api/internal/newspaper"
+	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
 )
 
@@ -32,6 +34,8 @@ type Handler struct {
 	worldReader         WorldDirectoryReader
 	newspaperReader     NewspaperReader
 	caseReader          CaseAPIReader
+	recordsReader       RecordsAPIReader
+	emailsReader        EmailsAPIReader
 	worldServerID       string
 }
 
@@ -52,27 +56,39 @@ type CaseAPIReader interface {
 	SavePlayerProgress(context.Context, string, string, string, cases.PlayerProgress) error
 }
 
+type RecordsAPIReader interface {
+	NPCRecords(context.Context, string, string, time.Time, time.Time) ([]records.Record, error)
+}
+
+type EmailsAPIReader interface {
+	NPCEmails(context.Context, string, string, time.Time, time.Time) ([]correspondence.Message, error)
+}
+
 // NewHandler creates the identity API. Cookies are secure in production deployments.
 func NewHandler(repository store, secureCookie bool) http.Handler {
-	return newHandler(repository, secureCookie, nil, "", nil, nil)
+	return newHandler(repository, secureCookie, nil, "", nil, nil, nil, nil)
 }
 
 // NewHandlerWithWorld composes authenticated world directory routes into the identity API.
 func NewHandlerWithWorld(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string) http.Handler {
-	return newHandler(repository, secureCookie, reader, serverID, nil, nil)
+	return newHandler(repository, secureCookie, reader, serverID, nil, nil, nil, nil)
 }
 
 func NewHandlerWithNewspaper(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, serverID string) http.Handler {
-	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, nil)
+	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, nil, nil, nil)
 }
 
-func NewHandlerWithGame(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, caseReader CaseAPIReader, serverID string) http.Handler {
-	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, caseReader)
+func NewHandlerWithGame(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, serverID string) http.Handler {
+	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, caseReader, recordsReader, nil)
 }
 
-func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string, newspaperReader NewspaperReader, caseReader CaseAPIReader) http.Handler {
+func NewHandlerWithGameAndMail(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, emailsReader EmailsAPIReader, serverID string) http.Handler {
+	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, caseReader, recordsReader, emailsReader)
+}
+
+func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, emailsReader EmailsAPIReader) http.Handler {
 	now := time.Now
-	handler := &Handler{store: repository, secureCookie: secureCookie, now: now, worldClockStartedAt: now(), worldReader: reader, newspaperReader: newspaperReader, caseReader: caseReader, worldServerID: serverID}
+	handler := &Handler{store: repository, secureCookie: secureCookie, now: now, worldClockStartedAt: now(), worldReader: reader, newspaperReader: newspaperReader, caseReader: caseReader, recordsReader: recordsReader, emailsReader: emailsReader, worldServerID: serverID}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/auth/register", handler.register)
 	mux.HandleFunc("POST /api/auth/login", handler.login)
@@ -83,6 +99,12 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/world/npcs", handler.searchNPCs)
 		mux.HandleFunc("GET /api/world/companies", handler.searchCompanies)
 		mux.HandleFunc("GET /api/world/locations", handler.searchLocations)
+	}
+	if recordsReader != nil {
+		mux.HandleFunc("GET /api/world/npcs/{npcID}/records", handler.npcRecords)
+	}
+	if emailsReader != nil {
+		mux.HandleFunc("GET /api/world/npcs/{npcID}/emails", handler.npcEmails)
 	}
 	if newspaperReader != nil {
 		mux.HandleFunc("GET /api/world/newspaper", handler.newspaper)
@@ -98,6 +120,90 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		defer cancel()
 		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
+	if !h.authorizeWorldRequest(w, r) {
+		return
+	}
+	from, err := time.Parse("2006-01-02", r.URL.Query().Get("from"))
+	if err != nil {
+		http.Error(w, "from must be a date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+	through, err := time.Parse("2006-01-02", r.URL.Query().Get("to"))
+	if err != nil {
+		http.Error(w, "to must be a date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+	if through.Before(from) || through.Sub(from) > (records.MaxRangeDays-1)*24*time.Hour {
+		http.Error(w, "date range must be valid and no longer than 7 calendar days", http.StatusBadRequest)
+		return
+	}
+	source := r.URL.Query().Get("source")
+	if source != "" && source != "bank" && source != "gate" {
+		http.Error(w, "source must be bank or gate", http.StatusBadRequest)
+		return
+	}
+	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	results, err := h.recordsReader.NPCRecords(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through)
+	if errors.Is(err, world.ErrEntityNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if errors.Is(err, records.ErrInvalidQuery) || errors.Is(err, records.ErrRangeTooLarge) {
+		http.Error(w, "date range must be valid and no longer than 7 calendar days", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, "could not retrieve personal records", http.StatusInternalServerError)
+		return
+	}
+	if source != "" {
+		filtered := results[:0]
+		for _, result := range results {
+			if result.Source == source {
+				filtered = append(filtered, result)
+			}
+		}
+		results = filtered
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
+	if !h.authorizeWorldRequest(w, r) {
+		return
+	}
+	from, err := time.Parse("2006-01-02", r.URL.Query().Get("from"))
+	if err != nil {
+		http.Error(w, "from must be a date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+	through, err := time.Parse("2006-01-02", r.URL.Query().Get("to"))
+	if err != nil {
+		http.Error(w, "to must be a date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+	if through.Before(from) || through.Sub(from) > (correspondence.MaxRangeDays-1)*24*time.Hour {
+		http.Error(w, "date range must be valid and no longer than 7 calendar days", http.StatusBadRequest)
+		return
+	}
+	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	results, err := h.emailsReader.NPCEmails(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through)
+	if errors.Is(err, world.ErrEntityNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if errors.Is(err, correspondence.ErrInvalidQuery) || errors.Is(err, correspondence.ErrRangeTooLarge) {
+		http.Error(w, "date range must be valid and no longer than 7 calendar days", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, "could not retrieve correspondence", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
 type caseDetailResponse struct {
