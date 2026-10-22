@@ -522,6 +522,15 @@
 .world-record__header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--noir-space-3); }
 .world-record__header h2 { margin: 0; color: var(--noir-paper-100); font-family: var(--noir-font-sans); font-size: 1rem; letter-spacing: 0.06em; }
 .world-record__header span { flex: 0 0 auto; color: var(--noir-brass-300); font-size: 0.6rem; }
+.world-record--personnel { padding: var(--noir-space-4); border: 1px solid var(--noir-ink-700); border-left: 2px solid var(--noir-brass-500); }
+.world-record__personnel-sheet { display: grid; grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr); gap: var(--noir-space-4); margin-top: var(--noir-space-3); padding: var(--noir-space-3); background: color-mix(in srgb, var(--noir-paper-100) 4%, var(--noir-ink-950)); }
+.world-record__portrait { display: grid; align-content: start; justify-items: center; gap: var(--noir-space-2); margin: 0; padding: var(--noir-space-2); border: 1px solid var(--noir-brass-500); background: var(--noir-ink-950); }
+.world-record__portrait .modular-face { width: 100%; }
+.world-record__portrait figcaption { color: var(--noir-brass-300); font-size: 0.52rem; letter-spacing: 0.08em; text-align: center; }
+.world-record__personnel-facts { display: grid; align-content: start; gap: var(--noir-space-3); margin: 0; }
+.world-record__personnel-facts > div { display: grid; gap: var(--noir-space-1); padding-bottom: var(--noir-space-2); border-bottom: 1px solid var(--noir-ink-700); }
+.world-record__personnel-facts dt { color: var(--noir-brass-300); font-size: 0.56rem; letter-spacing: 0.1em; }
+.world-record__personnel-facts dd { margin: 0; color: var(--noir-paper-200); font-size: 0.68rem; line-height: 1.55; overflow-wrap: anywhere; }
 .world-record p { margin: var(--noir-space-2) 0 0; color: var(--noir-paper-300); font-size: 0.68rem; line-height: 1.55; overflow-wrap: anywhere; }
 .world-record p.world-record__detail { margin-left: var(--noir-space-3); color: var(--noir-paper-400); }
 .world-record__activity-toggle { margin-top: var(--noir-space-3); padding: 0; color: var(--noir-brass-300); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 0.62rem; letter-spacing: 0.08em; text-align: left; }
@@ -770,6 +779,9 @@
   .computer-window:has(.personal-whiteboard) .computer-window__body { max-height: none; padding: var(--noir-space-3); }
   .computer-window:has(.email-inbox) .computer-window__body { max-height: none; padding: var(--noir-space-4); }
   .world-directory__searchline { gap: var(--noir-space-3); }
+  .world-record__personnel-sheet { grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr); gap: var(--noir-space-3); padding: var(--noir-space-2); }
+  .world-record__portrait { padding: var(--noir-space-1); }
+  .world-record__portrait figcaption { font-size: 0.46rem; }
   .whiteboard-destination { padding: var(--noir-space-2); }
   .whiteboard-destination__panel { padding: var(--noir-space-4); }
   .personal-whiteboard__viewport { height: min(54svh, 40rem); min-height: 20rem; }

@@ -27,7 +27,7 @@ type fakeStore struct {
 	locationID       string
 	locationErr      error
 	createdName      string
-	createdPortrait  int
+	createdVisual    world.VisualIdentity
 	sessionToken     string
 	sessionAccountID string
 	deletedToken     string
@@ -107,12 +107,12 @@ func (f *fakeStore) accountForSession(context.Context, string, time.Time) (accou
 	return f.account, f.character, f.sessionErr
 }
 
-func (f *fakeStore) createCharacter(_ context.Context, _, name string, portraitID int) (character, error) {
+func (f *fakeStore) createCharacter(_ context.Context, _, name string, visual world.VisualIdentity) (character, error) {
 	if f.characterErr != nil {
 		return character{}, f.characterErr
 	}
-	f.createdName, f.createdPortrait = name, portraitID
-	return character{DisplayName: name, PortraitID: portraitID}, nil
+	f.createdName, f.createdVisual = name, visual
+	return character{DisplayName: name, PortraitID: 1, Visual: visual}, nil
 }
 
 func (f *fakeStore) playerLocation(context.Context, string) (string, error) {
@@ -368,11 +368,11 @@ func TestLoginAndCharacterErrors(t *testing.T) {
 		{name: "unknown account", method: http.MethodPost, path: "/api/auth/login", body: `{"email":"d@example.com","password":"secret"}`, store: &fakeStore{accountErr: ErrNotFound}, want: http.StatusUnauthorized},
 		{name: "missing session", method: http.MethodGet, path: "/api/me", store: &fakeStore{}, want: http.StatusUnauthorized},
 		{name: "expired session", method: http.MethodGet, path: "/api/me", cookie: true, store: &fakeStore{sessionErr: ErrNotFound}, want: http.StatusUnauthorized},
-		{name: "character missing session", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"Ada","portraitId":1}`, want: http.StatusUnauthorized},
-		{name: "invalid character", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"A","portraitId":7}`, cookie: true, store: &fakeStore{}, want: http.StatusBadRequest},
-		{name: "existing character", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"Ada","portraitId":1}`, cookie: true, store: &fakeStore{character: &character{DisplayName: "Existing", PortraitID: 1}}, want: http.StatusConflict},
-		{name: "character created", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"  Ada  ","portraitId":3}`, cookie: true, store: &fakeStore{}, want: http.StatusCreated},
-		{name: "character database error", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"Ada","portraitId":3}`, cookie: true, store: &fakeStore{characterErr: errors.New("database unavailable")}, want: http.StatusInternalServerError},
+		{name: "character missing session", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"Ada","visual":{"hairId":"hair_short_brown","skinColorId":"skin_light","eyeColorId":"eyes_brown"}}`, want: http.StatusUnauthorized},
+		{name: "invalid character", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"A","visual":{}}`, cookie: true, store: &fakeStore{}, want: http.StatusBadRequest},
+		{name: "existing character", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"Ada","visual":{"hairId":"hair_short_brown","skinColorId":"skin_light","eyeColorId":"eyes_brown"}}`, cookie: true, store: &fakeStore{character: &character{DisplayName: "Existing", PortraitID: 1}}, want: http.StatusConflict},
+		{name: "character created", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"  Ada  ","visual":{"hairId":"hair_short_brown","skinColorId":"skin_light","eyeColorId":"eyes_brown","faceDetailId":"","accessoryIds":[]}}`, cookie: true, store: &fakeStore{}, want: http.StatusCreated},
+		{name: "character database error", method: http.MethodPost, path: "/api/characters", body: `{"displayName":"Ada","visual":{"hairId":"hair_short_brown","skinColorId":"skin_light","eyeColorId":"eyes_brown"}}`, cookie: true, store: &fakeStore{characterErr: errors.New("database unavailable")}, want: http.StatusInternalServerError},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -385,7 +385,7 @@ func TestLoginAndCharacterErrors(t *testing.T) {
 			if recorder.Code != test.want {
 				t.Fatalf("status = %d, want %d", recorder.Code, test.want)
 			}
-			if test.name == "character created" && (test.store.createdName != "Ada" || test.store.createdPortrait != 3) {
+			if test.name == "character created" && (test.store.createdName != "Ada" || test.store.createdVisual.HairID != "hair_short_brown") {
 				t.Fatalf("character input not normalized: %+v", test.store)
 			}
 		})

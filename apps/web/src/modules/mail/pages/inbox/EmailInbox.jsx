@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { MapPin } from "pixelarticons/react/MapPin";
 import { getNPCEmails, searchPeople } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
+import ModularFace from "../../../identity/components/ModularFace.jsx";
 
 function dateBefore(value, days) {
   const date = new Date(`${value}T00:00:00Z`);
@@ -133,6 +134,7 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
         {!mailbox && people.map(({ npc }) => (
           <article className="world-record" key={npc.id}>
             <header className="world-record__header"><h2>{npc.name}</h2><span>ACCOUNT LOCATED</span></header>
+            <ModularFace visual={npc.visual} name={npc.name} />
             <button className="world-record__activity-toggle" type="button" onClick={() => { setMailbox(npc); setMessage("Select an interval to consult this account's archived correspondence."); }}>
               OPEN CORRESPONDENCE FILE
             </button>
@@ -144,6 +146,7 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
             <h2>{mailbox.name}</h2>
             <button className="email-inbox__back" type="button" onClick={() => { requestId.current++; setBusy(false); setMailbox(null); setMessages([]); setMessage("Select a correspondence file."); }}>BACK TO FILES</button>
           </header>
+          <ModularFace visual={mailbox.visual} name={mailbox.name} />
           <form className="world-record__activity-filter" onSubmit={readMailbox}>
             <DatePicker label="FROM" value={from} minDate={rangeStart} maxDate={throughToday} onChange={updateFrom} />
             <DatePicker label="THROUGH" value={through} minDate={rangeStart} maxDate={throughToday} onChange={updateThrough} />

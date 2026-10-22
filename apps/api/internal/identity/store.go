@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"embed"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"noir-1974/apps/api/internal/world"
 )
 
 //go:embed schema.sql
@@ -33,8 +35,9 @@ type account struct {
 }
 
 type character struct {
-	DisplayName string `json:"displayName"`
-	PortraitID  int    `json:"portraitId"`
+	DisplayName string               `json:"displayName"`
+	PortraitID  int                  `json:"-"`
+	Visual      world.VisualIdentity `json:"visual"`
 }
 
 type store interface {
@@ -42,7 +45,7 @@ type store interface {
 	accountByEmail(context.Context, string) (account, error)
 	createSession(context.Context, string, string, time.Time) error
 	accountForSession(context.Context, string, time.Time) (account, *character, error)
-	createCharacter(context.Context, string, string, int) (character, error)
+	createCharacter(context.Context, string, string, world.VisualIdentity) (character, error)
 	playerLocation(context.Context, string) (string, error)
 	setPlayerLocation(context.Context, string, string) error
 	deleteSession(context.Context, string) error
@@ -89,18 +92,23 @@ func (s *postgresStore) accountByEmail(ctx context.Context, email string) (accou
 	var result account
 	var displayName pgtype.Text
 	var portraitID pgtype.Int2
+	var visualJSON []byte
 	err := s.db.QueryRow(ctx,
 		`SELECT a.id::text, a.username, a.email, a.password_hash,
-		       c.display_name, c.portrait_id
+		       c.display_name, c.portrait_id, c.visual_identity
 		 FROM player_accounts a
 		 LEFT JOIN player_characters c ON c.account_id = a.id
 		 WHERE lower(a.email) = lower($1)`, email,
-	).Scan(&result.ID, &result.Username, &result.Email, &result.PasswordHash, &displayName, &portraitID)
+	).Scan(&result.ID, &result.Username, &result.Email, &result.PasswordHash, &displayName, &portraitID, &visualJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return account{}, ErrNotFound
 	}
 	if err == nil && displayName.Valid && portraitID.Valid {
-		result.Character = &character{DisplayName: displayName.String, PortraitID: int(portraitID.Int16)}
+		visual, decodeErr := decodeVisualIdentity(visualJSON)
+		if decodeErr != nil {
+			return account{}, decodeErr
+		}
+		result.Character = &character{DisplayName: displayName.String, PortraitID: int(portraitID.Int16), Visual: visual}
 	}
 	return result, err
 }
@@ -119,14 +127,15 @@ func (s *postgresStore) accountForSession(ctx context.Context, token string, now
 	var result account
 	var displayName pgtype.Text
 	var portraitID pgtype.Int2
+	var visualJSON []byte
 	err := s.db.QueryRow(ctx,
 		`SELECT a.id::text, a.username, a.email,
-		       c.display_name, c.portrait_id
+		       c.display_name, c.portrait_id, c.visual_identity
 		 FROM player_sessions s
 		 JOIN player_accounts a ON a.id = s.account_id
 		 LEFT JOIN player_characters c ON c.account_id = a.id
 		 WHERE s.token_hash = $1 AND s.expires_at > $2`, hash[:], now,
-	).Scan(&result.ID, &result.Username, &result.Email, &displayName, &portraitID)
+	).Scan(&result.ID, &result.Username, &result.Email, &displayName, &portraitID, &visualJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return account{}, nil, ErrNotFound
 	}
@@ -135,16 +144,24 @@ func (s *postgresStore) accountForSession(ctx context.Context, token string, now
 	}
 	var characterResult *character
 	if displayName.Valid && portraitID.Valid {
-		characterResult = &character{DisplayName: displayName.String, PortraitID: int(portraitID.Int16)}
+		visual, decodeErr := decodeVisualIdentity(visualJSON)
+		if decodeErr != nil {
+			return account{}, nil, decodeErr
+		}
+		characterResult = &character{DisplayName: displayName.String, PortraitID: int(portraitID.Int16), Visual: visual}
 	}
 	return result, characterResult, nil
 }
 
-func (s *postgresStore) createCharacter(ctx context.Context, accountID, name string, portraitID int) (character, error) {
+func (s *postgresStore) createCharacter(ctx context.Context, accountID, name string, visual world.VisualIdentity) (character, error) {
+	visualJSON, err := json.Marshal(visual)
+	if err != nil {
+		return character{}, err
+	}
 	var result character
-	err := s.db.QueryRow(ctx,
-		`INSERT INTO player_characters (account_id, display_name, portrait_id)
-		 VALUES ($1::text::uuid, $2, $3) RETURNING display_name, portrait_id`, accountID, name, portraitID,
+	err = s.db.QueryRow(ctx,
+		`INSERT INTO player_characters (account_id, display_name, portrait_id, visual_identity)
+		 VALUES ($1::text::uuid, $2, 1, $3::jsonb) RETURNING display_name, portrait_id`, accountID, name, string(visualJSON),
 	).Scan(&result.DisplayName, &result.PortraitID)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -153,7 +170,21 @@ func (s *postgresStore) createCharacter(ctx context.Context, accountID, name str
 		}
 		return character{}, err
 	}
+	result.Visual = visual
 	return result, nil
+}
+
+func decodeVisualIdentity(data []byte) (world.VisualIdentity, error) {
+	visual := world.DefaultVisualIdentity()
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &visual); err != nil {
+			return world.VisualIdentity{}, err
+		}
+	}
+	if err := world.ValidateVisualIdentity(visual); err != nil {
+		return world.VisualIdentity{}, err
+	}
+	return visual, nil
 }
 
 func (s *postgresStore) playerLocation(ctx context.Context, accountID string) (string, error) {

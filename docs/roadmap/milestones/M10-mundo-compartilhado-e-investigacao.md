@@ -25,10 +25,11 @@ Dar ao jogador um espaço pessoal de investigação dentro do computador, onde p
 
 - [ ] Existe um conjunto modular de peças visuais combináveis, com alinhamento e escala consistentes para compor personagens em pixel art.
 - [ ] O catálogo oferece variações de rostos, cabelos, tons de pele, características visuais e acessórios, sem restringir combinações por gênero ou origem.
-- [ ] Cada NPC recebe uma composição visual determinística a partir da seed do servidor, da versão do gerador e de sua chave estável; todos os jogadores do servidor veem a mesma aparência para aquele NPC.
-- [ ] A nova aparência procedural de NPCs usa uma nova versão do gerador mundial; versões anteriores continuam disponíveis para reconstruir mundos existentes sem alterar seus personagens.
+- [x] Cada NPC recebe IDs de camadas visuais determinísticos a partir da seed do servidor, da versão do gerador e de sua chave estável; todos os jogadores do servidor recebem a mesma composição para aquele NPC.
+- [x] A aparência procedural de NPCs usa uma nova versão do gerador mundial; versões anteriores continuam disponíveis para reconstruir mundos existentes sem alterar seus personagens.
 - [ ] O jogador substitui a escolha entre seis retratos fixos por um editor modular com prévia e persiste as peças escolhidas na própria conta, independente da seed do mundo.
-- [ ] A API valida as peças do jogador contra o catálogo visual permitido e retorna dados que o cliente consegue compor sem duplicar regras de compatibilidade.
+- [x] A API valida as peças do jogador contra o catálogo visual permitido, persiste a identidade modular na conta e retorna os IDs para a composição no cliente.
+- [ ] O frontend compõe camadas PNG de rosto sem corpo usando os IDs retornados pela API; o contrato dos arquivos está em [`identidade-visual-modular.md`](../../architecture/identidade-visual-modular.md).
 - [ ] NPCs e personagem do jogador seguem literalmente a [Regra 0001](../../rules/0001-direcao-artistica.md), incluindo pixel art, paleta, proporções e influência de Scotland Yard.
 - [ ] A seed e a versão de mundos existentes não são sobrescritas; a nova versão é usada para mundos novos, e a reconstrução de um mundo existente exige processo explícito.
 - [ ] Testes cobrem determinismo visual de NPCs, consistência entre jogadores, validação e persistência da aparência do personagem, além da reconstrução de versões antigas do gerador.

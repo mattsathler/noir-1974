@@ -23,13 +23,14 @@ describe("identity API", () => {
   it("logs in and creates a character with JSON payloads", async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(new Response('{"account":{"id":"1"}}', { headers: { "content-type": "application/json" } }))
-      .mockResolvedValueOnce(new Response('{"character":{"portraitId":2}}', { headers: { "content-type": "application/json" } }));
+      .mockResolvedValueOnce(new Response('{"character":{"visual":{"hairId":"hair_short_ginger"}}}', { headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetch);
 
     await loginAccount({ email: "d@example.com", password: "secret" });
-    await createCharacter({ displayName: "Ada", portraitId: 2 });
+    const visual = { hairId: "hair_short_ginger", skinColorId: "skin_light", eyeColorId: "eyes_brown", faceDetailId: "", accessoryIds: [] };
+    await createCharacter({ displayName: "Ada", visual });
     expect(fetch.mock.calls.map(([path]) => path)).toEqual(["/api/auth/login", "/api/characters"]);
-    expect(fetch.mock.calls[1][1].body).toBe(JSON.stringify({ displayName: "Ada", portraitId: 2 }));
+    expect(fetch.mock.calls[1][1].body).toBe(JSON.stringify({ displayName: "Ada", visual }));
   });
 
   it("returns null after logout and reports server errors", async () => {

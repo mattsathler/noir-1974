@@ -7,6 +7,7 @@ POST /api/auth/register
 POST /api/auth/login
 POST /api/auth/logout
 GET /api/me
+GET /api/character-visuals
 GET /api/world
 POST /api/characters
 GET /api/world/npcs?q=<name>
@@ -31,9 +32,11 @@ CLIENT → REST API → WORLD / DATABASE → PROCEDURAL GENERATOR → CURRENT ST
 
 O frontend pede “NPC #23”. O servidor verifica o servidor do jogador, recupera seed/estado, gera atributos, consulta relações, aplica mutations e devolve só o que o cliente pode ver. Jogadores do mesmo servidor leem o mesmo estado compartilhado; progresso individual pode ser separado.
 
+`GET /api/character-visuals` retorna os IDs aceitos para cabelos, tons de pele, olhos, detalhes faciais e acessórios. O catálogo de cabelo inclui dois cortes curtos, um longo, ponytail, tied, tied long, pigtails e emo, cada um em cinco tons; os olhos incluem sete cores. Barbas e bigodes têm variantes em cinco tons, e há quatro formatos de barba. Os dois modelos de óculos estão disponíveis em cinco acabamentos. `POST /api/characters` recebe `{ "displayName": "Ada", "visual": { "hairId": "hair_long_ginger", "skinColorId": "skin_light", "eyeColorId": "eyes_green", "faceDetailId": "face_beard_goatee_ginger", "accessoryIds": ["face_glasses_round_tortoise"] } }`. A aparência contém no máximo um `faceDetailId` e um acessório (ou valores vazios para nenhum). A API valida cada ID e salva a aparência do personagem na conta; `GET /api/me` retorna os mesmos IDs. NPCs da versão 4 retornam seus IDs em `npc.visual`, determinísticos por mundo e estáveis para todos no servidor. Barbas e bigodes de NPCs recebem o mesmo tom do cabelo. O frontend compõe as imagens PNG; o backend não envia arquivos de arte.
+
 ## Diretório do mundo
 
-As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. A busca de pessoas retorna nome, idade, aparência, local de trabalho e estado civil; não retorna cargo nem identidade do parceiro. A busca de empresas retorna sede e funcionários com seus cargos, oferecendo uma fonte separada para descobrir funções dentro da empresa. A busca de locais retorna apenas endereços do bairro atual, incluindo os pontos fixos de serviço quando o jogador está em Central. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
+As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. A busca de pessoas retorna nome, idade, aparência, IDs visuais determinísticos, local de trabalho e estado civil; não retorna cargo nem identidade do parceiro. A busca de empresas retorna sede e funcionários com seus cargos, oferecendo uma fonte separada para descobrir funções dentro da empresa. A busca de locais retorna apenas endereços do bairro atual, incluindo os pontos fixos de serviço quando o jogador está em Central. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
 
 `GET /api/world/newspaper` retorna a edição determinística do dia fictício atual. A manchete usa o caso persistido mais recente e omite o culpado; seis notas leves são escolhidas de um catálogo por servidor e data. A API cria o caso inicial uma única vez no bootstrap e registra a vítima como morta no estado compartilhado.
 

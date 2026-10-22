@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { MapPin } from "pixelarticons/react/MapPin";
 import { getNPCRecords, searchCompanies, searchLocations, searchPeople } from "../../api.js";
 import DatePicker from "../../components/DatePicker.jsx";
+import ModularFace from "../../../identity/components/ModularFace.jsx";
+
+const FALLBACK_NPC_VISUAL = {
+  hairId: "hair_short_brown",
+  skinColorId: "skin_light",
+  eyeColorId: "eyes_brown",
+  faceDetailId: "",
+  accessoryIds: [],
+};
 
 function inputDate(date, timeZone) {
   const values = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
@@ -188,12 +197,25 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
       <p className="world-directory__message" role="status" aria-live="polite">{message}</p>
 
       {people.map(({ npc, workplaces, maritalStatus }) => (
-        <article className="world-record" key={npc.id}>
+        <article className="world-record world-record--personnel" key={npc.id}>
           <header className="world-record__header"><h2>{npc.name}</h2><span>PERSONNEL FILE</span></header>
-          <p>{npc.age} YEARS · {npc.appearance}</p>
-          {workplaces.map(({ company, address }) => <p key={`${company}-${address}`}>WORKPLACE · {company} — {address}</p>)}
-          {!workplaces.length && <p>WORKPLACE · NOT LISTED</p>}
-          <p>MARITAL STATUS · {maritalStatus?.toUpperCase() || "UNKNOWN"}</p>
+          <div className="world-record__personnel-sheet">
+            <figure className="world-record__portrait">
+              <ModularFace visual={npc.visual ?? FALLBACK_NPC_VISUAL} name={npc.name} />
+              <figcaption>IDENTIFICATION PORTRAIT</figcaption>
+            </figure>
+            <dl className="world-record__personnel-facts">
+              <div><dt>AGE</dt><dd>{npc.age} YEARS</dd></div>
+              <div><dt>DESCRIPTION</dt><dd>{npc.appearance || "NOT RECORDED"}</dd></div>
+              <div>
+                <dt>EMPLOYMENT</dt>
+                <dd>{workplaces.length
+                  ? workplaces.map(({ company, address }) => `${company} — ${address}`).join("; ")
+                  : "NOT LISTED"}</dd>
+              </div>
+              <div><dt>MARITAL STATUS</dt><dd>{maritalStatus?.toUpperCase() || "UNKNOWN"}</dd></div>
+            </dl>
+          </div>
           {(isBankRecords || isGateRecords) && <button
             className="world-record__activity-toggle"
             type="button"

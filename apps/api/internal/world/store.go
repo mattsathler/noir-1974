@@ -66,10 +66,11 @@ type PersonSearchRecord struct {
 }
 
 type PersonSearchNPC struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Age        int    `json:"age"`
-	Appearance string `json:"appearance"`
+	ID         string          `json:"id"`
+	Name       string          `json:"name"`
+	Age        int             `json:"age"`
+	Appearance string          `json:"appearance"`
+	Visual     *VisualIdentity `json:"visual,omitempty"`
 }
 
 type PersonSearchWorkplace struct {
@@ -377,7 +378,7 @@ func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query stri
 			}
 		}
 		results = append(results, PersonSearchRecord{
-			NPC:        PersonSearchNPC{ID: profile.NPC.ID, Name: profile.NPC.Name, Age: profile.NPC.Age, Appearance: profile.NPC.Appearance},
+			NPC:        PersonSearchNPC{ID: profile.NPC.ID, Name: profile.NPC.Name, Age: profile.NPC.Age, Appearance: profile.NPC.Appearance, Visual: profile.NPC.Visual},
 			Workplaces: workplaces, MaritalStatus: maritalStatus,
 		})
 	}

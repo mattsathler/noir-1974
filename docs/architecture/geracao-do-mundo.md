@@ -60,11 +60,11 @@ A versão `3` mantém o formato da sociedade inicial e escolhe nomes de catálog
 
 A versão `2` e seus catálogos pequenos continuam disponíveis para reconstruir mundos existentes sem alterar nomes. Cada servidor conserva a versão de gerador registrada na criação; mundos novos usam a versão mais recente. Ao adicionar cidades, deve-se acrescentar um arquivo de catálogo e registrá-lo com seu país e cidade canônicos.
 
-## Próxima versão — identidade visual procedural
+## Versão 4 — IDs de identidade visual
 
-O M10 adicionará uma composição visual modular para NPCs. A nova versão do gerador derivará, em um fluxo independente por NPC, IDs de peças compatíveis para rosto, tom de pele, cabelo, características visuais e acessórios. A composição depende da seed mundial, da versão do gerador, da versão do catálogo visual e da chave estável do NPC; não depende da ordem em que entidades forem consultadas. Assim, todos os jogadores do mesmo servidor verão a mesma composição para cada NPC.
+A versão `4` mantém a sociedade e os catálogos de nomes da versão 3 e acrescenta IDs de camadas visuais determinísticos para cada NPC. Cada NPC recebe cabelo (o ID identifica estilo e cor, incluindo ruivo), tom de pele, cor dos olhos, detalhes faciais opcionais e acessórios opcionais. Os IDs vêm de um fluxo independente por NPC derivado da seed e da chave estável; a ordem das consultas não interfere no resultado. Todos os jogadores do mesmo servidor recebem a mesma composição.
 
-Esta mudança exige incrementar a versão do gerador (planejada como versão `4`), mantendo as versões `1` a `3` reconstruíveis. Mundos existentes continuam usando a versão gravada; trocar sua seed ou versão não é uma migração automática e só pode ocorrer por reconstrução explícita. Novos mundos passam a usar a versão mais recente.
+Versões `1` a `3` continuam reconstruíveis. Mundos existentes continuam usando a versão gravada; trocar sua seed ou versão não é uma migração automática e só pode ocorrer por reconstrução explícita. Novos mundos passam a usar a versão mais recente. Os PNGs e a composição visual no frontend seguem o contrato em [identidade visual modular](identidade-visual-modular.md).
 
 A aparência escolhida para o personagem do jogador tem outra origem: é uma preferência individual, validada contra o catálogo de peças e persistida na conta. Ela não é derivada da seed mundial e não altera os personagens vistos por outros jogadores.
 

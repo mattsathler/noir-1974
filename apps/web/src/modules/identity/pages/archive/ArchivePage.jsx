@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { currentIdentity } from "../../api.js";
+import ModularFace from "../../components/ModularFace.jsx";
 
 const DOSSIER_LOAD_DELAY = 1800;
 
@@ -44,7 +45,10 @@ export default function ArchivePage({ initialIdentity = null, onLoaded }) {
       <section className="world-loader pos-relative w-full max-w-sm p-6 surface shadow-panel" aria-labelledby="dossier-title">
         <p className="text-xs tracking-wide uppercase text-success m-0 mb-3">PRIVATE FILE · LYON</p>
         <h1 id="dossier-title" className="text-2xl m-0">Case file opened</h1>
-        {identity?.character && <p className="world-loader__agent text-sm text-secondary">AGENT · {identity.character.displayName}</p>}
+        {identity?.character && <>
+          <div className="grid place-items-center py-3"><ModularFace visual={identity.character.visual} name={identity.character.displayName} /></div>
+          <p className="world-loader__agent text-sm text-secondary">AGENT · {identity.character.displayName}</p>
+        </>}
         <p className="text-xs tracking-wide uppercase text-accent m-0">{loading ? "Reading case files" : "Synchronizing world"}</p>
         <div className={`world-loader__track${!loading && !error ? " world-loader__track--ready" : ""}`} role="progressbar" aria-label="Loading world" aria-valuemin="0" aria-valuemax="100" aria-valuenow={loading ? 35 : error ? 0 : 70}>
           <span />

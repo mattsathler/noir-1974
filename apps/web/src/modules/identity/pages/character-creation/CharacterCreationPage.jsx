@@ -1,17 +1,36 @@
-import { useRef, useState } from "react";
-import { createCharacter } from "../../api.js";
+import { useEffect, useRef, useState } from "react";
+import { createCharacter, getCharacterVisuals } from "../../api.js";
+import ModularFace from "../../components/ModularFace.jsx";
 
-const portraits = [1, 2, 3, 4, 5, 6];
+const defaultVisual = {
+  hairId: "hair_short_brown",
+  skinColorId: "skin_light",
+  eyeColorId: "eyes_brown",
+  faceDetailId: "",
+  accessoryIds: [],
+};
+
+function labelFor(id) {
+  return id.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 export default function CharacterCreationPage({ onComplete }) {
-  const [portraitId, setPortraitId] = useState(1);
+  const [visualOptions, setVisualOptions] = useState(null);
+  const [visual, setVisual] = useState(defaultVisual);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const submissionLocked = useRef(false);
 
+  useEffect(() => {
+    let active = true;
+    getCharacterVisuals().then((options) => { if (active) setVisualOptions(options); })
+      .catch((requestError) => { if (active) setError(requestError.message); });
+    return () => { active = false; };
+  }, []);
+
   async function handleSubmit(event) {
     event.preventDefault();
-    if (submissionLocked.current) return;
+    if (submissionLocked.current || !visualOptions) return;
     const fields = new FormData(event.currentTarget);
     const displayName = String(fields.get("displayName")).trim();
     const displayNameLength = Array.from(displayName).length;
@@ -23,7 +42,7 @@ export default function CharacterCreationPage({ onComplete }) {
     setSubmitting(true);
     setError("");
     try {
-      await createCharacter({ displayName, portraitId });
+      await createCharacter({ displayName, visual });
       onComplete();
     } catch (requestError) {
       submissionLocked.current = false;
@@ -32,8 +51,12 @@ export default function CharacterCreationPage({ onComplete }) {
     }
   }
 
+  function setVisualPart(key, value) {
+    setVisual((current) => ({ ...current, [key]: value }));
+  }
+
   return (
-    <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-atmosphere text-primary">
+    <main className="grid min-h-screen place-items-center overflow-x-hidden overflow-y-auto pos-relative p-6 bg-atmosphere text-primary">
       <div className="pd-backdrop pos-absolute inset-0" aria-hidden="true" />
       <div className="pos-relative w-full max-w-sm">
         <img className="brand-mark" src="/images/logo.png" alt="NOIR 1974" />
@@ -45,27 +68,45 @@ export default function CharacterCreationPage({ onComplete }) {
             <label className="text-sm text-secondary mt-2" htmlFor="character-name">Detective name</label>
             <input className="w-full min-h-11 p-3 border bg-base text-primary focus-ring" id="character-name" name="displayName" autoComplete="off" minLength={2} maxLength={40} required />
             <p className="text-xs text-secondary m-0">2–40 characters.</p>
-            <fieldset className="grid gap-2 border-0 p-0 mt-3" aria-describedby="portrait-note">
-              <legend className="text-sm text-secondary mb-2">Portrait</legend>
-              <div className="portrait-grid">
-                {portraits.map((id) => (
-                  <button
-                    className={`portrait-slot${portraitId === id ? " portrait-slot--selected" : ""}`}
-                    type="button"
-                    key={id}
-                    aria-pressed={portraitId === id}
-                    aria-label={`Select portrait ${id}`}
-                    onClick={() => setPortraitId(id)}
-                  >
-                    <span className="portrait-slot__number">{String(id).padStart(2, "0")}</span>
-                    <span className="portrait-slot__caption">In development</span>
-                  </button>
-                ))}
-              </div>
-              <span className="text-xs text-secondary" id="portrait-note">Choose 1–6. Final artwork will follow Noir's pixel art direction.</span>
+
+            <div className="grid place-items-center py-3" aria-live="polite">
+              <ModularFace visual={visual} name="Your detective" />
+            </div>
+
+            <fieldset className="grid gap-3 border-0 p-0 mt-2" disabled={!visualOptions || submitting}>
+              <legend className="text-sm text-secondary mb-2">Face and accessories</legend>
+              {visualOptions ? <>
+                <label className="grid gap-1 text-xs uppercase text-secondary">Hair
+                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.hairId} onChange={(event) => setVisualPart("hairId", event.target.value)}>
+                    {visualOptions.hair.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs uppercase text-secondary">Skin color
+                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.skinColorId} onChange={(event) => setVisualPart("skinColorId", event.target.value)}>
+                    {visualOptions.skinColors.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs uppercase text-secondary">Eye color
+                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.eyeColorId} onChange={(event) => setVisualPart("eyeColorId", event.target.value)}>
+                    {visualOptions.eyeColors.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs uppercase text-secondary">Face details
+                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.faceDetailId} onChange={(event) => setVisualPart("faceDetailId", event.target.value)}>
+                    <option value="">None</option>
+                    {visualOptions.faceDetails.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs uppercase text-secondary">Accessory
+                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.accessoryIds[0] ?? ""} onChange={(event) => setVisualPart("accessoryIds", event.target.value ? [event.target.value] : [])}>
+                    <option value="">None</option>
+                    {visualOptions.accessories.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
+                  </select>
+                </label>
+              </> : <p className="text-xs text-secondary" role="status">Loading the appearance catalog…</p>}
             </fieldset>
             {error && <p className="text-sm text-danger m-0" role="alert">{error}</p>}
-            <button className="min-h-11 mt-4 border-0 bg-transparent text-accent tracking-wide uppercase transition" type="submit" disabled={submitting}>{submitting ? "Filing…" : "Create detective"}</button>
+            <button className="min-h-11 mt-4 border-0 bg-transparent text-accent tracking-wide uppercase transition" type="submit" disabled={submitting || !visualOptions}>{submitting ? "Filing…" : "Create detective"}</button>
           </form>
         </section>
       </div>

@@ -18,15 +18,16 @@ var ErrInvalidGenerationKey = errors.New("invalid generated entity key")
 var personNameOrderCache sync.Map
 
 type NPC struct {
-	ID            string `json:"id"`
-	GenerationKey string `json:"generationKey"`
-	RegionID      string `json:"regionId"`
-	Name          string `json:"name"`
-	Age           int    `json:"age"`
-	Appearance    string `json:"appearance"`
-	Personality   string `json:"personality"`
-	Status        string `json:"status"`
-	MaritalStatus string `json:"-"`
+	ID            string          `json:"id"`
+	GenerationKey string          `json:"generationKey"`
+	RegionID      string          `json:"regionId"`
+	Name          string          `json:"name"`
+	Age           int             `json:"age"`
+	Appearance    string          `json:"appearance"`
+	Visual        *VisualIdentity `json:"visual,omitempty"`
+	Personality   string          `json:"personality"`
+	Status        string          `json:"status"`
+	MaritalStatus string          `json:"-"`
 }
 
 type Company struct {
@@ -127,7 +128,7 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 			return NPC{}, ErrInvalidGenerationKey
 		}
 		districtSlug, slotPart = parts[4], parts[6]
-	case GeneratorVersion3:
+	case GeneratorVersion3, GeneratorVersion4:
 		if len(parts) != 8 || parts[0] != "fr" || parts[1] != "lyon" || parts[2] != "people" || parts[4] != "district" || parts[6] != "person" || parts[3] != seedFingerprint(seed, version) {
 			return NPC{}, ErrInvalidGenerationKey
 		}
@@ -236,7 +237,7 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 			return Company{}, ErrInvalidGenerationKey
 		}
 		districtSlug = parts[4]
-	case GeneratorVersion3:
+	case GeneratorVersion3, GeneratorVersion4:
 		if len(parts) != 7 || parts[0] != "fr" || parts[1] != "lyon" || parts[2] != "companies" || parts[3] != seedFingerprint(seed, version) || parts[4] != "district" || parts[6] != "company" {
 			return Company{}, ErrInvalidGenerationKey
 		}
@@ -279,7 +280,7 @@ func generateSociety(seed string, version int) (World, error) {
 	for _, district := range districts {
 		regionID := "fr/lyon/district/" + district.slug
 		companyKey := "lyon/companies/" + seedFingerprint(seed, version) + "/district/" + district.slug + "/company"
-		if version == GeneratorVersion3 {
+		if version >= GeneratorVersion3 {
 			companyKey = "fr/lyon/companies/" + seedFingerprint(seed, version) + "/district/" + district.slug + "/company"
 		}
 		company, err := GenerateCompany(seed, version, companyKey)
@@ -316,7 +317,7 @@ func generateSociety(seed string, version int) (World, error) {
 		peopleBySlot := make([]NPC, 8)
 		for slot := 1; slot <= len(peopleBySlot); slot++ {
 			personKey := fmt.Sprintf("lyon/people/%s/district/%s/person/%02d", seedFingerprint(seed, version), district.slug, slot)
-			if version == GeneratorVersion3 {
+			if version >= GeneratorVersion3 {
 				personKey = fmt.Sprintf("fr/lyon/people/%s/district/%s/person/%02d", seedFingerprint(seed, version), district.slug, slot)
 			}
 			person, err := GenerateNPC(seed, version, personKey)
@@ -379,7 +380,7 @@ func npcFor(seed string, version int, regionID, generationKey string, name perso
 	case 1, 2:
 		maritalStatus = "divorced"
 	}
-	return NPC{
+	npc := NPC{
 		ID:            "npc:" + generationKey,
 		GenerationKey: generationKey,
 		RegionID:      regionID,
@@ -389,6 +390,70 @@ func npcFor(seed string, version int, regionID, generationKey string, name perso
 		Personality:   personalities[stream.intn(len(personalities))],
 		Status:        "alive",
 		MaritalStatus: maritalStatus,
+	}
+	if version == GeneratorVersion4 {
+		visual := visualIdentityForNPC(seed, generationKey)
+		npc.Visual = &visual
+		npc.Appearance = generatedAppearanceDescription(visual)
+	}
+	return npc
+}
+
+func visualIdentityForNPC(seed, generationKey string) VisualIdentity {
+	stream := newStream(seed, GeneratorVersion4, "npc/visual/"+generationKey)
+	identity := VisualIdentity{
+		HairID:       hairLayerIDs[stream.intn(len(hairLayerIDs))],
+		SkinColorID:  skinColorLayerIDs[stream.intn(len(skinColorLayerIDs))],
+		EyeColorID:   eyeColorLayerIDs[stream.intn(len(eyeColorLayerIDs))],
+		AccessoryIDs: []string{},
+	}
+	if stream.intn(4) == 0 {
+		// Pick among visual styles, then color a beard to match the generated hair.
+		faceDetailStyles := []string{"beard", "goatee", "stubble", "mutton", "moustache", "face_scar_cheek", "face_scar_brow", "face_stubble", "face_freckles"}
+		style := faceDetailStyles[stream.intn(len(faceDetailStyles))]
+		tone := hairTone(identity.HairID)
+		switch style {
+		case "beard":
+			identity.FaceDetailID = "face_beard_" + tone
+		case "goatee", "stubble", "mutton":
+			identity.FaceDetailID = "face_beard_" + style + "_" + tone
+		case "moustache":
+			identity.FaceDetailID = "face_moustache_" + tone
+		default:
+			identity.FaceDetailID = style
+		}
+	}
+	if stream.intn(5) == 0 {
+		identity.AccessoryIDs = append(identity.AccessoryIDs, accessoryLayerIDs[stream.intn(len(accessoryLayerIDs))])
+	}
+	return identity
+}
+
+func generatedAppearanceDescription(identity VisualIdentity) string {
+	hairColor := hairTone(identity.HairID)
+	skinTone := strings.TrimPrefix(identity.SkinColorID, "skin_")
+	eyeColor := strings.TrimPrefix(identity.EyeColorID, "eyes_")
+	return hairColor + " hair, " + strings.ReplaceAll(skinTone, "_", " ") + " skin, " + strings.ReplaceAll(eyeColor, "_", " ") + " eyes"
+}
+
+func hairTone(hairID string) string {
+	parts := strings.Split(hairID, "_")
+	if len(parts) == 0 {
+		return "black"
+	}
+	switch parts[len(parts)-1] {
+	case "black":
+		return "black"
+	case "ginger":
+		return "ginger"
+	case "blonde":
+		return "blonde"
+	case "brown":
+		return "brown"
+	case "grey":
+		return "grey"
+	default:
+		return "black"
 	}
 }
 
@@ -406,7 +471,7 @@ func personNamesForVersion(version int, countrySlug, citySlug string) ([]personN
 	if version == GeneratorVersion2 {
 		return allPersonNames(), nil
 	}
-	if version != GeneratorVersion3 {
+	if version != GeneratorVersion3 && version != GeneratorVersion4 {
 		return nil, ErrUnsupportedGeneratorVersion
 	}
 	catalog, ok := names.ForCity(countrySlug, citySlug)

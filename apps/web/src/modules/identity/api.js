@@ -47,11 +47,15 @@ export function loginAccount({ email, password }) {
   });
 }
 
-export function createCharacter({ displayName, portraitId }) {
+export function createCharacter({ displayName, visual }) {
   return request("/api/characters", {
     method: "POST",
-    body: JSON.stringify({ displayName, portraitId }),
+    body: JSON.stringify({ displayName, visual }),
   });
+}
+
+export function getCharacterVisuals() {
+  return request("/api/character-visuals");
 }
 
 export function logoutAccount() {

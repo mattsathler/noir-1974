@@ -115,6 +115,7 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 	mux.HandleFunc("POST /api/auth/login", handler.login)
 	mux.HandleFunc("POST /api/auth/logout", handler.logout)
 	mux.HandleFunc("GET /api/me", handler.me)
+	mux.HandleFunc("GET /api/character-visuals", handler.characterVisuals)
 	mux.HandleFunc("GET /api/world", handler.world)
 	if reader != nil {
 		mux.HandleFunc("GET /api/world/npcs", handler.searchNPCs)
@@ -234,6 +235,17 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (h *Handler) characterVisuals(w http.ResponseWriter, _ *http.Request) {
+	hair, skinColors, eyeColors, faceDetails, accessories := world.VisualIdentityCatalog()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"hair":        hair,
+		"skinColors":  skinColors,
+		"eyeColors":   eyeColors,
+		"faceDetails": faceDetails,
+		"accessories": accessories,
+	})
 }
 
 func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
@@ -876,8 +888,8 @@ type loginRequest struct {
 }
 
 type characterRequest struct {
-	DisplayName string `json:"displayName"`
-	PortraitID  int    `json:"portraitId"`
+	DisplayName string               `json:"displayName"`
+	Visual      world.VisualIdentity `json:"visual"`
 }
 
 type identityResponse struct {
@@ -1049,11 +1061,15 @@ func (h *Handler) createCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
-	if len([]rune(input.DisplayName)) < 2 || len([]rune(input.DisplayName)) > 40 || input.PortraitID < 1 || input.PortraitID > 6 {
+	if len([]rune(input.DisplayName)) < 2 || len([]rune(input.DisplayName)) > 40 {
 		http.Error(w, "invalid character details", http.StatusBadRequest)
 		return
 	}
-	created, err := h.store.createCharacter(r.Context(), current.ID, input.DisplayName, input.PortraitID)
+	if err := world.ValidateVisualIdentity(input.Visual); err != nil {
+		http.Error(w, "invalid character appearance", http.StatusBadRequest)
+		return
+	}
+	created, err := h.store.createCharacter(r.Context(), current.ID, input.DisplayName, input.Visual)
 	if errors.Is(err, ErrConflict) {
 		http.Error(w, "character already exists", http.StatusConflict)
 		return
