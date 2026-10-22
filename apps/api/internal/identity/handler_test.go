@@ -63,16 +63,35 @@ func (fakeDirectory) SearchCompanies(context.Context, string, string) ([]world.C
 func (fakeDirectory) SearchLocations(context.Context, string, string, string) ([]world.LocationRecord, error) {
 	return nil, nil
 }
-func (fakeDirectory) TransitDistricts(context.Context, string) ([]world.DistrictDestination, error) {
+func (fakeDirectory) TransitDistricts(ctx context.Context, serverID string) ([]world.DistrictDestination, error) {
+	return fakeDirectory{}.TransitDistrictsForCity(ctx, serverID, "fr/lyon")
+}
+
+func (fakeDirectory) TransitDistrictsForCity(_ context.Context, _, cityID string) ([]world.DistrictDestination, error) {
+	city, ok := world.CityByID(cityID)
+	if !ok {
+		return nil, world.ErrEntityNotFound
+	}
+	cityKey := city.ID
+	if city.ID == "fr/lyon" {
+		cityKey = "lyon"
+	}
+	address := func(category, name, status string) world.Address {
+		return world.Address{
+			LocationID: "service:" + cityKey + "/" + category,
+			Name:       name, Kind: "building", Status: status, District: "Central", City: city.Name, Country: city.Country,
+			Full: name + ", Central, " + city.Name + ", " + city.Country,
+		}
+	}
 	return []world.DistrictDestination{
-		{ID: "fr/lyon/district/central", Name: "Central", Locations: []world.LocationRecord{
-			{Address: world.Address{LocationID: "service:lyon/police-station", Name: "Lyon Police Station"}},
-			{Address: world.Address{LocationID: "service:lyon/meridian-bank", Name: "Meridian Bank"}},
-			{Address: world.Address{LocationID: "service:lyon/gate-station", Name: "Central GATE Station"}},
-			{Address: world.Address{LocationID: "location:central-office", Name: "Central Office"}},
+		{ID: city.ID + "/district/central", Name: "Central", Locations: []world.LocationRecord{
+			{Address: address("police-station", city.Name+" Police Station", "")},
+			{Address: address("meridian-bank", "Meridian Bank", "")},
+			{Address: address("gate-station", "Central GATE Station", "")},
+			{Address: address("hospital", city.Name+" Hospital", "closed")},
 		}},
-		{ID: "fr/lyon/district/bellecour", Name: "Bellecour", Locations: []world.LocationRecord{
-			{Address: world.Address{LocationID: "location:bellecour-office", Name: "Bellecour Office"}},
+		{ID: city.ID + "/district/bellecour", Name: "Bellecour", Locations: []world.LocationRecord{
+			{Address: world.Address{LocationID: "location:bellecour-office", Name: "Bellecour Office", Kind: "building"}},
 		}},
 	}, nil
 }
@@ -131,7 +150,7 @@ func (f *fakeStore) playerLocation(context.Context, string) (string, error) {
 	if f.locationID != "" {
 		return f.locationID, nil
 	}
-	return "fr/lyon/district/central", nil
+	return "fr/lyon", nil
 }
 func (f *fakeStore) setPlayerLocation(_ context.Context, _ string, locationID string) error {
 	f.locationID = locationID
@@ -225,7 +244,7 @@ func TestBankRecordsAreAvailableBeforePhysicalVisitsAreEnabled(t *testing.T) {
 	}
 }
 
-func TestTravelAndVisitPersistValidatedPlayerLocation(t *testing.T) {
+func TestNeighborhoodTravelAndVisitDoNotPersistLocations(t *testing.T) {
 	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid"}
 	handler := NewHandlerWithWorld(repository, false, fakeDirectory{}, "server-1")
 	request := func(method, path, body string) *httptest.ResponseRecorder {
@@ -236,21 +255,14 @@ func TestTravelAndVisitPersistValidatedPlayerLocation(t *testing.T) {
 		return recorder
 	}
 
-	if got := request(http.MethodPost, "/api/world/travel", `{"districtId":"fr/lyon/district/missing"}`); got.Code != http.StatusBadRequest {
-		t.Fatalf("unknown travel destination status = %d, want 400", got.Code)
+	if got := request(http.MethodPost, "/api/world/travel", `{"districtId":"fr/lyon/district/bellecour"}`); got.Code != http.StatusNotFound {
+		t.Fatalf("legacy neighborhood travel route status = %d, want 404", got.Code)
 	}
-	if got := request(http.MethodPost, "/api/world/travel", `{"districtId":"fr/lyon/district/bellecour"}`); got.Code != http.StatusOK || repository.locationID != "fr/lyon/district/bellecour" {
-		t.Fatalf("travel did not persist valid district: status=%d location=%q body=%s", got.Code, repository.locationID, got.Body.String())
+	if got := request(http.MethodPost, "/api/world/visit", `{"locationId":"service:lyon/meridian-bank"}`); got.Code != http.StatusNotFound {
+		t.Fatalf("legacy building visit route status = %d, want 404", got.Code)
 	}
-
-	if got := request(http.MethodPost, "/api/world/visit", `{"locationId":"service:lyon/meridian-bank"}`); got.Code != http.StatusBadRequest || repository.locationID != "fr/lyon/district/bellecour" {
-		t.Fatalf("visit allowed a building from another district: status=%d location=%q", got.Code, repository.locationID)
-	}
-	if got := request(http.MethodPost, "/api/world/travel", `{"districtId":"fr/lyon/district/central"}`); got.Code != http.StatusOK {
-		t.Fatalf("return to Central status = %d body=%s", got.Code, got.Body.String())
-	}
-	if got := request(http.MethodPost, "/api/world/visit", `{"locationId":"service:lyon/meridian-bank"}`); got.Code != http.StatusOK || repository.locationID != "service:lyon/meridian-bank" {
-		t.Fatalf("visit did not persist current service location: status=%d location=%q body=%s", got.Code, repository.locationID, got.Body.String())
+	if repository.locationID != "" {
+		t.Fatalf("visual navigation unexpectedly persisted location %q", repository.locationID)
 	}
 
 	worldRequest := httptest.NewRequest(http.MethodGet, "/api/world", nil)
@@ -261,8 +273,8 @@ func TestTravelAndVisitPersistValidatedPlayerLocation(t *testing.T) {
 	if err := json.Unmarshal(worldResponseRecorder.Body.Bytes(), &state); err != nil {
 		t.Fatal(err)
 	}
-	if worldResponseRecorder.Code != http.StatusOK || state.DistrictID != "fr/lyon/district/central" || state.District != "Central" || state.LocationID != "service:lyon/meridian-bank" || state.PlaceName != "Meridian Bank" {
-		t.Fatalf("world response lost current place or district: status=%d state=%+v", worldResponseRecorder.Code, state)
+	if worldResponseRecorder.Code != http.StatusOK || state.CityID != "fr/lyon" || state.LocationID != "fr/lyon" || state.DistrictID != "" || state.District != "" || state.PlaceName != "" {
+		t.Fatalf("world response should persist only the current city: status=%d state=%+v", worldResponseRecorder.Code, state)
 	}
 }
 
@@ -299,9 +311,32 @@ func TestGateCityCatalogAndInternationalTravel(t *testing.T) {
 	if got := request(http.MethodPost, "/api/world/gate/travel", `{"cityId":"unknown/city"}`); got.Code != http.StatusBadRequest {
 		t.Fatalf("unknown city status=%d body=%s", got.Code, got.Body.String())
 	}
-	arrived := request(http.MethodPost, "/api/world/gate/travel", `{"cityId":"jp/tokyo"}`)
-	if arrived.Code != http.StatusOK || repository.locationID != "jp/tokyo/district/central" {
+	if got := request(http.MethodPost, "/api/world/gate/travel", `{"cityId":"jp/tokyo","districtId":"br/rio-de-janeiro/district/central"}`); got.Code != http.StatusBadRequest {
+		t.Fatalf("mismatched city and district status=%d body=%s", got.Code, got.Body.String())
+	}
+	arrived := request(http.MethodPost, "/api/world/gate/travel", `{"cityId":"jp/tokyo","districtId":"jp/tokyo/district/central"}`)
+	if arrived.Code != http.StatusOK || repository.locationID != "jp/tokyo" {
 		t.Fatalf("city travel status=%d location=%q body=%s", arrived.Code, repository.locationID, arrived.Body.String())
+	}
+	var travelResponse struct {
+		CityID    string                    `json:"cityId"`
+		District  world.DistrictDestination `json:"district"`
+		Buildings []world.Address           `json:"buildings"`
+		World     worldResponse             `json:"world"`
+	}
+	if err := json.Unmarshal(arrived.Body.Bytes(), &travelResponse); err != nil {
+		t.Fatalf("travel response is invalid JSON: %v", err)
+	}
+	if travelResponse.CityID != "jp/tokyo" || travelResponse.District.ID != "jp/tokyo/district/central" || len(travelResponse.Buildings) != 4 {
+		t.Fatalf("travel response missing selected district buildings: %+v", travelResponse)
+	}
+	if travelResponse.World.LocationID != "jp/tokyo" || travelResponse.World.DistrictID != "" {
+		t.Fatalf("travel response should persist only city location: %+v", travelResponse.World)
+	}
+	for _, building := range travelResponse.Buildings {
+		if building.Kind != "building" || building.City != "Tokyo" {
+			t.Errorf("travel returned an invalid local building: %+v", building)
+		}
 	}
 
 	worldRequest := request(http.MethodGet, "/api/world", "")
@@ -309,18 +344,39 @@ func TestGateCityCatalogAndInternationalTravel(t *testing.T) {
 	if err := json.Unmarshal(worldRequest.Body.Bytes(), &state); err != nil {
 		t.Fatal(err)
 	}
-	if worldRequest.Code != http.StatusOK || state.CityID != "jp/tokyo" || state.City != "Tokyo" || state.Country != "Japan" || state.TimeZone != "Asia/Tokyo" {
+	if worldRequest.Code != http.StatusOK || state.CityID != "jp/tokyo" || state.City != "Tokyo" || state.Country != "Japan" || state.TimeZone != "Asia/Tokyo" || state.LocationID != "jp/tokyo" || state.DistrictID != "" {
 		t.Fatalf("world response did not resolve city location: status=%d state=%+v", worldRequest.Code, state)
+	}
+}
+
+func TestGateReturnsDistrictsForSelectedCity(t *testing.T) {
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid"}
+	handler := NewHandlerWithWorld(repository, false, fakeDirectory{}, "server-1")
+	request := httptest.NewRequest(http.MethodGet, "/api/world/transit?cityId=br/rio-de-janeiro", nil)
+	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("district lookup status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Destinations []world.DistrictDestination `json:"destinations"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Destinations) == 0 || payload.Destinations[0].ID != "br/rio-de-janeiro/district/central" {
+		t.Fatalf("districts were not scoped to Rio de Janeiro: %+v", payload.Destinations)
 	}
 }
 
 func TestGateTravelMaterializationFailureReturnsDiagnosticEnvelope(t *testing.T) {
 	const session = "valid"
 	materializationErr := errors.New(`persist city employment: ERROR: insert or update on table "employment_relationships" violates foreign key constraint`)
-	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: session, locationID: "fr/lyon/district/central"}
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: session, locationID: "fr/lyon"}
 	reader := failingCityMaterializer{err: materializationErr}
 	handler := newHandler(repository, false, reader, "server-1", nil, nil, nil, nil, true)
-	request := httptest.NewRequest(http.MethodPost, "/api/world/gate/travel", strings.NewReader(`{"cityId":"us/los-angeles"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/world/gate/travel", strings.NewReader(`{"cityId":"us/los-angeles","districtId":"us/los-angeles/district/central"}`))
 	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -338,7 +394,7 @@ func TestGateTravelMaterializationFailureReturnsDiagnosticEnvelope(t *testing.T)
 	if payload.Details != materializationErr.Error() {
 		t.Fatalf("diagnostic details = %q, want %q", payload.Details, materializationErr.Error())
 	}
-	if repository.locationID != "fr/lyon/district/central" {
+	if repository.locationID != "fr/lyon" {
 		t.Fatalf("failed travel changed player location to %q", repository.locationID)
 	}
 }
@@ -348,7 +404,7 @@ func TestGateTravelMaterializationFailureHidesDiagnosticsWhenDisabled(t *testing
 	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: session}
 	reader := failingCityMaterializer{err: errors.New("database constraint details")}
 	handler := newHandler(repository, false, reader, "server-1", nil, nil, nil, nil, false)
-	request := httptest.NewRequest(http.MethodPost, "/api/world/gate/travel", strings.NewReader(`{"cityId":"us/los-angeles"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/world/gate/travel", strings.NewReader(`{"cityId":"us/los-angeles","districtId":"us/los-angeles/district/central"}`))
 	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)

@@ -28,12 +28,12 @@ Ordem e regras de entrada/saída: [`ciclos.md`](ciclos.md).
 | 8 | Sistema de correio eletrônico | [M08](milestones/M08-sistema-de-emails.md) |
 | 9 | Deslocamento e pontos de serviço | [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) |
 | 10 | Mundo compartilhado e investigação do detetive | [M10](milestones/M10-mundo-compartilhado-e-investigacao.md) |
-| 11 | Geografia internacional e viagem | [M11](milestones/M11-geografia-internacional-e-viagem.md) |
-| 12 | Busca e apreensão | [M12](milestones/M12-busca-e-apreensao.md) |
+| 11 | Geografia, viagem e visita a locais | [M11](milestones/M11-geografia-internacional-e-viagem.md) |
+| 12 | Interações investigativas em locais | [M12](milestones/M12-busca-e-apreensao.md) |
 | 13 | Acusação e julgamento | [M13](milestones/M13-acusacao-e-julgamento.md) |
 | 14 | Otimização, cache e estabilidade | [M14](milestones/M14-otimizacao-cache-e-estabilidade.md) |
 
-Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável para playtest, não a conclusão do jogo. M07–M13 constroem o fluxo investigativo completo: registros, correio, deslocamento, organização de elementos, expansão geográfica, busca, acusação e prisão do culpado. O M10 também entrega identidades visuais modulares para personagens e geração recorrente de casos compartilhados. M14 vem depois do fluxo criminal completo e consolida desempenho, cache e estabilidade da plataforma; ele não altera a porcentagem de conclusão desse fluxo. Tutorial (Vesper), auth completa, simulação temporal geral e outros sistemas continuam exigindo milestones próprios.
+Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável para playtest, não a conclusão do jogo. M07–M13 constroem o fluxo investigativo completo: registros, correio, deslocamento, organização de elementos, expansão geográfica, visita e investigação de locais, acusação e prisão do culpado. O M10 também entrega identidades visuais modulares para personagens e geração recorrente de casos compartilhados. M14 vem depois do fluxo criminal completo e consolida desempenho, cache e estabilidade da plataforma; ele não altera a porcentagem de conclusão desse fluxo. Tutorial (Vesper), auth completa, simulação temporal geral e outros sistemas continuam exigindo milestones próprios.
 
 ## Status
 

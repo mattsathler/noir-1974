@@ -50,7 +50,7 @@ export default function GateTransition({ destination, origin, onArrive, onComple
           <p className="screen-transition__eyebrow">MERIDIAN GLOBAL · GATE TRANSIT RELAY</p>
           <div className="screen-transition__readout" aria-label="GATE transit status">
           <span>{(origin?.city ?? "ORIGIN").toUpperCase()} RELAY: ONLINE</span>
-            <span>ROUTE LOCKED: {destination.name.toUpperCase()}, {destination.country.toUpperCase()}</span>
+            <span>ROUTE LOCKED: {destination.city.name.toUpperCase()}, {destination.district.name.toUpperCase()}</span>
             <span>TRANSIT FIELD: CALIBRATING</span>
           </div>
           <div className="computer-sequence__progress" role="progressbar" aria-label="GATE transit initialization"><i /></div>
@@ -58,11 +58,11 @@ export default function GateTransition({ destination, origin, onArrive, onComple
         </div>
       ) : phase === "typing" ? (
         <div className="screen-transition__content">
-          <p className="screen-transition__message"><Typewriter className="screen-transition__text" text={`ARRIVING IN ${destination.name.toUpperCase()}, ${destination.country.toUpperCase()}`} speed={48} onComplete={finishTypewriter} /></p>
+          <p className="screen-transition__message"><Typewriter className="screen-transition__text" text={`ARRIVING IN ${destination.district.name.toUpperCase()}, ${destination.city.name.toUpperCase()}`} speed={48} onComplete={finishTypewriter} /></p>
         </div>
       ) : (
         <div className="screen-transition__content">
-          <p className="screen-transition__message"><span className="screen-transition__text">{phase === "error" ? "GATE CONNECTION FAILED" : phase === "leaving" ? `ARRIVING IN ${destination.name.toUpperCase()}, ${destination.country.toUpperCase()}` : ""}</span></p>
+          <p className="screen-transition__message"><span className="screen-transition__text">{phase === "error" ? "GATE CONNECTION FAILED" : phase === "leaving" ? `ARRIVING IN ${destination.district.name.toUpperCase()}, ${destination.city.name.toUpperCase()}` : ""}</span></p>
         </div>
       )}
     </div>

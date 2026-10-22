@@ -119,6 +119,34 @@ func TestCityDistrictsAndLocationsAreDeterministicAndCityScoped(t *testing.T) {
 	}
 }
 
+func TestEveryCityHasTheSameFourCentralBuildingCategories(t *testing.T) {
+	wantCategories := []string{"police-station", "meridian-bank", "gate-station", "hospital"}
+	for _, city := range Cities() {
+		region := Region{ID: city.ID, Name: city.Name, Kind: "city"}
+		first := centralServiceLocations(region)
+		second := centralServiceLocations(region)
+		if len(first) != len(wantCategories) || len(second) != len(wantCategories) {
+			t.Fatalf("city %s has %d central buildings, want %d", city.ID, len(first), len(wantCategories))
+		}
+		for index, category := range wantCategories {
+			firstAddress, secondAddress := first[index].Address, second[index].Address
+			if !strings.HasSuffix(firstAddress.LocationID, "/"+category) || firstAddress.LocationID != secondAddress.LocationID {
+				t.Errorf("city %s central category %s has unstable ID: %q / %q", city.ID, category, firstAddress.LocationID, secondAddress.LocationID)
+			}
+			if firstAddress.Kind != "building" || firstAddress.District != "Central" || firstAddress.City != city.Name || firstAddress.Country != city.Country {
+				t.Errorf("city %s has inconsistent central building metadata: %+v", city.ID, firstAddress)
+			}
+			wantStatus := ""
+			if category == "hospital" {
+				wantStatus = "closed"
+			}
+			if firstAddress.Status != wantStatus {
+				t.Errorf("city %s %s status = %q, want %q", city.ID, category, firstAddress.Status, wantStatus)
+			}
+		}
+	}
+}
+
 func TestGeneratedCityRelationshipsReferenceMaterializedEntities(t *testing.T) {
 	for _, cityID := range []string{"us/los-angeles", "br/rio-de-janeiro"} {
 		generated, err := GenerateCity("shared-world-seed", GeneratorVersion5, cityID)

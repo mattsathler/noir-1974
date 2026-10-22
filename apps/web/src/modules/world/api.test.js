@@ -74,7 +74,7 @@ describe("world navigation APIs", () => {
     }));
     vi.stubGlobal("fetch", fetch);
 
-    await expect(getNeighborhoodDestinations()).resolves.toEqual(destinations);
-    expect(fetch).toHaveBeenCalledWith("/api/world/transit", { credentials: "same-origin" });
+    await expect(getNeighborhoodDestinations("fr/lyon")).resolves.toEqual(destinations);
+    expect(fetch).toHaveBeenCalledWith("/api/world/transit?cityId=fr%2Flyon", { credentials: "same-origin" });
   });
 });

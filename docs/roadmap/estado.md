@@ -12,12 +12,12 @@ Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadma
 | Campo | Valor |
 | --- | --- |
 | Data de referência | 2026-10-22 |
-| Milestone vigente | M12 — Busca e apreensão |
-| Último aceito | M11 — Geografia internacional e viagem |
+| Milestone vigente | M12 — Interações investigativas em locais |
+| Último aceito | M11 — Geografia, viagem e visita a locais |
 | Primeiro playtest | M06 aceito; recorte mínimo pronto para playtest interno. |
 | Fluxo do crime até a prisão | **86%** (12 de 14 milestones) |
 
-Whiteboards, identidade visual e geração recorrente estão aceitos. A expansão para 25 países e viagens internacionais está em curso; busca e acusação ainda virão.
+O catálogo de 25 países, as viagens internacionais e a visita visual a construções estão aceitos. A M12 implementará interiores e interações investigativas; acusação e julgamento ainda virão.
 
 ## Barra do fluxo criminal completo
 
@@ -56,8 +56,8 @@ Cada milestone do fluxo pesa **1/14 ≈ 7,1%**. Só entra na conta com status **
 | [M08](milestones/M08-sistema-de-emails.md) Correio eletrônico | 7,1% | Aceito | 64% |
 | [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,1% | Aceito | 71% |
 | [M10](milestones/M10-mundo-compartilhado-e-investigacao.md) Mundo compartilhado e investigação | 7,1% | Aceito | 79% |
-| [M11](milestones/M11-geografia-internacional-e-viagem.md) Geografia internacional e viagem | 7,1% | Aceito | 86% |
-| [M12](milestones/M12-busca-e-apreensao.md) Busca e apreensão | 7,1% | Não iniciado | 93% |
+| [M11](milestones/M11-geografia-internacional-e-viagem.md) Geografia, viagem e visita a locais | 7,1% | Aceito | 86% |
+| [M12](milestones/M12-busca-e-apreensao.md) Interações investigativas em locais | 7,1% | Não iniciado | 93% |
 | [M13](milestones/M13-acusacao-e-julgamento.md) Acusação e julgamento | 7,1% | Não iniciado | **100%** |
 
 Fórmula: `milestones_aceitos_M00_a_M13 / 14`, arredondado para inteiro. O primeiro playtest continua identificado pelo aceite do M06, em campo separado.

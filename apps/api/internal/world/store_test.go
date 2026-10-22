@@ -334,7 +334,7 @@ func TestCentralServicePointsAreStableAcrossWorldSeedsAndSearchIsDistrictScoped(
 	if err != nil {
 		t.Fatal(err)
 	}
-	serviceIDs := []string{"service:lyon/police-station", "service:lyon/meridian-bank", "service:lyon/gate-station"}
+	serviceIDs := []string{"service:lyon/police-station", "service:lyon/meridian-bank", "service:lyon/gate-station", "service:lyon/hospital"}
 	var firstCentral, secondCentral *DistrictDestination
 	for i := range first {
 		if first[i].Name == "Central" {
@@ -355,6 +355,16 @@ func TestCentralServicePointsAreStableAcrossWorldSeedsAndSearchIsDistrictScoped(
 		}
 		if firstCentral.Locations[i].Address.Name != secondCentral.Locations[i].Address.Name {
 			t.Fatalf("service %q name changed between worlds", id)
+		}
+		if firstCentral.Locations[i].Address.Kind != "building" || secondCentral.Locations[i].Address.Kind != "building" {
+			t.Fatalf("service %q was not categorized as a building", id)
+		}
+		wantStatus := ""
+		if strings.HasSuffix(id, "/hospital") {
+			wantStatus = "closed"
+		}
+		if firstCentral.Locations[i].Address.Status != wantStatus || secondCentral.Locations[i].Address.Status != wantStatus {
+			t.Fatalf("service %q status = %q/%q, want %q", id, firstCentral.Locations[i].Address.Status, secondCentral.Locations[i].Address.Status, wantStatus)
 		}
 	}
 

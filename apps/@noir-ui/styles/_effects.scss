@@ -114,12 +114,10 @@
   inset: 0;
   background-position: center;
   background-size: cover;
+  background-color: #11120f;
+  background-image: linear-gradient(180deg, rgb(7 8 8 / 55%), rgb(7 8 8 / 28%) 46%, rgb(7 8 8 / 66%)), var(--city-backdrop), radial-gradient(ellipse at 50% 40%, #30302a, #0c0d0b 70%);
   filter: saturate(0.78);
   transform: scale(1.015);
-}
-
-.game-backdrop[data-location="lyon"] {
-  background-image: url("/images/cities/lyon.png");
 }
 
 .game-vignette {

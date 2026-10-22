@@ -84,6 +84,7 @@ type Address struct {
 	LocationID string `json:"locationId"`
 	Name       string `json:"name"`
 	Kind       string `json:"kind"`
+	Status     string `json:"status,omitempty"`
 	District   string `json:"district"`
 	City       string `json:"city"`
 	Country    string `json:"country"`
@@ -751,10 +752,11 @@ func centralServiceLocations(city Region) []LocationRecord {
 	if cityData.ID == "fr/lyon" {
 		cityKey = "lyon"
 	}
-	services := []struct{ id, name string }{
-		{"police-station", city.Name + " Police Station"},
-		{"meridian-bank", "Meridian Bank"},
-		{"gate-station", "Central GATE Station"},
+	services := []struct{ id, name, status string }{
+		{"police-station", city.Name + " Police Station", ""},
+		{"meridian-bank", "Meridian Bank", ""},
+		{"gate-station", "Central GATE Station", ""},
+		{"hospital", city.Name + " Hospital", "closed"},
 	}
 	locations := make([]LocationRecord, 0, len(services))
 	for _, service := range services {
@@ -763,6 +765,7 @@ func centralServiceLocations(city Region) []LocationRecord {
 			LocationID: "service:" + cityKey + "/" + service.id,
 			Name:       service.name,
 			Kind:       "building",
+			Status:     service.status,
 			District:   "Central",
 			City:       city.Name,
 			Country:    cityData.Country,

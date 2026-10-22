@@ -13,7 +13,7 @@ O módulo `internal/identity` mantém contas de jogador, sessões e personagens.
 - `POST /api/auth/logout` encerra a sessão.
 - `GET /api/me` retorna a conta e o personagem da sessão.
 - `GET /api/world` retorna a localização atual e o horário do servidor para a sessão autenticada. O horário é UTC em ISO 8601; o cliente o exibe no fuso local do mundo.
-- `GET /api/world/transit` lista destinos GATE e pontos fixos de serviço. `POST /api/world/travel` valida e persiste a chegada a um bairro; `POST /api/world/visit` registra a visita a um edifício somente no bairro atual. As respostas de mundo incluem a localização e o bairro atuais.
+- `GET /api/world/gate/destinations` retorna as cidades do catálogo fixo; o frontend as agrupa por país. `GET /api/world/transit?cityId=...` retorna os bairros da cidade. O GATE conduz país → cidade → bairro; `POST /api/world/gate/travel` valida cidade e bairro, persiste somente a cidade e retorna as construções do bairro para a interface principal. Selecionar uma construção abre sua tela de interior sem gravar visita; o Hospital aparece fechado para uma feature futura.
 - `POST /api/characters` cria o personagem, uma única vez por conta.
 - `GET /api/health` verifica a API e a conexão com o banco.
 

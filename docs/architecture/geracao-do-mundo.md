@@ -28,7 +28,7 @@ WORLD SEED
 
 ## Geografia de referência e expansão dos bairros
 
-A geografia terá duas camadas. A camada de referência é fixa e igual em todos os servidores: o catálogo inicial de 25 países e 100 cidades, registrado no M11. Esses nomes e identidades não variam com a seed do servidor. O app GATE conecta cidades do catálogo, inclusive entre países, e não oferece bairros ou construções como destinos. A navegação local entre bairros e a visita a construções usam interfaces distintas. A localização persistida identifica país, cidade, bairro e, quando aplicável, construção.
+A geografia terá duas camadas. A camada de referência é fixa e igual em todos os servidores: o catálogo inicial de 25 países e 100 cidades, registrado no M11. Esses nomes e identidades não variam com a seed do servidor. O app GATE apresenta países, cidades e bairros nessa ordem; o jogador escolhe cidade e bairro de destino antes de viajar. Construções não são destinos GATE: após a chegada, cards mostram as construções do bairro e uma seleção abre a tela de interior. A localização persistida do jogador identifica somente sua cidade; o bairro de chegada e a construção aberta são contextos transitórios e não são gravados como localização atual.
 
 Dentro das cidades, os bairros serão partições lógicas para distribuir detetives e ocorrências, evitando a concentração de jogadores em um único lugar. Cada cidade recebe 20 bairros compostos deterministicamente a partir de seu banco de palavras ao ser materializada. Seus nomes e IDs são únicos dentro da cidade e estáveis para todos os jogadores daquele servidor. Ao adicionar cidades, cada uma receberá seu próprio banco de palavras e as mesmas regras de composição; aumentar a quantidade de bairros será uma mudança versionada do gerador.
 
@@ -74,9 +74,11 @@ A versão `5` preserva a identidade modular da versão 4, cria 20 bairros e ampl
 
 A geração visual da versão 5 também calibra cabelos por idade: NPCs abaixo de 40 anos não recebem cabelo grisalho; a chance aumenta gradualmente nas faixas seguintes. Calvície e cabelos ralos nas laterais só são selecionados a partir dos 45 anos. Cortes ausentes do catálogo de NPCs, como maria-chiquinha, não podem ser gerados. A versão 4 mantém sua saída histórica; novos mundos usam a versão 5.
 
-## M11 — catálogo e viagem entre cidades
+## M11 — catálogo e viagem para bairros
 
-O catálogo geográfico fixo e versionado associa cada cidade canônica a um país e fuso horário. O GATE consulta esse catálogo e posiciona o jogador em Central na cidade escolhida. Bairros e visitas a locais são acessados por interfaces locais próprias e nunca aparecem como destinos GATE.
+O catálogo geográfico fixo e versionado associa cada cidade canônica a um país e fuso horário. O GATE apresenta países, cidades e bairros em sequência, e valida o bairro escolhido dentro da cidade selecionada. A viagem persiste apenas a cidade; o bairro de chegada fica como contexto transitório da sessão.
+
+Em Central, todas as cidades apresentam Police Station, Bank, GATE Central e Hospital. O Hospital fica fechado e indisponível até uma feature futura. Selecionar ou abrir um desses prédios só troca a representação visual; não persiste uma visita. Ações investigativas futuras recebem o local como contexto da solicitação e validam que pertence à cidade atual do jogador.
 
 A primeira viagem a uma cidade materializa seu conteúdo no mundo compartilhado do servidor. A tabela `world_city_generators` registra a versão usada por cidade para que NPCs, empresas e relações mantenham suas identidades em reconstruções futuras. Cada cidade materializada mantém sua própria população e seus próprios casos. A geração recorrente alterna entre essas cidades e seleciona os candidatos apenas dentro da cidade sorteada; a expansão pode adicionar NPCs ao bairro menos povoado dessa cidade.
 

@@ -64,12 +64,12 @@ PRODUCT_BLURB = {
         "A expansão para 25 países e viagens internacionais começa agora; busca e acusação ainda virão."
     ),
     11: (
-        "Whiteboards, identidade visual e geração recorrente estão aceitos. "
-        "A expansão para 25 países e viagens internacionais está em curso; busca e acusação ainda virão."
+        "O catálogo de 25 países, as viagens internacionais e a visita visual a construções estão aceitos. "
+        "A M12 implementará interiores e interações investigativas; acusação e julgamento ainda virão."
     ),
     12: (
-        "O catálogo mundial e as viagens internacionais estão aceitos. "
-        "Busca e apreensão e acusação ainda precisam fechar o fluxo investigativo."
+        "Interiores, buscas, apreensões e interações investigativas em locais estão aceitos. "
+        "Acusação e julgamento ainda precisam fechar o fluxo criminal."
     ),
     13: (
         "Busca e apreensão está aceita, com o mundo internacional e compartilhado disponível. "
@@ -93,8 +93,8 @@ TABLE_LABELS = {
     8: "Correio eletrônico",
     9: "Deslocamento e pontos de serviço",
     10: "Mundo compartilhado e investigação",
-    11: "Geografia internacional e viagem",
-    12: "Busca e apreensão",
+    11: "Geografia, viagem e visita a locais",
+    12: "Interações investigativas em locais",
     13: "Acusação e julgamento",
 }
 

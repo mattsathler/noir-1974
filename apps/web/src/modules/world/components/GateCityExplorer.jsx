@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getGateDestinations } from "../api.js";
+import { getGateDestinations, getNeighborhoodDestinations } from "../api.js";
 
 export default function GateCityExplorer({ world, onTravel, onClose }) {
   const [cities, setCities] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [countryId, setCountryId] = useState("");
+  const [cityId, setCityId] = useState("");
+  const [districtId, setDistrictId] = useState("");
+  const [districtSearch, setDistrictSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [selectedCity, setSelectedCity] = useState(null);
   const closeRef = useRef(null);
+  const districtRequest = useRef(0);
 
   useEffect(() => {
     const previousFocus = document.activeElement;
@@ -28,7 +34,18 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
     getGateDestinations().then((items) => {
       if (!active) return;
       setCities(items);
-      setSelectedCity(items.find(({ id }) => id === world?.cityId) ?? null);
+      const currentCity = items.find(({ id }) => id === world?.cityId);
+      if (!currentCity) return;
+      setCountryId(currentCity.countryId);
+      setCityId(currentCity.id);
+      setLoadingDistricts(true);
+      getNeighborhoodDestinations(currentCity.id).then((destinations) => {
+        if (active) setDistricts(destinations);
+      }).catch((requestError) => {
+        if (active) setError(requestError);
+      }).finally(() => {
+        if (active) setLoadingDistricts(false);
+      });
     }).catch((requestError) => {
       if (active) setError(requestError);
     }).finally(() => {
@@ -45,13 +62,39 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
     }
     return [...grouped.values()];
   }, [cities]);
+  const selectedCountry = countries.find((country) => country.id === countryId);
+  const availableCities = selectedCountry?.cities ?? [];
+  const selectedCity = cities.find((city) => city.id === cityId);
+  const selectedDistrict = districts.find((district) => district.id === districtId);
+  const filteredDistricts = useMemo(() => {
+    const query = districtSearch.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
+    return query ? districts.filter(({ name }) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().includes(query)) : districts;
+  }, [districts, districtSearch]);
+
+  async function selectCity(city) {
+    const request = ++districtRequest.current;
+    setCityId(city.id);
+    setDistrictId("");
+    setDistrictSearch("");
+    setDistricts([]);
+    setError(null);
+    setLoadingDistricts(true);
+    try {
+      const items = await getNeighborhoodDestinations(city.id);
+      if (request === districtRequest.current) setDistricts(items);
+    } catch (requestError) {
+      if (request === districtRequest.current) setError(requestError);
+    } finally {
+      if (request === districtRequest.current) setLoadingDistricts(false);
+    }
+  }
 
   async function travel() {
-    if (!selectedCity || selectedCity.id === world?.cityId) return;
+    if (!selectedCity || !selectedDistrict) return;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
-      await onTravel?.(selectedCity);
+      await onTravel?.({ city: selectedCity, district: selectedDistrict });
     } catch (requestError) {
       setError(requestError);
       setBusy(false);
@@ -59,44 +102,51 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
   }
 
   return (
-    <div className="modal-overlay gate-interface-overlay" role="dialog" aria-modal="true" aria-label="GATE city transit" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
+    <div className="modal-overlay gate-interface-overlay" role="dialog" aria-modal="true" aria-label="GATE travel selection" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
       <section className="gate-interface" aria-labelledby="gate-city-title" aria-busy={busy}>
         <header className="gate-interface__header">
           <div className="gate-interface__identity">
             <span className="gate-interface__mark" aria-hidden="true">G</span>
-            <div><p>MERIDIAN GLOBAL · GATE NETWORK</p><h2 id="gate-city-title">City transit</h2></div>
+            <div><p>MERIDIAN GLOBAL · GATE NETWORK</p><h2 id="gate-city-title">Travel registry</h2></div>
           </div>
           <div className="gate-interface__relay"><span /> {(world?.city ?? "CITY").toUpperCase()} RELAY ONLINE</div>
-          <button ref={closeRef} className="gate-interface__close" type="button" onClick={onClose} aria-label="Close GATE city transit">
+          <button ref={closeRef} className="gate-interface__close" type="button" onClick={onClose} aria-label="Close GATE travel selection">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19" /></svg>
           </button>
         </header>
-        <div className="gate-interface__body">
-          <aside className="gate-interface__destinations" aria-label="City destinations">
-            <div className="gate-interface__section-heading"><span>01 / COUNTRIES</span><small>{loading ? "SYNCING" : `${countries.length} COUNTRIES · ${cities.length} CITIES`}</small></div>
-            {loading ? <p className="gate-interface__loading" role="status">Loading city registry<span>…</span></p> : <nav className="gate-interface__districts" aria-label="Cities grouped by country">
-              {countries.map((country) => <section className="gate-interface__country" key={country.id} aria-label={country.name}>
-                <h3 className="gate-interface__caption">{country.name}</h3>
-                {country.cities.map((city) => <button className="gate-interface__district" key={city.id} type="button" aria-pressed={city.id === selectedCity?.id} aria-current={city.id === world?.cityId ? "location" : undefined} disabled={busy} onClick={() => setSelectedCity(city)}>
-                  <span>{city.name}</span><small>{city.id === world?.cityId ? "CURRENT CITY" : "SELECT CITY"}</small>
-                </button>)}
-              </section>)}
+        <div className="gate-interface__body gate-interface__body--gate-steps">
+          <section className="gate-interface__column" aria-labelledby="gate-countries-heading">
+            <div className="gate-interface__section-heading"><span id="gate-countries-heading">01 / COUNTRY</span><small>{loading ? "SYNCING" : `${countries.length} COUNTRIES`}</small></div>
+            {loading ? <p className="gate-interface__loading" role="status">Loading countries<span>…</span></p> : <nav className="gate-interface__districts" aria-label="Countries">
+              {countries.map((country) => <button className="gate-interface__district" key={country.id} type="button" aria-pressed={country.id === countryId} disabled={busy} onClick={() => { districtRequest.current += 1; setLoadingDistricts(false); setCountryId(country.id); setCityId(""); setDistrictId(""); setDistricts([]); setError(null); }}>
+                <span>{country.name}</span><small>{country.cities.length} CITIES</small>
+              </button>)}
             </nav>}
-          </aside>
-          <main className="gate-interface__preview">
-            <div className="gate-interface__section-heading"><span>02 / TRANSIT FILE</span><small>{selectedCity ? "DESTINATION VERIFIED" : "AWAITING INPUT"}</small></div>
+          </section>
+          <section className="gate-interface__column" aria-labelledby="gate-cities-heading">
+            <div className="gate-interface__section-heading"><span id="gate-cities-heading">02 / CITY</span><small>{selectedCountry ? selectedCountry.name.toUpperCase() : "SELECT A COUNTRY"}</small></div>
+            {selectedCountry ? <nav className="gate-interface__districts" aria-label={`Cities in ${selectedCountry.name}`}>
+              {availableCities.map((city) => <button className="gate-interface__district" key={city.id} type="button" aria-pressed={city.id === cityId} disabled={busy} onClick={() => selectCity(city)}>
+                <span>{city.name}</span><small>{city.id === world?.cityId ? "CURRENT CITY" : "SELECT CITY"}</small>
+              </button>)}
+            </nav> : <p className="gate-interface__column-empty">Choose a country to view its cities.</p>}
+          </section>
+          <section className="gate-interface__column" aria-labelledby="gate-neighborhoods-heading">
+            <div className="gate-interface__section-heading"><span id="gate-neighborhoods-heading">03 / NEIGHBORHOOD</span><small>{loadingDistricts ? "LOADING" : selectedCity ? `${districts.length} AVAILABLE` : "SELECT A CITY"}</small></div>
             {error && <div className="gate-interface__error" role="alert"><p>{error.message}</p>{error.requestId && <small>REFERENCE {error.requestId}{error.code ? ` · ${error.code}` : ""}</small>}{error.details && <small>{error.details}</small>}</div>}
-            {selectedCity ? <section aria-label={`Selected city ${selectedCity.name}`}>
-              <h3 className="gate-interface__district-name">{selectedCity.name}</h3>
-              <p className="gate-interface__caption">{selectedCity.country.toUpperCase()}</p>
-              <p className="gate-interface__empty">GATE transit connects cities. Neighborhood access and building visits are handled through local interfaces.</p>
-              <dl className="gate-interface__city-record"><div><dt>ORIGIN</dt><dd>{world?.city}, {world?.country}</dd></div><div><dt>DESTINATION</dt><dd>{selectedCity.name}, {selectedCity.country}</dd></div><div><dt>RELAY TIME ZONE</dt><dd>{selectedCity.timeZone}</dd></div></dl>
-            </section> : <div className="gate-interface__empty-state"><span aria-hidden="true">⌖</span><p>Select a city from the Meridian Global network.</p></div>}
-          </main>
+            {loadingDistricts ? <p className="gate-interface__loading" role="status">Loading neighborhoods<span>…</span></p> : selectedCity ? <>
+              <label className="gate-interface__search"><span>SEARCH NEIGHBORHOODS</span><input type="search" value={districtSearch} onChange={(event) => setDistrictSearch(event.target.value)} placeholder="Filter neighborhoods" /></label>
+              {filteredDistricts.length ? <nav className="gate-interface__districts" aria-label={`Neighborhoods in ${selectedCity.name}`}>
+              {filteredDistricts.map((district) => <button className="gate-interface__district" key={district.id} type="button" aria-pressed={district.id === districtId} disabled={busy} onClick={() => setDistrictId(district.id)}>
+                <span>{district.name}</span><small>{district.id.endsWith("/district/central") ? "PUBLIC SERVICES" : "NEIGHBORHOOD"}</small>
+              </button>)}
+              </nav> : <p className="gate-interface__column-empty">No neighborhoods match that search.</p>}
+            </> : <p className="gate-interface__column-empty">Choose a city to view its neighborhoods.</p>}
+          </section>
         </div>
         <footer className="gate-interface__footer">
-          <p><span>CITY ROUTE</span>{selectedCity ? `${world?.city?.toUpperCase()}  →  ${selectedCity.name.toUpperCase()}` : "SELECT A CITY"}</p>
-          <button className="gate-interface__travel" type="button" disabled={!selectedCity || selectedCity.id === world?.cityId || busy || loading} onClick={travel}>{busy ? "CONNECTING…" : "TRAVEL BY GATE"}<span aria-hidden="true">→</span></button>
+          <p><span>GATE ROUTE</span>{selectedCountry && selectedCity && selectedDistrict ? `${world?.city?.toUpperCase()}  →  ${selectedDistrict.name.toUpperCase()}, ${selectedCity.name.toUpperCase()}` : "SELECT COUNTRY · CITY · NEIGHBORHOOD"}</p>
+          <button className="gate-interface__travel" type="button" disabled={!selectedCity || !selectedDistrict || busy || loading || loadingDistricts} onClick={travel}>{busy ? "CONNECTING…" : "TRAVEL BY GATE"}<span aria-hidden="true">→</span></button>
         </footer>
       </section>
     </div>

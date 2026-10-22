@@ -51,7 +51,8 @@ export const searchLocations = (query) => search("/api/world/locations", query);
 export async function getNeighborhoodDestinations(cityId = "unknown") {
   const key = `${worldCachePrefix}:neighborhoods:${encodeURIComponent(cityId)}`;
   return cachedWorldList(key, async () => {
-    const response = await fetch("/api/world/transit", { credentials: "same-origin" });
+    const params = new URLSearchParams({ cityId });
+    const response = await fetch(`/api/world/transit?${params}`, { credentials: "same-origin" });
     const payload = await responsePayload(response);
     if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve neighborhood destinations.");
     return payload.destinations ?? [];
@@ -62,7 +63,7 @@ export async function getGateDestinations() {
   return cachedWorldList(`${worldCachePrefix}:gate-cities`, async () => {
     const response = await fetch("/api/world/gate/destinations", { credentials: "same-origin" });
     const payload = await responsePayload(response);
-    if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve GATE city destinations.");
+    if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve GATE destinations.");
     return payload.destinations ?? [];
   });
 }

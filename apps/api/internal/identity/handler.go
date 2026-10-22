@@ -159,10 +159,8 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/world/companies", handler.searchCompanies)
 		mux.HandleFunc("GET /api/world/locations", handler.searchLocations)
 		mux.HandleFunc("GET /api/world/transit", handler.transitDistricts)
-		mux.HandleFunc("POST /api/world/travel", handler.travel)
 		mux.HandleFunc("GET /api/world/gate/destinations", handler.gateDestinations)
 		mux.HandleFunc("POST /api/world/gate/travel", handler.gateTravel)
-		mux.HandleFunc("POST /api/world/visit", handler.visit)
 	}
 	if recordsReader != nil {
 		mux.HandleFunc("GET /api/world/npcs/{npcID}/records", handler.npcRecords)
@@ -960,7 +958,17 @@ func (h *Handler) searchLocations(w http.ResponseWriter, r *http.Request) {
 	}
 	districtID := districtForLocation(destinations, locationID)
 	if districtID == "" {
-		http.Error(w, "current location is unavailable", http.StatusConflict)
+		// Player locations intentionally persist only the city. When a local
+		// directory lookup has no transient neighborhood context, use Central.
+		for _, destination := range destinations {
+			if strings.EqualFold(destination.Name, "Central") {
+				districtID = destination.ID
+				break
+			}
+		}
+	}
+	if districtID == "" {
+		http.Error(w, "current city directory is unavailable", http.StatusConflict)
 		return
 	}
 	results, err := h.worldReader.SearchLocations(r.Context(), h.worldServerID, districtID, query)
@@ -1003,17 +1011,25 @@ func (h *Handler) transitDistricts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "neighborhood directory unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	locationID, err := h.store.playerLocation(r.Context(), current.ID)
-	if err != nil {
-		http.Error(w, "could not retrieve current location", http.StatusInternalServerError)
+	cityID := r.URL.Query().Get("cityId")
+	if cityID == "" {
+		locationID, err := h.store.playerLocation(r.Context(), current.ID)
+		if err != nil {
+			http.Error(w, "could not retrieve current location", http.StatusInternalServerError)
+			return
+		}
+		city, exists := world.CityForLocation(locationID)
+		if !exists {
+			http.Error(w, "current city is unavailable", http.StatusConflict)
+			return
+		}
+		cityID = city.ID
+	}
+	if _, exists := world.CityByID(cityID); !exists {
+		http.Error(w, "unknown city", http.StatusBadRequest)
 		return
 	}
-	city, ok := world.CityForLocation(locationID)
-	if !ok {
-		http.Error(w, "current city is unavailable", http.StatusConflict)
-		return
-	}
-	districts, err := h.transitDestinations(r.Context(), reader, city.ID)
+	districts, err := h.transitDestinations(r.Context(), reader, cityID)
 	if err != nil {
 		http.Error(w, "could not retrieve neighborhood destinations", http.StatusInternalServerError)
 		return
@@ -1037,7 +1053,8 @@ func (h *Handler) gateTravel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		CityID string `json:"cityId"`
+		CityID     string `json:"cityId"`
+		DistrictID string `json:"districtId"`
 	}
 	if !decodeJSON(w, r, &input) {
 		return
@@ -1047,14 +1064,34 @@ func (h *Handler) gateTravel(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusBadRequest, "UNKNOWN_GATE_DESTINATION", "The selected GATE destination is not available.", nil)
 		return
 	}
+	reader, ok := h.worldReader.(transitReader)
+	if !ok {
+		h.writeAPIError(w, r, http.StatusServiceUnavailable, "GATE_DESTINATIONS_UNAVAILABLE", "Neighborhood destinations are temporarily unavailable.", nil)
+		return
+	}
+	districts, err := h.transitDestinations(r.Context(), reader, destination.ID)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "GATE_DESTINATIONS_UNAVAILABLE", "Neighborhood destinations could not be loaded.", err)
+		return
+	}
+	var selectedDistrict *world.DistrictDestination
+	for index := range districts {
+		if districts[index].ID == input.DistrictID {
+			selectedDistrict = &districts[index]
+			break
+		}
+	}
+	if selectedDistrict == nil {
+		h.writeAPIError(w, r, http.StatusBadRequest, "UNKNOWN_GATE_NEIGHBORHOOD", "The selected neighborhood is not part of that city.", nil)
+		return
+	}
 	if materializer, ok := h.worldReader.(cityWorldMaterializer); ok {
 		if err := materializer.MaterializeCity(r.Context(), h.worldServerID, destination.ID); err != nil {
 			h.writeAPIError(w, r, http.StatusInternalServerError, "GATE_CITY_MATERIALIZATION_FAILED", "The destination could not be prepared. Your location has not changed.", err)
 			return
 		}
 	}
-	locationID := destination.ID + "/district/central"
-	if err := h.store.setPlayerLocation(r.Context(), current.ID, locationID); err != nil {
+	if err := h.store.setPlayerLocation(r.Context(), current.ID, destination.ID); err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "PLAYER_LOCATION_SAVE_FAILED", "The destination was prepared, but your location could not be updated.", err)
 		return
 	}
@@ -1063,118 +1100,22 @@ func (h *Handler) gateTravel(w http.ResponseWriter, r *http.Request) {
 	state.City = destination.Name
 	state.Country = destination.Country
 	state.TimeZone = destination.TimeZone
-	state.LocationID = locationID
-	state.DistrictID = locationID
-	state.District = "Central"
-	writeJSON(w, http.StatusOK, map[string]any{"locationId": locationID, "cityId": destination.ID, "world": state})
-}
-
-func (h *Handler) travel(w http.ResponseWriter, r *http.Request) {
-	current, ok := h.authorizedPlayer(w, r)
-	if !ok {
-		return
-	}
-	reader, ok := h.worldReader.(transitReader)
-	if !ok {
-		http.Error(w, "neighborhood navigation unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	var input struct {
-		DistrictID string `json:"districtId"`
-	}
-	if !decodeJSON(w, r, &input) {
-		return
-	}
-	locationID, err := h.store.playerLocation(r.Context(), current.ID)
-	if err != nil {
-		http.Error(w, "could not retrieve current location", http.StatusInternalServerError)
-		return
-	}
-	city, ok := world.CityForLocation(locationID)
-	if !ok {
-		http.Error(w, "current city is unavailable", http.StatusConflict)
-		return
-	}
-	destinations, err := h.transitDestinations(r.Context(), reader, city.ID)
-	if err != nil {
-		http.Error(w, "could not retrieve current neighborhoods", http.StatusInternalServerError)
-		return
-	}
-	valid := false
-	for _, destination := range destinations {
-		if destination.ID == input.DistrictID {
-			valid = true
-			break
+	state.LocationID = destination.ID
+	state.DistrictID = ""
+	state.District = ""
+	state.PlaceName = ""
+	buildings := make([]world.Address, 0)
+	for _, place := range selectedDistrict.Locations {
+		if place.Address.Kind == "building" {
+			buildings = append(buildings, place.Address)
 		}
 	}
-	if !valid {
-		http.Error(w, "unknown GATE destination", http.StatusBadRequest)
-		return
-	}
-	if err := h.store.setPlayerLocation(r.Context(), current.ID, input.DistrictID); err != nil {
-		http.Error(w, "could not save player location", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"locationId": input.DistrictID})
-}
-
-func (h *Handler) visit(w http.ResponseWriter, r *http.Request) {
-	current, ok := h.authorizedPlayer(w, r)
-	if !ok {
-		return
-	}
-	reader, ok := h.worldReader.(transitReader)
-	if !ok {
-		http.Error(w, "GATE transit unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	var input struct {
-		LocationID string `json:"locationId"`
-	}
-	if !decodeJSON(w, r, &input) {
-		return
-	}
-	locationID, err := h.store.playerLocation(r.Context(), current.ID)
-	if err != nil {
-		http.Error(w, "could not retrieve current location", http.StatusInternalServerError)
-		return
-	}
-	city, ok := world.CityForLocation(locationID)
-	if !ok {
-		http.Error(w, "current city is unavailable", http.StatusConflict)
-		return
-	}
-	destinations, err := h.transitDestinations(r.Context(), reader, city.ID)
-	if err != nil {
-		http.Error(w, "could not retrieve current district", http.StatusInternalServerError)
-		return
-	}
-	currentDistrictID := districtForLocation(destinations, locationID)
-	if currentDistrictID == "" {
-		http.Error(w, "current location is unavailable", http.StatusConflict)
-		return
-	}
-	valid := input.LocationID == currentDistrictID
-	for _, destination := range destinations {
-		if destination.ID != currentDistrictID {
-			continue
-		}
-		for _, place := range destination.Locations {
-			if place.Address.LocationID == input.LocationID {
-				valid = true
-				break
-			}
-		}
-	}
-	if !valid {
-		http.Error(w, "location is not in the current district", http.StatusBadRequest)
-		return
-	}
-	if err := h.store.setPlayerLocation(r.Context(), current.ID, input.LocationID); err != nil {
-		http.Error(w, "could not save player location", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"locationId": input.LocationID, "districtId": currentDistrictID})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"cityId":    destination.ID,
+		"district":  selectedDistrict,
+		"buildings": buildings,
+		"world":     state,
+	})
 }
 
 func districtForLocation(destinations []world.DistrictDestination, locationID string) string {
@@ -1339,7 +1280,7 @@ type worldResponse struct {
 	Country    string    `json:"country"`
 	TimeZone   string    `json:"timeZone"`
 	LocationID string    `json:"locationId"`
-	DistrictID string    `json:"districtId"`
+	DistrictID string    `json:"districtId,omitempty"`
 	District   string    `json:"district,omitempty"`
 	PlaceName  string    `json:"placeName,omitempty"`
 	ServerTime time.Time `json:"serverTime"`
@@ -1368,7 +1309,7 @@ func (h *Handler) worldAt() worldResponse {
 		City:       lyon.Name,
 		Country:    lyon.Country,
 		TimeZone:   lyon.TimeZone,
-		LocationID: "lyon",
+		LocationID: lyon.ID,
 		ServerTime: gameTime.UTC(),
 	}
 }
@@ -1379,47 +1320,14 @@ func (h *Handler) worldFor(ctx context.Context, accountID string) worldResponse 
 	if err != nil {
 		return state
 	}
-	state.LocationID = locationID
 	if city, ok := world.CityForLocation(locationID); ok {
 		state.CityID = city.ID
 		state.City = city.Name
 		state.Country = city.Country
 		state.TimeZone = city.TimeZone
-	}
-	if strings.HasSuffix(locationID, "/district/central") {
-		state.DistrictID = locationID
-		state.District = "Central"
-		return state
-	}
-	if reader, ok := h.worldReader.(transitReader); ok {
-		if cityReader, cityOK := h.worldReader.(cityTransitReader); cityOK {
-			cityID := state.CityID
-			if destinations, err := cityReader.TransitDistrictsForCity(ctx, h.worldServerID, cityID); err == nil {
-				for _, district := range destinations {
-					if district.ID == locationID {
-						state.DistrictID, state.District = district.ID, district.Name
-					}
-					for _, place := range district.Locations {
-						if place.Address.LocationID == locationID {
-							state.DistrictID, state.District = district.ID, district.Name
-							state.PlaceName = place.Address.Name
-						}
-					}
-				}
-			}
-		} else if destinations, err := reader.TransitDistricts(ctx, h.worldServerID); err == nil {
-			for _, district := range destinations {
-				if district.ID == locationID {
-					state.DistrictID, state.District = district.ID, district.Name
-				}
-				for _, place := range district.Locations {
-					if place.Address.LocationID == locationID {
-						state.DistrictID, state.District = district.ID, district.Name
-						state.PlaceName = place.Address.Name
-					}
-				}
-			}
-		}
+		state.LocationID = city.ID
+	} else {
+		state.LocationID = locationID
 	}
 	return state
 }

@@ -110,7 +110,7 @@ func (g *RecurringGenerator) generateOne(ctx context.Context) error {
 		return err
 	}
 	if open >= g.maxOpen {
-		return g.store.AdvanceGeneration(ctx, g.serverID, slot, g.interval)
+		return g.store.DeferGeneration(ctx, g.serverID, slot, g.interval)
 	}
 	seed := fmt.Sprintf("noir-1974/recurring-case/%s/%s/%d", g.serverID, cityID, slot)
 	used, err := g.store.UsedNPCIDs(ctx, g.serverID, cityID, seed)
