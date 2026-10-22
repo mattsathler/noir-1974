@@ -5,10 +5,11 @@ import { createCharacter, getCharacterVisuals } from "../../api.js";
 
 const visualOptions = {
   hair: ["hair_short_brown", "hair_short_ginger"],
-  skinColors: ["skin_light"],
-  eyeColors: ["eyes_brown"],
-  faceDetails: ["face_moustache_black"],
-  accessories: ["face_glasses_round_black"],
+  skin: ["skin_white", "skin_light"],
+  eyes: ["eyes_brown"],
+  beard: ["beard_moustache_black"],
+  face: ["face_scar_short"],
+  accessories: ["accessories_glasses_round_black"],
 };
 
 vi.mock("../../api.js", () => ({ createCharacter: vi.fn(), getCharacterVisuals: vi.fn() }));
@@ -26,7 +27,7 @@ describe("CharacterCreationPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create detective" }));
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
-    expect(createCharacter).toHaveBeenCalledWith({ displayName: "Ada", visual: { hairId: "hair_short_ginger", skinColorId: "skin_light", eyeColorId: "eyes_brown", faceDetailId: "", accessoryIds: [] } });
+    expect(createCharacter).toHaveBeenCalledWith({ displayName: "Ada", visual: { hairId: "hair_short_ginger", skinId: "skin_white", eyesId: "eyes_brown", faceId: "", beardId: "", accessoryIds: [] } });
   });
 
   it("shows API errors and keeps the player in character setup", async () => {

@@ -23,6 +23,8 @@ var (
 	ErrInvalidMutation   = errors.New("invalid world mutation")
 )
 
+const MaxSearchResults = 5
+
 type worldDatabase interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 	Query(context.Context, string, ...any) (pgx.Rows, error)
@@ -361,11 +363,24 @@ func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query stri
 			}
 		}
 	}
-	results := make([]PersonSearchRecord, 0)
+	matches := make([]NPC, 0)
 	for _, npc := range base.NPCs {
 		if !strings.Contains(strings.ToLower(npc.Name), query) {
 			continue
 		}
+		matches = append(matches, npc)
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].Name == matches[j].Name {
+			return matches[i].ID < matches[j].ID
+		}
+		return matches[i].Name < matches[j].Name
+	})
+	if len(matches) > MaxSearchResults {
+		matches = matches[:MaxSearchResults]
+	}
+	results := make([]PersonSearchRecord, 0, len(matches))
+	for _, npc := range matches {
 		profile, err := store.GetNPC(ctx, serverID, npc.ID)
 		if err != nil {
 			return nil, err
@@ -382,7 +397,6 @@ func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query stri
 			Workplaces: workplaces, MaritalStatus: maritalStatus,
 		})
 	}
-	sort.Slice(results, func(i, j int) bool { return results[i].NPC.Name < results[j].NPC.Name })
 	return results, nil
 }
 
@@ -436,13 +450,24 @@ func (store *PostgresStore) SearchCompanies(ctx context.Context, serverID, query
 		if !strings.Contains(strings.ToLower(company.Name+" "+address.Full), query) {
 			continue
 		}
-		employees, err := store.EmployeesOfCompany(ctx, serverID, company.ID)
+		results = append(results, CompanyRecord{Company: company, Address: address})
+	}
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].Company.Name == results[j].Company.Name {
+			return results[i].Company.ID < results[j].Company.ID
+		}
+		return results[i].Company.Name < results[j].Company.Name
+	})
+	if len(results) > MaxSearchResults {
+		results = results[:MaxSearchResults]
+	}
+	for index := range results {
+		employees, err := store.EmployeesOfCompany(ctx, serverID, results[index].Company.ID)
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, CompanyRecord{Company: company, Address: address, Employees: employees})
+		results[index].Employees = employees
 	}
-	sort.Slice(results, func(i, j int) bool { return results[i].Company.Name < results[j].Company.Name })
 	return results, nil
 }
 
@@ -478,7 +503,15 @@ func (store *PostgresStore) SearchLocations(ctx context.Context, serverID, distr
 			}
 		}
 	}
-	sort.Slice(results, func(i, j int) bool { return results[i].Address.Full < results[j].Address.Full })
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].Address.Full == results[j].Address.Full {
+			return results[i].Address.LocationID < results[j].Address.LocationID
+		}
+		return results[i].Address.Full < results[j].Address.Full
+	})
+	if len(results) > MaxSearchResults {
+		results = results[:MaxSearchResults]
+	}
 	return results, nil
 }
 

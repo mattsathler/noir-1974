@@ -7,9 +7,8 @@ Não tratar estes itens como decididos. Cada fechamento vira um ADR em `docs/dec
 - Estratégia operacional de migrations para aplicar/evoluir o [schema inicial](schema-inicial.sql).
 - Cache: o que cachear.
 - Materialização: a âncora é criada quando uma identidade precisa ser referenciada; definir limiares e gatilhos concretos com o gerador.
-- Definir a seleção dos 50 países e o catálogo fixo de capitais e principais cidades; especificar o banco de palavras e as regras de composição dos nomes de bairros.
-- Definir critérios de distribuição de detetives e ocorrências entre bairros lógicos, gatilhos de criação sob demanda e limites operacionais, preservando a identidade estável por servidor.
-- Definir a cadência padrão da geração contínua de casos, o limite de casos abertos por servidor e o comportamento do agendador quando a API reinicia ou opera em múltiplas instâncias; a implementação está prevista no [M10](../roadmap/milestones/M10-mundo-compartilhado-e-investigacao.md).
+- Implementar o catálogo fixo de 25 países e 100 cidades e viagens internacionais pelo GATE conforme M11; novos destinos poderão ser adicionados em versões posteriores. A versão 5 define a composição de 20 bairros por cidade, inicialmente implementada para Lyon.
+- Definir como distribuir detetives e ocorrências entre os 20 bairros lógicos conforme os servidores e cidades forem adicionados, preservando a identidade estável por servidor.
 - Concorrência: como serializar ou resolver ações simultâneas sobre a mesma entidade, mutation ou caso.
 - Distribuição dos casos compartilhados: quantidade, disponibilidade, atribuição ou reserva para evitar disputa excessiva.
 - Atualização dos clientes conectados quando o mundo ou um caso compartilhado muda; transporte e frequência.
@@ -19,7 +18,7 @@ Não tratar estes itens como decididos. Cada fechamento vira um ADR em `docs/dec
 
 - Refinar a lista provisória de atributos do NPC (seed, persistidos, materializados ou mutáveis) durante a implementação do gerador.
 - Limites e gatilhos de expansão sob demanda; quais entidades/regiões são geradas juntas para preservar coerência.
-- Evitar nomes de bairros duplicados ou ambíguos na mesma cidade e definir a política de colisão do gerador.
+- Definir a política de colisão se um futuro banco de palavras de cidade produzir nomes duplicados ou ambíguos.
 - Algoritmos de famílias, casamentos, parentesco, amizades, empresas, cargos, vizinhança, histórico.
 - Geração de casos: tipos de crime, suspeitos, escolha do culpado, motivos, evidências, pistas falsas, solucionabilidade, contradições.
 - Validação procedural (killer ≠ vítima, entidades existem, pistas alcançáveis).

@@ -7,7 +7,7 @@ import re
 from datetime import date
 from pathlib import Path
 
-CRIME_FLOW_THROUGH = 12  # M00..M12 = geração do caso até prisão do culpado
+CRIME_FLOW_THROUGH = 13  # M00..M13 = geração do caso até prisão do culpado
 PLAYTEST_MILESTONE = 6  # M06 = primeiro recorte de playtest, não fim do jogo
 BAR_WIDTH = 20
 
@@ -61,13 +61,21 @@ PRODUCT_BLURB = {
     ),
     10: (
         "O jogador já pode organizar elementos por caso e personalizar identidades visuais. "
-        "A busca e apreensão e a acusação ainda precisam fechar o fluxo investigativo."
+        "A expansão para 25 países e viagens internacionais começa agora; busca e acusação ainda virão."
     ),
     11: (
-        "Whiteboards e busca e apreensão estão aceitos. "
-        "Acusação e julgamento ainda precisam fechar o fluxo criminal."
+        "Whiteboards, identidade visual e geração recorrente estão aceitos. "
+        "A expansão para 25 países e viagens internacionais está em curso; busca e acusação ainda virão."
     ),
     12: (
+        "O catálogo mundial e as viagens internacionais estão aceitos. "
+        "Busca e apreensão e acusação ainda precisam fechar o fluxo investigativo."
+    ),
+    13: (
+        "Busca e apreensão está aceita, com o mundo internacional e compartilhado disponível. "
+        "Acusação e julgamento ainda precisam fechar o fluxo criminal."
+    ),
+    14: (
         "O fluxo criminal completo está aceito: o caso é gerado, investigado, "
         "organizado e pode terminar na prisão do culpado."
     ),
@@ -85,8 +93,9 @@ TABLE_LABELS = {
     8: "Correio eletrônico",
     9: "Deslocamento e pontos de serviço",
     10: "Mundo compartilhado e investigação",
-    11: "Busca e apreensão",
-    12: "Acusação e julgamento",
+    11: "Geografia internacional e viagem",
+    12: "Busca e apreensão",
+    13: "Acusação e julgamento",
 }
 
 HEADING_RE = re.compile(

@@ -15,7 +15,8 @@ const (
 	GeneratorVersion2      = 2
 	GeneratorVersion3      = 3
 	GeneratorVersion4      = 4
-	LatestGeneratorVersion = GeneratorVersion4
+	GeneratorVersion5      = 5
+	LatestGeneratorVersion = GeneratorVersion5
 )
 
 var ErrUnsupportedGeneratorVersion = errors.New("unsupported world generator version")
@@ -95,6 +96,8 @@ func Generate(seed string, version int) (World, error) {
 		return generateSociety(seed, GeneratorVersion3)
 	case GeneratorVersion4:
 		return generateSociety(seed, GeneratorVersion4)
+	case GeneratorVersion5:
+		return generateSociety(seed, GeneratorVersion5)
 	default:
 		return World{}, fmt.Errorf("%w: %d", ErrUnsupportedGeneratorVersion, version)
 	}
@@ -102,7 +105,7 @@ func Generate(seed string, version int) (World, error) {
 
 // SupportsSocietyVersion reports whether a world version includes generated NPCs and relationships.
 func SupportsSocietyVersion(version int) bool {
-	return version == GeneratorVersion2 || version == GeneratorVersion3 || version == GeneratorVersion4
+	return version == GeneratorVersion2 || version == GeneratorVersion3 || version == GeneratorVersion4 || version == GeneratorVersion5
 }
 
 func generateCity(seed string, version int) World {

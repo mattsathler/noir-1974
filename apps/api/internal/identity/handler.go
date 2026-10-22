@@ -215,6 +215,9 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		}
 		results = filtered
 	}
+	if len(results) > world.MaxSearchResults {
+		results = results[:world.MaxSearchResults]
+	}
 	items := make([]cases.DiscoveredItem, 0, len(results))
 	for _, result := range results {
 		metadata, _ := json.Marshal(result)
@@ -242,14 +245,7 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) characterVisuals(w http.ResponseWriter, _ *http.Request) {
-	hair, skinColors, eyeColors, faceDetails, accessories := world.VisualIdentityCatalog()
-	writeJSON(w, http.StatusOK, map[string]any{
-		"hair":        hair,
-		"skinColors":  skinColors,
-		"eyeColors":   eyeColors,
-		"faceDetails": faceDetails,
-		"accessories": accessories,
-	})
+	writeJSON(w, http.StatusOK, world.VisualIdentityCatalog())
 }
 
 func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
@@ -718,6 +714,9 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not search people", http.StatusInternalServerError)
 		return
 	}
+	if len(results) > world.MaxSearchResults {
+		results = results[:world.MaxSearchResults]
+	}
 	if h.whiteboardReader != nil {
 		items := make([]cases.DiscoveredItem, 0, len(results))
 		for _, result := range results {
@@ -780,6 +779,9 @@ func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not search companies", http.StatusInternalServerError)
 		return
 	}
+	if len(results) > world.MaxSearchResults {
+		results = results[:world.MaxSearchResults]
+	}
 	if h.whiteboardReader != nil {
 		items := make([]cases.DiscoveredItem, 0, len(results))
 		for _, result := range results {
@@ -834,6 +836,9 @@ func (h *Handler) searchLocations(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "could not search addresses", http.StatusInternalServerError)
 		return
+	}
+	if len(results) > world.MaxSearchResults {
+		results = results[:world.MaxSearchResults]
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }

@@ -4,23 +4,23 @@ import "./ModularFace.scss";
 function spritePathFor(id) {
   const directory = id.startsWith("hair_") ? "hair"
     : id.startsWith("skin_") ? "skin"
-      : id.startsWith("eyes_") || id.startsWith("face_eyes_") ? "eyes"
-        : id.startsWith("accessory_") || id.startsWith("face_glasses_") ? "accessories"
-          : "face";
+      : id.startsWith("eyes_") ? "eyes"
+        : id.startsWith("beard_") ? "beard"
+          : id.startsWith("accessories_") ? "accessories"
+            : "face";
   return `/images/characters/${directory}/${id}.png`;
 }
 
 export default function ModularFace({ visual, name = "Character" }) {
   const layers = useMemo(() => {
-    if (!visual?.skinColorId || !visual?.eyeColorId || !visual?.hairId) return [];
-    const accessories = visual.accessoryIds ?? [];
+    if (!visual?.skinId || !visual?.eyesId || !visual?.hairId) return [];
     return [
-      visual.skinColorId,
+      visual.skinId,
       visual.hairId,
-      ...accessories.filter((id) => id.startsWith("accessory_hat_")),
-      visual.eyeColorId,
-      ...(visual.faceDetailId ? [visual.faceDetailId] : []),
-      ...accessories.filter((id) => !id.startsWith("accessory_hat_")),
+      visual.eyesId,
+      ...(visual.beardId ? [visual.beardId] : []),
+      ...(visual.faceId ? [visual.faceId] : []),
+      ...(visual.accessoryIds ?? []),
     ];
   }, [visual]);
   if (!layers.length) return null;

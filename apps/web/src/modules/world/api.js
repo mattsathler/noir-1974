@@ -227,14 +227,40 @@ export function pinWhiteboardItem(boardId, itemId, x = 700, y = 700) {
   });
 }
 
-export function createWhiteboardNote(boardId, x = 700, y = 700) {
+export function createWhiteboardNote(boardId, x = 700, y = 700, optimisticId = null) {
+  const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const pendingId = optimisticId ?? `note:pending-${nonce}`;
+  const pendingPin = { id: pendingId, source: "note", title: "UNTITLED NOTE", content: "", x, y, pending: true };
+  const cachedBoard = readWhiteboardCache(boardId);
+  if (cachedBoard) {
+    writeWhiteboardCache(boardId, {
+      ...cachedBoard,
+      pins: [...(cachedBoard.pins ?? []).filter((pin) => pin.id !== pendingId), pendingPin],
+    });
+  }
+  setWhiteboardSaveState(boardId, "saving");
+
   return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/notes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ x, y }),
   }).then(({ pin }) => {
-    updateWhiteboardCache(boardId, (board) => ({ ...board, pins: [...board.pins, pin] }));
+    const board = readWhiteboardCache(boardId);
+    if (board) {
+      writeWhiteboardCache(boardId, {
+        ...board,
+        pins: [...(board.pins ?? []).filter((item) => item.id !== pendingId && item.id !== pin.id), pin],
+      });
+    }
+    setWhiteboardSaveState(boardId, "saved");
     return pin;
+  }).catch((error) => {
+    const board = readWhiteboardCache(boardId);
+    if (board) {
+      writeWhiteboardCache(boardId, { ...board, pins: (board.pins ?? []).filter((pin) => pin.id !== pendingId) });
+    }
+    setWhiteboardSaveState(boardId, "save");
+    throw error;
   });
 }
 

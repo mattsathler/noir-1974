@@ -6,9 +6,10 @@ import ModularFace from "../../../identity/components/ModularFace.jsx";
 
 const FALLBACK_NPC_VISUAL = {
   hairId: "hair_short_brown",
-  skinColorId: "skin_light",
-  eyeColorId: "eyes_brown",
-  faceDetailId: "",
+  skinId: "skin_white",
+  eyesId: "eyes_brown",
+  faceId: "",
+  beardId: "",
   accessoryIds: [],
 };
 

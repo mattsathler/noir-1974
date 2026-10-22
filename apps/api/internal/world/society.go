@@ -128,7 +128,7 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 			return NPC{}, ErrInvalidGenerationKey
 		}
 		districtSlug, slotPart = parts[4], parts[6]
-	case GeneratorVersion3, GeneratorVersion4:
+	case GeneratorVersion3, GeneratorVersion4, GeneratorVersion5:
 		if len(parts) != 8 || parts[0] != "fr" || parts[1] != "lyon" || parts[2] != "people" || parts[4] != "district" || parts[6] != "person" || parts[3] != seedFingerprint(seed, version) {
 			return NPC{}, ErrInvalidGenerationKey
 		}
@@ -237,7 +237,7 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 			return Company{}, ErrInvalidGenerationKey
 		}
 		districtSlug = parts[4]
-	case GeneratorVersion3, GeneratorVersion4:
+	case GeneratorVersion3, GeneratorVersion4, GeneratorVersion5:
 		if len(parts) != 7 || parts[0] != "fr" || parts[1] != "lyon" || parts[2] != "companies" || parts[3] != seedFingerprint(seed, version) || parts[4] != "district" || parts[6] != "company" {
 			return Company{}, ErrInvalidGenerationKey
 		}
@@ -256,7 +256,7 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 	if districtIndex < 0 {
 		return Company{}, ErrInvalidGenerationKey
 	}
-	names := shuffledCopy(companyNames, newStream(seed, version, "company/names"))
+	names := shuffledCopy(companyNamesForVersion(version), newStream(seed, version, "company/names"))
 	if districtIndex >= len(names) {
 		return Company{}, ErrInvalidGenerationKey
 	}
@@ -391,37 +391,32 @@ func npcFor(seed string, version int, regionID, generationKey string, name perso
 		Status:        "alive",
 		MaritalStatus: maritalStatus,
 	}
-	if version == GeneratorVersion4 {
-		visual := visualIdentityForNPC(seed, generationKey)
+	if version >= GeneratorVersion4 {
+		visual := visualIdentityForNPC(seed, version, generationKey, npc.Age)
 		npc.Visual = &visual
 		npc.Appearance = generatedAppearanceDescription(visual)
 	}
 	return npc
 }
 
-func visualIdentityForNPC(seed, generationKey string) VisualIdentity {
-	stream := newStream(seed, GeneratorVersion4, "npc/visual/"+generationKey)
+func visualIdentityForNPC(seed string, version int, generationKey string, age int) VisualIdentity {
+	if version == GeneratorVersion4 {
+		return legacyVisualIdentityForNPC(seed, generationKey)
+	}
+	stream := newStream(seed, version, "npc/visual/"+generationKey)
+	hairStream := newStream(seed, version, "npc/visual/hair/"+generationKey)
 	identity := VisualIdentity{
-		HairID:       hairLayerIDs[stream.intn(len(hairLayerIDs))],
-		SkinColorID:  skinColorLayerIDs[stream.intn(len(skinColorLayerIDs))],
-		EyeColorID:   eyeColorLayerIDs[stream.intn(len(eyeColorLayerIDs))],
+		HairID:       generatedHairID(hairStream, age),
+		SkinID:       skinLayerIDs[stream.intn(len(skinLayerIDs))],
+		EyesID:       eyeLayerIDs[stream.intn(len(eyeLayerIDs))],
 		AccessoryIDs: []string{},
 	}
 	if stream.intn(4) == 0 {
-		// Pick among visual styles, then color a beard to match the generated hair.
-		faceDetailStyles := []string{"beard", "goatee", "stubble", "mutton", "moustache", "face_scar_cheek", "face_scar_brow", "face_stubble", "face_freckles"}
-		style := faceDetailStyles[stream.intn(len(faceDetailStyles))]
-		tone := hairTone(identity.HairID)
-		switch style {
-		case "beard":
-			identity.FaceDetailID = "face_beard_" + tone
-		case "goatee", "stubble", "mutton":
-			identity.FaceDetailID = "face_beard_" + style + "_" + tone
-		case "moustache":
-			identity.FaceDetailID = "face_moustache_" + tone
-		default:
-			identity.FaceDetailID = style
-		}
+		styles := []string{"moustache", "mutton", "soul_patch", "goatee", "full"}
+		identity.BeardID = "beard_" + styles[stream.intn(len(styles))] + "_" + hairTone(identity.HairID)
+	}
+	if stream.intn(8) == 0 {
+		identity.FaceID = "face_scar_short"
 	}
 	if stream.intn(5) == 0 {
 		identity.AccessoryIDs = append(identity.AccessoryIDs, accessoryLayerIDs[stream.intn(len(accessoryLayerIDs))])
@@ -429,18 +424,65 @@ func visualIdentityForNPC(seed, generationKey string) VisualIdentity {
 	return identity
 }
 
+func legacyVisualIdentityForNPC(seed, generationKey string) VisualIdentity {
+	stream := newStream(seed, GeneratorVersion4, "npc/visual/"+generationKey)
+	identity := VisualIdentity{
+		HairID:       hairLayerIDs[stream.intn(len(hairLayerIDs))],
+		SkinID:       skinLayerIDs[stream.intn(len(skinLayerIDs))],
+		EyesID:       eyeLayerIDs[stream.intn(len(eyeLayerIDs))],
+		AccessoryIDs: []string{},
+	}
+	if stream.intn(4) == 0 {
+		styles := []string{"moustache", "mutton", "soul_patch", "goatee", "full"}
+		identity.BeardID = "beard_" + styles[stream.intn(len(styles))] + "_" + hairTone(identity.HairID)
+	}
+	if stream.intn(8) == 0 {
+		identity.FaceID = "face_scar_short"
+	}
+	if stream.intn(5) == 0 {
+		identity.AccessoryIDs = append(identity.AccessoryIDs, accessoryLayerIDs[stream.intn(len(accessoryLayerIDs))])
+	}
+	return identity
+}
+
+func generatedHairID(stream randomStream, age int) string {
+	styles := []string{"short", "long", "long_wavy", "long_curly", "messy", "wavy", "bob", "slicked", "mohawk"}
+	if age >= 45 {
+		styles = append(styles, "balding", "sparse_sides")
+	}
+	style := styles[stream.intn(len(styles))]
+
+	tones := []string{"black", "brown", "ginger", "blonde"}
+	greyChance := 0
+	switch {
+	case age >= 60:
+		greyChance = 40
+	case age >= 50:
+		greyChance = 20
+	case age >= 40:
+		greyChance = 5
+	}
+	if greyChance > 0 && stream.intn(100) < greyChance {
+		return "hair_" + style + "_grey"
+	}
+	return "hair_" + style + "_" + tones[stream.intn(len(tones))]
+}
+
 func generatedAppearanceDescription(identity VisualIdentity) string {
 	hairColor := hairTone(identity.HairID)
 	hairStyle := hairStyle(identity.HairID)
-	skinTone := strings.TrimPrefix(identity.SkinColorID, "skin_")
-	eyeColor := strings.TrimPrefix(identity.EyeColorID, "eyes_")
+	skinTone := strings.TrimPrefix(identity.SkinID, "skin_")
+	eyeColor := strings.TrimPrefix(identity.EyesID, "eyes_")
 	description := []string{
 		hairColor + " " + hairStyle + " hair",
 		strings.ReplaceAll(skinTone, "_", " ") + " skin",
 		strings.ReplaceAll(eyeColor, "_", " ") + " eyes",
 	}
-	if detail := faceDetailDescription(identity.FaceDetailID); detail != "" {
-		description = append(description, detail)
+	if beard := beardDescription(identity.BeardID); beard != "" {
+		description = append(description, beard)
+	}
+	if face := faceDescription(identity.FaceID); face != "" {
+		description = append(description, face)
 	}
 	for _, accessoryID := range identity.AccessoryIDs {
 		if accessory := accessoryDescription(accessoryID); accessory != "" {
@@ -460,6 +502,22 @@ func hairStyle(hairID string) string {
 		return "swept short"
 	case "long":
 		return "long"
+	case "long_wavy":
+		return "long wavy"
+	case "long_curly":
+		return "long curly"
+	case "wavy":
+		return "wavy"
+	case "bob":
+		return "bob"
+	case "slicked":
+		return "slicked-back"
+	case "mohawk":
+		return "mohawk"
+	case "balding":
+		return "balding"
+	case "sparse_sides":
+		return "sparse-sided"
 	case "ponytail":
 		return "ponytail"
 	case "tied":
@@ -477,44 +535,39 @@ func hairStyle(hairID string) string {
 	}
 }
 
-func faceDetailDescription(id string) string {
+func beardDescription(id string) string {
 	switch {
 	case id == "":
 		return ""
-	case strings.HasPrefix(id, "face_beard_mutton_"):
-		return "mutton-chop sideburns"
-	case strings.HasPrefix(id, "face_beard_goatee_"):
-		return "a goatee"
-	case strings.HasPrefix(id, "face_beard_stubble_") || id == "face_stubble":
-		return "short stubble"
-	case strings.HasPrefix(id, "face_beard_"):
-		return "a beard"
-	case strings.HasPrefix(id, "face_moustache_"):
+	case strings.HasPrefix(id, "beard_moustache_"):
 		return "a moustache"
-	case id == "face_scar_cheek":
-		return "a cheek scar"
-	case id == "face_scar_brow":
-		return "a brow scar"
-	case id == "face_freckles":
-		return "freckles"
+	case strings.HasPrefix(id, "beard_mutton_"):
+		return "mutton-chop sideburns"
+	case strings.HasPrefix(id, "beard_soul_patch_"):
+		return "a soul patch"
+	case strings.HasPrefix(id, "beard_goatee_"):
+		return "a goatee"
+	case strings.HasPrefix(id, "beard_full_"):
+		return "a full beard"
 	default:
 		return ""
 	}
 }
 
+func faceDescription(id string) string {
+	if id == "face_scar_short" {
+		return "a short scar"
+	}
+	return ""
+}
+
 func accessoryDescription(id string) string {
 	switch {
-	case strings.HasPrefix(id, "face_glasses_round_") || id == "accessory_glasses_round":
+	case strings.HasPrefix(id, "accessories_glasses_round_"):
 		return "round glasses"
-	case strings.HasPrefix(id, "face_glasses_square_") || id == "accessory_glasses_square":
-		return "square glasses"
-	case id == "accessory_hat_cloche":
-		return "a cloche hat"
-	case id == "accessory_hat_fedora":
-		return "a fedora"
-	case id == "accessory_hat_bowler":
-		return "a bowler hat"
-	case id == "accessory_monocle":
+	case strings.HasPrefix(id, "accessories_glasses_squared_"):
+		return "squared glasses"
+	case strings.HasPrefix(id, "accessories_monocle_"):
 		return "a monocle"
 	default:
 		return ""
@@ -556,7 +609,7 @@ func personNamesForVersion(version int, countrySlug, citySlug string) ([]personN
 	if version == GeneratorVersion2 {
 		return allPersonNames(), nil
 	}
-	if version != GeneratorVersion3 && version != GeneratorVersion4 {
+	if version != GeneratorVersion3 && version != GeneratorVersion4 && version != GeneratorVersion5 {
 		return nil, ErrUnsupportedGeneratorVersion
 	}
 	catalog, ok := names.ForCity(countrySlug, citySlug)
@@ -580,9 +633,41 @@ func personNameScope(version int, countrySlug, citySlug string) string {
 }
 
 func selectedDistricts(seed string, version int) []namedPlace {
+	if version == GeneratorVersion5 {
+		catalog, ok := names.ForCity("fr", "lyon")
+		if !ok || len(catalog.DistrictPrefixes)*len(catalog.DistrictSuffixes) < 20 {
+			return nil
+		}
+		candidates := make([]namedPlace, 0, len(catalog.DistrictPrefixes)*len(catalog.DistrictSuffixes))
+		slugify := strings.NewReplacer(" ", "-", "é", "e", "è", "e", "ê", "e", "ô", "o", "û", "u", "ç", "c", "'", "")
+		for _, prefix := range catalog.DistrictPrefixes {
+			for _, suffix := range catalog.DistrictSuffixes {
+				name := prefix + " " + suffix
+				slug := strings.ToLower(slugify.Replace(name))
+				candidates = append(candidates, namedPlace{slug: slug, name: name})
+			}
+		}
+		selected := shuffledCopy(candidates, newStream(seed, version, "city/districts"))[:20]
+		sort.Slice(selected, func(i, j int) bool { return selected[i].slug < selected[j].slug })
+		return selected
+	}
 	districts := shuffledCopy(lyonDistricts, newStream(seed, version, "city/districts"))[:3]
 	sort.Slice(districts, func(i, j int) bool { return districts[i].slug < districts[j].slug })
 	return districts
+}
+
+var expandedCompanyNames = []string{
+	"Aurore Industries", "Cendre Group", "Delacroix Holdings", "Étoile Conglomerate", "Fournier & Fils",
+	"Lumière Corporation", "Montclair Industries", "Rhône Commercial Group", "Bastion Mutual", "Civic Assurance",
+	"Continental Relay Company", "Dargent Shipping", "Eastbank Provisions", "Fallow & March", "Garnier Foundry",
+	"Hearthstone Exchange", "Imperial Ledger Company", "Juno Telegraph Works", "Kingswell Security", "Lanterne Properties",
+}
+
+func companyNamesForVersion(version int) []string {
+	if version >= GeneratorVersion5 {
+		return expandedCompanyNames
+	}
+	return companyNames
 }
 
 func seedFingerprint(seed string, version int) string {

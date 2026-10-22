@@ -180,11 +180,87 @@ func decodeVisualIdentity(data []byte) (world.VisualIdentity, error) {
 		if err := json.Unmarshal(data, &visual); err != nil {
 			return world.VisualIdentity{}, err
 		}
+		// Accept identities saved by earlier versions of the character editor.
+		var legacy struct {
+			HairID       string   `json:"hairId"`
+			SkinColorID  string   `json:"skinColorId"`
+			EyeColorID   string   `json:"eyeColorId"`
+			FaceDetailID string   `json:"faceDetailId"`
+			AccessoryIDs []string `json:"accessoryIds"`
+		}
+		if err := json.Unmarshal(data, &legacy); err != nil {
+			return world.VisualIdentity{}, err
+		}
+		if legacy.SkinColorID != "" {
+			visual.SkinID = strings.TrimSuffix(legacy.SkinColorID, "_01")
+		}
+		if legacy.EyeColorID != "" {
+			visual.EyesID = strings.TrimSuffix(legacy.EyeColorID, "_01")
+		}
+		if legacy.HairID != "" && !isCurrentHairID(legacy.HairID) {
+			visual.HairID = "hair_short_" + legacyTone(legacy.HairID)
+		}
+		if len(visual.AccessoryIDs) == 0 && len(legacy.AccessoryIDs) > 0 {
+			visual.AccessoryIDs = legacy.AccessoryIDs
+		}
+		if legacy.FaceDetailID != "" {
+			if strings.Contains(legacy.FaceDetailID, "scar") {
+				visual.FaceID = "face_scar_short"
+			} else if strings.Contains(legacy.FaceDetailID, "moustache") || strings.Contains(legacy.FaceDetailID, "beard") {
+				visual.BeardID = "beard_moustache_" + legacyTone(legacy.FaceDetailID, visual.HairID)
+			}
+		}
+		for index, id := range visual.AccessoryIDs {
+			switch {
+			case strings.Contains(id, "monocle"):
+				visual.AccessoryIDs[index] = "accessories_monocle_" + legacyAccessoryTone(id)
+			case strings.Contains(id, "glasses_round"):
+				visual.AccessoryIDs[index] = "accessories_glasses_round_" + legacyAccessoryTone(id)
+			case strings.Contains(id, "glasses_square"):
+				visual.AccessoryIDs[index] = "accessories_glasses_squared_" + legacyAccessoryTone(id)
+			default:
+				visual.AccessoryIDs[index] = ""
+			}
+		}
+		filtered := visual.AccessoryIDs[:0]
+		for _, id := range visual.AccessoryIDs {
+			if id != "" {
+				filtered = append(filtered, id)
+			}
+		}
+		visual.AccessoryIDs = filtered
+		if len(visual.AccessoryIDs) == 0 {
+			visual.AccessoryIDs = []string{}
+		}
 	}
 	if err := world.ValidateVisualIdentity(visual); err != nil {
 		return world.VisualIdentity{}, err
 	}
 	return visual, nil
+}
+
+func isCurrentHairID(id string) bool {
+	return id == "hair_short_black" || id == "hair_short_brown" || id == "hair_short_ginger" || id == "hair_short_blonde" || id == "hair_short_grey"
+}
+
+func legacyTone(ids ...string) string {
+	for _, id := range ids {
+		for _, tone := range []string{"black", "brown", "ginger", "blonde", "grey"} {
+			if strings.Contains(id, tone) {
+				return tone
+			}
+		}
+	}
+	return "brown"
+}
+
+func legacyAccessoryTone(id string) string {
+	for _, tone := range []string{"black", "tortoise", "brass", "silver", "ivory"} {
+		if strings.Contains(id, tone) {
+			return tone
+		}
+	}
+	return "black"
 }
 
 func (s *postgresStore) playerLocation(ctx context.Context, accountID string) (string, error) {

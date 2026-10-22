@@ -1,33 +1,30 @@
 # Identidade visual modular
 
-Personagens são representados somente pelo rosto, seguindo o modelo modular pixel art de referência. O frontend monta os PNGs transparentes; a API envia identificadores de camada e não transporta imagens.
+Personagens são representados somente pelo rosto, em sprites pixel art transparentes. O frontend monta as camadas PNG; a API envia e persiste apenas seus IDs. As seis categorias são `Accessories`, `Beard`, `Eyes`, `Face`, `Hair` e `Skin`.
 
-## Camadas e IDs
+## Identidade e catálogo
 
-`GET /api/character-visuals` retorna os identificadores permitidos, separados em `hair`, `skinColors`, `eyeColors`, `faceDetails` e `accessories`. Os PNGs ficam separados nas pastas `hair`, `skin`, `eyes`, `face` e `accessories` dentro de `apps/web/public/images/characters/`; o frontend resolve cada ID para sua pasta pelo tipo de camada.
-
-Exemplo de identidade retornada ou enviada pela API:
+`GET /api/character-visuals` retorna listas `accessories`, `beard`, `eyes`, `face`, `hair` e `skin`. A identidade usa este formato:
 
 ```json
 {
-  "hairId": "hair_long_ginger",
-  "skinColorId": "skin_light",
-  "eyeColorId": "eyes_green",
-  "faceDetailId": "face_beard_goatee_ginger",
-  "accessoryIds": ["face_glasses_round_tortoise"]
+  "hairId": "hair_short_brown",
+  "skinId": "skin_white",
+  "eyesId": "eyes_brown",
+  "faceId": "face_scar_short",
+  "beardId": "beard_moustache_brown",
+  "accessoryIds": ["accessories_glasses_round_tortoise"]
 }
 ```
 
-Cada sprite usa a mesma tela transparente de `25 × 25` pixels, origem e alinhamento que as demais camadas. Os IDs usam nomes descritivos sem sufixos numéricos; cortes alternativos e formatos distintos são nomeados pelo estilo, como `hair_short_alt` e óculos `round`/`square`. `skin_light.png`, `hair_short_base.png`, `hair_short_alt_black.png`, `hair_long_black.png`, `hair_ponytail_black.png`, `hair_tied_long_black.png`, `hair_emo.png`, `face_eyes_black.png`, `face_beard_base.png` e `face_beard_goatee_black.png` são bases artísticas. O ponytail deriva da base de cabelo longo, preserva o alinhamento do topo e prende a mecha atrás da cabeça. `hair_emo.png` é mantido como base autoral; o gerador preserva sua arte preta em `hair_emo_black.png` e cria os demais tons. O cavanhaque preto é a referência de posição para os formatos adicionais de barba; a geração preserva esse PNG e deriva os demais tons dele. `generate_hair_and_beard_tones.mjs` mapeia cores pela luminosidade para manter a sombra escura à esquerda, junto à orelha, e a cor clara à direita, sem alterar forma ou transparência. Há dois modelos curtos, um longo, ponytail, tied, tied long, pigtails e emo, cada um em cinco tons. Olhos têm sete cores derivadas de `face_eyes_black.png`. Barba, bigode e cabelo compartilham os tons preto, castanho, ruivo, loiro e grisalho; barbas têm quatro formatos, incluindo cavanhaque, barba por fazer e costeletas. Os dois modelos de óculos têm acabamento preto, tartaruga, latão, prata ou marfim. NPCs recebem bigode ou barba no mesmo tom do cabelo. O frontend compõe nesta ordem: pele, cabelo, chapéus, olhos, detalhe facial e acessórios. A composição não inclui corpo. Os sprites ficam organizados em `apps/web/public/images/characters/{hair,skin,eyes,face,accessories}/`.
+`faceId`, `beardId` e um acessório são opcionais. A API valida cada ID e salva a seleção na conta. `GET /api/me` retorna os mesmos campos. Registros criados com o formato anterior são adaptados ao serem lidos: cabelos antigos sem sprite correspondente usam o corte curto na cor registrada, detalhes faciais são separados entre barba e face, e acessórios sem variante compatível são descartados.
+
+## Sprites e variantes
+
+Os PNGs ficam em `apps/web/public/images/characters/{accessories,beard,eyes,face,hair,skin}/`. As peças atuais usam tela transparente de `40 × 40` pixels e compartilham origem e alinhamento. A composição é feita na ordem pele, cabelo, olhos, barba, face e acessórios; não há corpo.
+
+O gerador `scripts/generate_character_color_variants.mjs` lê a luminosidade da paleta-base e mapeia cada nível de sombra para paletas de destino. Os níveis são ordenados do mais escuro ao mais claro, preservando forma, transparência e separação das sombras desenhadas; se uma base de cabelo tiver quatro tons, a paleta de destino é interpolada para preservar os quatro níveis. As cores de cabelo, barba, pele, olhos e acessórios usam tons mais escuros e menos saturados. Bases nomeadas como `hair_<corte>_brown.png` e `beard_<formato>_brown.png` geram automaticamente cinco variantes de cor. Os cortes atuais incluem short, long, messy, wavy, bob, slicked, long wavy, long curly, mohawk, balding e sparse sides. Os formatos de barba incluem moustache, mutton, soul patch, goatee e full. Execute `npm run generate:character-variants` após atualizar um sprite-base; bases cujo nome também representa uma variante não são sobrescritas pelo gerador.
 
 ## NPCs
 
-Mundos novos usam a versão 4 do gerador. A aparência procedural é obtida de uma stream determinística própria, derivada da seed e da chave do NPC; portanto, cada jogador do servidor recebe os mesmos IDs. A descrição textual da aparência é derivada do ID de cabelo selecionado. Versões 1–3 continuam reconstruíveis com o comportamento anterior; mundos já materializados não mudam de versão automaticamente.
-
-Os IDs são enviados em `npc.visual` tanto na busca de pessoas quanto nos perfis completos. O frontend resolve cada ID para o PNG de mesmo nome na pasta correspondente ao tipo da camada.
-
-## Identidade do jogador e arquivos de arte
-
-O personagem do jogador usa a mesma composição sem corpo e persiste os IDs na conta, independentemente da seed do mundo. A criação envia os IDs para `POST /api/characters`; a API valida a seleção contra o catálogo e `GET /api/me` retorna a aparência salva. O editor já oferece cabelo, pele, olhos, detalhes faciais e acessório.
-
-Cada personagem pode ter um `faceDetailId` opcional, ou seja, no máximo um detalhe facial. As opções incluem formatos e tons de barba, bigode e outros detalhes faciais. Cabelos são sprites completos já coloridos; acessórios também são opcionais. Novas variantes devem receber IDs estáveis e ser adicionadas ao catálogo, sem renomear arquivos já persistidos em identidades. A composição está ligada ao editor e aos registros de NPCs e só aparece quando todos os PNGs correspondentes estiverem disponíveis.
+NPCs das versões 4 e 5 recebem aparência determinística e enviam as seis categorias em `npc.visual`; a descrição textual é derivada dos mesmos IDs. A versão 4 conserva sua seleção histórica para reconstrução. A versão 5 usa um fluxo visual próprio e calibra cor e estilo do cabelo por idade: não gera grisalho abaixo dos 40 anos e só seleciona calvície ou laterais ralas a partir dos 45. Cortes fora do catálogo de NPCs não são sorteados. Todos no mesmo servidor veem a mesma identidade e o backend não envia arquivos de arte.

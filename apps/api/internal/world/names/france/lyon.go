@@ -1,6 +1,14 @@
 // Package france contains name catalogs keyed to individual French cities.
 package france
 
+var LyonDistrictPrefixes = []string{
+	"Bas", "Beau", "Clair", "Grand", "Haut", "Noir", "Nouveau", "Petit", "Saint", "Vieux",
+}
+
+var LyonDistrictSuffixes = []string{
+	"Atelier", "Bastion", "Canal", "Faubourg", "Jardin", "Marché", "Moulin", "Passage", "Pont", "Théâtre",
+}
+
 // LyonGivenNames and LyonFamilyNames form the v3 procedural name pool for Lyon.
 var LyonGivenNames = []string{
 	"Abel", "Abigaëlle", "Achille", "Adèle", "Adrien", "Agathe", "Agnès", "Aimé",

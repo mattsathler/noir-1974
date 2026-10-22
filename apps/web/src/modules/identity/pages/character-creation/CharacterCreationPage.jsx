@@ -4,9 +4,10 @@ import ModularFace from "../../components/ModularFace.jsx";
 
 const defaultVisual = {
   hairId: "hair_short_brown",
-  skinColorId: "skin_light",
-  eyeColorId: "eyes_brown",
-  faceDetailId: "",
+  skinId: "skin_white",
+  eyesId: "eyes_brown",
+  faceId: "",
+  beardId: "",
   accessoryIds: [],
 };
 
@@ -74,30 +75,36 @@ export default function CharacterCreationPage({ onComplete }) {
             </div>
 
             <fieldset className="grid gap-3 border-0 p-0 mt-2" disabled={!visualOptions || submitting}>
-              <legend className="text-sm text-secondary mb-2">Face and accessories</legend>
+              <legend className="text-sm text-secondary mb-2">Appearance</legend>
               {visualOptions ? <>
                 <label className="grid gap-1 text-xs uppercase text-secondary">Hair
                   <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.hairId} onChange={(event) => setVisualPart("hairId", event.target.value)}>
                     {visualOptions.hair.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
                   </select>
                 </label>
-                <label className="grid gap-1 text-xs uppercase text-secondary">Skin color
-                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.skinColorId} onChange={(event) => setVisualPart("skinColorId", event.target.value)}>
-                    {visualOptions.skinColors.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
+                <label className="grid gap-1 text-xs uppercase text-secondary">Skin
+                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.skinId} onChange={(event) => setVisualPart("skinId", event.target.value)}>
+                    {visualOptions.skin.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
                   </select>
                 </label>
-                <label className="grid gap-1 text-xs uppercase text-secondary">Eye color
-                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.eyeColorId} onChange={(event) => setVisualPart("eyeColorId", event.target.value)}>
-                    {visualOptions.eyeColors.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
+                <label className="grid gap-1 text-xs uppercase text-secondary">Eyes
+                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.eyesId} onChange={(event) => setVisualPart("eyesId", event.target.value)}>
+                    {visualOptions.eyes.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
                   </select>
                 </label>
-                <label className="grid gap-1 text-xs uppercase text-secondary">Face details
-                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.faceDetailId} onChange={(event) => setVisualPart("faceDetailId", event.target.value)}>
+                <label className="grid gap-1 text-xs uppercase text-secondary">Beard
+                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.beardId} onChange={(event) => setVisualPart("beardId", event.target.value)}>
                     <option value="">None</option>
-                    {visualOptions.faceDetails.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
+                    {visualOptions.beard.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
                   </select>
                 </label>
-                <label className="grid gap-1 text-xs uppercase text-secondary">Accessory
+                <label className="grid gap-1 text-xs uppercase text-secondary">Face
+                  <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.faceId} onChange={(event) => setVisualPart("faceId", event.target.value)}>
+                    <option value="">None</option>
+                    {visualOptions.face.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs uppercase text-secondary">Accessories
                   <select className="w-full min-h-11 p-3 border bg-base text-primary" value={visual.accessoryIds[0] ?? ""} onChange={(event) => setVisualPart("accessoryIds", event.target.value ? [event.target.value] : [])}>
                     <option value="">None</option>
                     {visualOptions.accessories.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}

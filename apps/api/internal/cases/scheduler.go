@@ -28,16 +28,21 @@ type recurringStore interface {
 	DeferGeneration(context.Context, string, int64, time.Duration) error
 }
 
+type generationLock func(context.Context, func() error) error
+
 type RecurringGenerator struct {
 	databaseURL, serverID string
 	store                 recurringStore
 	world                 recurringWorld
 	interval              time.Duration
 	maxOpen               int
+	withGenerationLock    generationLock
 }
 
 func NewRecurringGenerator(databaseURL, serverID string, store recurringStore, worldStore recurringWorld, interval time.Duration, maxOpen int) *RecurringGenerator {
-	return &RecurringGenerator{databaseURL: databaseURL, serverID: serverID, store: store, world: worldStore, interval: interval, maxOpen: maxOpen}
+	generator := &RecurringGenerator{databaseURL: databaseURL, serverID: serverID, store: store, world: worldStore, interval: interval, maxOpen: maxOpen}
+	generator.withGenerationLock = generator.withAdvisoryLock
+	return generator
 }
 
 func (g *RecurringGenerator) Run(ctx context.Context) {
@@ -63,6 +68,10 @@ func (g *RecurringGenerator) Run(ctx context.Context) {
 }
 
 func (g *RecurringGenerator) runOne(ctx context.Context) error {
+	return g.withGenerationLock(ctx, func() error { return g.generateOne(ctx) })
+}
+
+func (g *RecurringGenerator) withAdvisoryLock(ctx context.Context, generate func() error) error {
 	conn, err := pgx.Connect(ctx, g.databaseURL)
 	if err != nil {
 		return fmt.Errorf("connect generation lock: %w", err)
@@ -80,6 +89,10 @@ func (g *RecurringGenerator) runOne(ctx context.Context) error {
 	if !locked {
 		return nil
 	}
+	return generate()
+}
+
+func (g *RecurringGenerator) generateOne(ctx context.Context) error {
 	slot, due, err := g.store.DueGeneration(ctx, g.serverID)
 	if err != nil || !due {
 		return err

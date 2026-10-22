@@ -13,7 +13,7 @@ vi.mock("../../api.js", () => ({
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("WorldDirectory activity records", () => {
-  it("queries and presents only the bank app's unmarked ledger", async () => {
+  it("queries the bank ledger while showing only the account holder's name", async () => {
     searchPeople.mockResolvedValue([{
       npc: { id: "npc:ada", name: "Ada Morel", age: 41, appearance: "dark hair" },
       workplaces: [{ company: "Aurore Industries", address: "Aurore Industries, Bellecour, Lyon, France" }],
@@ -30,9 +30,7 @@ describe("WorldDirectory activity records", () => {
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));
     await screen.findByText("Ada Morel");
-    expect(screen.getByText("WORKPLACE · Aurore Industries — Aurore Industries, Bellecour, Lyon, France")).toBeInTheDocument();
-    expect(screen.getByText("MARITAL STATUS · MARRIED")).toBeInTheDocument();
-    expect(screen.queryByText(/manager|accountant|partner|spouse/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/WORKPLACE|MARITAL STATUS|41 YEARS|dark hair/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "OPEN FINANCIAL LEDGER" }));
     fireEvent.click(screen.getByRole("button", { name: "Select date FROM" }));
     fireEvent.click(screen.getByRole("button", { name: "1974-11-08" }));

@@ -180,18 +180,34 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
     const index = board.pins.length;
     const x = 700 + (index % 3) * 3000;
     const y = 700 + Math.floor(index / 3) * 2500;
+    const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const pendingID = `note:pending-${nonce}`;
+    const pendingPin = { id: pendingID, source: "note", title: "UNTITLED NOTE", content: "", x, y, pending: true };
+    const initialDraft = { title: pendingPin.title, content: pendingPin.content };
+    setBoard((previous) => previous?.id === boardID ? { ...previous, pins: [...previous.pins, pendingPin] } : previous);
+    noteDraftsRef.current = { ...noteDraftsRef.current, [pendingID]: initialDraft };
+    setNoteDrafts((previous) => ({ ...previous, [pendingID]: initialDraft }));
     setBusy(true);
     setSaveState("saving");
     try {
-      const pin = await createWhiteboardNote(boardID, x, y);
-      setBoard((previous) => previous?.id === boardID && !previous.pins.some((item) => item.id === pin.id)
-        ? { ...previous, pins: [...previous.pins, pin] }
+      const pin = await createWhiteboardNote(boardID, x, y, pendingID);
+      setBoard((previous) => previous?.id === boardID
+        ? { ...previous, pins: previous.pins.map((item) => item.id === pendingID ? pin : item) }
         : previous);
-      const initialDraft = { title: pin.title, content: pin.content };
       noteDraftsRef.current = { ...noteDraftsRef.current, [pin.id]: initialDraft };
-      setNoteDrafts((previous) => ({ ...previous, [pin.id]: initialDraft }));
+      delete noteDraftsRef.current[pendingID];
+      setNoteDrafts((previous) => {
+        const next = { ...previous, [pin.id]: initialDraft };
+        delete next[pendingID];
+        return next;
+      });
       setMessage("BLANK NOTE ADDED · WRITE YOUR OWN RECORD");
     } catch (error) {
+      setBoard((previous) => previous?.id === boardID
+        ? { ...previous, pins: previous.pins.filter((item) => item.id !== pendingID) }
+        : previous);
+      delete noteDraftsRef.current[pendingID];
+      setNoteDrafts((previous) => { const next = { ...previous }; delete next[pendingID]; return next; });
       setSaveState("save");
       setMessage(error.message || "A BLANK NOTE COULD NOT BE ADDED");
     } finally {
@@ -435,6 +451,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
                   aria-label="Note text"
                   maxLength={5000}
                   value={(noteDrafts[pin.id] ?? pin).content}
+                  disabled={pin.pending}
                   onChange={(event) => updateNoteDraft(pin, "content", event.target.value)}
                 />
               </> : <>

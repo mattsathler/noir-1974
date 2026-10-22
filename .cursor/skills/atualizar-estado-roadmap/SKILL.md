@@ -2,7 +2,7 @@
 name: atualizar-estado-roadmap
 description: >-
   Recalcula docs/roadmap/estado.md a partir do Status dos milestones
-  (M00–M11): aceitos, vigente, progresso do fluxo completo do crime até a prisão.
+  (M00–M13): aceitos, vigente, progresso do fluxo completo do crime até a prisão.
   Use when accepting or reopening a milestone, updating product status,
   playtest progress, estado.md, or when the user asks to atualizar o estado
   do roadmap / porcentagem de desenvolvimento.
@@ -32,13 +32,13 @@ python3 .cursor/skills/atualizar-estado-roadmap/scripts/recompute_estado.py
 
 ## Regras de cálculo (já no script)
 
-- Alvo da porcentagem: fluxo completo do crime, da geração do caso à prisão do culpado: **M00..M11** (`CRIME_FLOW_THROUGH = 11`).
-- Peso igual: milestones aceitos / 12, arredondado para inteiro.
+- Alvo da porcentagem: fluxo completo do crime, da geração do caso à prisão do culpado: **M00..M13** (`CRIME_FLOW_THROUGH = 13`).
+- Peso igual: milestones aceitos / 14, arredondado para inteiro.
 - Só **Aceito** soma. **Em curso** aparece na barra como vazio.
 - Milestone vigente = primeiro que ainda não está Aceito, em ordem.
 - M06 aceito ⇒ primeiro recorte de playtest está pronto; isso não conclui o fluxo criminal.
-- M11 aceito ⇒ fluxo completo, incluindo acusação e prisão, está concluído.
+- M13 aceito ⇒ fluxo completo, incluindo acusação e prisão, está concluído.
 
 ## Extra no fluxo criminal
 
-Se milestones forem adicionados, removidos ou reordenados entre M00 e M11, atualizar `CRIME_FLOW_THROUGH`, os rótulos e as descrições no script e `docs/roadmap/ciclos.md`. Depois rerodar o script.
+Se milestones forem adicionados, removidos ou reordenados entre M00 e M13, atualizar `CRIME_FLOW_THROUGH`, os rótulos e as descrições no script e `docs/roadmap/ciclos.md`. Depois rerodar o script.

@@ -23,11 +23,11 @@ CREATE TABLE IF NOT EXISTS player_characters (
     account_id uuid PRIMARY KEY REFERENCES player_accounts(id) ON DELETE CASCADE,
     display_name text NOT NULL,
     portrait_id smallint NOT NULL CHECK (portrait_id BETWEEN 1 AND 6),
-    visual_identity jsonb NOT NULL DEFAULT '{"hairId":"hair_short_brown","skinColorId":"skin_light","eyeColorId":"eyes_brown","faceDetailId":"","accessoryIds":[]}'::jsonb,
+    visual_identity jsonb NOT NULL DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE player_characters ADD COLUMN IF NOT EXISTS visual_identity jsonb NOT NULL DEFAULT '{"hairId":"hair_short_brown","skinColorId":"skin_light","eyeColorId":"eyes_brown","faceDetailId":"","accessoryIds":[]}'::jsonb;
-ALTER TABLE player_characters ALTER COLUMN visual_identity SET DEFAULT '{"hairId":"hair_short_brown","skinColorId":"skin_light","eyeColorId":"eyes_brown","faceDetailId":"","accessoryIds":[]}'::jsonb;
+ALTER TABLE player_characters ADD COLUMN IF NOT EXISTS visual_identity jsonb NOT NULL DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
+ALTER TABLE player_characters ALTER COLUMN visual_identity SET DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
 
 UPDATE player_characters
 SET visual_identity = (visual_identity - 'faceFeatureIds') || jsonb_build_object('faceDetailId', COALESCE(visual_identity->'faceFeatureIds'->>0, ''))

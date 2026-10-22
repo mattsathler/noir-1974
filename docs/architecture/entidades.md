@@ -14,7 +14,7 @@ A identidade conceitual é `(server_id, entity_id)`. Um `entity_id` é estável 
 | --- | --- |
 | Servidor (`game_server`) | Escopo de isolamento e raiz do mundo compartilhado. |
 | Mundo (`world`) | Uma seed e uma `generator_version` por servidor. |
-| Região (`world_region`) | Recorte lógico. Países, capitais e principais cidades vêm de um catálogo fixo comum a todos os servidores; bairros são partições procedurais expansíveis sob demanda para distribuir detetives e ocorrências. |
+| Região (`world_region`) | Recorte lógico. Países, capitais e principais cidades vêm de um catálogo fixo comum a todos os servidores; cada cidade materializada recebe 20 bairros procedurais para distribuir detetives e ocorrências. |
 | Entidade do mundo (`world_entity`) | Âncora de identidade de um NPC, empresa ou local materializado. Guarda tipo, região e chave estável do gerador; atributos reconstruíveis não são copiados por padrão. |
 | NPC | Pessoa gerada, com identidade estável e relações consultáveis. Atributos base podem ser reconstruídos da seed. |
 | Empresa | Organização gerada, com relações próprias, incluindo localizações e vínculos de emprego. |
@@ -57,7 +57,7 @@ O schema registra mutations individualmente. No recorte M04, as mutations de sta
 
 Regiões são endereçadas por uma chave lógica canônica (`region_id`), independente da ordem em que forem solicitadas. Entidades têm uma chave de geração estável dentro da região (`generation_key`); o ID final é único dentro do servidor. A seed derivada para uma região/entidade não pode depender de outras regiões geradas antes dela.
 
-O formato exato das chaves, derivação das subseeds e limites de expansão pertencem ao M02. O catálogo geográfico e a geração lógica de bairros estão definidos em [geração do mundo](geracao-do-mundo.md). Bairros não representam áreas físicas simuladas: não possuem coordenadas, distâncias ou relações de vizinhança. Uma expansão não troca a identidade de conteúdo já referenciado e a materialização de bairros é sob demanda.
+O formato exato das chaves, derivação das subseeds e versões do gerador pertencem ao M02. O catálogo geográfico e a geração lógica de bairros estão definidos em [geração do mundo](geracao-do-mundo.md). Bairros não representam áreas físicas simuladas: não possuem coordenadas, distâncias ou relações de vizinhança. A lista de 20 bairros é criada deterministicamente quando a cidade é materializada; alterações posteriores na quantidade ou composição exigem uma nova versão do gerador.
 
 ## Casos: estado comum e progresso individual
 

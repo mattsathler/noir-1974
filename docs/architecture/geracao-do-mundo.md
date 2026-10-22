@@ -28,11 +28,11 @@ WORLD SEED
 
 ## Geografia de referência e expansão dos bairros
 
-A geografia terá duas camadas. A camada de referência será fixa e igual em todos os servidores: um catálogo curado de 50 países de diferentes partes do mundo, com suas capitais e principais cidades. Esses nomes e identidades não variam com a seed do servidor. O catálogo ainda precisa ser selecionado e registrado como dado versionado do jogo.
+A geografia terá duas camadas. A camada de referência é fixa e igual em todos os servidores: o catálogo inicial de 25 países e 100 cidades, registrado no M11. Esses nomes e identidades não variam com a seed do servidor. O app GATE conecta cidades do catálogo, inclusive entre países, e não oferece bairros ou construções como destinos. A navegação local entre bairros e a visita a construções usam interfaces distintas. A localização persistida identifica país, cidade, bairro e, quando aplicável, construção.
 
-Dentro das cidades, os bairros serão partições lógicas para distribuir detetives e ocorrências, evitando a concentração de jogadores em um único lugar. Seus nomes serão compostos deterministicamente a partir de um banco de palavras e regras de combinação, com escopo por servidor e cidade. Novos bairros serão criados sob demanda conforme a distribuição de jogadores e a necessidade de gerar ocorrências locais; uma vez criados, sua identidade permanece estável para todos os jogadores daquele servidor.
+Dentro das cidades, os bairros serão partições lógicas para distribuir detetives e ocorrências, evitando a concentração de jogadores em um único lugar. Cada cidade recebe 20 bairros compostos deterministicamente a partir de seu banco de palavras ao ser materializada. Seus nomes e IDs são únicos dentro da cidade e estáveis para todos os jogadores daquele servidor. Ao adicionar cidades, cada uma receberá seu próprio banco de palavras e as mesmas regras de composição; aumentar a quantidade de bairros será uma mudança versionada do gerador.
 
-Não haverá mapa físico individual dos bairros nem planejamento de coordenadas, distâncias, rotas ou vizinhança entre eles. O bairro identifica o contexto lógico de uma ocorrência e ajuda o sistema a distribuir jogadores e casos; não determina deslocamento ou proximidade física. A geração deve evitar nomes duplicados ou ambíguos dentro da mesma cidade e preservar chaves canônicas, independentemente da ordem em que bairros forem criados.
+Não haverá mapa físico individual dos bairros nem planejamento de coordenadas, distâncias, rotas ou vizinhança entre eles. O bairro identifica o contexto lógico de uma ocorrência e ajuda o sistema a distribuir jogadores e casos; não determina deslocamento ou proximidade física. A geração evita nomes duplicados dentro da cidade e preserva chaves canônicas em todas as consultas.
 
 ## Grafo
 
@@ -67,6 +67,12 @@ A versão `4` mantém a sociedade e os catálogos de nomes da versão 3 e acresc
 Versões `1` a `3` continuam reconstruíveis. Mundos existentes continuam usando a versão gravada; trocar sua seed ou versão não é uma migração automática e só pode ocorrer por reconstrução explícita. Novos mundos passam a usar a versão mais recente. Os PNGs e a composição visual no frontend seguem o contrato em [identidade visual modular](identidade-visual-modular.md).
 
 A aparência escolhida para o personagem do jogador tem outra origem: é uma preferência individual, validada contra o catálogo de peças e persistida na conta. Ela não é derivada da seed mundial e não altera os personagens vistos por outros jogadores.
+
+## Versão 5 — bairros procedurais e identidade visual calibrada
+
+A versão `5` preserva os catálogos de nomes e a identidade modular da versão 4, cria 20 bairros para cada cidade cadastrada usando seu banco de palavras e amplia a sociedade inicial para oito NPCs e uma empresa por bairro. Lyon é a única cidade cadastrada no momento; nela, isso significa 160 NPCs, 20 empresas e 80 locais na população inicial. A seleção dos nomes dos bairros e todos os IDs continuam determinísticos por servidor.
+
+A geração visual da versão 5 também calibra cabelos por idade: NPCs abaixo de 40 anos não recebem cabelo grisalho; a chance aumenta gradualmente nas faixas seguintes. Calvície e cabelos ralos nas laterais só são selecionados a partir dos 45 anos. Cortes ausentes do catálogo de NPCs, como maria-chiquinha, não podem ser gerados. A versão 4 mantém sua saída histórica; novos mundos usam a versão 5.
 
 ## Determinismo e identidade
 

@@ -84,7 +84,7 @@ func (fixture *casePersistenceFixture) QueryRow(_ context.Context, query string,
 			return testCaseRow{err: pgx.ErrNoRows}
 		}
 		return testCaseRow{values: []any{status}}
-	case strings.Contains(query, "SELECT COUNT(*) FROM case_evidence"):
+	case strings.Contains(query, "SELECT COUNT(*) FROM ("):
 		key := args[0].(string) + "/" + args[1].(string)
 		count := 0
 		for _, evidenceID := range args[2].([]string) {
