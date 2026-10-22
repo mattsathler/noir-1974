@@ -56,7 +56,7 @@ As funções `GenerateNPC` e `GenerateCompany` reconstroem um registro específi
 
 ## Versão 3 — catálogos de nomes por cidade
 
-A versão `3` mantém o formato da sociedade inicial e escolhe nomes de catálogos próprios para cada cidade. Os catálogos ficam em arquivos por país e cidade em `apps/api/internal/world/names`; o registro de cidades liga o código geográfico canônico ao catálogo. Lyon, França, possui 300 prenomes e 300 sobrenomes, combinados e embaralhados deterministicamente por mundo. A amostra de combinações de um mundo não repete nomes completos.
+A versão `3` mantém o formato da sociedade inicial e escolhe nomes de catálogos locais. Lyon, França, possui 300 prenomes e 300 sobrenomes. O M11 acrescenta listas próprias de prenomes e sobrenomes para os demais países do catálogo; cidades usam o catálogo de seu país até receberem um catálogo municipal específico. As combinações são escolhidas deterministicamente por cidade e mundo, sem repetir nomes completos na amostra inicial. Variantes determinísticas mantêm a expansão quando uma combinação-base já foi usada.
 
 A versão `2` e seus catálogos pequenos continuam disponíveis para reconstruir mundos existentes sem alterar nomes. Cada servidor conserva a versão de gerador registrada na criação; mundos novos usam a versão mais recente. Ao adicionar cidades, deve-se acrescentar um arquivo de catálogo e registrá-lo com seu país e cidade canônicos.
 
@@ -70,9 +70,15 @@ A aparência escolhida para o personagem do jogador tem outra origem: é uma pre
 
 ## Versão 5 — bairros procedurais e identidade visual calibrada
 
-A versão `5` preserva os catálogos de nomes e a identidade modular da versão 4, cria 20 bairros para cada cidade cadastrada usando seu banco de palavras e amplia a sociedade inicial para oito NPCs e uma empresa por bairro. Lyon é a única cidade cadastrada no momento; nela, isso significa 160 NPCs, 20 empresas e 80 locais na população inicial. A seleção dos nomes dos bairros e todos os IDs continuam determinísticos por servidor.
+A versão `5` preserva a identidade modular da versão 4, cria 20 bairros e amplia a sociedade inicial para oito NPCs e uma empresa por bairro. Lyon mantém seus IDs e conteúdo históricos. Cada outra cidade recebe uma seed local derivada da seed do servidor e de seu ID canônico, mais 160 NPCs, 20 empresas e 80 locais. Os bairros, relações e identidades são determinísticos por servidor e cidade.
 
 A geração visual da versão 5 também calibra cabelos por idade: NPCs abaixo de 40 anos não recebem cabelo grisalho; a chance aumenta gradualmente nas faixas seguintes. Calvície e cabelos ralos nas laterais só são selecionados a partir dos 45 anos. Cortes ausentes do catálogo de NPCs, como maria-chiquinha, não podem ser gerados. A versão 4 mantém sua saída histórica; novos mundos usam a versão 5.
+
+## M11 — catálogo e viagem entre cidades
+
+O catálogo geográfico fixo e versionado associa cada cidade canônica a um país e fuso horário. O GATE consulta esse catálogo e posiciona o jogador em Central na cidade escolhida. Bairros e visitas a locais são acessados por interfaces locais próprias e nunca aparecem como destinos GATE.
+
+A primeira viagem a uma cidade materializa seu conteúdo no mundo compartilhado do servidor. A tabela `world_city_generators` registra a versão usada por cidade para que NPCs, empresas e relações mantenham suas identidades em reconstruções futuras. Cada cidade materializada mantém sua própria população e seus próprios casos. A geração recorrente alterna entre essas cidades e seleciona os candidatos apenas dentro da cidade sorteada; a expansão pode adicionar NPCs ao bairro menos povoado dessa cidade.
 
 ## Determinismo e identidade
 

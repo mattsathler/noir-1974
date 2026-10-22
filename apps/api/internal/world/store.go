@@ -250,14 +250,134 @@ func (store *PostgresStore) Materialize(ctx context.Context, serverID, seed stri
 	return nil
 }
 
+// MaterializeCity adds a city's deterministic shared content the first time a
+// player reaches it. New cities use at least the current city-generation rules;
+// an existing city's stored version is never replaced.
+func (store *PostgresStore) MaterializeCity(ctx context.Context, serverID, cityID string) error {
+	city, ok := CityByID(cityID)
+	if !ok {
+		return ErrEntityNotFound
+	}
+	if cityID == "fr/lyon" {
+		return nil
+	}
+	var seed string
+	var worldVersion int
+	var alreadyMaterialized bool
+	err := store.db.QueryRow(ctx,
+		`SELECT world_seed, generator_version,
+			EXISTS (SELECT 1 FROM world_city_generators c WHERE c.server_id = w.server_id AND c.city_id = $2)
+		 FROM worlds w WHERE w.server_id = $1::uuid`,
+		serverID, city.ID,
+	).Scan(&seed, &worldVersion, &alreadyMaterialized)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrEntityNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if alreadyMaterialized {
+		return nil
+	}
+	version := worldVersion
+	if version < GeneratorVersion5 {
+		version = GeneratorVersion5
+	}
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin city materialization: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	inserted, err := tx.Exec(ctx,
+		`INSERT INTO world_city_generators(server_id, city_id, generator_version) VALUES($1::uuid, $2, $3) ON CONFLICT(server_id, city_id) DO NOTHING`,
+		serverID, city.ID, version,
+	)
+	if err != nil {
+		return fmt.Errorf("record city generator: %w", err)
+	}
+	if inserted.RowsAffected() == 0 {
+		return nil
+	}
+	generated, err := GenerateCity(seed, version, city.ID)
+	if err != nil {
+		return err
+	}
+	if err := persistGeneratedCity(ctx, tx, serverID, generated); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit city materialization: %w", err)
+	}
+	return nil
+}
+
+func (store *PostgresStore) cityGeneratorVersion(ctx context.Context, serverID, cityID string, fallback int) (int, error) {
+	if cityID == "fr/lyon" {
+		return fallback, nil
+	}
+	var version int
+	err := store.db.QueryRow(ctx, `SELECT generator_version FROM world_city_generators WHERE server_id=$1::uuid AND city_id=$2`, serverID, cityID).Scan(&version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if fallback < GeneratorVersion5 {
+			return GeneratorVersion5, nil
+		}
+		return fallback, nil
+	}
+	return version, err
+}
+
+func persistGeneratedCity(ctx context.Context, tx pgx.Tx, serverID string, generated World) error {
+	regionArgs := make([][]any, 0, len(generated.Regions))
+	for _, region := range generated.Regions {
+		regionArgs = append(regionArgs, []any{serverID, region.ID, optionalString(region.ParentID), region.Kind, region.Name})
+	}
+	regionIndex, err := execConsistentBatch(ctx, tx, `INSERT INTO world_regions(server_id,region_id,parent_region_id,region_kind,display_name) VALUES($1::uuid,$2,$3,$4,$5) ON CONFLICT(server_id,region_id) DO UPDATE SET display_name=EXCLUDED.display_name WHERE world_regions.parent_region_id IS NOT DISTINCT FROM EXCLUDED.parent_region_id AND world_regions.region_kind=EXCLUDED.region_kind AND world_regions.display_name=EXCLUDED.display_name`, regionArgs)
+	if err != nil {
+		return fmt.Errorf("persist city region %q: %w", generated.Regions[max(regionIndex, 0)].ID, err)
+	}
+	entityArgs := make([][]any, 0, len(generated.Entities))
+	for _, entity := range generated.Entities {
+		entityArgs = append(entityArgs, []any{serverID, entity.ID, entity.EntityType, entity.RegionID, entity.GenerationKey, optionalString(entity.LocationKind)})
+	}
+	entityIndex, err := execConsistentBatch(ctx, tx, `INSERT INTO world_entities(server_id,entity_id,entity_type,region_id,generation_key,location_kind) VALUES($1::uuid,$2,$3,$4,$5,$6) ON CONFLICT(server_id,entity_id) DO UPDATE SET generation_key=EXCLUDED.generation_key WHERE world_entities.entity_type=EXCLUDED.entity_type AND world_entities.region_id=EXCLUDED.region_id AND world_entities.generation_key=EXCLUDED.generation_key AND world_entities.location_kind IS NOT DISTINCT FROM EXCLUDED.location_kind`, entityArgs)
+	if err != nil {
+		return fmt.Errorf("persist city entity %q: %w", generated.Entities[max(entityIndex, 0)].ID, err)
+	}
+	employmentArgs := make([][]any, 0, len(generated.EmploymentRelationships))
+	for _, relation := range generated.EmploymentRelationships {
+		employmentArgs = append(employmentArgs, []any{serverID, relation.ID, relation.EmployeeNPCID, relation.EmployerCompanyID, relation.Role})
+	}
+	if _, err := execConsistentBatch(ctx, tx, `INSERT INTO employment_relationships(server_id,relationship_id,employee_npc_id,employer_company_id,role) VALUES($1::uuid,$2,$3,$4,$5) ON CONFLICT(server_id,relationship_id) DO UPDATE SET role=EXCLUDED.role WHERE employment_relationships.employee_npc_id=EXCLUDED.employee_npc_id AND employment_relationships.employer_company_id=EXCLUDED.employer_company_id AND employment_relationships.role IS NOT DISTINCT FROM EXCLUDED.role`, employmentArgs); err != nil {
+		return fmt.Errorf("persist city employment: %w", err)
+	}
+	personalArgs := make([][]any, 0, len(generated.PersonalRelationships))
+	for _, relation := range generated.PersonalRelationships {
+		personalArgs = append(personalArgs, []any{serverID, relation.ID, relation.PersonANPCID, relation.PersonBNPCID, relation.RelationshipType})
+	}
+	if _, err := execConsistentBatch(ctx, tx, `INSERT INTO personal_relationships(server_id,relationship_id,person_a_npc_id,person_b_npc_id,relationship_type) VALUES($1::uuid,$2,$3,$4,$5) ON CONFLICT(server_id,relationship_id) DO UPDATE SET relationship_type=EXCLUDED.relationship_type WHERE personal_relationships.person_a_npc_id=EXCLUDED.person_a_npc_id AND personal_relationships.person_b_npc_id=EXCLUDED.person_b_npc_id AND personal_relationships.relationship_type=EXCLUDED.relationship_type`, personalArgs); err != nil {
+		return fmt.Errorf("persist city personal relationships: %w", err)
+	}
+	companyLocationArgs := make([][]any, 0, len(generated.CompanyLocations))
+	for _, relation := range generated.CompanyLocations {
+		companyLocationArgs = append(companyLocationArgs, []any{serverID, relation.ID, relation.CompanyID, relation.LocationID, relation.LocationRole})
+	}
+	if _, err := execConsistentBatch(ctx, tx, `INSERT INTO company_locations(server_id,relationship_id,company_id,location_id,location_role) VALUES($1::uuid,$2,$3,$4,$5) ON CONFLICT(server_id,relationship_id) DO UPDATE SET location_role=EXCLUDED.location_role WHERE company_locations.company_id=EXCLUDED.company_id AND company_locations.location_id=EXCLUDED.location_id AND company_locations.location_role=EXCLUDED.location_role`, companyLocationArgs); err != nil {
+		return fmt.Errorf("persist city headquarters: %w", err)
+	}
+	return nil
+}
+
 // GetNPC rebuilds one person's generated fields and loads persisted relationships by indexed IDs.
 func (store *PostgresStore) GetNPC(ctx context.Context, serverID, npcID string) (NPCProfile, error) {
 	var seed string
 	var version int
 	var generationKey string
 	err := store.db.QueryRow(ctx,
-		`SELECT w.world_seed, w.generator_version, e.generation_key
+		`SELECT w.world_seed, COALESCE(city_generator.generator_version, w.generator_version), e.generation_key
 		 FROM world_entities e JOIN worlds w ON w.server_id = e.server_id
+		 LEFT JOIN world_city_generators city_generator
+		   ON city_generator.server_id=e.server_id
+		  AND city_generator.city_id=split_part(e.region_id, '/district/', 1)
 		 WHERE e.server_id = $1::uuid AND e.entity_id = $2 AND e.entity_type = 'npc'`,
 		serverID, npcID,
 	).Scan(&seed, &version, &generationKey)
@@ -267,7 +387,7 @@ func (store *PostgresStore) GetNPC(ctx context.Context, serverID, npcID string) 
 	if err != nil {
 		return NPCProfile{}, err
 	}
-	npc, err := GenerateNPC(seed, version, generationKey)
+	npc, err := GenerateNPCFromKey(seed, version, generationKey)
 	if err != nil {
 		return NPCProfile{}, err
 	}
@@ -297,10 +417,13 @@ func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcI
 	var result NPCRecordsProfile
 	var generationKey, companyID, companyKey string
 	err := store.db.QueryRow(ctx,
-		`SELECT w.world_seed, w.generator_version, e.generation_key,
+		`SELECT w.world_seed, COALESCE(city_generator.generator_version, w.generator_version), e.generation_key,
 		        COALESCE(employer.entity_id, ''), COALESCE(employer.generation_key, '')
 		 FROM world_entities e
 		 JOIN worlds w ON w.server_id = e.server_id
+		 LEFT JOIN world_city_generators city_generator
+		   ON city_generator.server_id=e.server_id
+		  AND city_generator.city_id=split_part(e.region_id, '/district/', 1)
 		 LEFT JOIN LATERAL (
 		     SELECT c.entity_id, c.generation_key
 		     FROM employment_relationships r
@@ -319,7 +442,7 @@ func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcI
 	if err != nil {
 		return NPCRecordsProfile{}, err
 	}
-	result.NPC, err = GenerateNPC(result.WorldSeed, result.GeneratorVersion, generationKey)
+	result.NPC, err = GenerateNPCFromKey(result.WorldSeed, result.GeneratorVersion, generationKey)
 	if err != nil {
 		return NPCRecordsProfile{}, err
 	}
@@ -327,7 +450,7 @@ func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcI
 		return NPCRecordsProfile{}, ErrGeneratedConflict
 	}
 	if companyKey != "" {
-		company, err := GenerateCompany(result.WorldSeed, result.GeneratorVersion, companyKey)
+		company, err := GenerateCompanyFromKey(result.WorldSeed, result.GeneratorVersion, companyKey)
 		if err != nil {
 			return NPCRecordsProfile{}, err
 		}
@@ -477,6 +600,21 @@ func (store *PostgresStore) SearchLocations(ctx context.Context, serverID, distr
 	if err != nil {
 		return nil, err
 	}
+	city, cityFound := CityForLocation(districtID)
+	if cityFound && city.ID != "fr/lyon" {
+		seed, version, err := store.worldSeedAndVersion(ctx, serverID)
+		if err != nil {
+			return nil, err
+		}
+		version, err = store.cityGeneratorVersion(ctx, serverID, city.ID, version)
+		if err != nil {
+			return nil, err
+		}
+		base, err = GenerateCity(seed, version, city.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	query = strings.ToLower(strings.TrimSpace(query))
 	regions := make(map[string]string, len(base.Regions))
 	for _, region := range base.Regions {
@@ -517,7 +655,24 @@ func (store *PostgresStore) SearchLocations(ctx context.Context, serverID, distr
 
 // TransitDistricts returns the generated neighborhoods and visitable locations for the GATE map.
 func (store *PostgresStore) TransitDistricts(ctx context.Context, serverID string) ([]DistrictDestination, error) {
-	base, err := store.generatedWorld(ctx, serverID)
+	return store.TransitDistrictsForCity(ctx, serverID, "fr/lyon")
+}
+
+// TransitDistrictsForCity returns local navigation data for one city, never GATE city routes.
+func (store *PostgresStore) TransitDistrictsForCity(ctx context.Context, serverID, cityID string) ([]DistrictDestination, error) {
+	city, ok := CityByID(cityID)
+	if !ok {
+		return nil, ErrEntityNotFound
+	}
+	seed, version, err := store.worldSeedAndVersion(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	version, err = store.cityGeneratorVersion(ctx, serverID, city.ID, version)
+	if err != nil {
+		return nil, err
+	}
+	base, err := generateCityGeography(seed, version, city.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -562,8 +717,40 @@ func (store *PostgresStore) TransitDistricts(ctx context.Context, serverID strin
 	return result, nil
 }
 
+func generatedCityLocations(seed string, city WorldCity, districtID, districtName string) []LocationRecord {
+	streets := []string{"Rue de la Gare", "Market Street", "Foundry Lane", "Exchange Road", "Riverside Walk", "Station Street"}
+	buildings := []string{"The Lantern Café", "Meridian Office", "Northstar Tailors", "Civic Exchange", "The Evening Ledger", "Bell & Finch Rooms"}
+	stream := newStream(seed, GeneratorVersion5, "city/"+city.ID+"/district/"+districtID+"/locations")
+	selectedStreets := shuffledCopy(streets, stream)[:2]
+	selectedBuildings := shuffledCopy(buildings, stream)[:2]
+	locations := make([]LocationRecord, 0, 4)
+	for _, street := range selectedStreets {
+		locations = append(locations, LocationRecord{Address: Address{
+			LocationID: "location:" + city.ID + "/district/" + strings.TrimPrefix(districtID, city.ID+"/district/") + "/street/" + slug(street),
+			Name:       street, Kind: "street", District: districtName, City: city.Name, Country: city.Country,
+			Full: strings.Join([]string{street, districtName, city.Name, city.Country}, ", "),
+		}})
+	}
+	for _, building := range selectedBuildings {
+		locations = append(locations, LocationRecord{Address: Address{
+			LocationID: "location:" + city.ID + "/district/" + strings.TrimPrefix(districtID, city.ID+"/district/") + "/building/" + slug(building),
+			Name:       building, Kind: "building", District: districtName, City: city.Name, Country: city.Country,
+			Full: strings.Join([]string{building, districtName, city.Name, city.Country}, ", "),
+		}})
+	}
+	sort.Slice(locations, func(i, j int) bool { return locations[i].Address.LocationID < locations[j].Address.LocationID })
+	return locations
+}
+
 func centralServiceLocations(city Region) []LocationRecord {
-	cityKey := strings.TrimPrefix(city.ID, "fr/")
+	cityData, ok := CityByID(city.ID)
+	if !ok {
+		cityData, _ = CityByID("fr/lyon")
+	}
+	cityKey := cityData.ID
+	if cityData.ID == "fr/lyon" {
+		cityKey = "lyon"
+	}
 	services := []struct{ id, name string }{
 		{"police-station", city.Name + " Police Station"},
 		{"meridian-bank", "Meridian Bank"},
@@ -571,14 +758,14 @@ func centralServiceLocations(city Region) []LocationRecord {
 	}
 	locations := make([]LocationRecord, 0, len(services))
 	for _, service := range services {
-		fullAddress := strings.Join([]string{service.name, "Central", city.Name, "France"}, ", ")
+		fullAddress := strings.Join([]string{service.name, "Central", city.Name, cityData.Country}, ", ")
 		locations = append(locations, LocationRecord{Address: Address{
 			LocationID: "service:" + cityKey + "/" + service.id,
 			Name:       service.name,
 			Kind:       "building",
 			District:   "Central",
 			City:       city.Name,
-			Country:    "France",
+			Country:    cityData.Country,
 			Full:       fullAddress,
 		}})
 	}
@@ -623,8 +810,40 @@ func (store *PostgresStore) WorldForCases(ctx context.Context, serverID string) 
 	if err != nil {
 		return World{}, err
 	}
+	cityRows, err := store.db.Query(ctx, `SELECT city_id, generator_version FROM world_city_generators WHERE server_id=$1::uuid ORDER BY city_id`, serverID)
+	if err != nil {
+		return World{}, err
+	}
+	for cityRows.Next() {
+		var cityID string
+		var cityVersion int
+		if err := cityRows.Scan(&cityID, &cityVersion); err != nil {
+			cityRows.Close()
+			return World{}, err
+		}
+		cityWorld, err := GenerateCity(seed, cityVersion, cityID)
+		if err != nil {
+			cityRows.Close()
+			return World{}, err
+		}
+		base.Regions = append(base.Regions, cityWorld.Regions...)
+		base.Entities = append(base.Entities, cityWorld.Entities...)
+		base.NPCs = append(base.NPCs, cityWorld.NPCs...)
+		base.Companies = append(base.Companies, cityWorld.Companies...)
+		base.CompanyLocations = append(base.CompanyLocations, cityWorld.CompanyLocations...)
+		base.EmploymentRelationships = append(base.EmploymentRelationships, cityWorld.EmploymentRelationships...)
+		base.PersonalRelationships = append(base.PersonalRelationships, cityWorld.PersonalRelationships...)
+	}
+	cityRows.Close()
+	if err := cityRows.Err(); err != nil {
+		return World{}, err
+	}
 	known := make(map[string]bool, len(base.NPCs))
-	for _, npc := range base.NPCs {
+	for index := range base.NPCs {
+		npc := &base.NPCs[index]
+		if err := store.applyNPCStatus(ctx, serverID, npc.ID, npc); err != nil {
+			return World{}, err
+		}
 		known[npc.ID] = true
 	}
 	rows, err := store.db.Query(ctx, `SELECT entity_id, generation_key FROM world_entities WHERE server_id=$1::uuid AND entity_type='npc' ORDER BY entity_id`, serverID)
@@ -640,7 +859,7 @@ func (store *PostgresStore) WorldForCases(ctx context.Context, serverID string) 
 		if known[id] {
 			continue
 		}
-		npc, err := GenerateNPC(seed, version, key)
+		npc, err := GenerateNPCFromKey(seed, version, key)
 		if err != nil {
 			rows.Close()
 			return World{}, err
@@ -698,11 +917,167 @@ func (store *PostgresStore) WorldForCases(ctx context.Context, serverID string) 
 	return base, nil
 }
 
+// CityWorldForCases reconstructs one city's case data without rebuilding every
+// city visited by the server or querying each NPC mutation separately.
+func (store *PostgresStore) CityWorldForCases(ctx context.Context, serverID, cityID string) (World, error) {
+	if _, ok := CityByID(cityID); !ok {
+		return World{}, ErrEntityNotFound
+	}
+	seed, worldVersion, err := store.worldSeedAndVersion(ctx, serverID)
+	if err != nil {
+		return World{}, err
+	}
+	cityVersion, err := store.cityGeneratorVersion(ctx, serverID, cityID, worldVersion)
+	if err != nil {
+		return World{}, err
+	}
+	base, err := GenerateCity(seed, cityVersion, cityID)
+	if err != nil {
+		return World{}, err
+	}
+	known := make(map[string]bool, len(base.NPCs))
+	for _, npc := range base.NPCs {
+		known[npc.ID] = true
+	}
+	rows, err := store.db.Query(ctx,
+		`SELECT entity_id, generation_key FROM world_entities
+		 WHERE server_id=$1::uuid AND entity_type='npc' AND region_id LIKE $2 ORDER BY entity_id`,
+		serverID, cityID+"/district/%",
+	)
+	if err != nil {
+		return World{}, err
+	}
+	for rows.Next() {
+		var id, key string
+		if err := rows.Scan(&id, &key); err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		if known[id] {
+			continue
+		}
+		npc, err := GenerateNPCFromKey(seed, worldVersion, key)
+		if err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		if npc.ID != id {
+			rows.Close()
+			return World{}, ErrGeneratedConflict
+		}
+		base.NPCs = append(base.NPCs, npc)
+		known[id] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return World{}, err
+	}
+
+	npcIDs := make([]string, 0, len(base.NPCs))
+	for _, npc := range base.NPCs {
+		npcIDs = append(npcIDs, npc.ID)
+	}
+	rows, err = store.db.Query(ctx,
+		`SELECT DISTINCT ON (entity_id) entity_id, value #>> '{}'
+		 FROM world_mutations WHERE server_id=$1::uuid AND field_key='status'
+		 AND entity_id=ANY($2::text[]) ORDER BY entity_id, mutation_order DESC`, serverID, npcIDs,
+	)
+	if err != nil {
+		return World{}, err
+	}
+	statuses := make(map[string]string)
+	for rows.Next() {
+		var id, status string
+		if err := rows.Scan(&id, &status); err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		statuses[id] = status
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return World{}, err
+	}
+	for index := range base.NPCs {
+		if status, ok := statuses[base.NPCs[index].ID]; ok {
+			if status != "alive" && status != "dead" {
+				return World{}, ErrInvalidMutation
+			}
+			base.NPCs[index].Status = status
+		}
+	}
+
+	employmentIDs := make(map[string]bool, len(base.EmploymentRelationships))
+	for _, relation := range base.EmploymentRelationships {
+		employmentIDs[relation.ID] = true
+	}
+	rows, err = store.db.Query(ctx,
+		`SELECT relationship_id, employee_npc_id, employer_company_id, COALESCE(role,'')
+		 FROM employment_relationships WHERE server_id=$1::uuid AND employee_npc_id=ANY($2::text[])
+		 ORDER BY relationship_id`, serverID, npcIDs,
+	)
+	if err != nil {
+		return World{}, err
+	}
+	for rows.Next() {
+		var relation EmploymentRelationship
+		if err := rows.Scan(&relation.ID, &relation.EmployeeNPCID, &relation.EmployerCompanyID, &relation.Role); err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		if !employmentIDs[relation.ID] {
+			base.EmploymentRelationships = append(base.EmploymentRelationships, relation)
+			employmentIDs[relation.ID] = true
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return World{}, err
+	}
+
+	personalIDs := make(map[string]bool, len(base.PersonalRelationships))
+	for _, relation := range base.PersonalRelationships {
+		personalIDs[relation.ID] = true
+	}
+	rows, err = store.db.Query(ctx,
+		`SELECT relationship_id, person_a_npc_id, person_b_npc_id, relationship_type
+		 FROM personal_relationships WHERE server_id=$1::uuid
+		 AND (person_a_npc_id=ANY($2::text[]) OR person_b_npc_id=ANY($2::text[]))
+		 ORDER BY relationship_id`, serverID, npcIDs,
+	)
+	if err != nil {
+		return World{}, err
+	}
+	for rows.Next() {
+		var relation PersonalRelationship
+		if err := rows.Scan(&relation.ID, &relation.PersonANPCID, &relation.PersonBNPCID, &relation.RelationshipType); err != nil {
+			rows.Close()
+			return World{}, err
+		}
+		if !personalIDs[relation.ID] {
+			base.PersonalRelationships = append(base.PersonalRelationships, relation)
+			personalIDs[relation.ID] = true
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return World{}, err
+	}
+	sort.Slice(base.NPCs, func(i, j int) bool { return base.NPCs[i].ID < base.NPCs[j].ID })
+	return base, nil
+}
+
 // ExpandDistrictSociety adds a deterministic pair to an existing district under a row lock.
 func (store *PostgresStore) ExpandDistrictSociety(ctx context.Context, serverID, districtID string) error {
 	seed, version, err := store.worldSeedAndVersion(ctx, serverID)
 	if err != nil {
 		return err
+	}
+	if city, _, _, ok := cityForDistrict(seed, districtID); ok {
+		version, err = store.cityGeneratorVersion(ctx, serverID, city.ID, version)
+		if err != nil {
+			return err
+		}
 	}
 	tx, err := store.db.Begin(ctx)
 	if err != nil {
@@ -717,7 +1092,7 @@ func (store *PostgresStore) ExpandDistrictSociety(ctx context.Context, serverID,
 	if err := tx.QueryRow(ctx, `SELECT generation_key FROM world_entities WHERE server_id=$1::uuid AND region_id=$2 AND entity_type='company' ORDER BY entity_id LIMIT 1`, serverID, districtID).Scan(&companyKey); err != nil {
 		return err
 	}
-	company, err := GenerateCompany(seed, version, companyKey)
+	company, err := GenerateCompanyFromKey(seed, version, companyKey)
 	if err != nil {
 		return err
 	}
@@ -757,8 +1132,12 @@ func (store *PostgresStore) WorldConfig(ctx context.Context, serverID string) (s
 
 func makeAddress(entity Entity, regions map[string]string) Address {
 	district := regions[entity.RegionID]
-	city := "Lyon"
-	country := "France"
+	cityData, ok := CityForLocation(entity.RegionID)
+	if !ok {
+		cityData, _ = CityByID("fr/lyon")
+	}
+	city := cityData.Name
+	country := cityData.Country
 	full := strings.Trim(strings.Join([]string{entity.Name, district, city, country}, ", "), ", ")
 	return Address{LocationID: entity.ID, Name: entity.Name, Kind: entity.LocationKind, District: district, City: city, Country: country, Full: full}
 }

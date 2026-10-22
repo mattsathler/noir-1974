@@ -26,7 +26,7 @@ var gameTables = []string{
 	"case_evidence", "case_relationships", "cases", "player_locations", "player_characters",
 	"player_sessions", "player_accounts", "world_mutations", "company_locations",
 	"personal_relationships", "employment_relationships", "world_entities", "world_regions",
-	"worlds", "game_servers",
+	"world_city_generators", "case_generation_schedule", "worlds", "game_servers",
 }
 
 const truncateSQL = `TRUNCATE TABLE
@@ -51,6 +51,8 @@ const truncateSQL = `TRUNCATE TABLE
 	employment_relationships,
 	world_entities,
 	world_regions,
+	world_city_generators,
+	case_generation_schedule,
 	worlds,
 	game_servers
 	RESTART IDENTITY CASCADE`

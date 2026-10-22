@@ -31,7 +31,7 @@ const programs = [
   { id: "telephone", label: "TELEPHONE", Icon: Phone, state: "OFFLINE", available: false },
 ];
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, onClose }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, issueDay, onClose }) {
   const [windows, setWindows] = useState(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem("noir:computer:windows") || "null");
@@ -360,7 +360,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 </header>
                 <div className="computer-window__body">
                   {program.id === "case-files"
-                    ? <CaseFiles key={id} onPin={requestPin} />
+                    ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} onPin={requestPin} />
                     : program.id === "whiteboard"
                       ? <Whiteboard key={id} initialBoardId={boardId || preferredBoardId} focusBoard={(boardId) => setPreferredBoardId(boardId)} />
                       : program.id === "email"

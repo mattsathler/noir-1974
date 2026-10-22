@@ -121,6 +121,8 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 
 	parts := strings.Split(generationKey, "/")
 	countrySlug, citySlug, districtSlug := "fr", "lyon", ""
+	cityID := "fr/lyon"
+	citySeed := seed
 	var slotPart string
 	switch version {
 	case GeneratorVersion2:
@@ -129,7 +131,17 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 		}
 		districtSlug, slotPart = parts[4], parts[6]
 	case GeneratorVersion3, GeneratorVersion4, GeneratorVersion5:
-		if len(parts) != 8 || parts[0] != "fr" || parts[1] != "lyon" || parts[2] != "people" || parts[4] != "district" || parts[6] != "person" || parts[3] != seedFingerprint(seed, version) {
+		if len(parts) != 8 || parts[2] != "people" || parts[4] != "district" || parts[6] != "person" {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		countrySlug, citySlug = parts[0], parts[1]
+		cityID = countrySlug + "/" + citySlug
+		city, ok := CityByID(cityID)
+		if !ok {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		citySeed = CitySeed(seed, city.ID)
+		if parts[3] != seedFingerprint(citySeed, version) {
 			return NPC{}, ErrInvalidGenerationKey
 		}
 		districtSlug, slotPart = parts[5], parts[7]
@@ -141,7 +153,8 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 		return NPC{}, ErrInvalidGenerationKey
 	}
 
-	districts := selectedDistricts(seed, version)
+	city, _ := CityByID(cityID)
+	districts := districtsForCity(citySeed, version, city)
 	districtIndex := -1
 	for index, district := range districts {
 		if district.slug == districtSlug {
@@ -160,17 +173,45 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 	if slot > 8 {
 		nameIndex = len(districts)*8 + (slot-9)*len(districts) + districtIndex
 	}
-	cacheKey := fmt.Sprintf("%d:%s:%s", version, seed, personNameScope(version, countrySlug, citySlug))
+	cacheKey := fmt.Sprintf("%d:%s:%s", version, citySeed, personNameScope(version, countrySlug, citySlug))
 	namesValue, ok := personNameOrderCache.Load(cacheKey)
 	if !ok {
-		namesValue, _ = personNameOrderCache.LoadOrStore(cacheKey, shuffledCopy(personNames, newStream(seed, version, personNameScope(version, countrySlug, citySlug))))
+		namesValue, _ = personNameOrderCache.LoadOrStore(cacheKey, shuffledCopy(personNames, newStream(citySeed, version, personNameScope(version, countrySlug, citySlug))))
 	}
 	names := namesValue.([]personName)
-	if nameIndex >= len(names) {
+	if len(names) == 0 {
 		return NPC{}, ErrInvalidGenerationKey
 	}
-	regionID := "fr/lyon/district/" + districtSlug
-	return npcFor(seed, version, regionID, generationKey, names[nameIndex]), nil
+	nameVariant := nameIndex / len(names)
+	name := names[nameIndex%len(names)]
+	if nameVariant > 0 {
+		middleNames := []string{"Arthur", "Beatrice", "Claude", "Diane", "Edwin", "Flora", "Gideon", "Helen", "Isaac", "June", "Laurent", "Margot", "Nolan", "Odette", "Pierre", "Ruth"}
+		middle := middleNames[(nameVariant-1)%len(middleNames)]
+		if nameVariant > len(middleNames) {
+			middle = fmt.Sprintf("%s %d", middle, (nameVariant-1)/len(middleNames)+1)
+		}
+		name.first += " " + middle
+	}
+	regionID := cityID + "/district/" + districtSlug
+	return npcFor(citySeed, version, regionID, generationKey, name), nil
+}
+
+// GenerateNPCFromKey chooses the city generator version embedded in a modern
+// city-scoped key, falling back to the server's legacy version for Lyon.
+func GenerateNPCFromKey(seed string, fallbackVersion int, generationKey string) (NPC, error) {
+	parts := strings.Split(generationKey, "/")
+	if len(parts) == 8 {
+		cityID := parts[0] + "/" + parts[1]
+		if city, ok := CityByID(cityID); ok && city.ID != "fr/lyon" {
+			citySeed := CitySeed(seed, city.ID)
+			for version := GeneratorVersion5; version >= GeneratorVersion3; version-- {
+				if parts[3] == seedFingerprint(citySeed, version) {
+					return GenerateNPC(seed, version, generationKey)
+				}
+			}
+		}
+	}
+	return GenerateNPC(seed, fallbackVersion, generationKey)
 }
 
 // GenerateNPCPair creates two deterministic new residents in an existing
@@ -179,14 +220,14 @@ func GenerateNPCPair(seed string, version int, districtID string, firstSlot int,
 	if firstSlot < 9 || company.ID == "" || company.RegionID != districtID {
 		return nil, nil, PersonalRelationship{}, ErrInvalidGenerationKey
 	}
-	districtSlug := strings.TrimPrefix(districtID, "fr/lyon/district/")
-	if districtSlug == districtID || strings.Contains(districtSlug, "/") {
+	city, citySeed, districtSlug, ok := cityForDistrict(seed, districtID)
+	if !ok || strings.Contains(districtSlug, "/") {
 		return nil, nil, PersonalRelationship{}, ErrInvalidGenerationKey
 	}
 	npcs := make([]NPC, 0, 2)
 	employment := make([]EmploymentRelationship, 0, 2)
 	for slot := firstSlot; slot < firstSlot+2; slot++ {
-		key := npcGenerationKey(seed, version, districtSlug, slot)
+		key := npcGenerationKeyForCity(citySeed, version, city, districtSlug, slot)
 		npc, err := GenerateNPC(seed, version, key)
 		if err != nil {
 			return nil, nil, PersonalRelationship{}, err
@@ -220,6 +261,36 @@ func npcGenerationKey(seed string, version int, districtSlug string, slot int) s
 	return fmt.Sprintf("fr/lyon/people/%s/district/%s/person/%02d", fingerprint, districtSlug, slot)
 }
 
+func npcGenerationKeyForCity(seed string, version int, city WorldCity, districtSlug string, slot int) string {
+	fingerprint := seedFingerprint(seed, version)
+	if version == GeneratorVersion2 {
+		return fmt.Sprintf("lyon/people/%s/district/%s/person/%02d", fingerprint, districtSlug, slot)
+	}
+	return fmt.Sprintf("%s/people/%s/district/%s/person/%02d", city.ID, fingerprint, districtSlug, slot)
+}
+
+func cityForDistrict(seed, districtID string) (WorldCity, string, string, bool) {
+	for _, city := range Cities() {
+		prefix := city.ID + "/district/"
+		if strings.HasPrefix(districtID, prefix) {
+			return city, CitySeed(seed, city.ID), strings.TrimPrefix(districtID, prefix), true
+		}
+	}
+	return WorldCity{}, "", "", false
+}
+
+func districtsForCity(seed string, version int, city WorldCity) []namedPlace {
+	if city.ID == "fr/lyon" {
+		return selectedDistricts(seed, version)
+	}
+	cityDistricts := CityDistricts(seed, city)
+	result := make([]namedPlace, 0, len(cityDistricts))
+	for _, district := range cityDistricts {
+		result = append(result, namedPlace{slug: strings.TrimPrefix(district.ID, city.ID+"/district/"), name: district.Name})
+	}
+	return result
+}
+
 // GenerateCompany reconstructs one company directly from its stable generation key.
 func GenerateCompany(seed string, version int, generationKey string) (Company, error) {
 	if strings.TrimSpace(seed) == "" {
@@ -238,14 +309,28 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 		}
 		districtSlug = parts[4]
 	case GeneratorVersion3, GeneratorVersion4, GeneratorVersion5:
-		if len(parts) != 7 || parts[0] != "fr" || parts[1] != "lyon" || parts[2] != "companies" || parts[3] != seedFingerprint(seed, version) || parts[4] != "district" || parts[6] != "company" {
+		if len(parts) != 7 || parts[2] != "companies" || parts[4] != "district" || parts[6] != "company" {
+			return Company{}, ErrInvalidGenerationKey
+		}
+		cityID := parts[0] + "/" + parts[1]
+		city, ok := CityByID(cityID)
+		if !ok {
+			return Company{}, ErrInvalidGenerationKey
+		}
+		seed = CitySeed(seed, city.ID)
+		if parts[3] != seedFingerprint(seed, version) {
 			return Company{}, ErrInvalidGenerationKey
 		}
 		districtSlug = parts[5]
 	default:
 		return Company{}, ErrUnsupportedGeneratorVersion
 	}
-	districts := selectedDistricts(seed, version)
+	cityID := "fr/lyon"
+	if version >= GeneratorVersion3 {
+		cityID = parts[0] + "/" + parts[1]
+	}
+	city, _ := CityByID(cityID)
+	districts := districtsForCity(seed, version, city)
 	districtIndex := -1
 	for index, district := range districts {
 		if district.slug == districtSlug {
@@ -263,9 +348,26 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 	return Company{
 		ID:            "company:" + generationKey,
 		GenerationKey: generationKey,
-		RegionID:      "fr/lyon/district/" + districtSlug,
+		RegionID:      city.ID + "/district/" + districtSlug,
 		Name:          names[districtIndex],
 	}, nil
+}
+
+// GenerateCompanyFromKey mirrors GenerateNPCFromKey for a city-scoped company.
+func GenerateCompanyFromKey(seed string, fallbackVersion int, generationKey string) (Company, error) {
+	parts := strings.Split(generationKey, "/")
+	if len(parts) == 7 {
+		cityID := parts[0] + "/" + parts[1]
+		if city, ok := CityByID(cityID); ok && city.ID != "fr/lyon" {
+			citySeed := CitySeed(seed, city.ID)
+			for version := GeneratorVersion5; version >= GeneratorVersion3; version-- {
+				if parts[3] == seedFingerprint(citySeed, version) {
+					return GenerateCompany(seed, version, generationKey)
+				}
+			}
+		}
+	}
+	return GenerateCompany(seed, fallbackVersion, generationKey)
 }
 
 func generateSociety(seed string, version int) (World, error) {
@@ -614,7 +716,7 @@ func personNamesForVersion(version int, countrySlug, citySlug string) ([]personN
 	}
 	catalog, ok := names.ForCity(countrySlug, citySlug)
 	if !ok || len(catalog.GivenNames) == 0 || len(catalog.FamilyNames) == 0 {
-		return nil, ErrInvalidGenerationKey
+		return allPersonNames(), nil
 	}
 	result := make([]personName, 0, len(catalog.GivenNames)*len(catalog.FamilyNames))
 	for _, first := range catalog.GivenNames {

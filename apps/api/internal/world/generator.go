@@ -103,6 +103,183 @@ func Generate(seed string, version int) (World, error) {
 	}
 }
 
+// GenerateCity reconstructs one city inside a server's shared world. Lyon's
+// existing identities remain untouched; additional cities receive their own
+// deterministic seed scope and canonical IDs.
+func GenerateCity(seed string, version int, cityID string) (World, error) {
+	city, ok := CityByID(cityID)
+	if !ok || strings.TrimSpace(seed) == "" {
+		return World{}, ErrEntityNotFound
+	}
+	if cityID == "fr/lyon" {
+		return Generate(seed, version)
+	}
+	if version < GeneratorVersion5 {
+		return World{}, fmt.Errorf("city expansion requires generator version %d or later", GeneratorVersion5)
+	}
+	citySeed := CitySeed(seed, cityID)
+	base, err := Generate(citySeed, version)
+	if err != nil {
+		return World{}, err
+	}
+	generated, err := generateCityGeography(seed, version, cityID)
+	if err != nil {
+		return World{}, err
+	}
+	oldDistricts := selectedDistricts(citySeed, version)
+	newDistricts := CityDistricts(citySeed, city)
+	if len(oldDistricts) != len(newDistricts) {
+		return World{}, errors.New("city district catalog does not match generated world")
+	}
+	districtIDs := make(map[string]CityDistrict, len(oldDistricts))
+	for index, oldDistrict := range oldDistricts {
+		districtIDs["fr/lyon/district/"+oldDistrict.slug] = newDistricts[index]
+	}
+
+	for _, company := range base.Companies {
+		targetDistrict := districtIDs[company.RegionID]
+		newKey := cityGenerationKey(company.GenerationKey, city, targetDistrict)
+		company, err = GenerateCompany(seed, version, newKey)
+		if err != nil {
+			return World{}, err
+		}
+		generated.Companies = append(generated.Companies, company)
+		generated.Entities = append(generated.Entities, Entity{
+			ID: company.ID, EntityType: "company", RegionID: company.RegionID,
+			GenerationKey: company.GenerationKey, Name: company.Name,
+		})
+	}
+	for _, npc := range base.NPCs {
+		targetDistrict := districtIDs[npc.RegionID]
+		newKey := cityGenerationKey(npc.GenerationKey, city, targetDistrict)
+		npc, err = GenerateNPC(seed, version, newKey)
+		if err != nil {
+			return World{}, err
+		}
+		generated.NPCs = append(generated.NPCs, npc)
+		generated.Entities = append(generated.Entities, Entity{
+			ID: npc.ID, EntityType: "npc", RegionID: npc.RegionID,
+			GenerationKey: newKey, Name: npc.Name,
+		})
+	}
+	for _, relation := range base.EmploymentRelationships {
+		relation.EmployeeNPCID = remapCityEntityID(relation.EmployeeNPCID, "npc:fr/lyon/", "npc:"+city.ID+"/", city, districtIDs)
+		relation.EmployerCompanyID = remapCityEntityID(relation.EmployerCompanyID, "company:fr/lyon/", "company:"+city.ID+"/", city, districtIDs)
+		relation.ID = "employment:" + relation.EmployeeNPCID + ":" + relation.EmployerCompanyID
+		generated.EmploymentRelationships = append(generated.EmploymentRelationships, relation)
+	}
+	for _, relation := range base.PersonalRelationships {
+		relation.PersonANPCID = remapCityEntityID(relation.PersonANPCID, "npc:fr/lyon/", "npc:"+city.ID+"/", city, districtIDs)
+		relation.PersonBNPCID = remapCityEntityID(relation.PersonBNPCID, "npc:fr/lyon/", "npc:"+city.ID+"/", city, districtIDs)
+		if relation.PersonBNPCID < relation.PersonANPCID {
+			relation.PersonANPCID, relation.PersonBNPCID = relation.PersonBNPCID, relation.PersonANPCID
+		}
+		relation.ID = "personal:" + relation.RelationshipType + ":" + relation.PersonANPCID + ":" + relation.PersonBNPCID
+		generated.PersonalRelationships = append(generated.PersonalRelationships, relation)
+	}
+	for _, company := range generated.Companies {
+		for _, entity := range generated.Entities {
+			if entity.EntityType == "location" && entity.RegionID == company.RegionID && entity.LocationKind == "building" {
+				generated.CompanyLocations = append(generated.CompanyLocations, CompanyLocation{
+					ID:        "company-location:" + company.ID + ":" + entity.ID,
+					CompanyID: company.ID, LocationID: entity.ID, LocationRole: "headquarters",
+				})
+				break
+			}
+		}
+	}
+	sortWorld(&generated)
+	return generated, nil
+}
+
+// generateCityGeography builds only regions and addresses. Navigation endpoints
+// use it without paying the cost of generating every NPC and relationship.
+func generateCityGeography(seed string, version int, cityID string) (World, error) {
+	city, ok := CityByID(cityID)
+	if !ok || strings.TrimSpace(seed) == "" {
+		return World{}, ErrEntityNotFound
+	}
+	if cityID == "fr/lyon" {
+		generated := generateCity(seed, version)
+		generated.GeneratorVersion = version
+		return generated, nil
+	}
+	if version < GeneratorVersion5 {
+		return World{}, fmt.Errorf("city expansion requires generator version %d or later", GeneratorVersion5)
+	}
+	citySeed := CitySeed(seed, cityID)
+	generated := World{GeneratorVersion: version, Regions: []Region{{ID: city.ID, Kind: "city", Name: city.Name}}}
+	for _, district := range CityDistricts(citySeed, city) {
+		generated.Regions = append(generated.Regions, Region{ID: district.ID, ParentID: city.ID, Kind: "district", Name: district.Name})
+		for _, location := range generatedCityLocations(citySeed, city, district.ID, district.Name) {
+			address := location.Address
+			key := strings.TrimPrefix(address.LocationID, "location:")
+			generated.Entities = append(generated.Entities, Entity{
+				ID: address.LocationID, EntityType: "location", RegionID: district.ID,
+				GenerationKey: key, LocationKind: address.Kind, Name: address.Name,
+			})
+		}
+	}
+	sortWorld(&generated)
+	return generated, nil
+}
+
+func remapCityEntityID(entityID, oldPrefix, newPrefix string, city WorldCity, districts map[string]CityDistrict) string {
+	if !strings.HasPrefix(entityID, oldPrefix) {
+		return entityID
+	}
+	remapped := strings.Replace(entityID, oldPrefix, newPrefix, 1)
+	marker := city.ID + "/district/"
+	cityRelative := strings.TrimPrefix(remapped, strings.TrimSuffix(newPrefix, "/")+"/")
+	if !strings.HasPrefix(cityRelative, "people/") && !strings.HasPrefix(cityRelative, "companies/") {
+		return remapped
+	}
+	parts := strings.Split(cityRelative, "/")
+	for index, part := range parts {
+		if part == "district" && index+1 < len(parts) {
+			oldDistrictID := "fr/lyon/district/" + parts[index+1]
+			if district, ok := districts[oldDistrictID]; ok {
+				parts[index+1] = strings.TrimPrefix(district.ID, marker)
+			}
+			break
+		}
+	}
+	return strings.TrimSuffix(newPrefix, "/") + "/" + strings.Join(parts, "/")
+}
+
+func sortWorld(generated *World) {
+	sort.Slice(generated.Regions, func(i, j int) bool { return generated.Regions[i].ID < generated.Regions[j].ID })
+	sort.Slice(generated.Entities, func(i, j int) bool { return generated.Entities[i].ID < generated.Entities[j].ID })
+	sort.Slice(generated.NPCs, func(i, j int) bool { return generated.NPCs[i].ID < generated.NPCs[j].ID })
+	sort.Slice(generated.Companies, func(i, j int) bool { return generated.Companies[i].ID < generated.Companies[j].ID })
+	sort.Slice(generated.EmploymentRelationships, func(i, j int) bool {
+		return generated.EmploymentRelationships[i].ID < generated.EmploymentRelationships[j].ID
+	})
+	sort.Slice(generated.PersonalRelationships, func(i, j int) bool {
+		return generated.PersonalRelationships[i].ID < generated.PersonalRelationships[j].ID
+	})
+	sort.Slice(generated.CompanyLocations, func(i, j int) bool {
+		return generated.CompanyLocations[i].ID < generated.CompanyLocations[j].ID
+	})
+}
+
+func cityGenerationKey(legacyKey string, city WorldCity, district CityDistrict) string {
+	parts := strings.Split(legacyKey, "/")
+	for index := range parts {
+		if parts[index] == "lyon" && index == 1 {
+			parts[0], parts[1] = strings.SplitN(city.ID, "/", 2)[0], strings.SplitN(city.ID, "/", 2)[1]
+			break
+		}
+	}
+	for index := range parts {
+		if parts[index] == "district" && index+1 < len(parts) {
+			parts[index+1] = strings.TrimPrefix(district.ID, city.ID+"/district/")
+			break
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
 // SupportsSocietyVersion reports whether a world version includes generated NPCs and relationships.
 func SupportsSocietyVersion(version int) bool {
 	return version == GeneratorVersion2 || version == GeneratorVersion3 || version == GeneratorVersion4 || version == GeneratorVersion5

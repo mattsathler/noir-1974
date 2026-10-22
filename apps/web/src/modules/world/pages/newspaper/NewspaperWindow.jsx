@@ -1,28 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getNewspaperIssue } from "../../api.js";
 
-export default function NewspaperWindow({ onClose }) {
+export default function NewspaperWindow({ cityId, issueDay, onClose }) {
   const [issue, setIssue] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
 
-  async function loadIssue() {
+  const loadIssue = useCallback(async () => {
     setLoading(true);
     setError("");
+    setIssue(null);
     try {
-      setIssue(await getNewspaperIssue());
+      setIssue(await getNewspaperIssue(cityId, issueDay));
     } catch (requestError) {
       setError(requestError.message || "The newspaper could not be retrieved.");
     } finally {
       setLoading(false);
     }
-  }
+  }, [cityId, issueDay]);
 
   useEffect(() => {
     loadIssue();
-  }, []);
+  }, [loadIssue]);
 
   useEffect(() => {
     const previousFocus = document.activeElement;
@@ -54,7 +55,7 @@ export default function NewspaperWindow({ onClose }) {
     <div className="modal-overlay newspaper-overlay" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Daily newspaper" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
       <article className="newspaper-sheet">
         <header className="newspaper-utility">
-          <span>LYON CITY EDITION</span>
+          <span>{issue?.city ? `${issue.city.toUpperCase()} CITY EDITION` : "CITY EDITION"}</span>
           <span>PRICE: 20 CREDITS</span>
           <button ref={closeRef} type="button" className="newspaper-close" aria-label="Close newspaper" onClick={onClose}>×</button>
         </header>
@@ -77,7 +78,7 @@ export default function NewspaperWindow({ onClose }) {
             </header>
 
             <section className="newspaper-lead" aria-labelledby="newspaper-lead-title">
-              <p className="newspaper-section-label">{issue.lead.section} · LATEST CASE</p>
+              <p className="newspaper-section-label">{issue.lead.section} · LATEST NEWS</p>
               <h2 id="newspaper-lead-title">{issue.lead.headline}</h2>
               <p className="newspaper-lead__summary">{issue.lead.summary}</p>
             </section>
@@ -92,7 +93,7 @@ export default function NewspaperWindow({ onClose }) {
                 </article>
               ))}
             </section>
-            <footer className="newspaper-footer">PRINTED IN LYON · ALL THE NEWS THAT FITS THE PAGE</footer>
+            <footer className="newspaper-footer">PRINTED IN {issue.city.toUpperCase()} · ALL THE NEWS THAT FITS THE PAGE</footer>
           </>
         )}
       </article>

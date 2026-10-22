@@ -14,6 +14,7 @@ A identidade conceitual é `(server_id, entity_id)`. Um `entity_id` é estável 
 | --- | --- |
 | Servidor (`game_server`) | Escopo de isolamento e raiz do mundo compartilhado. |
 | Mundo (`world`) | Uma seed e uma `generator_version` por servidor. |
+| Gerador da cidade (`world_city_generators`) | Versão determinística de conteúdo registrada por cidade materializada no servidor. |
 | Região (`world_region`) | Recorte lógico. Países, capitais e principais cidades vêm de um catálogo fixo comum a todos os servidores; cada cidade materializada recebe 20 bairros procedurais para distribuir detetives e ocorrências. |
 | Entidade do mundo (`world_entity`) | Âncora de identidade de um NPC, empresa ou local materializado. Guarda tipo, região e chave estável do gerador; atributos reconstruíveis não são copiados por padrão. |
 | NPC | Pessoa gerada, com identidade estável e relações consultáveis. Atributos base podem ser reconstruídos da seed. |

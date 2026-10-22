@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import NeighborhoodExplorer from "./NeighborhoodExplorer.jsx";
-import { getGateDestinations } from "../api.js";
+import { getNeighborhoodDestinations } from "../api.js";
 
-vi.mock("../api.js", () => ({ getGateDestinations: vi.fn() }));
+vi.mock("../api.js", () => ({ getNeighborhoodDestinations: vi.fn() }));
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
@@ -25,7 +25,7 @@ const bellecour = {
 describe("NeighborhoodExplorer", () => {
   it("shows buildings only in the current district and allows visiting its service points", async () => {
     const onVisit = vi.fn().mockResolvedValue(undefined);
-    getGateDestinations.mockResolvedValue([central, bellecour]);
+    getNeighborhoodDestinations.mockResolvedValue([central, bellecour]);
     render(<NeighborhoodExplorer
       world={{ districtId: central.id, district: "Central", locationId: central.id }}
       onVisit={onVisit}
@@ -34,7 +34,7 @@ describe("NeighborhoodExplorer", () => {
     />);
 
     fireEvent.click(await screen.findByRole("button", { name: /Bellecour/ }));
-    expect(screen.getByText("Building records are available after arriving in this district.")).toBeInTheDocument();
+    expect(screen.getByText("Building records are available after opening this neighborhood.")).toBeInTheDocument();
     expect(screen.queryByText("Bellecour Office")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Central/ }));
@@ -45,7 +45,7 @@ describe("NeighborhoodExplorer", () => {
 
   it("returns a player from a service point to the district without changing districts", async () => {
     const onVisit = vi.fn().mockResolvedValue(undefined);
-    getGateDestinations.mockResolvedValue([central, bellecour]);
+    getNeighborhoodDestinations.mockResolvedValue([central, bellecour]);
     render(<NeighborhoodExplorer
       world={{ districtId: central.id, district: "Central", locationId: "service:lyon/meridian-bank", placeName: "Meridian Bank" }}
       onVisit={onVisit}

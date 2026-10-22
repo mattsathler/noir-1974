@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS cases (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
     case_id text NOT NULL CHECK (case_id <> ''),
     case_seed text NOT NULL CHECK (case_seed <> ''),
+    city_id text NOT NULL DEFAULT 'fr/lyon' CHECK (city_id <> ''),
     generator_version integer NOT NULL CHECK (generator_version > 0),
     case_type text NOT NULL CHECK (case_type = 'homicide'),
     archetype_id text NOT NULL DEFAULT 'workplace_conflict' CHECK (archetype_id <> ''),
@@ -24,6 +25,17 @@ CREATE INDEX IF NOT EXISTS cases_by_server_created_idx
 
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS archetype_id text NOT NULL DEFAULT 'workplace_conflict';
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS motive text NOT NULL DEFAULT 'Legacy workplace homicide.';
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS city_id text NOT NULL DEFAULT 'fr/lyon';
+UPDATE cases c
+SET city_id = substring(r.region_id from '^([^/]+/[^/]+)')
+FROM world_entities e
+JOIN world_regions r ON r.server_id = e.server_id AND r.region_id = e.region_id
+WHERE c.server_id = e.server_id
+  AND c.location_entity_id = e.entity_id
+  AND c.city_id = 'fr/lyon'
+  AND r.region_id LIKE '%/district/%';
+CREATE INDEX IF NOT EXISTS cases_by_server_city_created_idx
+    ON cases(server_id, city_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS case_relationships (
     server_id uuid NOT NULL,

@@ -16,7 +16,7 @@ Isso significa que o mundo não depende de sorteio novo a cada acesso: os jogado
 4. Cada pessoa trabalha em uma empresa; alguns pares também têm uma relação pessoal. Cada empresa tem um edifício como sede.
 5. Na versão 3 e posteriores, nomes de pessoas vêm de catálogos específicos da cidade e são combinados deterministicamente; a versão 4 acrescenta IDs de camadas visuais e a versão 5 calibra esses IDs por idade e gera 20 bairros em cada cidade.
 
-Na implementação atual, o catálogo de cidades ainda contém apenas Lyon. A versão 5 gera 20 bairros a partir do banco de palavras de Lyon, além de ruas, edifícios, NPCs e empresas. Lyon tem um catálogo versionado de 300 prenomes e 300 sobrenomes. O M11 adiciona o catálogo inicial de 25 países e 100 cidades e viabiliza viagens do GATE entre elas; cada cidade terá dados próprios para gerar seus bairros e conteúdo local.
+O catálogo fixo do M11 contém 25 países e 100 cidades. Lyon preserva os bairros, IDs, relações e nomes já existentes. Ao viajar para outra cidade, a API deriva uma seed local a partir da seed compartilhada do servidor e do identificador canônico da cidade, materializa 20 bairros, locais, empresas e NPCs e registra a versão usada por cidade. Cada país possui listas próprias de prenomes e sobrenomes; combinações determinísticas adicionais mantêm a geração em crescimento sem esgotar a população após a primeira leva.
 
 ## O que fica salvo e o que é reconstruído
 

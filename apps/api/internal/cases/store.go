@@ -81,6 +81,7 @@ type Whiteboard struct {
 // PublicCase contains only facts safe for the newspaper headline.
 type PublicCase struct {
 	ID         string    `json:"id"`
+	CityID     string    `json:"cityId"`
 	CaseType   string    `json:"caseType"`
 	VictimID   string    `json:"victimId"`
 	LocationID string    `json:"locationId"`
@@ -112,14 +113,14 @@ func (store *PostgresStore) DueGeneration(ctx context.Context, serverID string) 
 	return slot, due, err
 }
 
-func (store *PostgresStore) CountOpenCases(ctx context.Context, serverID string) (int, error) {
+func (store *PostgresStore) CountOpenCases(ctx context.Context, serverID, cityID string) (int, error) {
 	var count int
-	err := store.db.QueryRow(ctx, `SELECT count(*) FROM case_states WHERE server_id=$1::uuid AND status='open'`, serverID).Scan(&count)
+	err := store.db.QueryRow(ctx, `SELECT count(*) FROM case_states s JOIN cases c USING(server_id,case_id) WHERE s.server_id=$1::uuid AND c.city_id=$2 AND s.status='open'`, serverID, cityID).Scan(&count)
 	return count, err
 }
 
-func (store *PostgresStore) UsedNPCIDs(ctx context.Context, serverID, currentSeed string) (map[string]struct{}, error) {
-	rows, err := store.db.Query(ctx, `SELECT victim_entity_id FROM cases WHERE server_id=$1::uuid AND case_seed<>$2 UNION SELECT killer_entity_id FROM cases WHERE server_id=$1::uuid AND case_seed<>$2`, serverID, currentSeed)
+func (store *PostgresStore) UsedNPCIDs(ctx context.Context, serverID, cityID, currentSeed string) (map[string]struct{}, error) {
+	rows, err := store.db.Query(ctx, `SELECT victim_entity_id FROM cases WHERE server_id=$1::uuid AND city_id=$2 AND case_seed<>$3 UNION SELECT killer_entity_id FROM cases WHERE server_id=$1::uuid AND city_id=$2 AND case_seed<>$3`, serverID, cityID, currentSeed)
 	if err != nil {
 		return nil, err
 	}
@@ -178,14 +179,14 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 	}
 	defer func() { _ = tx.Rollback(context.Background()) }()
 
-	var existingSeed, existingType, existingArchetype, existingMotive, existingVictim, existingKiller, existingLocation string
+	var existingSeed, existingCityID, existingType, existingArchetype, existingMotive, existingVictim, existingKiller, existingLocation string
 	var existingVersion int
 	err = tx.QueryRow(ctx,
-		`SELECT case_seed, generator_version, case_type, archetype_id, motive, victim_entity_id, killer_entity_id, location_entity_id
+		`SELECT case_seed, city_id, generator_version, case_type, archetype_id, motive, victim_entity_id, killer_entity_id, location_entity_id
 		 FROM cases WHERE server_id = $1::uuid AND case_id = $2 FOR UPDATE`, serverID, definition.ID,
-	).Scan(&existingSeed, &existingVersion, &existingType, &existingArchetype, &existingMotive, &existingVictim, &existingKiller, &existingLocation)
+	).Scan(&existingSeed, &existingCityID, &existingVersion, &existingType, &existingArchetype, &existingMotive, &existingVictim, &existingKiller, &existingLocation)
 	if err == nil {
-		if existingSeed != definition.Seed || existingVersion != definition.GeneratorVersion || existingType != definition.CaseType || existingArchetype != definition.ArchetypeID || existingMotive != definition.Motive || existingVictim != definition.VictimID || existingKiller != definition.KillerID || existingLocation != definition.LocationID {
+		if existingSeed != definition.Seed || existingCityID != definition.CityID || existingVersion != definition.GeneratorVersion || existingType != definition.CaseType || existingArchetype != definition.ArchetypeID || existingMotive != definition.Motive || existingVictim != definition.VictimID || existingKiller != definition.KillerID || existingLocation != definition.LocationID {
 			return ErrPersistedConflict
 		}
 		if err := persistCaseEmails(ctx, tx, serverID, definition); err != nil {
@@ -239,10 +240,10 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 	}
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO cases (server_id, case_id, case_seed, generator_version, case_type, archetype_id, motive,
+		`INSERT INTO cases (server_id, case_id, case_seed, city_id, generator_version, case_type, archetype_id, motive,
 		 victim_entity_id, killer_entity_id, location_entity_id)
-		 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		serverID, definition.ID, definition.Seed, definition.GeneratorVersion, definition.CaseType, definition.ArchetypeID, definition.Motive,
+		 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		serverID, definition.ID, definition.Seed, definition.CityID, definition.GeneratorVersion, definition.CaseType, definition.ArchetypeID, definition.Motive,
 		definition.VictimID, definition.KillerID, definition.LocationID,
 	); err != nil {
 		return fmt.Errorf("persist case definition: %w", err)
@@ -384,13 +385,13 @@ func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID strin
 }
 
 // LatestPublicCase returns the newest case without disclosing its killer.
-func (store *PostgresStore) LatestPublicCase(ctx context.Context, serverID string) (PublicCase, error) {
+func (store *PostgresStore) LatestPublicCase(ctx context.Context, serverID, cityID string) (PublicCase, error) {
 	var result PublicCase
 	err := store.db.QueryRow(ctx,
-		`SELECT c.case_id, c.case_type, c.victim_entity_id, c.location_entity_id, s.status, c.created_at
+		`SELECT c.case_id, c.city_id, c.case_type, c.victim_entity_id, c.location_entity_id, s.status, c.created_at
 		 FROM cases c JOIN case_states s USING (server_id, case_id)
-		 WHERE c.server_id = $1::uuid ORDER BY c.created_at DESC, c.case_id DESC LIMIT 1`, serverID,
-	).Scan(&result.ID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt)
+		 WHERE c.server_id = $1::uuid AND c.city_id = $2 ORDER BY c.created_at DESC, c.case_id DESC LIMIT 1`, serverID, cityID,
+	).Scan(&result.ID, &result.CityID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return PublicCase{}, ErrCaseNotFound
 	}
@@ -398,12 +399,12 @@ func (store *PostgresStore) LatestPublicCase(ctx context.Context, serverID strin
 }
 
 // ListOpenPublicCases returns active cases without exposing their solutions.
-func (store *PostgresStore) ListOpenPublicCases(ctx context.Context, serverID string) ([]PublicCase, error) {
+func (store *PostgresStore) ListOpenPublicCases(ctx context.Context, serverID, cityID string) ([]PublicCase, error) {
 	rows, err := store.db.Query(ctx,
-		`SELECT c.case_id, c.case_type, c.victim_entity_id, c.location_entity_id, s.status, c.created_at
+		`SELECT c.case_id, c.city_id, c.case_type, c.victim_entity_id, c.location_entity_id, s.status, c.created_at
 		 FROM cases c JOIN case_states s USING (server_id, case_id)
-		 WHERE c.server_id = $1::uuid AND s.status = 'open'
-		 ORDER BY c.created_at DESC, c.case_id DESC`, serverID,
+		 WHERE c.server_id = $1::uuid AND c.city_id = $2 AND s.status = 'open'
+		 ORDER BY c.created_at DESC, c.case_id DESC`, serverID, cityID,
 	)
 	if err != nil {
 		return nil, err
@@ -412,7 +413,7 @@ func (store *PostgresStore) ListOpenPublicCases(ctx context.Context, serverID st
 	results := make([]PublicCase, 0)
 	for rows.Next() {
 		var result PublicCase
-		if err := rows.Scan(&result.ID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt); err != nil {
+		if err := rows.Scan(&result.ID, &result.CityID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt); err != nil {
 			return nil, err
 		}
 		results = append(results, result)
@@ -424,10 +425,10 @@ func (store *PostgresStore) ListOpenPublicCases(ctx context.Context, serverID st
 func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID string) (PublicCase, []PublicEvidence, error) {
 	var result PublicCase
 	err := store.db.QueryRow(ctx,
-		`SELECT c.case_id, c.case_type, c.victim_entity_id, c.location_entity_id, s.status, c.created_at
+		`SELECT c.case_id, c.city_id, c.case_type, c.victim_entity_id, c.location_entity_id, s.status, c.created_at
 		 FROM cases c JOIN case_states s USING (server_id, case_id)
 		 WHERE c.server_id = $1::uuid AND c.case_id = $2`, serverID, caseID,
-	).Scan(&result.ID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt)
+	).Scan(&result.ID, &result.CityID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return PublicCase{}, nil, ErrCaseNotFound
 	}

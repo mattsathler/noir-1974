@@ -40,6 +40,15 @@ type locationDirectory struct {
 	queriedDistrict string
 }
 
+type failingCityMaterializer struct {
+	fakeDirectory
+	err error
+}
+
+func (reader failingCityMaterializer) MaterializeCity(context.Context, string, string) error {
+	return reader.err
+}
+
 func (directory *locationDirectory) SearchLocations(_ context.Context, _, districtID, _ string) ([]world.LocationRecord, error) {
 	directory.queriedDistrict = districtID
 	return nil, nil
@@ -82,7 +91,7 @@ func (reader *fakeRecordReader) NPCRecords(_ context.Context, _, npcID string, f
 
 type fakeNews struct{}
 
-func (fakeNews) Issue(context.Context, string, string, string, time.Time) (newspaper.Issue, error) {
+func (fakeNews) Issue(context.Context, string, string, string, string, time.Time) (newspaper.Issue, error) {
 	return newspaper.Issue{}, nil
 }
 
@@ -254,6 +263,121 @@ func TestTravelAndVisitPersistValidatedPlayerLocation(t *testing.T) {
 	}
 	if worldResponseRecorder.Code != http.StatusOK || state.DistrictID != "fr/lyon/district/central" || state.District != "Central" || state.LocationID != "service:lyon/meridian-bank" || state.PlaceName != "Meridian Bank" {
 		t.Fatalf("world response lost current place or district: status=%d state=%+v", worldResponseRecorder.Code, state)
+	}
+}
+
+func TestGateCityCatalogAndInternationalTravel(t *testing.T) {
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid"}
+	handler := NewHandlerWithWorld(repository, false, fakeDirectory{}, "server-1")
+	request := func(method, path, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
+		return recorder
+	}
+
+	catalog := request(http.MethodGet, "/api/world/gate/destinations", "")
+	if catalog.Code != http.StatusOK {
+		t.Fatalf("catalog status=%d body=%s", catalog.Code, catalog.Body.String())
+	}
+	var response struct {
+		Destinations []world.WorldCity `json:"destinations"`
+	}
+	if err := json.Unmarshal(catalog.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Destinations) != 100 {
+		t.Fatalf("GATE returned %d city destinations, want 100", len(response.Destinations))
+	}
+	for _, destination := range response.Destinations {
+		if strings.Contains(destination.ID, "district") || strings.Contains(destination.ID, "building") {
+			t.Fatalf("GATE city catalog exposed a local destination: %+v", destination)
+		}
+	}
+
+	if got := request(http.MethodPost, "/api/world/gate/travel", `{"cityId":"unknown/city"}`); got.Code != http.StatusBadRequest {
+		t.Fatalf("unknown city status=%d body=%s", got.Code, got.Body.String())
+	}
+	arrived := request(http.MethodPost, "/api/world/gate/travel", `{"cityId":"jp/tokyo"}`)
+	if arrived.Code != http.StatusOK || repository.locationID != "jp/tokyo/district/central" {
+		t.Fatalf("city travel status=%d location=%q body=%s", arrived.Code, repository.locationID, arrived.Body.String())
+	}
+
+	worldRequest := request(http.MethodGet, "/api/world", "")
+	var state worldResponse
+	if err := json.Unmarshal(worldRequest.Body.Bytes(), &state); err != nil {
+		t.Fatal(err)
+	}
+	if worldRequest.Code != http.StatusOK || state.CityID != "jp/tokyo" || state.City != "Tokyo" || state.Country != "Japan" || state.TimeZone != "Asia/Tokyo" {
+		t.Fatalf("world response did not resolve city location: status=%d state=%+v", worldRequest.Code, state)
+	}
+}
+
+func TestGateTravelMaterializationFailureReturnsDiagnosticEnvelope(t *testing.T) {
+	const session = "valid"
+	materializationErr := errors.New(`persist city employment: ERROR: insert or update on table "employment_relationships" violates foreign key constraint`)
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: session, locationID: "fr/lyon/district/central"}
+	reader := failingCityMaterializer{err: materializationErr}
+	handler := newHandler(repository, false, reader, "server-1", nil, nil, nil, nil, true)
+	request := httptest.NewRequest(http.MethodPost, "/api/world/gate/travel", strings.NewReader(`{"cityId":"us/los-angeles"}`))
+	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	var payload apiErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("error response is not JSON: %v; body=%s", err, response.Body.String())
+	}
+	if response.Code != http.StatusInternalServerError || payload.Code != "GATE_CITY_MATERIALIZATION_FAILED" {
+		t.Fatalf("status/code = %d/%q; body=%s", response.Code, payload.Code, response.Body.String())
+	}
+	if payload.RequestID == "" || response.Header().Get("X-Request-ID") != payload.RequestID {
+		t.Fatalf("request ID missing or inconsistent: payload=%q header=%q", payload.RequestID, response.Header().Get("X-Request-ID"))
+	}
+	if payload.Details != materializationErr.Error() {
+		t.Fatalf("diagnostic details = %q, want %q", payload.Details, materializationErr.Error())
+	}
+	if repository.locationID != "fr/lyon/district/central" {
+		t.Fatalf("failed travel changed player location to %q", repository.locationID)
+	}
+}
+
+func TestGateTravelMaterializationFailureHidesDiagnosticsWhenDisabled(t *testing.T) {
+	const session = "valid"
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: session}
+	reader := failingCityMaterializer{err: errors.New("database constraint details")}
+	handler := newHandler(repository, false, reader, "server-1", nil, nil, nil, nil, false)
+	request := httptest.NewRequest(http.MethodPost, "/api/world/gate/travel", strings.NewReader(`{"cityId":"us/los-angeles"}`))
+	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	var payload apiErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("error response is not JSON: %v; body=%s", err, response.Body.String())
+	}
+	if payload.Details != "" || payload.RequestID == "" || payload.Code != "GATE_CITY_MATERIALIZATION_FAILED" {
+		t.Fatalf("unexpected sanitized error payload: %+v", payload)
+	}
+}
+
+func TestAPIErrorMiddlewareReturnsRequestReferenceForPanic(t *testing.T) {
+	handler := apiErrorMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("simulated handler panic")
+	}))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/test", nil))
+
+	var payload apiErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("panic response is not JSON: %v; body=%s", err, response.Body.String())
+	}
+	if response.Code != http.StatusInternalServerError || payload.Code != "INTERNAL_SERVER_ERROR" || payload.RequestID == "" {
+		t.Fatalf("unexpected panic response: status=%d payload=%+v", response.Code, payload)
+	}
+	if response.Header().Get("X-Request-ID") != payload.RequestID || strings.Contains(response.Body.String(), "simulated handler panic") {
+		t.Fatalf("panic response has no matching reference or leaked internals: headers=%v body=%s", response.Header(), response.Body.String())
 	}
 }
 

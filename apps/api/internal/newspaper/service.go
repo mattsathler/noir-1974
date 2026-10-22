@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"noir-1974/apps/api/internal/cases"
@@ -13,16 +15,25 @@ import (
 )
 
 type worldReader interface {
-	GeneratedWorld(context.Context, string) (world.World, error)
+	CityWorldForCases(context.Context, string, string) (world.World, error)
 }
 
 type caseReader interface {
-	LatestPublicCase(context.Context, string) (cases.PublicCase, error)
+	LatestPublicCase(context.Context, string, string) (cases.PublicCase, error)
 }
 
 type Service struct {
 	worlds worldReader
 	cases  caseReader
+	mu     sync.Mutex
+	issues map[string]Issue
+	flight map[string]*issueFlight
+}
+
+type issueFlight struct {
+	done  chan struct{}
+	issue Issue
+	err   error
 }
 
 type Article struct {
@@ -49,53 +60,110 @@ type newsTemplate struct {
 }
 
 func NewService(worlds worldReader, cases caseReader) *Service {
-	return &Service{worlds: worlds, cases: cases}
+	return &Service{worlds: worlds, cases: cases, issues: make(map[string]Issue), flight: make(map[string]*issueFlight)}
 }
 
-// Issue creates a deterministic newspaper issue and keeps the latest case as its lead.
-func (service *Service) Issue(ctx context.Context, serverID, city, country string, serverTime time.Time) (Issue, error) {
-	base, err := service.worlds.GeneratedWorld(ctx, serverID)
-	if err != nil {
-		return Issue{}, err
+// Issue caches one generated edition per server, city, and in-game calendar day.
+func (service *Service) Issue(ctx context.Context, serverID, cityID, city, country string, serverTime time.Time) (Issue, error) {
+	if serverTime.IsZero() {
+		return Issue{}, fmt.Errorf("invalid newspaper date")
 	}
-	latest, err := service.cases.LatestPublicCase(ctx, serverID)
+	zone := time.FixedZone("CET", 60*60)
+	if cityData, ok := world.CityByID(cityID); ok {
+		if cityZone, err := time.LoadLocation(cityData.TimeZone); err == nil {
+			zone = cityZone
+		}
+	}
+	dateKey := serverTime.In(zone).Format("2006-01-02")
+	cacheKey := serverID + "/" + cityID + "/" + dateKey
+	service.mu.Lock()
+	if issue, ok := service.issues[cacheKey]; ok {
+		service.mu.Unlock()
+		return issue, nil
+	}
+	if flight := service.flight[cacheKey]; flight != nil {
+		service.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return Issue{}, ctx.Err()
+		case <-flight.done:
+			return flight.issue, flight.err
+		}
+	}
+	flight := &issueFlight{done: make(chan struct{})}
+	service.flight[cacheKey] = flight
+	service.mu.Unlock()
+
+	issue, err := service.buildIssue(ctx, serverID, cityID, city, country, serverTime)
+	service.mu.Lock()
+	if err == nil {
+		service.issues[cacheKey] = issue
+		cityPrefix := serverID + "/" + cityID + "/"
+		for key := range service.issues {
+			if key != cacheKey && len(key) >= len(cityPrefix) && key[:len(cityPrefix)] == cityPrefix {
+				delete(service.issues, key)
+			}
+		}
+	}
+	flight.issue, flight.err = issue, err
+	delete(service.flight, cacheKey)
+	close(flight.done)
+	service.mu.Unlock()
+	return issue, err
+}
+
+// buildIssue creates a deterministic city edition with its newest local case as lead.
+func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, country string, serverTime time.Time) (Issue, error) {
+	base, err := service.worlds.CityWorldForCases(ctx, serverID, cityID)
 	if err != nil {
-		return Issue{}, err
+		return Issue{}, fmt.Errorf("reconstruct city newspaper data: %w", err)
+	}
+	latest, caseErr := service.cases.LatestPublicCase(ctx, serverID, cityID)
+	if caseErr != nil && !errors.Is(caseErr, cases.ErrCaseNotFound) {
+		return Issue{}, fmt.Errorf("query latest case for city %s: %w", cityID, caseErr)
 	}
 	if serverTime.IsZero() {
 		return Issue{}, fmt.Errorf("invalid newspaper date")
 	}
-	localTime := serverTime.In(time.FixedZone("CET", 60*60))
+	location := time.FixedZone("CET", 60*60)
+	if cityData, ok := world.CityByID(cityID); ok {
+		if cityLocation, err := time.LoadLocation(cityData.TimeZone); err == nil {
+			location = cityLocation
+		}
+	}
+	localTime := serverTime.In(location)
 	dateKey := localTime.Format("2006-01-02")
 	dateLabel := localTime.Format("Monday, January 2, 2006")
 
-	npcNames := make(map[string]string, len(base.NPCs))
-	for _, npc := range base.NPCs {
+	local := base
+	npcNames := make(map[string]string, len(local.NPCs))
+	for _, npc := range local.NPCs {
 		npcNames[npc.ID] = npc.Name
 	}
-	locations := make(map[string]world.Entity, len(base.Entities))
-	for _, entity := range base.Entities {
+	locations := make(map[string]world.Entity, len(local.Entities))
+	for _, entity := range local.Entities {
 		if entity.EntityType == "location" {
 			locations[entity.ID] = entity
 		}
 	}
-	victimName, exists := npcNames[latest.VictimID]
-	if !exists {
-		return Issue{}, fmt.Errorf("latest case victim is missing from generated world")
+	lead := Article{ID: "city-desk-" + cityID + "-" + dateKey, Section: "CITY DESK", Headline: "A quiet day for the city police", Summary: fmt.Sprintf("No new homicide inquiry has been reported in %s. Local authorities remain on duty.", city)}
+	if caseErr == nil {
+		victimName, exists := npcNames[latest.VictimID]
+		if !exists {
+			return Issue{}, fmt.Errorf("latest case victim is missing from generated city")
+		}
+		location, exists := locations[latest.LocationID]
+		if !exists {
+			return Issue{}, fmt.Errorf("latest case location is missing from generated city")
+		}
+		lead = Article{
+			ID: latest.ID, Section: "SPECIAL REPORT",
+			Headline: fmt.Sprintf("Police open homicide inquiry at %s", location.Name),
+			Summary:  fmt.Sprintf("Authorities confirmed the death of %s at %s, in %s. Detectives are asking anyone with information to come forward. The investigation remains open.", victimName, location.Name, city),
+			CaseID:   latest.ID,
+		}
 	}
-	location, exists := locations[latest.LocationID]
-	if !exists {
-		return Issue{}, fmt.Errorf("latest case location is missing from generated world")
-	}
-
-	lead := Article{
-		ID:       latest.ID,
-		Section:  "SPECIAL REPORT",
-		Headline: fmt.Sprintf("Police open homicide inquiry at %s", location.Name),
-		Summary:  fmt.Sprintf("Authorities confirmed the death of %s at %s, in %s. Detectives are asking anyone with information to come forward. The investigation remains open.", victimName, location.Name, city),
-		CaseID:   latest.ID,
-	}
-	articles := makeLightStories(base, serverID, dateKey)
+	articles := makeLightStories(local, serverID+"/"+cityID, dateKey)
 	return Issue{
 		Publication: fmt.Sprintf("THE %s GAZETTE", city),
 		City:        city,

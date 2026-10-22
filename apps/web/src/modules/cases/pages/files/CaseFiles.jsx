@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MapPin } from "pixelarticons/react/MapPin";
 import { getCaseFile, getNewspaperIssue, getOpenCases, saveCaseProgress } from "../../../world/api.js";
 
-export default function CaseFiles({ onPin }) {
+export default function CaseFiles({ cityId, issueDay, onPin }) {
   const [cases, setCases] = useState([]);
   const [issue, setIssue] = useState(null);
   const [activeCase, setActiveCase] = useState(null);
@@ -13,7 +13,7 @@ export default function CaseFiles({ onPin }) {
 
   useEffect(() => {
     let active = true;
-    Promise.all([getOpenCases(), getNewspaperIssue()])
+    Promise.all([getOpenCases(), getNewspaperIssue(cityId, issueDay)])
       .then(([openCases, newspaper]) => {
         if (!active) return;
         setCases(openCases);
@@ -23,7 +23,7 @@ export default function CaseFiles({ onPin }) {
       })
       .catch((error) => { if (active) setMessage(error.message || "THE CASE ARCHIVE IS UNAVAILABLE"); });
     return () => { active = false; };
-  }, []);
+  }, [cityId, issueDay]);
 
   useEffect(() => {
     if (!activeCase) { setDetail(null); return undefined; }

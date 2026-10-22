@@ -165,6 +165,52 @@ func TestGeneratorVersion5CreatesTwentyDeterministicDistricts(t *testing.T) {
 	}
 }
 
+func TestGenerateCityCreatesAnIndependentDeterministicPopulation(t *testing.T) {
+	const seed = "m11-city-world"
+	first, err := GenerateCity(seed, GeneratorVersion5, "jp/tokyo")
+	if err != nil {
+		t.Fatalf("GenerateCity() error = %v", err)
+	}
+	second, err := GenerateCity(seed, GeneratorVersion5, "jp/tokyo")
+	if err != nil {
+		t.Fatalf("GenerateCity() second call error = %v", err)
+	}
+	if !reflect.DeepEqual(first, second) {
+		t.Fatal("same seed, city and generator version produced different city worlds")
+	}
+	if len(first.NPCs) != 160 || len(first.Companies) != 20 || len(first.Regions) != 21 || len(first.Entities) != 260 {
+		t.Fatalf("Tokyo world shape: %d NPCs, %d companies, %d regions, %d entities", len(first.NPCs), len(first.Companies), len(first.Regions), len(first.Entities))
+	}
+	if first.Regions[0].ID == "fr/lyon" {
+		t.Fatal("Tokyo generation retained Lyon's city identity")
+	}
+	for _, npc := range first.NPCs {
+		rebuilt, err := GenerateNPC(seed, GeneratorVersion5, npc.GenerationKey)
+		if err != nil {
+			t.Fatalf("reconstruct NPC %q: %v", npc.ID, err)
+		}
+		if !reflect.DeepEqual(npc, rebuilt) {
+			t.Fatalf("NPC %q changed when reconstructed", npc.ID)
+		}
+	}
+	for _, company := range first.Companies {
+		rebuilt, err := GenerateCompany(seed, GeneratorVersion5, company.GenerationKey)
+		if err != nil {
+			t.Fatalf("reconstruct company %q: %v", company.ID, err)
+		}
+		if company != rebuilt {
+			t.Fatalf("company %q changed when reconstructed", company.ID)
+		}
+	}
+	lyon, err := GenerateCity(seed, GeneratorVersion5, "fr/lyon")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reflect.DeepEqual(first.NPCs[0].ID, lyon.NPCs[0].ID) {
+		t.Fatal("NPC IDs were reused between cities")
+	}
+}
+
 func TestVersion5HairChoicesRespectAgeAndNPCStyleCatalog(t *testing.T) {
 	for _, age := range []int{18, 25, 39} {
 		for sample := 0; sample < 100; sample++ {

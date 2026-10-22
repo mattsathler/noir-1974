@@ -136,7 +136,9 @@ func main() {
 	newsService := newspaper.NewService(worldStore, caseStore)
 	recordsService := records.NewService(worldStore, caseStore)
 	mailService := mail.NewService(worldStore, caseStore)
-	mux.Handle("/api/", identity.NewHandlerWithGameAndMail(identityStore, os.Getenv("APP_ENV") == "production", worldStore, newsService, caseStore, recordsService, mailService, worldServerID))
+	appEnvironment := os.Getenv("APP_ENV")
+	exposeErrorDetails := appEnvironment == "" || appEnvironment == "development"
+	mux.Handle("/api/", identity.NewHandlerWithGameAndMailDiagnostics(identityStore, appEnvironment == "production", worldStore, newsService, caseStore, recordsService, mailService, worldServerID, exposeErrorDetails))
 	mux.Handle("GET /api/health", health.NewHandler(pool))
 	server := &http.Server{
 		Addr:              ":8080",

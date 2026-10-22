@@ -28,10 +28,10 @@ func (fixture *recurringStoreFixture) DueGeneration(_ context.Context, _ string)
 	defer fixture.mu.Unlock()
 	return fixture.slot, true, nil
 }
-func (fixture *recurringStoreFixture) CountOpenCases(context.Context, string) (int, error) {
+func (fixture *recurringStoreFixture) CountOpenCases(context.Context, string, string) (int, error) {
 	return fixture.open, nil
 }
-func (fixture *recurringStoreFixture) UsedNPCIDs(context.Context, string, string) (map[string]struct{}, error) {
+func (fixture *recurringStoreFixture) UsedNPCIDs(context.Context, string, string, string) (map[string]struct{}, error) {
 	return map[string]struct{}{}, nil
 }
 func (fixture *recurringStoreFixture) Create(_ context.Context, serverID string, base world.World, definition Definition) error {

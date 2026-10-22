@@ -10,6 +10,14 @@ CREATE TABLE IF NOT EXISTS worlds (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS world_city_generators (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    city_id text NOT NULL CHECK (city_id <> ''),
+    generator_version integer NOT NULL CHECK (generator_version > 0),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, city_id)
+);
+
 CREATE TABLE IF NOT EXISTS world_regions (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
     region_id text NOT NULL CHECK (region_id <> ''),

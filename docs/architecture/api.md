@@ -18,6 +18,8 @@ GET /api/world/locations?q=<name-or-address>
 GET /api/world/transit
 POST /api/world/travel
 POST /api/world/visit
+GET /api/world/gate/destinations
+POST /api/world/gate/travel
 GET /api/world/newspaper
 GET /api/cases
 GET /api/cases/:caseID
@@ -38,11 +40,11 @@ O frontend pede “NPC #23”. O servidor verifica o servidor do jogador, recupe
 
 As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. A busca de pessoas retorna nome, idade, aparência, IDs visuais determinísticos, local de trabalho e estado civil; não retorna cargo nem identidade do parceiro. A busca de empresas retorna sede e funcionários com seus cargos, oferecendo uma fonte separada para descobrir funções dentro da empresa. A busca de locais retorna apenas endereços do bairro atual, incluindo os pontos fixos de serviço quando o jogador está em Central. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
 
-`GET /api/world/newspaper` retorna a edição determinística do dia fictício atual. A manchete usa o caso persistido mais recente e omite o culpado; seis notas leves são escolhidas de um catálogo por servidor e data. A API cria o caso inicial uma única vez no bootstrap e registra a vítima como morta no estado compartilhado.
+`GET /api/world/newspaper` retorna a edição local da cidade atual do jogador, no dia fictício atual. A manchete usa o caso mais recente daquela cidade e omite o culpado; as notas locais são escolhidas deterministicamente por servidor, cidade e data. Cidades sem casos recebem uma chamada local de abertura. A API cria o caso inicial de Lyon uma única vez no bootstrap e registra a vítima como morta no estado compartilhado.
 
 As buscas de pessoas, empresas e locais retornam no máximo cinco resultados, em ordem alfabética. A busca de pessoas monta os perfis completos somente para os cinco primeiros resultados; a busca de empresas consulta os funcionários somente para as cinco empresas retornadas. A consulta de registros bancários/GATE também retorna no máximo cinco registros por chamada.
 
-`GET /api/world/transit` retorna o bairro Central, seus pontos fixos de serviço e os bairros procedurais para a interface de navegação local. `POST /api/world/travel` recebe `districtId` e persiste a mudança de bairro após validar o destino; essa navegação local não é feita pelo app GATE. `POST /api/world/visit` recebe `locationId` e aceita apenas um ponto do bairro atual; a visita preserva o bairro e registra a localização exata do jogador. O app GATE é reservado a viagens entre cidades e não oferece bairros nem construções como destinos. `GET /api/world` e `GET /api/me` incluem `locationId`, `districtId`, o nome do bairro e, quando aplicável, `placeName`.
+`GET /api/world/gate/destinations` devolve o catálogo versionado de cidades agrupável por país. `POST /api/world/gate/travel` recebe `cityId`, materializa a cidade de destino no mundo compartilhado se necessário e posiciona o jogador em Central. O app GATE lista apenas cidades, inclusive em outros países; não lista bairros ou construções. `GET /api/world/transit` retorna Central, seus pontos fixos de serviço e os bairros procedurais da cidade atual para a interface de navegação local. `POST /api/world/travel` recebe `districtId` e persiste a mudança de bairro após validar que pertence à cidade atual. `POST /api/world/visit` recebe `locationId` e aceita apenas um ponto da cidade e bairro atuais; a visita preserva o bairro e registra a localização exata do jogador. `GET /api/world` e `GET /api/me` incluem `cityId`, cidade, país, fuso horário, `locationId`, `districtId`, o nome do bairro e, quando aplicável, `placeName`.
 
 `GET /api/world/npcs/:npcID/records` retorna registros do NPC no intervalo inclusivo informado. `source=bank` seleciona o ledger bancário e, enquanto a visita presencial a serviços não estiver disponível no fluxo de jogo, não exige presença no Meridian Bank. `source=gate` seleciona o histórico GATE. O filtro de fonte é aplicado na geração cotidiana e na consulta SQL, que usa índice por servidor, NPC, fonte e data; não carrega nem serializa eventos do outro serviço. Nenhuma consulta de registros lê a localização do jogador. Sem filtro, ambos os serviços são incluídos. As datas usam `YYYY-MM-DD` e aceitam no máximo sete dias de calendário inclusivos. Os resultados são ordenados por horário e ID. O JSON público não contém `caseId` nem a classificação interna.
 
@@ -54,7 +56,7 @@ O serviço bancário é operado pelo Meridian Global Settlement Office e a infra
 
 ## Casos e progresso
 
-`GET /api/cases` lista os casos abertos do servidor. `GET /api/cases/:caseID` retorna os dados públicos do caso, registros narrativos sem classificações internas e o progresso daquela conta. Respostas públicas não incluem `killerId`, motivo real, tipo interno das evidências, relações usadas para gerá-las ou regras de acesso.
+`GET /api/cases` lista os casos abertos da cidade atual do jogador. A geração recorrente distribui novos casos entre as cidades materializadas e usa apenas NPCs, empresas e locais da cidade selecionada; cada caso persiste seu `city_id`. `GET /api/cases/:caseID` retorna os dados públicos do caso, registros narrativos sem classificações internas e o progresso daquela conta. Respostas públicas não incluem `killerId`, motivo real, tipo interno das evidências, relações usadas para gerá-las ou regras de acesso.
 
 `POST /api/cases/:caseID/progress` recebe `{ "discoveredEvidenceIds": ["…"] }`. O servidor valida que o caso existe e que cada ID de registro pertence ao caso, normaliza a lista e a salva por conta. O progresso persiste entre sessões e não altera o estado compartilhado do caso. O endpoint ainda representa o recorte mínimo de M06; ações de descoberta ficam para milestones posteriores.
 

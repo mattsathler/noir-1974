@@ -6,15 +6,65 @@ async function search(path, query) {
   return payload.results ?? [];
 }
 
+const worldCacheVersion = 1;
+const worldCacheLifetimeMs = 7 * 24 * 60 * 60 * 1000;
+const worldCachePrefix = `noir:world-data:v${worldCacheVersion}`;
+const newspaperCachePrefix = "noir:newspaper:v1";
+const newspaperRequests = new Map();
+
+function readCachedWorldList(key) {
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(key) ?? "null");
+    if (cached?.version === worldCacheVersion && cached.expiresAt > Date.now() && Array.isArray(cached.items)) {
+      return cached.items;
+    }
+  } catch {
+    // Storage can be disabled or contain data from an older client version.
+  }
+  return null;
+}
+
+function writeCachedWorldList(key, items) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify({
+      version: worldCacheVersion,
+      expiresAt: Date.now() + worldCacheLifetimeMs,
+      items,
+    }));
+  } catch {
+    // The endpoints remain usable when browser storage is unavailable.
+  }
+}
+
+async function cachedWorldList(key, load) {
+  const cached = readCachedWorldList(key);
+  if (cached) return cached;
+  const items = await load();
+  writeCachedWorldList(key, items);
+  return items;
+}
+
 export const searchPeople = (query) => search("/api/world/npcs", query);
 export const searchCompanies = (query) => search("/api/world/companies", query);
 export const searchLocations = (query) => search("/api/world/locations", query);
 
+export async function getNeighborhoodDestinations(cityId = "unknown") {
+  const key = `${worldCachePrefix}:neighborhoods:${encodeURIComponent(cityId)}`;
+  return cachedWorldList(key, async () => {
+    const response = await fetch("/api/world/transit", { credentials: "same-origin" });
+    const payload = await responsePayload(response);
+    if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve neighborhood destinations.");
+    return payload.destinations ?? [];
+  });
+}
+
 export async function getGateDestinations() {
-  const response = await fetch("/api/world/transit", { credentials: "same-origin" });
-  const payload = await responsePayload(response);
-  if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve GATE destinations.");
-  return payload.destinations ?? [];
+  return cachedWorldList(`${worldCachePrefix}:gate-cities`, async () => {
+    const response = await fetch("/api/world/gate/destinations", { credentials: "same-origin" });
+    const payload = await responsePayload(response);
+    if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve GATE city destinations.");
+    return payload.destinations ?? [];
+  });
 }
 
 export async function movePlayer(path, body) {
@@ -25,7 +75,13 @@ export async function movePlayer(path, body) {
     body: JSON.stringify(body),
   });
   const payload = await responsePayload(response);
-  if (!response.ok) throw new Error(payload.message?.trim() || "Could not change location.");
+  if (!response.ok) {
+    const error = new Error(payload.message?.trim() || "Could not change location.");
+    error.code = payload.code;
+    error.requestId = payload.requestId;
+    error.details = payload.details;
+    throw error;
+  }
   return payload;
 }
 
@@ -62,12 +118,45 @@ export async function getNPCRecords(npcId, from, to, source) {
   return payload.results ?? [];
 }
 
-export async function getNewspaperIssue() {
+async function requestNewspaperIssue() {
   const response = await fetch("/api/world/newspaper", { credentials: "same-origin" });
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
   if (!response.ok) throw new Error(payload.message?.trim() || "The newspaper could not be retrieved.");
   return payload;
+}
+
+export function getNewspaperIssue(cityId, issueDay) {
+  if (!cityId || !issueDay) return requestNewspaperIssue();
+
+  const cityKey = encodeURIComponent(cityId);
+  const cacheKey = `${newspaperCachePrefix}:${cityKey}:${issueDay}`;
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(cacheKey) ?? "null");
+    if (cached?.cityId === cityId && cached?.issueDay === issueDay && cached.issue) {
+      return Promise.resolve(cached.issue);
+    }
+  } catch {
+    // Storage may be disabled or contain an incomplete cached issue.
+  }
+
+  if (newspaperRequests.has(cacheKey)) return newspaperRequests.get(cacheKey);
+
+  const request = requestNewspaperIssue().then((issue) => {
+    try {
+      const cityPrefix = `${newspaperCachePrefix}:${cityKey}:`;
+      for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.localStorage.key(index);
+        if (key?.startsWith(cityPrefix) && key !== cacheKey) window.localStorage.removeItem(key);
+      }
+      window.localStorage.setItem(cacheKey, JSON.stringify({ cityId, issueDay, issue }));
+    } catch {
+      // Keep the current issue usable when storage is unavailable or full.
+    }
+    return issue;
+  }).finally(() => newspaperRequests.delete(cacheKey));
+  newspaperRequests.set(cacheKey, request);
+  return request;
 }
 
 async function requestCase(path, options) {

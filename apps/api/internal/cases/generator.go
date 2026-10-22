@@ -27,6 +27,7 @@ var (
 
 type Definition struct {
 	ID               string                  `json:"id"`
+	CityID           string                  `json:"cityId"`
 	Seed             string                  `json:"caseSeed"`
 	GeneratorVersion int                     `json:"generatorVersion"`
 	CaseType         string                  `json:"caseType"`
@@ -137,6 +138,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	caseID := makeCaseID(seed, version)
 	definition := Definition{
 		ID:               caseID,
+		CityID:           cityForLocation(base, selected.locationID),
 		Seed:             seed,
 		GeneratorVersion: version,
 		CaseType:         "homicide",
@@ -157,6 +159,18 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 		return Definition{}, err
 	}
 	return definition, nil
+}
+
+func cityForLocation(base world.World, locationID string) string {
+	for _, entity := range base.Entities {
+		if entity.ID != locationID {
+			continue
+		}
+		if index := strings.Index(entity.RegionID, "/district/"); index > 0 {
+			return entity.RegionID[:index]
+		}
+	}
+	return "fr/lyon"
 }
 
 func buildCaseEmails(seed string, worldVersion int, caseID string, selected candidate, base world.World) []mail.Message {

@@ -20,5 +20,10 @@ func ForCity(countrySlug, citySlug string) (Catalog, bool) {
 			DistrictSuffixes: france.LyonDistrictSuffixes,
 		}, true
 	}
-	return Catalog{}, false
+	catalog, ok := countryCatalogs[countrySlug]
+	if banks, exists := countryDistrictBanks[countrySlug]; exists {
+		catalog.DistrictPrefixes = banks[0]
+		catalog.DistrictSuffixes = banks[1]
+	}
+	return catalog, ok
 }

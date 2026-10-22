@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { MonitorSharp } from "pixelarticons/react/MonitorSharp";
 import { Earth } from "pixelarticons/react/Earth";
+import { Map } from "pixelarticons/react/Map";
 import { NotebookSharp } from "pixelarticons/react/NotebookSharp";
 import { currentIdentity } from "../../../identity/api.js";
 import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx";
 import ComputerDesktop from "./ComputerDesktop.jsx";
 import NeighborhoodExplorer from "../../../world/components/NeighborhoodExplorer.jsx";
+import GateCityExplorer from "../../../world/components/GateCityExplorer.jsx";
 import { getCurrentWorld, movePlayer } from "../../../world/api.js";
 import GateTransition from "../../components/GateTransition.jsx";
 
@@ -29,6 +31,17 @@ function formatServerDateTime(timestamp, timeZone) {
   };
 }
 
+function localDateKey(timestamp, timeZone) {
+  if (!timestamp || !timeZone) return "";
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(timestamp).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 export default function GamePage({ initialWorld = null, onLogout }) {
   const [world, setWorld] = useState(initialWorld);
   const [serverTime, setServerTime] = useState(initialWorld ? new Date(initialWorld.serverTime) : null);
@@ -36,22 +49,31 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [computerOpen, setComputerOpen] = useState(false);
   const [newspaperOpen, setNewspaperOpen] = useState(false);
   const [transitOpen, setTransitOpen] = useState(false);
+  const [neighborhoodsOpen, setNeighborhoodsOpen] = useState(false);
   const [gateTransition, setGateTransition] = useState(null);
   const closeComputer = useCallback(() => setComputerOpen(false), []);
   const closeNewspaper = useCallback(() => setNewspaperOpen(false), []);
   const closeTransit = useCallback(() => setTransitOpen(false), []);
+  const closeNeighborhoods = useCallback(() => setNeighborhoodsOpen(false), []);
 
   const travelViaGate = useCallback((destination) => {
     setError("");
     setGateTransition(destination);
   }, []);
-  const arriveAtDistrict = useCallback(async (destination) => {
-    await movePlayer("/api/world/travel", { districtId: destination.id });
-    const nextWorld = await getCurrentWorld();
+  const arriveAtCity = useCallback(async (destination) => {
+    const arrival = await movePlayer("/api/world/gate/travel", { cityId: destination.id });
+    const nextWorld = arrival.world ?? await getCurrentWorld();
     setWorld(nextWorld);
     setServerTime(new Date(nextWorld.serverTime));
     closeTransit();
   }, [closeTransit]);
+  const travelWithinCity = useCallback(async (destination) => {
+    await movePlayer("/api/world/travel", { districtId: destination.id });
+    const nextWorld = await getCurrentWorld();
+    setWorld(nextWorld);
+    setServerTime(new Date(nextWorld.serverTime));
+    closeNeighborhoods();
+  }, [closeNeighborhoods]);
   const visitPlace = useCallback(async (place) => {
     await movePlayer("/api/world/visit", { locationId: place.locationId });
     const nextWorld = await getCurrentWorld();
@@ -59,7 +81,14 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     setServerTime(new Date(nextWorld.serverTime));
   }, []);
   const completeGateTransition = useCallback(() => setGateTransition(null), []);
-  const failGateTransition = useCallback((requestError) => setError(requestError.message), []);
+  const failGateTransition = useCallback((requestError) => {
+    setError([
+      requestError.message,
+      requestError.code && `CODE ${requestError.code}`,
+      requestError.requestId && `REFERENCE ${requestError.requestId}`,
+      requestError.details,
+    ].filter(Boolean).join(" · "));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -85,6 +114,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   }, [world]);
 
   const display = world && serverTime ? formatServerDateTime(serverTime, world.timeZone) : null;
+  const issueDay = localDateKey(serverTime, world?.timeZone);
   const location = world ? [world.placeName || world.district, world.city, world.country].filter(Boolean).join(", ") : "";
 
   return (
@@ -96,12 +126,22 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           <button
             className="gate-transit-launch"
             type="button"
-            aria-label="Open GATE transit"
+            aria-label="Open GATE city transit"
             aria-haspopup="dialog"
             aria-expanded={transitOpen}
-            onClick={() => { setComputerOpen(false); setNewspaperOpen(false); setTransitOpen(true); }}
+            onClick={() => { setComputerOpen(false); setNewspaperOpen(false); setNeighborhoodsOpen(false); setTransitOpen(true); }}
           >
             <Earth className="computer-launch__icon" aria-hidden="true" />
+          </button>
+          <button
+            className="neighborhood-launch"
+            type="button"
+            aria-label="Open neighborhood access"
+            aria-haspopup="dialog"
+            aria-expanded={neighborhoodsOpen}
+            onClick={() => { setComputerOpen(false); setNewspaperOpen(false); setTransitOpen(false); setNeighborhoodsOpen(true); }}
+          >
+            <Map className="computer-launch__icon" aria-hidden="true" />
           </button>
           <div className="game-hud__location-copy">
             <p className="text-xs tracking-widest uppercase text-accent m-0">Current location</p>
@@ -123,7 +163,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
             <button
               className="newspaper-launch"
               type="button"
-              aria-label="Read the Lyon Gazette"
+              aria-label="Read the local newspaper"
               aria-haspopup="dialog"
               aria-expanded={newspaperOpen}
               onClick={() => { setComputerOpen(false); setNewspaperOpen(true); }}
@@ -148,12 +188,15 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           display={display}
           serverTime={serverTime}
           timeZone={world?.timeZone}
+          cityId={world?.cityId}
+          issueDay={issueDay}
           onClose={closeComputer}
         />
       )}
-      {newspaperOpen && <NewspaperWindow onClose={closeNewspaper} />}
-      {transitOpen && <NeighborhoodExplorer world={world} onTravel={travelViaGate} onVisit={visitPlace} onClose={closeTransit} />}
-      {gateTransition && <GateTransition destination={gateTransition} onArrive={arriveAtDistrict} onComplete={completeGateTransition} onError={failGateTransition} />}
+      {newspaperOpen && <NewspaperWindow cityId={world?.cityId} issueDay={issueDay} onClose={closeNewspaper} />}
+      {transitOpen && <GateCityExplorer world={world} onTravel={travelViaGate} onClose={closeTransit} />}
+      {neighborhoodsOpen && <NeighborhoodExplorer world={world} onTravel={travelWithinCity} onVisit={visitPlace} onClose={closeNeighborhoods} />}
+      {gateTransition && <GateTransition destination={gateTransition} origin={world} onArrive={arriveAtCity} onComplete={completeGateTransition} onError={failGateTransition} />}
     </main>
   );
 }

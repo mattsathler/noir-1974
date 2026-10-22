@@ -36,8 +36,9 @@ M00 docs + monorepo
                         → M11 geografia internacional e viagem
                             → M12 busca e apreensão
                                 → M13 acusação + julgamento (fluxo criminal completo)
+                                  → M14 otimização, cache e estabilidade da plataforma
 ```
 
-M06 é o primeiro recorte atravessável para playtest. A porcentagem geral acompanha o fluxo criminal completo até o aceite do M13, quando uma acusação válida pode levar à prisão do culpado. M10 reúne whiteboards, identidade visual modular e geração recorrente de casos compartilhados. M11 expande o catálogo fixo para 25 países e 100 cidades e habilita viagens internacionais do GATE. A busca e apreensão do M12 requer presença na Delegacia; M13 depende do M12 para garantir que whiteboard e busca estejam disponíveis para acusação.
+M06 é o primeiro recorte atravessável para playtest. A porcentagem geral acompanha o fluxo criminal completo até o aceite do M13, quando uma acusação válida pode levar à prisão do culpado. M14 é uma etapa posterior de qualidade técnica e não entra nesse cálculo. M10 reúne whiteboards, identidade visual modular e geração recorrente de casos compartilhados. M11 expande o catálogo fixo para 25 países e 100 cidades e habilita viagens internacionais do GATE. A busca e apreensão do M12 requer presença na Delegacia; M13 depende do M12 para garantir que whiteboard e busca estejam disponíveis para acusação.
 
 Pular um ciclo só com ADR explicando por que o critério deixou de ser necessário.
