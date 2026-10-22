@@ -75,6 +75,8 @@ type WhiteboardAPIReader interface {
 	RenameWhiteboard(context.Context, string, string, string, string) error
 	DeleteWhiteboard(context.Context, string, string, string) error
 	GetWhiteboard(context.Context, string, string, string) (cases.Whiteboard, error)
+	CreateWhiteboardNote(context.Context, string, string, string, int, int) (cases.WhiteboardPin, error)
+	UpdateWhiteboardNote(context.Context, string, string, string, string, string, string) error
 	PinDiscoveredItem(context.Context, string, string, string, string, int, int) error
 	MoveWhiteboardPin(context.Context, string, string, string, string, int, int) error
 	RemoveWhiteboardPin(context.Context, string, string, string, string) error
@@ -145,6 +147,8 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/whiteboards/{boardID}", handler.getWhiteboard)
 		mux.HandleFunc("PATCH /api/whiteboards/{boardID}", handler.renameWhiteboard)
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}", handler.deleteWhiteboard)
+		mux.HandleFunc("POST /api/whiteboards/{boardID}/notes", handler.createWhiteboardNote)
+		mux.HandleFunc("PATCH /api/whiteboards/{boardID}/notes/{itemID}", handler.updateWhiteboardNote)
 		mux.HandleFunc("POST /api/whiteboards/{boardID}/pins", handler.pinWhiteboardItem)
 		mux.HandleFunc("PATCH /api/whiteboards/{boardID}/pins/{itemID}", handler.moveWhiteboardPin)
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/pins/{itemID}", handler.removeWhiteboardPin)
@@ -374,6 +378,10 @@ type whiteboardPositionRequest struct {
 	X int `json:"x"`
 	Y int `json:"y"`
 }
+type whiteboardNoteRequest struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
 type whiteboardConnectionRequest struct {
 	FromID string `json:"fromId"`
 	ToID   string `json:"toId"`
@@ -499,6 +507,56 @@ func (h *Handler) pinWhiteboardItem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, "could not pin discovered item", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) createWhiteboardNote(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input whiteboardPositionRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	pin, err := h.whiteboardReader.CreateWhiteboardNote(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"), input.X, input.Y)
+	if errors.Is(err, cases.ErrInvalidProgress) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, cases.ErrCaseNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "could not create whiteboard note", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"pin": pin})
+}
+
+func (h *Handler) updateWhiteboardNote(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input whiteboardNoteRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	err := h.whiteboardReader.UpdateWhiteboardNote(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"), r.PathValue("itemID"), input.Title, input.Content)
+	if errors.Is(err, cases.ErrInvalidWhiteboardNote) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, cases.ErrEvidenceNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "could not save whiteboard note", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -641,7 +699,14 @@ func (h *Handler) newspaper(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
-	if !h.authorizeWorldRequest(w, r) {
+	var current account
+	if h.whiteboardReader != nil {
+		var ok bool
+		current, ok = h.caseAccount(w, r)
+		if !ok {
+			return
+		}
+	} else if !h.authorizeWorldRequest(w, r) {
 		return
 	}
 	query, ok := directoryQuery(w, r)
@@ -653,11 +718,57 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not search people", http.StatusInternalServerError)
 		return
 	}
+	if h.whiteboardReader != nil {
+		items := make([]cases.DiscoveredItem, 0, len(results))
+		for _, result := range results {
+			metadata, _ := json.Marshal(result)
+			workplaces := make([]string, 0, len(result.Workplaces))
+			for _, workplace := range result.Workplaces {
+				workplaces = append(workplaces, workplace.Company+" — "+workplace.Address)
+			}
+			if len(workplaces) == 0 {
+				workplaces = append(workplaces, "NOT LISTED")
+			}
+			appearance := result.NPC.Appearance
+			if appearance == "" {
+				appearance = "NOT RECORDED"
+			}
+			maritalStatus := result.MaritalStatus
+			if maritalStatus == "" {
+				maritalStatus = "UNKNOWN"
+			}
+			content := strings.Join([]string{
+				"AGE · " + strconv.Itoa(result.NPC.Age) + " YEARS",
+				"DESCRIPTION · " + appearance,
+				"EMPLOYMENT · " + strings.Join(workplaces, "; "),
+				"MARITAL STATUS · " + strings.ToUpper(maritalStatus),
+			}, "\n")
+			items = append(items, cases.DiscoveredItem{
+				ID:       "person:" + result.NPC.ID,
+				Source:   "person",
+				Title:    result.NPC.Name,
+				Content:  content,
+				Metadata: metadata,
+			})
+		}
+		if err := h.whiteboardReader.RecordDiscoveredItems(r.Context(), h.worldServerID, current.ID, items); err != nil {
+			log.Printf("record personnel files for whiteboard: %v", err)
+			http.Error(w, "could not save personnel files", http.StatusInternalServerError)
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
 func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
-	if !h.authorizeWorldRequest(w, r) {
+	var current account
+	if h.whiteboardReader != nil {
+		var ok bool
+		current, ok = h.caseAccount(w, r)
+		if !ok {
+			return
+		}
+	} else if !h.authorizeWorldRequest(w, r) {
 		return
 	}
 	query, ok := directoryQuery(w, r)
@@ -668,6 +779,24 @@ func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "could not search companies", http.StatusInternalServerError)
 		return
+	}
+	if h.whiteboardReader != nil {
+		items := make([]cases.DiscoveredItem, 0, len(results))
+		for _, result := range results {
+			metadata, _ := json.Marshal(result)
+			items = append(items, cases.DiscoveredItem{
+				ID:       result.Company.ID,
+				Source:   "company",
+				Title:    result.Company.Name,
+				Content:  "HEADQUARTERS · " + result.Address.Full + "\nPERSONNEL ON FILE · " + strconv.Itoa(len(result.Employees)),
+				Metadata: metadata,
+			})
+		}
+		if err := h.whiteboardReader.RecordDiscoveredItems(r.Context(), h.worldServerID, current.ID, items); err != nil {
+			log.Printf("record company files for whiteboard: %v", err)
+			http.Error(w, "could not save company files", http.StatusInternalServerError)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }

@@ -198,24 +198,45 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
 
       {people.map(({ npc, workplaces, maritalStatus }) => (
         <article className="world-record world-record--personnel" key={npc.id}>
-          <header className="world-record__header"><h2>{npc.name}</h2><span>PERSONNEL FILE</span></header>
-          <div className="world-record__personnel-sheet">
-            <figure className="world-record__portrait">
-              <ModularFace visual={npc.visual ?? FALLBACK_NPC_VISUAL} name={npc.name} />
-              <figcaption>IDENTIFICATION PORTRAIT</figcaption>
-            </figure>
-            <dl className="world-record__personnel-facts">
-              <div><dt>AGE</dt><dd>{npc.age} YEARS</dd></div>
-              <div><dt>DESCRIPTION</dt><dd>{npc.appearance || "NOT RECORDED"}</dd></div>
-              <div>
-                <dt>EMPLOYMENT</dt>
-                <dd>{workplaces.length
-                  ? workplaces.map(({ company, address }) => `${company} — ${address}`).join("; ")
-                  : "NOT LISTED"}</dd>
-              </div>
-              <div><dt>MARITAL STATUS</dt><dd>{maritalStatus?.toUpperCase() || "UNKNOWN"}</dd></div>
-            </dl>
-          </div>
+          <header className="world-record__header"><h2>{npc.name}</h2><span>{isInterpol ? "PERSONNEL FILE" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"}</span></header>
+          {isInterpol && <>
+            <div className="world-record__personnel-sheet">
+              <figure className="world-record__portrait">
+                <ModularFace visual={npc.visual ?? FALLBACK_NPC_VISUAL} name={npc.name} />
+                <figcaption>IDENTIFICATION PORTRAIT</figcaption>
+              </figure>
+              <dl className="world-record__personnel-facts">
+                <div><dt>AGE</dt><dd>{npc.age} YEARS</dd></div>
+                <div><dt>DESCRIPTION</dt><dd>{npc.appearance || "NOT RECORDED"}</dd></div>
+                <div>
+                  <dt>EMPLOYMENT</dt>
+                  <dd>{workplaces.length
+                    ? workplaces.map(({ company, address }) => `${company} — ${address}`).join("; ")
+                    : "NOT LISTED"}</dd>
+                </div>
+                <div><dt>MARITAL STATUS</dt><dd>{maritalStatus?.toUpperCase() || "UNKNOWN"}</dd></div>
+              </dl>
+            </div>
+            <button
+              className="whiteboard-pin-button"
+              type="button"
+              aria-label={`Pin personnel file for ${npc.name}`}
+              onClick={() => onPin?.({
+                id: `person:${npc.id}`,
+                source: "person",
+                title: npc.name,
+                content: [
+                  `AGE · ${npc.age} YEARS`,
+                  `DESCRIPTION · ${npc.appearance || "NOT RECORDED"}`,
+                  `EMPLOYMENT · ${workplaces.length ? workplaces.map(({ company, address }) => `${company} — ${address}`).join("; ") : "NOT LISTED"}`,
+                  `MARITAL STATUS · ${maritalStatus?.toUpperCase() || "UNKNOWN"}`,
+                ].join("\n"),
+                metadata: { npc, workplaces, maritalStatus },
+              })}
+            >
+              <MapPin aria-hidden="true" />
+            </button>
+          </>}
           {(isBankRecords || isGateRecords) && <button
             className="world-record__activity-toggle"
             type="button"
@@ -256,6 +277,20 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
           <p>HEADQUARTERS · {address.full}</p>
           <p>PERSONNEL ON FILE · {employees.length}</p>
           {employees.map((employee) => <p className="world-record__detail" key={employee.id}>{employee.name} · {employee.role.toUpperCase()}</p>)}
+          <button
+            className="whiteboard-pin-button"
+            type="button"
+            aria-label={`Pin company file for ${company.name}`}
+            onClick={() => onPin?.({
+              id: company.id,
+              source: "company",
+              title: company.name,
+              content: [`HEADQUARTERS · ${address.full}`, `PERSONNEL ON FILE · ${employees.length}`].join("\n"),
+              metadata: { company, address, employees },
+            })}
+          >
+            <MapPin aria-hidden="true" />
+          </button>
         </article>
       ))}
 

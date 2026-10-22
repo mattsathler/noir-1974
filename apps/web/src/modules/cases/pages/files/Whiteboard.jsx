@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Pencil } from "pixelarticons/react/Pencil";
 import { Trash } from "pixelarticons/react/Trash";
+import ModularFace from "../../../identity/components/ModularFace.jsx";
 import {
   connectWhiteboardPins,
   cacheWhiteboardDraft,
   createWhiteboard,
   createWhiteboardDraft,
+  createWhiteboardNote,
   deleteWhiteboard,
   discardWhiteboardDraft,
   disconnectWhiteboardPins,
@@ -15,6 +17,7 @@ import {
   moveWhiteboardPin,
   renameWhiteboard,
   removeWhiteboardPin,
+  updateWhiteboardNote,
 } from "../../../world/api.js";
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
@@ -29,6 +32,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
   const [renamingBoardId, setRenamingBoardId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [noteDrafts, setNoteDrafts] = useState({});
   const [connectorLines, setConnectorLines] = useState([]);
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
@@ -36,6 +40,12 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
   const dragRef = useRef(null);
   const panRef = useRef(null);
   const renameInputRef = useRef(null);
+  const noteDraftsRef = useRef({});
+  const noteTimersRef = useRef(new Map());
+  const noteVersionsRef = useRef(new Map());
+  const activeNoteSavesRef = useRef(0);
+
+  useEffect(() => () => noteTimersRef.current.forEach((timer) => clearTimeout(timer)), []);
 
   async function loadBoard(id) {
     const result = await getWhiteboard(id);
@@ -59,7 +69,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
           setMessage(`${result.pins.length} RECORD${result.pins.length === 1 ? "" : "S"} ON THIS BOARD`);
         }
       } else {
-        setMessage("PIN A RECORD TO CREATE YOUR FIRST BOARD");
+        setMessage("PIN A PERSONNEL FILE OR RECORD TO CREATE YOUR FIRST BOARD");
       }
     }).catch((error) => { if (active) setMessage(error.message || "PERSONAL BOARDS ARE UNAVAILABLE"); });
     return () => { active = false; };
@@ -164,6 +174,79 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
     });
   }
 
+  async function createBlankNote() {
+    if (!board || busy || saveState === "saving") return;
+    const boardID = board.id;
+    const index = board.pins.length;
+    const x = 700 + (index % 3) * 3000;
+    const y = 700 + Math.floor(index / 3) * 2500;
+    setBusy(true);
+    setSaveState("saving");
+    try {
+      const pin = await createWhiteboardNote(boardID, x, y);
+      setBoard((previous) => previous?.id === boardID && !previous.pins.some((item) => item.id === pin.id)
+        ? { ...previous, pins: [...previous.pins, pin] }
+        : previous);
+      const initialDraft = { title: pin.title, content: pin.content };
+      noteDraftsRef.current = { ...noteDraftsRef.current, [pin.id]: initialDraft };
+      setNoteDrafts((previous) => ({ ...previous, [pin.id]: initialDraft }));
+      setMessage("BLANK NOTE ADDED · WRITE YOUR OWN RECORD");
+    } catch (error) {
+      setSaveState("save");
+      setMessage(error.message || "A BLANK NOTE COULD NOT BE ADDED");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function updateNoteDraft(pin, field, value) {
+    const draft = { title: pin.title, content: pin.content, ...noteDraftsRef.current[pin.id], [field]: value };
+    noteDraftsRef.current = { ...noteDraftsRef.current, [pin.id]: draft };
+    setNoteDrafts((previous) => ({ ...previous, [pin.id]: draft }));
+    const version = (noteVersionsRef.current.get(pin.id) ?? 0) + 1;
+    noteVersionsRef.current.set(pin.id, version);
+    clearTimeout(noteTimersRef.current.get(pin.id));
+    const boardID = board?.id;
+    noteTimersRef.current.set(pin.id, setTimeout(() => {
+      noteTimersRef.current.delete(pin.id);
+      saveNote(pin, version, boardID);
+    }, 800));
+  }
+
+  async function saveNote(pin, version = noteVersionsRef.current.get(pin.id) ?? 0, boardID = board?.id) {
+    if (!boardID) return;
+    const draft = noteDraftsRef.current[pin.id] ?? noteDrafts[pin.id] ?? { title: pin.title, content: pin.content };
+    const title = "UNTITLED NOTE";
+    setSaveState("saving");
+    activeNoteSavesRef.current += 1;
+    try {
+      await updateWhiteboardNote(boardID, pin.id, title, draft.content);
+      if (noteVersionsRef.current.get(pin.id) === version) {
+        setBoard((previous) => previous?.id === boardID ? { ...previous, pins: previous.pins.map((item) => item.id === pin.id ? { ...item, title, content: draft.content } : item) } : previous);
+        delete noteDraftsRef.current[pin.id];
+        setNoteDrafts((previous) => { const next = { ...previous }; delete next[pin.id]; return next; });
+      }
+    } catch (error) {
+      setSaveState("save");
+      setMessage(error.message || "NOTE COULD NOT BE SAVED · SELECT SAVE TO RETRY");
+    } finally {
+      activeNoteSavesRef.current -= 1;
+      if (activeNoteSavesRef.current === 0 && noteTimersRef.current.size === 0 && Object.keys(noteDraftsRef.current).length === 0) {
+        setSaveState("saved");
+      }
+    }
+  }
+
+  function retryNoteSaves() {
+    if (!board) return;
+    const pending = board.pins.filter((pin) => pin.source === "note" && noteDraftsRef.current[pin.id]);
+    if (!pending.length) return;
+    setSaveState("saving");
+    Promise.all(pending.map((pin) => saveNote(pin, noteVersionsRef.current.get(pin.id) ?? 0, board.id))).then(() => {
+      if (pending.every((pin) => !noteDraftsRef.current[pin.id])) setSaveState("saved");
+    });
+  }
+
   async function confirmDeleteBoard() {
     if (!board || busy) return;
     const deletedId = board.id;
@@ -178,7 +261,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
         await loadBoard(remaining[0].id);
       } else {
         setBoard(null);
-        setMessage("BOARD DELETED · PIN A RECORD TO CREATE A NEW ONE");
+        setMessage("BOARD DELETED · CREATE A NOTE OR PIN A RECORD TO START AGAIN");
         setSaveState("saved");
       }
     } catch (error) {
@@ -200,11 +283,22 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
 
   async function connectSelected() {
     if (!board || busy || selection.length !== 2) return;
+    const [fromId, toId] = selection;
+    const previousConnections = board.connections;
+    const exists = previousConnections.some((edge) => edge.fromId === fromId && edge.toId === toId || edge.fromId === toId && edge.toId === fromId);
+    if (exists) { setSelection([]); return; }
+    const optimisticConnections = [...previousConnections, { fromId, toId }];
+    setBoard((previous) => previous?.id === board.id ? { ...previous, connections: optimisticConnections } : previous);
     setBusy(true);
+    setSaveState("saving");
     try {
-      await connectWhiteboardPins(board.id, selection[0], selection[1]);
-      await loadBoard(board.id);
-    } catch (error) { setSaveState("save"); setMessage(error.message || "THE RECORDS COULD NOT BE CONNECTED"); }
+      await connectWhiteboardPins(board.id, fromId, toId);
+      setSelection([]);
+      setSaveState("saved");
+    } catch (error) {
+      setBoard((previous) => previous?.id === board.id ? { ...previous, connections: previousConnections } : previous);
+      setSaveState("save"); setMessage(error.message || "THE RECORDS COULD NOT BE CONNECTED");
+    }
     finally { setBusy(false); }
   }
 
@@ -219,7 +313,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
   }
 
   function beginDrag(event, pin) {
-    if (event.target.closest("button")) return;
+    if (event.target.closest("button, input, textarea, select")) return;
     event.stopPropagation();
     const stage = stageRef.current;
     if (!stage) return;
@@ -304,10 +398,11 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
         {boards.map((item) => <button type="button" key={item.id} aria-current={item.id === board?.id ? "page" : undefined} onClick={() => loadBoard(item.id).catch((error) => setMessage(error.message || "THE SELECTED BOARD COULD NOT BE OPENED"))}>{item.title}</button>)}
       </nav>
       <p className="personal-whiteboard__status" role="status" aria-live="polite">{message}</p>
-      {!board ? <div className="personal-whiteboard__empty"><span aria-hidden="true">＋</span><p>Pin a discovered email or record to create your first investigation board.</p></div> : <>
+      {!board ? <div className="personal-whiteboard__empty"><span aria-hidden="true">＋</span><p>Create a board, then add a blank note or pin a personnel file, email, or record.</p></div> : <>
         <div className="personal-whiteboard__tools">
           <span>DRAG PINS TO ARRANGE · SELECT TWO PINS TO CONNECT</span>
-          <span className={`personal-whiteboard__save personal-whiteboard__save--${saveState}`} role="status" aria-live="polite">{saveState === "saving" ? "SAVING" : saveState === "save" ? "SAVE" : "SAVED"}</span>
+          {saveState === "save" ? <button type="button" className="personal-whiteboard__save personal-whiteboard__save--save" onClick={retryNoteSaves}>SAVE</button> : <span className={`personal-whiteboard__save personal-whiteboard__save--${saveState}`} role="status" aria-live="polite">{saveState === "saving" ? "SAVING" : "SAVED"}</span>}
+          <button type="button" disabled={busy || saveState === "saving"} onClick={createBlankNote}>+ BLANK NOTE</button>
           {selection.length === 2 && <button type="button" disabled={busy} onClick={connectSelected}>CONNECT SELECTED</button>}
         </div>
         <div className="personal-whiteboard__viewport" ref={viewportRef} onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={endPan}>
@@ -319,7 +414,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
             const selected = selection.includes(pin.id);
             return <article
               ref={(node) => { if (node) pinRefs.current.set(pin.id, node); else pinRefs.current.delete(pin.id); }}
-              className={`personal-whiteboard__pin${selected ? " personal-whiteboard__pin--selected" : ""}`}
+              className={`personal-whiteboard__pin${selected ? " personal-whiteboard__pin--selected" : ""}${pin.source === "note" ? " personal-whiteboard__pin--note" : ""}`}
               key={pin.id}
               style={{ left: `${pin.x / 100}%`, top: `${pin.y / 100}%` }}
               tabIndex={0}
@@ -333,8 +428,20 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
               }}
             >
               <span className="personal-whiteboard__tack" aria-hidden="true" />
-              <header><span>{pin.source.toUpperCase()} · PINNED</span><button className="personal-whiteboard__remove-pin" type="button" aria-label={`Remove ${pin.title} from board`} disabled={busy} onClick={() => removePin(pin.id)}><Trash aria-hidden="true" /></button></header>
-              <h2>{pin.title}</h2><p>{pin.content}</p>
+              {pin.source === "note" ? <>
+                <header><span>NOTE - PINNED</span><button className="personal-whiteboard__remove-pin" type="button" aria-label="Remove note" disabled={busy} onClick={() => removePin(pin.id)}><Trash aria-hidden="true" /></button></header>
+                <textarea
+                  className="personal-whiteboard__note-content"
+                  aria-label="Note text"
+                  maxLength={5000}
+                  value={(noteDrafts[pin.id] ?? pin).content}
+                  onChange={(event) => updateNoteDraft(pin, "content", event.target.value)}
+                />
+              </> : <>
+                <header><span>{pin.source.toUpperCase()} · PINNED</span><button className="personal-whiteboard__remove-pin" type="button" aria-label={`Remove ${pin.title} from board`} disabled={busy} onClick={() => removePin(pin.id)}><Trash aria-hidden="true" /></button></header>
+                {pin.source === "person" && pin.metadata?.npc?.visual && <div className="personal-whiteboard__person-portrait"><ModularFace visual={pin.metadata.npc.visual} name={pin.metadata.npc.name || pin.title} /></div>}
+                <h2>{pin.title}</h2><p>{pin.content}</p>
+              </>}
               <button className="personal-whiteboard__connect" type="button" aria-pressed={selected} onClick={() => setSelection((previous) => selected ? previous.filter((id) => id !== pin.id) : previous.length < 2 ? [...previous, pin.id] : [previous[1], pin.id])}>{selected ? "SELECTED" : "SELECT TO CONNECT"}</button>
             </article>;
           })}

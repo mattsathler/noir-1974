@@ -144,10 +144,13 @@ export function setWhiteboardSaveState(boardId, status) {
 }
 
 export async function getWhiteboards() {
-  const cached = readWhiteboardCache("list");
-  if (cached) return cached;
   const payload = await whiteboardRequest("/api/whiteboards");
-  return writeWhiteboardCache("list", payload.results ?? []);
+  const remoteBoards = payload.results ?? [];
+  const cachedBoards = readWhiteboardCache("list") ?? [];
+  const pendingDrafts = cachedBoards.filter((board) =>
+    getWhiteboardSaveState(board.id) === "saving" && !remoteBoards.some((remote) => remote.id === board.id),
+  );
+  return writeWhiteboardCache("list", [...remoteBoards, ...pendingDrafts]);
 }
 
 export function createWhiteboardDraft(index = 0) {
@@ -211,7 +214,7 @@ export function deleteWhiteboard(boardId) {
 
 export async function getWhiteboard(boardId) {
   const cached = readWhiteboardCache(boardId);
-  if (cached) return cached;
+  if (cached && getWhiteboardSaveState(boardId) === "saving") return cached;
   const payload = await whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`);
   return writeWhiteboardCache(boardId, payload.whiteboard);
 }
@@ -221,6 +224,31 @@ export function pinWhiteboardItem(boardId, itemId, x = 700, y = 700) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ itemId, x, y }),
+  });
+}
+
+export function createWhiteboardNote(boardId, x = 700, y = 700) {
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ x, y }),
+  }).then(({ pin }) => {
+    updateWhiteboardCache(boardId, (board) => ({ ...board, pins: [...board.pins, pin] }));
+    return pin;
+  });
+}
+
+export function updateWhiteboardNote(boardId, itemId, title, content) {
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/notes/${encodeURIComponent(itemId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, content }),
+  }).then((result) => {
+    updateWhiteboardCache(boardId, (board) => ({
+      ...board,
+      pins: board.pins.map((pin) => pin.id === itemId ? { ...pin, title, content } : pin),
+    }));
+    return result;
   });
 }
 

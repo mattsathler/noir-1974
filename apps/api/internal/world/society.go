@@ -431,9 +431,94 @@ func visualIdentityForNPC(seed, generationKey string) VisualIdentity {
 
 func generatedAppearanceDescription(identity VisualIdentity) string {
 	hairColor := hairTone(identity.HairID)
+	hairStyle := hairStyle(identity.HairID)
 	skinTone := strings.TrimPrefix(identity.SkinColorID, "skin_")
 	eyeColor := strings.TrimPrefix(identity.EyeColorID, "eyes_")
-	return hairColor + " hair, " + strings.ReplaceAll(skinTone, "_", " ") + " skin, " + strings.ReplaceAll(eyeColor, "_", " ") + " eyes"
+	description := []string{
+		hairColor + " " + hairStyle + " hair",
+		strings.ReplaceAll(skinTone, "_", " ") + " skin",
+		strings.ReplaceAll(eyeColor, "_", " ") + " eyes",
+	}
+	if detail := faceDetailDescription(identity.FaceDetailID); detail != "" {
+		description = append(description, detail)
+	}
+	for _, accessoryID := range identity.AccessoryIDs {
+		if accessory := accessoryDescription(accessoryID); accessory != "" {
+			description = append(description, accessory)
+		}
+	}
+	return strings.Join(description, ", ")
+}
+
+func hairStyle(hairID string) string {
+	style := strings.TrimPrefix(hairID, "hair_")
+	style = strings.TrimSuffix(style, "_"+hairTone(hairID))
+	switch style {
+	case "short":
+		return "short"
+	case "short_alt":
+		return "swept short"
+	case "long":
+		return "long"
+	case "ponytail":
+		return "ponytail"
+	case "tied":
+		return "tied-back"
+	case "tied_long":
+		return "long tied-back"
+	case "messy":
+		return "messy"
+	case "pigtails":
+		return "pigtails"
+	case "emo":
+		return "emo"
+	default:
+		return "short"
+	}
+}
+
+func faceDetailDescription(id string) string {
+	switch {
+	case id == "":
+		return ""
+	case strings.HasPrefix(id, "face_beard_mutton_"):
+		return "mutton-chop sideburns"
+	case strings.HasPrefix(id, "face_beard_goatee_"):
+		return "a goatee"
+	case strings.HasPrefix(id, "face_beard_stubble_") || id == "face_stubble":
+		return "short stubble"
+	case strings.HasPrefix(id, "face_beard_"):
+		return "a beard"
+	case strings.HasPrefix(id, "face_moustache_"):
+		return "a moustache"
+	case id == "face_scar_cheek":
+		return "a cheek scar"
+	case id == "face_scar_brow":
+		return "a brow scar"
+	case id == "face_freckles":
+		return "freckles"
+	default:
+		return ""
+	}
+}
+
+func accessoryDescription(id string) string {
+	switch {
+	case strings.HasPrefix(id, "face_glasses_round_") || id == "accessory_glasses_round":
+		return "round glasses"
+	case strings.HasPrefix(id, "face_glasses_square_") || id == "accessory_glasses_square":
+		return "square glasses"
+	case id == "accessory_hat_cloche":
+		return "a cloche hat"
+	case id == "accessory_hat_fedora":
+		return "a fedora"
+	case id == "accessory_hat_bowler":
+		return "a bowler hat"
+	case id == "accessory_monocle":
+		return "a monocle"
+	default:
+		return ""
+	}
 }
 
 func hairTone(hairID string) string {

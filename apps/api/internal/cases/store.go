@@ -21,11 +21,12 @@ import (
 var caseSchema embed.FS
 
 var (
-	ErrCaseNotFound      = errors.New("case not found")
-	ErrInvalidCaseState  = errors.New("invalid shared case state")
-	ErrInvalidProgress   = errors.New("invalid player case progress")
-	ErrEvidenceNotFound  = errors.New("case evidence not found")
-	ErrPersistedConflict = errors.New("persisted case does not match generated definition")
+	ErrCaseNotFound          = errors.New("case not found")
+	ErrInvalidCaseState      = errors.New("invalid shared case state")
+	ErrInvalidProgress       = errors.New("invalid player case progress")
+	ErrInvalidWhiteboardNote = errors.New("invalid whiteboard note")
+	ErrEvidenceNotFound      = errors.New("case evidence not found")
+	ErrPersistedConflict     = errors.New("persisted case does not match generated definition")
 )
 
 type caseDatabase interface {
@@ -700,7 +701,7 @@ func normalizeProgress(progress PlayerProgress) (PlayerProgress, error) {
 func (store *PostgresStore) RecordDiscoveredItems(ctx context.Context, serverID, accountID string, items []DiscoveredItem) error {
 	valid := make([]DiscoveredItem, 0, len(items))
 	for _, item := range items {
-		if item.ID == "" || item.Title == "" || (item.Source != "email" && item.Source != "bank" && item.Source != "gate" && item.Source != "case") {
+		if item.ID == "" || item.Title == "" || (item.Source != "email" && item.Source != "bank" && item.Source != "gate" && item.Source != "case" && item.Source != "person" && item.Source != "company" && item.Source != "note") {
 			continue
 		}
 		valid = append(valid, item)
@@ -780,17 +781,12 @@ func (store *PostgresStore) RenameWhiteboard(ctx context.Context, serverID, acco
 }
 
 func (store *PostgresStore) DeleteWhiteboard(ctx context.Context, serverID, accountID, boardID string) error {
-	tag, err := store.db.Exec(ctx,
+	_, err := store.db.Exec(ctx,
 		`DELETE FROM player_whiteboards
 		 WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3`,
 		serverID, accountID, boardID)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrCaseNotFound
-	}
-	return nil
+	// DELETE is idempotent so clients can remove stale boards left in local cache.
+	return err
 }
 
 func (store *PostgresStore) GetWhiteboard(ctx context.Context, serverID, accountID, boardID string) (Whiteboard, error) {
@@ -834,20 +830,97 @@ func (store *PostgresStore) PinDiscoveredItem(ctx context.Context, serverID, acc
 	if x < 0 || y < 0 || x > 10000 || y > 10000 {
 		return ErrInvalidProgress
 	}
-	var exists bool
+	itemIDs := []string{itemID}
+	if strings.HasPrefix(itemID, "company:company:") {
+		itemIDs = append(itemIDs, strings.TrimPrefix(itemID, "company:"))
+	} else if strings.HasPrefix(itemID, "company:") {
+		itemIDs = append(itemIDs, "company:"+itemID)
+	}
+	var boardExists bool
+	var discoveredItemID string
 	if err := store.db.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM player_whiteboards WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3)
-		 AND EXISTS (SELECT 1 FROM player_discovered_items WHERE server_id = $1::uuid AND account_id = $2::uuid AND item_id = $4)`,
-		serverID, accountID, boardID, itemID).Scan(&exists); err != nil {
+		`SELECT EXISTS (SELECT 1 FROM player_whiteboards WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3),
+		        COALESCE((SELECT item_id FROM player_discovered_items
+		                  WHERE server_id = $1::uuid AND account_id = $2::uuid AND item_id = ANY($4::text[])
+		                  ORDER BY CASE WHEN item_id = $5 THEN 0 ELSE 1 END LIMIT 1), '')`,
+		serverID, accountID, boardID, itemIDs, itemID).Scan(&boardExists, &discoveredItemID); err != nil {
 		return err
 	}
-	if !exists {
+	if !boardExists || discoveredItemID == "" {
 		return ErrEvidenceNotFound
 	}
 	_, err := store.db.Exec(ctx,
 		`INSERT INTO player_whiteboard_pins (server_id, account_id, whiteboard_id, item_id, position_x, position_y)
-		 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6) ON CONFLICT DO NOTHING`, serverID, accountID, boardID, itemID, x, y)
+		 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6) ON CONFLICT DO NOTHING`, serverID, accountID, boardID, discoveredItemID, x, y)
 	return err
+}
+
+func (store *PostgresStore) CreateWhiteboardNote(ctx context.Context, serverID, accountID, boardID string, x, y int) (WhiteboardPin, error) {
+	if x < 0 || y < 0 || x > 10000 || y > 10000 {
+		return WhiteboardPin{}, ErrInvalidProgress
+	}
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return WhiteboardPin{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var boardExists bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM player_whiteboards WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3)`,
+		serverID, accountID, boardID).Scan(&boardExists); err != nil {
+		return WhiteboardPin{}, err
+	}
+	if !boardExists {
+		return WhiteboardPin{}, ErrCaseNotFound
+	}
+
+	var itemID string
+	if err := tx.QueryRow(ctx,
+		`WITH note_id AS (SELECT 'note:' || gen_random_uuid()::text AS id)
+		 INSERT INTO player_discovered_items (server_id, account_id, item_id, item_source, item_data)
+		 SELECT $1::uuid, $2::uuid, note_id.id, 'note',
+		        jsonb_build_object('id', note_id.id, 'source', 'note', 'title', 'UNTITLED NOTE', 'content', '')
+		 FROM note_id
+		 RETURNING item_id`, serverID, accountID).Scan(&itemID); err != nil {
+		return WhiteboardPin{}, err
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO player_whiteboard_pins (server_id, account_id, whiteboard_id, item_id, position_x, position_y)
+		 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6)`, serverID, accountID, boardID, itemID, x, y); err != nil {
+		return WhiteboardPin{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return WhiteboardPin{}, err
+	}
+	return WhiteboardPin{DiscoveredItem: DiscoveredItem{ID: itemID, Source: "note", Title: "UNTITLED NOTE"}, X: x, Y: y}, nil
+}
+
+func (store *PostgresStore) UpdateWhiteboardNote(ctx context.Context, serverID, accountID, boardID, itemID, title, content string) error {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		title = "UNTITLED NOTE"
+	}
+	if len([]rune(title)) > 80 || len([]rune(content)) > 5000 {
+		return ErrInvalidWhiteboardNote
+	}
+	result, err := store.db.Exec(ctx,
+		`UPDATE player_discovered_items item
+		 SET item_data = item.item_data || jsonb_build_object('title', $5::text, 'content', $6::text)
+		 WHERE item.server_id = $1::uuid AND item.account_id = $2::uuid AND item.item_id = $4
+		   AND item.item_source = 'note'
+		   AND EXISTS (
+		       SELECT 1 FROM player_whiteboard_pins pin
+		       WHERE pin.server_id = item.server_id AND pin.account_id = item.account_id
+		         AND pin.whiteboard_id = $3 AND pin.item_id = item.item_id
+		   )`, serverID, accountID, boardID, itemID, title, content)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrEvidenceNotFound
+	}
+	return nil
 }
 
 func (store *PostgresStore) MoveWhiteboardPin(ctx context.Context, serverID, accountID, boardID, itemID string, x, y int) error {
@@ -868,16 +941,11 @@ func (store *PostgresStore) MoveWhiteboardPin(ctx context.Context, serverID, acc
 }
 
 func (store *PostgresStore) RemoveWhiteboardPin(ctx context.Context, serverID, accountID, boardID, itemID string) error {
-	result, err := store.db.Exec(ctx,
+	_, err := store.db.Exec(ctx,
 		`DELETE FROM player_whiteboard_pins WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3 AND item_id = $4`,
 		serverID, accountID, boardID, itemID)
-	if err != nil {
-		return err
-	}
-	if result.RowsAffected() != 1 {
-		return ErrEvidenceNotFound
-	}
-	return nil
+	// DELETE is idempotent: a stale client may still show a pin already removed on the server.
+	return err
 }
 
 func (store *PostgresStore) ConnectWhiteboardPins(ctx context.Context, serverID, accountID, boardID, fromID, toID string) error {

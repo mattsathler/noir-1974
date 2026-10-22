@@ -140,11 +140,14 @@ CREATE TABLE IF NOT EXISTS player_discovered_items (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
     account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
     item_id text NOT NULL CHECK (item_id <> ''),
-    item_source text NOT NULL CHECK (item_source IN ('email', 'bank', 'gate', 'case')),
+    item_source text NOT NULL CHECK (item_source IN ('email', 'bank', 'gate', 'case', 'person', 'company', 'note')),
     item_data jsonb NOT NULL,
     discovered_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (server_id, account_id, item_id)
 );
+ALTER TABLE player_discovered_items DROP CONSTRAINT IF EXISTS player_discovered_items_item_source_check;
+ALTER TABLE player_discovered_items ADD CONSTRAINT player_discovered_items_item_source_check
+    CHECK (item_source IN ('email', 'bank', 'gate', 'case', 'person', 'company', 'note'));
 
 CREATE TABLE IF NOT EXISTS player_whiteboards (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
