@@ -22,7 +22,6 @@ function displayDate(value, timeZone) {
 export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z"), timeZone = "Europe/Paris", runHack, onPin }) {
   const throughToday = serverTime.toISOString().slice(0, 10);
   const rangeStart = `${throughToday.slice(0, 4)}-01-01`;
-  const [authorized, setAuthorized] = useState(false);
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState([]);
   const [mailbox, setMailbox] = useState(null);
@@ -35,18 +34,6 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
 
   async function hackRequest(loadRequest) {
     return runHack ? runHack(loadRequest) : loadRequest();
-  }
-
-  async function authorizeMailbox() {
-    setBusy(true);
-    try {
-      if (runHack) await runHack(() => Promise.resolve(true));
-      setAuthorized(true);
-    } catch (error) {
-      setMessage(error.message || "THE SECURE CONNECTION FAILED.");
-    } finally {
-      setBusy(false);
-    }
   }
 
   function updateFrom(nextFrom) {
@@ -114,13 +101,6 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
     <div className="email-inbox">
       <p className="computer-window__eyebrow">MERIDIAN GLOBAL · PRIVATE CORRESPONDENCE EXCHANGE</p>
       <h1>MAILROOM ARCHIVE</h1>
-      {!authorized ? (
-        <section className="email-inbox__access" aria-label="Correspondence access">
-          <p>CREDENTIALS REQUIRED · RESTRICTED EXCHANGE</p>
-          <p>Legacy operative credentials can establish a connection through this Meridian relay.</p>
-          <button type="button" disabled={busy} onClick={authorizeMailbox}>{busy ? "HACKING SYSTEM…" : "HACK SYSTEM"}</button>
-        </section>
-      ) : <>
         <form className="world-directory__search" onSubmit={searchMailbox}>
           <label className="world-directory__label" htmlFor="mail-search-person">PERSON NAME</label>
           <div className="world-directory__searchline">
@@ -164,7 +144,6 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
             </details>
           ))}
         </section>}
-      </>}
     </div>
   );
 }

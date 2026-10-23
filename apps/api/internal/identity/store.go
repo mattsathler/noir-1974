@@ -267,18 +267,23 @@ func (s *postgresStore) playerLocation(ctx context.Context, accountID string) (s
 	var locationID string
 	err := s.db.QueryRow(ctx, `SELECT location_id FROM player_locations WHERE account_id = $1::uuid`, accountID).Scan(&locationID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "fr/lyon", nil
+		return "fr/lyon/district/central", nil
 	}
 	if err != nil {
 		return "", err
 	}
-	if city, ok := world.CityForLocation(locationID); ok && city.ID != locationID {
+	if city, ok := world.CityForLocation(locationID); ok && city.ID != locationID && !isDistrictLocation(locationID, city.ID) {
 		if _, err := s.db.Exec(ctx, `UPDATE player_locations SET location_id=$2, updated_at=now() WHERE account_id=$1::uuid`, accountID, city.ID); err != nil {
 			return "", err
 		}
 		return city.ID, nil
 	}
 	return locationID, nil
+}
+
+func isDistrictLocation(locationID, cityID string) bool {
+	parts := strings.Split(locationID, "/")
+	return len(parts) == 4 && parts[0]+"/"+parts[1] == cityID && parts[2] == "district" && parts[3] != ""
 }
 
 func (s *postgresStore) setPlayerLocation(ctx context.Context, accountID, locationID string) error {

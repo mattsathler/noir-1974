@@ -37,7 +37,9 @@ O primeiro conjunto nomeado é:
 
 - **Emprego:** `employee_npc_id → employer_company_id`. Uma empresa pode ter muitos funcionários; as consultas pelos dois lados são indexadas.
 - **Relação pessoal:** `person_a_npc_id ↔ person_b_npc_id`, com tipo como casamento, amizade ou parentesco. Relações simétricas usam os dois lados na consulta. Tipos direcionais, como parentesco, preservam a direção nos campos `person_a` e `person_b` definida para aquele tipo.
-- **Localização de empresa:** `company_id → location_id`, com papel como sede ou filial.
+- **Localização de empresa:** `company_id → location_id`, com papel como sede ou filial. A relação é muitos-para-muitos: um prédio pode abrigar várias empresas e uma empresa pode ocupar vários prédios.
+
+Prédio é sempre uma entidade `location`; não representa por si só a empresa que opera ali. Um endereço pode abrigar várias empresas, e o Neighborhood lista cada empresa individualmente em vez de listar o prédio. Selecionar uma empresa abre diretamente seu espaço de trabalho; o computador pertence à empresa, nunca ao endereço físico. Empresa e endereço selecionados são contexto transitório.
 
 As tabelas de relação são tipadas. Chaves estrangeiras garantem que os extremos existam no mesmo servidor; o domínio também valida que cada extremo tem o tipo correto (por exemplo, NPC em emprego e empresa no papel de empregador).
 

@@ -8,6 +8,7 @@ html {
   min-width: 320px;
   min-height: 100%;
   background: var(--noir-ink-900);
+  font-family: var(--noir-font-sans);
   text-size-adjust: 100%;
   scroll-behavior: smooth;
 }
@@ -18,7 +19,6 @@ body {
   margin: 0;
   color: var(--noir-paper-200);
   background: var(--noir-ink-900);
-  font-family: var(--noir-font-sans);
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { MapPin } from "pixelarticons/react/MapPin";
-import { getNPCRecords, searchCompanies, searchLocations, searchPeople } from "../../api.js";
+import { getCompanyAtLocation, getNPCRecords, searchCompanies, searchLocations, searchPeople } from "../../api.js";
 import DatePicker from "../../components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 
@@ -47,12 +47,13 @@ function displayRecordDate(value, timeZone) {
   }).format(date);
 }
 
-export default function WorldDirectory({ program, serverTime = new Date("1974-11-12T20:15:00Z"), timeZone = "Europe/Paris", runHack, onPin }) {
+export default function WorldDirectory({ program, companyLocationId = "", companyId = "", serverTime = new Date("1974-11-12T20:15:00Z"), timeZone = "Europe/Paris", runHack, onPin }) {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [message, setMessage] = useState("Enter a name or address to search the city records.");
+  const isStaffDirectory = program === "staff-directory";
+  const [message, setMessage] = useState(isStaffDirectory ? "Enter a company name to search its staff directory." : "Enter a name or address to search the city records.");
   const [busy, setBusy] = useState(false);
   const [recordNPC, setRecordNPC] = useState("");
   const [recordRange, setRecordRange] = useState(() => {
@@ -64,27 +65,42 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
   const [activity, setActivity] = useState([]);
   const [activityMessage, setActivityMessage] = useState("");
   const [activityBusy, setActivityBusy] = useState(false);
-  const [privilegedAccess, setPrivilegedAccess] = useState(false);
-  const [accessReady, setAccessReady] = useState(false);
-  const [accessBusy, setAccessBusy] = useState(false);
   const requestId = useRef(0);
   const activityRequestId = useRef(0);
   const isInterpol = program === "interpol";
   const isCityRecords = program === "city-records";
   const isBankRecords = program === "bank-records";
   const isGateRecords = program === "gate-records";
-  const isPeopleSearch = !isCityRecords;
+  const isPeopleSearch = !isCityRecords && !isStaffDirectory;
   const isPrivilegedSystem = isBankRecords || isGateRecords;
+  const staffCompanies = companyId ? companies.filter(({ company }) => company.id === companyId) : companies;
 
   useEffect(() => {
-    if (!(isInterpol || isPrivilegedSystem)) {
-      setAccessReady(true);
-      return undefined;
+    if (!isStaffDirectory) return undefined;
+    let active = true;
+    if (!companyLocationId) {
+      setMessage("COMPANY IDENTIFIER NOT AVAILABLE FOR THIS WORKSTATION");
+      return () => { active = false; };
     }
-    setAccessReady(false);
-    const timer = window.setTimeout(() => setAccessReady(true), 850);
-    return () => window.clearTimeout(timer);
-  }, [isInterpol, isPrivilegedSystem]);
+
+    setBusy(true);
+    setMessage("LOADING EMPLOYEE DIRECTORY…");
+    const loadDirectory = () => getCompanyAtLocation(companyLocationId, companyId);
+    const request = runHack ? runHack(loadDirectory) : loadDirectory();
+    Promise.resolve(request)
+      .then((results) => {
+        if (!active) return;
+        setCompanies(results);
+        const companyExists = companyId ? results.some(({ company }) => company.id === companyId) : results.length > 0;
+        setMessage(companyExists ? "COMPANY EMPLOYEE DIRECTORY LOADED" : companyId ? "NO EMPLOYEE RECORDS FOUND FOR THIS COMPANY" : "NO COMPANY REGISTERED IN THIS BUILDING");
+      })
+      .catch((error) => {
+        if (active) setMessage(error.message || "THE EMPLOYEE DIRECTORY COULD NOT BE REACHED.");
+      })
+      .finally(() => { if (active) setBusy(false); });
+
+    return () => { active = false; };
+  }, [companyId, companyLocationId, isStaffDirectory, runHack]);
 
   function updateRecordFrom(from) {
     setRecordRange((previous) => ({
@@ -123,18 +139,6 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
       setActivityMessage(error.message || "THE RECORDS OFFICE COULD NOT BE REACHED.");
     } finally {
       if (request === activityRequestId.current) setActivityBusy(false);
-    }
-  }
-
-  async function authorizeConfidentialAccess() {
-    setAccessBusy(true);
-    try {
-      if (runHack) await runHack(() => Promise.resolve(true));
-      setPrivilegedAccess(true);
-    } catch (error) {
-      setActivityMessage(error.message || "THE SECURE CONNECTION FAILED.");
-    } finally {
-      setAccessBusy(false);
     }
   }
 
@@ -179,22 +183,15 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
 
   return (
     <div className="world-directory">
-      <p className="computer-window__eyebrow">{isInterpol ? "FORMER INTERPOL AFFILIATION · LEGACY ACCESS" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? `MERIDIAN GLOBAL SETTLEMENT OFFICE · ${privilegedAccess ? "PRIVILEGED SESSION" : "RESTRICTED ACCESS"}` : `MERIDIAN GLOBAL · GATE CONTROL ARCHIVE · ${privilegedAccess ? "PRIVILEGED SESSION" : "RESTRICTED ACCESS"}`}</p>
-      <h1>{isInterpol ? "PERSON SEARCH" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE MOVEMENT SEARCH"}</h1>
-      {(isPrivilegedSystem || isInterpol) && !privilegedAccess ? (
-        accessReady ? <section className="world-directory__credential-access" aria-label="Privileged system access">
-          <p>CREDENTIALS REQUIRED · RESTRICTED SYSTEM</p>
-          <p>Establish an unauthorized connection with the operative's legacy access tools.</p>
-          <button type="button" disabled={accessBusy} onClick={authorizeConfidentialAccess}>{accessBusy ? "HACKING SYSTEM…" : "HACK SYSTEM"}</button>
-        </section> : <p className="world-directory__message" role="status" aria-live="polite">ESTABLISHING SECURE CONNECTION…</p>
-      ) : <>
-      <form className="world-directory__search" onSubmit={submitSearch}>
-        <label className="world-directory__label" htmlFor="world-directory-query">{isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
+      <p className="computer-window__eyebrow">{isInterpol ? "CORPORATE SECURITY OFFICE · PERSONNEL SEARCH" : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "MERIDIAN GLOBAL SETTLEMENT OFFICE · PRIVILEGED SESSION" : "MERIDIAN GLOBAL · GATE CONTROL ARCHIVE · PRIVILEGED SESSION"}</p>
+      <h1>{isInterpol ? "PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE MOVEMENT SEARCH"}</h1>
+      {!isStaffDirectory && <form className="world-directory__search" onSubmit={submitSearch}>
+        <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
         <div className="world-directory__searchline">
-          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isPeopleSearch ? "Search personnel files" : "Search companies and locations"} />
+          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Search a company directory" : isPeopleSearch ? "Search personnel files" : "Search companies and locations"} />
           <button type="submit" disabled={busy}>{busy ? "SEARCHING…" : "SEARCH"}</button>
         </div>
-      </form>
+      </form>}
       <p className="world-directory__message" role="status" aria-live="polite">{message}</p>
 
       {people.map(({ npc, workplaces, maritalStatus }) => (
@@ -272,12 +269,10 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
         </article>
       ))}
 
-      {isCityRecords && companies.map(({ company, address, employees }) => (
+      {isCityRecords && companies.map(({ company, address }) => (
         <article className="world-record" key={company.id}>
           <header className="world-record__header"><h2>{company.name}</h2><span>COMPANY</span></header>
           <p>HEADQUARTERS · {address.full}</p>
-          <p>PERSONNEL ON FILE · {employees.length}</p>
-          {employees.map((employee) => <p className="world-record__detail" key={employee.id}>{employee.name} · {employee.role.toUpperCase()}</p>)}
           <button
             className="whiteboard-pin-button"
             type="button"
@@ -286,12 +281,28 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
               id: company.id,
               source: "company",
               title: company.name,
-              content: [`HEADQUARTERS · ${address.full}`, `PERSONNEL ON FILE · ${employees.length}`].join("\n"),
-              metadata: { company, address, employees },
+              content: `HEADQUARTERS · ${address.full}`,
+              metadata: { company, address },
             })}
           >
             <MapPin aria-hidden="true" />
           </button>
+        </article>
+      ))}
+
+      {isStaffDirectory && staffCompanies.map(({ company, address, employees }) => (
+        <article className="world-record" key={company.id}>
+          <header className="world-record__header"><h2>{company.name}</h2><span>EMPLOYER FILE</span></header>
+          <p>HEADQUARTERS · {address.full}</p>
+          <p>EMPLOYEES · {employees.length}</p>
+          <div className="world-record__staff-list" aria-label={`Employees at ${company.name}`}>
+            {employees.map((employee) => <article className="world-record__staff-member" key={employee.id}>
+              <figure className="world-record__staff-portrait">
+                <ModularFace visual={employee.visual ?? FALLBACK_NPC_VISUAL} name={employee.name} />
+              </figure>
+              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span></div>
+            </article>)}
+          </div>
         </article>
       ))}
 
@@ -301,7 +312,6 @@ export default function WorldDirectory({ program, serverTime = new Date("1974-11
           <p>{address.full}</p>
         </article>
       ))}
-      </>}
     </div>
   );
 }

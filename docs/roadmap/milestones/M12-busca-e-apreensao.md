@@ -1,18 +1,23 @@
 # M12 — Interações investigativas em locais
 
 **Ciclo:** 12  
-**Status:** Não iniciado  
+**Status:** Em curso
 **Depende de:** M11 aceito
 
 ## Objetivo
 
-Construir as telas de interior dos locais e transformá-los em espaços de investigação. A partir do card de uma construção no M11, o jogador entra em sua tela de interior e poderá interrogar NPCs, solicitar na Delegacia uma autorização de busca e apreensão, investigar residências e burlar controles de acesso a sistemas restritos. A seleção do bairro e da construção continua transitória; cada ação envia o contexto necessário e o backend valida cidade, alvo e permissões. Buscas podem revelar artefatos e vestígios pináveis; interrogatórios usam falas fixas que dão contexto e direção ao jogador, mas não viram elementos do whiteboard. Achados, falas e resultados misturam fatos cotidianos e elementos ligados a crimes sem sinalizar ao jogador o que é pista.
+Transformar os espaços de trabalho das empresas e os serviços públicos em pontos de investigação. O jogador seleciona uma empresa diretamente no Neighborhood; não há etapa intermediária de visita ao prédio. O computador e as interações pertencem à empresa escolhida, enquanto bancos, Delegacia e Central da GATE são destinos de serviço próprios em Central. A partir do local apropriado, poderá interrogar NPCs, solicitar na Delegacia uma autorização de busca e apreensão, investigar residências e burlar controles de acesso a sistemas restritos. A seleção do bairro, endereço e empresa continua transitória; cada ação envia o contexto necessário e o backend valida cidade, alvo e permissões. Buscas podem revelar artefatos e vestígios pináveis; interrogatórios usam falas fixas que dão contexto e direção ao jogador, mas não viram elementos do whiteboard. Achados, falas e resultados misturam fatos cotidianos e elementos ligados a crimes sem sinalizar ao jogador o que é pista.
 
 ## Critérios de aceite
 
 - [ ] API valida o alvo, o local, a sessão do jogador e as condições de acesso antes de executar uma busca.
-- [ ] Cada construção disponível possui uma tela de interior compatível com a direção visual do jogo; entrar e sair dela não persiste bairro ou prédio atual. O Hospital permanece fechado e não pode ser aberto nesta milestone.
-- [ ] O interior recebe a construção selecionada no M11 e oferece os NPCs, serviços ou sistemas pertinentes àquele local, sem carregar conteúdo de outra cidade.
+- [ ] Cada empresa disponível possui um espaço de trabalho compatível com a direção visual do jogo; entrar e sair dele não persiste bairro, prédio ou empresa atual. O Hospital permanece fechado e não pode ser aberto nesta milestone.
+- [ ] O Neighborhood lista empresas ligadas ao endereço exato, sem deduzir ocupantes pelo bairro e sem limitar a cinco resultados quando a consulta for por localização.
+- [ ] Selecionar uma empresa abre diretamente seu espaço de trabalho; não existe lobby, elevador ou tela intermediária de prédio.
+- [ ] As opções de interação com a empresa aparecem no centro da tela, com os aplicativos apresentados no padrão visual do desktop do computador.
+- [ ] O espaço de trabalho recebe a empresa selecionada no Neighborhood e oferece os NPCs, serviços ou sistemas pertinentes àquela empresa, sem carregar conteúdo de outra cidade.
+- [ ] O computador pessoal não oferece banco, registros GATE, emails ou busca de pessoas; registros bancários só podem ser consultados no Banco, registros GATE na Central GATE e emails/busca de pessoas na Delegacia da cidade atual.
+- [ ] O acesso a sistemas locais abre uma janela de terminal; o jogador digita comandos para estabelecer a sessão restrita e solicitar dados, com saída textual simulando a negociação e a resposta do sistema.
 - [ ] Ações enviam o local pretendido como contexto transitório; o backend valida sessão, cidade persistida, cidade do local e permissões. Não depende de uma visita salva nem de um campo de prédio atual no perfil do jogador.
 - [ ] NPCs presentes em locais podem ser interrogados por uma interface própria, com opções de perguntas em frases fixas; diálogos respeitam o universo corporativo de Noir e nunca identificam uma fala como pista ou prova.
 - [ ] O interrogatório oferece no máximo estas cinco perguntas genéricas, aplicáveis a qualquer NPC e local: “Como tem sido sua rotina ultimamente?”, “Com quem você costuma passar o tempo?”, “Aconteceu algo fora do comum por aqui recentemente?”, “Como vão as coisas no trabalho?” e “Há algo que esteja preocupando você?”.

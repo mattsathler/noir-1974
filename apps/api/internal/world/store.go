@@ -24,6 +24,7 @@ var (
 )
 
 const MaxSearchResults = 5
+const MaxNPCSearchResults = 10
 
 type worldDatabase interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
@@ -98,9 +99,10 @@ type CompanyRecord struct {
 }
 
 type CompanyEmployee struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Role string `json:"role"`
+	ID     string          `json:"id"`
+	Name   string          `json:"name"`
+	Role   string          `json:"role"`
+	Visual *VisualIdentity `json:"visual,omitempty"`
 }
 
 type LocationRecord struct {
@@ -467,7 +469,7 @@ func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcI
 func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query string) ([]PersonSearchRecord, error) {
 	base, err := store.WorldForCases(ctx, serverID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reconstruct world for person search: %w", err)
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
 	regions := make(map[string]string, len(base.Regions))
@@ -500,24 +502,36 @@ func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query stri
 		}
 		return matches[i].Name < matches[j].Name
 	})
-	if len(matches) > MaxSearchResults {
-		matches = matches[:MaxSearchResults]
+	if len(matches) > MaxNPCSearchResults {
+		matches = matches[:MaxNPCSearchResults]
 	}
 	results := make([]PersonSearchRecord, 0, len(matches))
-	for _, npc := range matches {
-		profile, err := store.GetNPC(ctx, serverID, npc.ID)
-		if err != nil {
-			return nil, err
+	married := make(map[string]bool)
+	for _, relation := range base.PersonalRelationships {
+		if relation.RelationshipType == "marriage" {
+			married[relation.PersonANPCID] = true
+			married[relation.PersonBNPCID] = true
 		}
-		workplaces := make([]PersonSearchWorkplace, 0, len(profile.Employment))
-		maritalStatus := personMaritalStatus(profile)
-		for _, employment := range profile.Employment {
-			if workplace, ok := workplacesByCompany[employment.Company.ID]; ok {
+	}
+	employmentByNPC := make(map[string][]EmploymentRelationship)
+	for _, relation := range base.EmploymentRelationships {
+		employmentByNPC[relation.EmployeeNPCID] = append(employmentByNPC[relation.EmployeeNPCID], relation)
+	}
+	for _, npc := range matches {
+		workplaces := make([]PersonSearchWorkplace, 0, len(employmentByNPC[npc.ID]))
+		for _, employment := range employmentByNPC[npc.ID] {
+			if workplace, ok := workplacesByCompany[employment.EmployerCompanyID]; ok {
 				workplaces = append(workplaces, workplace)
 			}
 		}
+		maritalStatus := npc.MaritalStatus
+		if married[npc.ID] {
+			maritalStatus = "married"
+		} else if maritalStatus != "single" && maritalStatus != "divorced" && maritalStatus != "widowed" {
+			maritalStatus = "single"
+		}
 		results = append(results, PersonSearchRecord{
-			NPC:        PersonSearchNPC{ID: profile.NPC.ID, Name: profile.NPC.Name, Age: profile.NPC.Age, Appearance: profile.NPC.Appearance, Visual: profile.NPC.Visual},
+			NPC:        PersonSearchNPC{ID: npc.ID, Name: npc.Name, Age: npc.Age, Appearance: npc.Appearance, Visual: npc.Visual},
 			Workplaces: workplaces, MaritalStatus: maritalStatus,
 		})
 	}
@@ -554,6 +568,9 @@ func (store *PostgresStore) SearchCompanies(ctx context.Context, serverID, query
 		return nil, err
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return []CompanyRecord{}, nil
+	}
 	entities := make(map[string]Entity, len(base.Entities))
 	regions := make(map[string]string, len(base.Regions))
 	for _, entity := range base.Entities {
@@ -563,6 +580,7 @@ func (store *PostgresStore) SearchCompanies(ctx context.Context, serverID, query
 		regions[region.ID] = region.Name
 	}
 	results := make([]CompanyRecord, 0)
+	exactResults := make([]CompanyRecord, 0)
 	for _, company := range base.Companies {
 		var address Address
 		for _, relation := range base.CompanyLocations {
@@ -571,10 +589,17 @@ func (store *PostgresStore) SearchCompanies(ctx context.Context, serverID, query
 				break
 			}
 		}
-		if !strings.Contains(strings.ToLower(company.Name+" "+address.Full), query) {
-			continue
+		record := CompanyRecord{Company: company, Address: address}
+		if strings.EqualFold(strings.TrimSpace(company.Name), query) ||
+			strings.EqualFold(strings.TrimSpace(address.Name), query) ||
+			strings.EqualFold(strings.TrimSpace(address.Full), query) {
+			exactResults = append(exactResults, record)
+		} else if strings.Contains(strings.ToLower(company.Name+" "+address.Full), query) {
+			results = append(results, record)
 		}
-		results = append(results, CompanyRecord{Company: company, Address: address})
+	}
+	if len(exactResults) > 0 {
+		results = exactResults
 	}
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].Company.Name == results[j].Company.Name {
@@ -593,6 +618,94 @@ func (store *PostgresStore) SearchCompanies(ctx context.Context, serverID, query
 		results[index].Employees = employees
 	}
 	return results, nil
+}
+
+// CompanyAtLocation returns every company whose location relation points to the selected building.
+func (store *PostgresStore) CompanyAtLocation(ctx context.Context, serverID, locationID string) ([]CompanyRecord, error) {
+	base, err := store.generatedWorld(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	cityID := strings.TrimPrefix(locationID, "location:")
+	if districtIndex := strings.Index(cityID, "/district/"); districtIndex >= 0 {
+		cityID = cityID[:districtIndex]
+	}
+	if cityID != "lyon" && cityID != "fr/lyon" {
+		var cityVersion int
+		err := store.db.QueryRow(ctx, `SELECT generator_version FROM world_city_generators WHERE server_id=$1::uuid AND city_id=$2`, serverID, cityID).Scan(&cityVersion)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+		if err == nil {
+			seed, _, err := store.worldSeedAndVersion(ctx, serverID)
+			if err != nil {
+				return nil, err
+			}
+			cityWorld, err := GenerateCity(seed, cityVersion, cityID)
+			if err != nil {
+				return nil, err
+			}
+			base.Entities = append(base.Entities, cityWorld.Entities...)
+			base.Regions = append(base.Regions, cityWorld.Regions...)
+			base.Companies = append(base.Companies, cityWorld.Companies...)
+			base.CompanyLocations = append(base.CompanyLocations, cityWorld.CompanyLocations...)
+		}
+	}
+	entities := make(map[string]Entity, len(base.Entities))
+	regions := make(map[string]string, len(base.Regions))
+	companies := make(map[string]Company, len(base.Companies))
+	for _, entity := range base.Entities {
+		entities[entity.ID] = entity
+	}
+	for _, region := range base.Regions {
+		regions[region.ID] = region.Name
+	}
+	for _, company := range base.Companies {
+		companies[company.ID] = company
+	}
+
+	location, exists := entities[locationID]
+	if !exists {
+		return []CompanyRecord{}, nil
+	}
+	results := make([]CompanyRecord, 0)
+	for _, relation := range base.CompanyLocations {
+		if relation.LocationID != locationID {
+			continue
+		}
+		company, exists := companies[relation.CompanyID]
+		if !exists {
+			continue
+		}
+		results = append(results, CompanyRecord{Company: company, Address: makeAddress(location, regions)})
+	}
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].Company.Name == results[j].Company.Name {
+			return results[i].Company.ID < results[j].Company.ID
+		}
+		return results[i].Company.Name < results[j].Company.Name
+	})
+	return results, nil
+}
+
+// CompanyDirectoryAtLocation returns staff only for a company occupying the selected building.
+func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serverID, locationID, companyID string) ([]CompanyRecord, error) {
+	companies, err := store.CompanyAtLocation(ctx, serverID, locationID)
+	if err != nil {
+		return nil, err
+	}
+	for _, record := range companies {
+		if record.Company.ID != companyID {
+			continue
+		}
+		employees, err := store.EmployeesOfCompany(ctx, serverID, companyID)
+		if err != nil {
+			return nil, err
+		}
+		record.Employees = employees
+		return []CompanyRecord{record}, nil
+	}
+	return []CompanyRecord{}, nil
 }
 
 // SearchLocations finds persisted city locations by name or their complete address.
@@ -726,17 +839,19 @@ func generatedCityLocations(seed string, city WorldCity, districtID, districtNam
 	selectedBuildings := shuffledCopy(buildings, stream)[:2]
 	locations := make([]LocationRecord, 0, 4)
 	for _, street := range selectedStreets {
+		name := street + " — " + districtName
 		locations = append(locations, LocationRecord{Address: Address{
 			LocationID: "location:" + city.ID + "/district/" + strings.TrimPrefix(districtID, city.ID+"/district/") + "/street/" + slug(street),
-			Name:       street, Kind: "street", District: districtName, City: city.Name, Country: city.Country,
-			Full: strings.Join([]string{street, districtName, city.Name, city.Country}, ", "),
+			Name:       name, Kind: "street", District: districtName, City: city.Name, Country: city.Country,
+			Full: strings.Join([]string{name, city.Name, city.Country}, ", "),
 		}})
 	}
 	for _, building := range selectedBuildings {
+		name := building + " — " + districtName
 		locations = append(locations, LocationRecord{Address: Address{
 			LocationID: "location:" + city.ID + "/district/" + strings.TrimPrefix(districtID, city.ID+"/district/") + "/building/" + slug(building),
-			Name:       building, Kind: "building", District: districtName, City: city.Name, Country: city.Country,
-			Full: strings.Join([]string{building, districtName, city.Name, city.Country}, ", "),
+			Name:       name, Kind: "building", District: districtName, City: city.Name, Country: city.Country,
+			Full: strings.Join([]string{name, city.Name, city.Country}, ", "),
 		}})
 	}
 	sort.Slice(locations, func(i, j int) bool { return locations[i].Address.LocationID < locations[j].Address.LocationID })
@@ -842,11 +957,7 @@ func (store *PostgresStore) WorldForCases(ctx context.Context, serverID string) 
 		return World{}, err
 	}
 	known := make(map[string]bool, len(base.NPCs))
-	for index := range base.NPCs {
-		npc := &base.NPCs[index]
-		if err := store.applyNPCStatus(ctx, serverID, npc.ID, npc); err != nil {
-			return World{}, err
-		}
+	for _, npc := range base.NPCs {
 		known[npc.ID] = true
 	}
 	rows, err := store.db.Query(ctx, `SELECT entity_id, generation_key FROM world_entities WHERE server_id=$1::uuid AND entity_type='npc' ORDER BY entity_id`, serverID)
@@ -871,15 +982,14 @@ func (store *PostgresStore) WorldForCases(ctx context.Context, serverID string) 
 			rows.Close()
 			return World{}, ErrGeneratedConflict
 		}
-		if err := store.applyNPCStatus(ctx, serverID, id, &npc); err != nil {
-			rows.Close()
-			return World{}, err
-		}
 		base.NPCs = append(base.NPCs, npc)
 		known[id] = true
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
+		return World{}, err
+	}
+	if err := store.applyNPCStatuses(ctx, serverID, base.NPCs); err != nil {
 		return World{}, err
 	}
 	rows, err = store.db.Query(ctx, `SELECT relationship_id, employee_npc_id, employer_company_id, role FROM employment_relationships WHERE server_id=$1::uuid ORDER BY relationship_id`, serverID)
@@ -1191,6 +1301,38 @@ func (store *PostgresStore) applyNPCStatus(ctx context.Context, serverID, npcID 
 	return nil
 }
 
+func (store *PostgresStore) applyNPCStatuses(ctx context.Context, serverID string, npcs []NPC) error {
+	if len(npcs) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(npcs))
+	byID := make(map[string]*NPC, len(npcs))
+	for index := range npcs {
+		ids = append(ids, npcs[index].ID)
+		byID[npcs[index].ID] = &npcs[index]
+	}
+	rows, err := store.db.Query(ctx,
+		`SELECT DISTINCT ON (entity_id) entity_id, value #>> '{}'
+		 FROM world_mutations WHERE server_id=$1::uuid AND field_key='status'
+		 AND entity_id=ANY($2::text[]) ORDER BY entity_id, mutation_order DESC`, serverID, ids,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, status string
+		if err := rows.Scan(&id, &status); err != nil {
+			return err
+		}
+		if status != "alive" && status != "dead" {
+			return ErrInvalidMutation
+		}
+		byID[id].Status = status
+	}
+	return rows.Err()
+}
+
 // EmployeesOfCompany uses the employer relationship index and reconstructs only matching NPCs.
 func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, companyID string) ([]CompanyEmployee, error) {
 	seed, version, err := store.worldSeedAndVersion(ctx, serverID)
@@ -1241,7 +1383,7 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 		if err != nil {
 			return nil, err
 		}
-		employees = append(employees, CompanyEmployee{ID: employeeID, Name: npc.Name, Role: role})
+		employees = append(employees, CompanyEmployee{ID: employeeID, Name: npc.Name, Role: role, Visual: npc.Visual})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

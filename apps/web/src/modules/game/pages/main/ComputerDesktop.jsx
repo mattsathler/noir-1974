@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Building } from "pixelarticons/react/Building";
 import { Files } from "pixelarticons/react/Files";
-import { Map as MapIcon } from "pixelarticons/react/Map";
+import { Dollar } from "pixelarticons/react/Dollar";
 import { Mail } from "pixelarticons/react/Mail";
+import { Map as MapIcon } from "pixelarticons/react/Map";
+import { Message } from "pixelarticons/react/Message";
+import { Note } from "pixelarticons/react/Note";
 import { Notes } from "pixelarticons/react/Notes";
 import { Phone } from "pixelarticons/react/Phone";
-import { Globe } from "pixelarticons/react/Globe";
+import { Printer } from "pixelarticons/react/Printer";
+import { User } from "pixelarticons/react/User";
+import { Users } from "pixelarticons/react/Users";
+import { Wifi } from "pixelarticons/react/Wifi";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
 import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, setWhiteboardSaveState } from "../../../world/api.js";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
 import Whiteboard from "../../../cases/pages/files/Whiteboard.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
+import LocalTerminal from "./LocalTerminal.jsx";
 
 const BOOT_LINES = [
   "NOIR PERSONAL TERMINAL · 1974",
@@ -20,18 +26,71 @@ const BOOT_LINES = [
   "PRIVATE SYSTEM READY",
 ];
 
-const programs = [
-  { id: "interpol", label: "PERSON SEARCH", Icon: Globe, state: "ONLINE", available: true },
+const PERSONAL_PROGRAMS = [
   { id: "case-files", label: "CASE FILES", Icon: Files, state: "UNDER REVIEW", available: false },
   { id: "whiteboard", label: "WHITEBOARD", Icon: Notes, state: "ONLINE", available: true },
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
-  { id: "bank-records", label: "MERIDIAN BANK", Icon: Building, state: "RESTRICTED", available: true },
-  { id: "gate-records", label: "GATE NETWORK", Icon: Globe, state: "RESTRICTED", available: true },
-  { id: "email", label: "MERIDIAN MAIL", Icon: Mail, state: "RESTRICTED", available: true },
   { id: "telephone", label: "TELEPHONE", Icon: Phone, state: "OFFLINE", available: false },
 ];
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, issueDay, onClose }) {
+const BYPASSED_PROGRAM_LABELS = {
+  "case-files": "CA\uE000E FI\uE001ES",
+  whiteboard: "WHI\uE000\uE001BOAR\uE002",
+  "city-records": "CI\uE003Y RECO\uE004DS",
+  telephone: "TELE\uE000ONE",
+  interpol: "PERSON\uE001EL SEARCH",
+  emails: "E\uE002AIL ARCHIVE",
+  "bank-records": "FINANCI\uE003L RECORDS",
+  "gate-records": "GATE ACCESS L\uE004GS",
+  "staff-directory": "STAFF DIREC\uE001ORY",
+  "internal-memos": "INTERNAL ME\uE002OS",
+  "print-queue": "PRINT Q\uE003EUE",
+  "network-status": "NETW\uE004RK STATUS",
+  "voice-mail": "VOICE MESSA\uE000ES",
+};
+
+function visibleProgramLabel(program, bypassed) {
+  const label = bypassed ? BYPASSED_PROGRAM_LABELS[program.id] || program.label : program.label;
+  if (!bypassed) return label;
+  return Array.from(label).map((character, index) => /[\uE000-\uF8FF]/u.test(character)
+    ? <span className="computer-program__tofu" key={`${program.id}:tofu:${index}`}>{character}</span>
+    : character);
+}
+
+function programsFor(facilityContext) {
+  if (!facilityContext || facilityContext.kind === "personal") return PERSONAL_PROGRAMS;
+  const whiteboard = { id: "whiteboard", label: "WHITEBOARD", Icon: Notes, state: "ONLINE", available: true };
+  const offlinePrograms = [
+    { id: "internal-memos", label: "INTERNAL MEMOS", Icon: Note, state: "OFFLINE", available: false },
+    { id: "print-queue", label: "PRINT QUEUE", Icon: Printer, state: "OFFLINE", available: false },
+    { id: "network-status", label: "NETWORK STATUS", Icon: Wifi, state: "OFFLINE", available: false },
+    { id: "voice-mail", label: "VOICE MESSAGES", Icon: Message, state: "OFFLINE", available: false },
+  ];
+  let activePrograms;
+  if (facilityContext.kind === "police") return [
+    { id: "interpol", label: "PERSONNEL SEARCH", Icon: User, state: "ONLINE", available: true },
+    { id: "emails", label: "EMAIL ARCHIVE", Icon: Mail, state: "ONLINE", available: true },
+    whiteboard,
+    ...offlinePrograms,
+  ];
+  if (facilityContext.kind === "bank") activePrograms = [{ id: "bank-records", label: "FINANCIAL RECORDS", Icon: Dollar, state: "ONLINE", available: true }, whiteboard];
+  else if (facilityContext.kind === "gate") activePrograms = [{ id: "gate-records", label: "GATE ACCESS LOGS", Icon: MapIcon, state: "ONLINE", available: true }, whiteboard];
+  else if (facilityContext.kind === "company") activePrograms = [
+    { id: "staff-directory", label: "STAFF DIRECTORY", Icon: Users, state: "ONLINE", available: true },
+    whiteboard,
+  ];
+  if (activePrograms) return [...activePrograms, ...offlinePrograms];
+  return PERSONAL_PROGRAMS;
+}
+
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, issueDay, facilityContext, onClose }) {
+  const programs = programsFor(facilityContext);
+  const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
+  const bootLines = isCompanyComputer ? [`${facilityContext.label} WORKSTATION`, "MERIDIAN AUTHENTICATION SERVICE…", "LOCAL SESSION READY"] : BOOT_LINES;
+  const [facilityUnlocked, setFacilityUnlocked] = useState(!isCompanyComputer);
+  const isBypassed = isCompanyComputer && facilityUnlocked;
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const [windows, setWindows] = useState(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem("noir:computer:windows") || "null");
@@ -43,7 +102,6 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     } catch { return []; }
   });
   const [booting, setBooting] = useState(true);
-  const [hacking, setHacking] = useState(false);
   const [pinDialog, setPinDialog] = useState(null);
   const [preferredBoardId, setPreferredBoardId] = useState(null);
   const modalRef = useRef(null);
@@ -52,7 +110,6 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const dragRef = useRef(null);
   const bootTimerRef = useRef(null);
   const nextZIndexRef = useRef(Math.max(5, ...windows.map((item) => item.zIndex + 1)));
-  const hackingRequestsRef = useRef(0);
   const windowsStateRef = useRef(windows);
   const pinDialogRef = useRef(pinDialog);
   windowsStateRef.current = windows;
@@ -120,19 +177,12 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   }
 
   const runHack = useCallback(async (loadRequest) => {
-    hackingRequestsRef.current += 1;
-    setHacking(true);
-    try {
-      const request = typeof loadRequest === "function" ? loadRequest() : Promise.resolve(loadRequest);
-      const [result] = await Promise.all([
-        request,
-        new Promise((resolve) => window.setTimeout(resolve, 900)),
-      ]);
-      return result;
-    } finally {
-      hackingRequestsRef.current = Math.max(0, hackingRequestsRef.current - 1);
-      setHacking(hackingRequestsRef.current > 0);
-    }
+    const request = typeof loadRequest === "function" ? loadRequest() : Promise.resolve(loadRequest);
+    const [result] = await Promise.all([
+      request,
+      new Promise((resolve) => window.setTimeout(resolve, 900)),
+    ]);
+    return result;
   }, []);
 
   function startWindowDrag(event) {
@@ -300,13 +350,26 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     >
       <section className="computer-frame computer-frame--modal" aria-label="Desktop applications">
       <div className="computer-bezel">
-        <div className="computer-screen">
+        <div className={`computer-screen${isBypassed ? " computer-screen--bypassed" : ""}`}>
           <div className="computer-screen__glass texture-scanlines" aria-hidden="true" />
+          {isBypassed && <div className="computer-bypass-overlay" aria-hidden="true">
+            <span>BYPASSDECRYPT.EXE // SESSION HIJACKED</span>
+            <span>AUTH LAYER: OVERRIDDEN // BYPASS</span>
+            <span>TRACE DETECTED… FALSE ROUTE ENGAGED</span>
+            <span className="computer-bypass-garble">▓▒░ 0x7F // �#%&amp;? ⌧ ▒▓█</span>
+            <span className="computer-bypass-garble">�� 1010:ERR // �&lt;!~ #�</span>
+            <span className="computer-bypass-garble">KERNEL? NO // BYPASS::BYPASS</span>
+            <span className="computer-bypass-garble">▒#@! 0x0000:DECRYPT_FAIL?=FALSE</span>
+            <span className="computer-bypass-tofu computer-bypass-tofu--one">{"\uE000\uE001\uE002"}</span>
+            <span className="computer-bypass-tofu computer-bypass-tofu--two">{"\uF8FF\uE017\uE0FF"}</span>
+            <span className="computer-bypass-tofu computer-bypass-tofu--three">{"\uE100\uE101\uE102\uE103"}</span>
+            <span className="computer-bypass-tofu computer-bypass-tofu--four">{"\uE777\uE778\uE779"}</span>
+          </div>}
           {booting && <div className="computer-sequence computer-sequence--boot" role="status">
-            <Typewriter className="computer-sequence__typewriter" texts={BOOT_LINES} speed={26} lineDelay={220} onComplete={finishBoot} />
+            <Typewriter className="computer-sequence__typewriter" texts={bootLines} speed={26} lineDelay={220} onComplete={finishBoot} />
           </div>}
           <header className="computer-menubar">
-            <p className="computer-brand"><span className="computer-brand__mark">N</span> NOIR TERMINAL <span className="computer-brand__divider">/</span> MERIDIAN GLOBAL RELAY</p>
+            <p className="computer-brand"><span className="computer-brand__mark">N</span> NOIR TERMINAL <span className="computer-brand__divider">/</span> MERIDIAN GLOBAL RELAY {isBypassed && <span className="computer-bypass-tag">BYPASS ACTIVE</span>}</p>
             <div className="computer-menubar__status">
               <span className="computer-status-light" />
               <span>{location || "WORLD CONNECTION PENDING"}</span>
@@ -319,10 +382,27 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             <button ref={closeButtonRef} className="computer-modal__close" type="button" aria-label="Close computer" onClick={exitComputer}>×</button>
           </header>
 
-          {!booting && <div className="computer-desktop__content">
+          {!booting && isCompanyComputer && !facilityUnlocked && <section className="company-login" aria-label={`${facilityContext.label} employee login`}>
+            <div className="company-login__panel">
+              <p className="company-login__eyebrow">{facilityContext.label} · EMPLOYEE ACCESS</p>
+              <h1>Sign in to your workstation</h1>
+              <p className="company-login__copy">Use your company credentials to access internal applications.</p>
+              <form onSubmit={(event) => { event.preventDefault(); setLoginError("INVALID EMPLOYEE CREDENTIALS"); }}>
+                <label htmlFor="company-login-email">EMPLOYEE EMAIL</label>
+                <input id="company-login-email" type="email" autoComplete="username" placeholder="name@meridian.global" />
+                <label htmlFor="company-login-password">PASSWORD</label>
+                <input id="company-login-password" type="password" autoComplete="current-password" placeholder="Enter your password" />
+                {loginError && <p className="company-login__error" role="alert">{loginError}</p>}
+                <button type="submit">SIGN IN</button>
+              </form>
+            </div>
+            <button className="company-login__terminal" type="button" aria-label="Open local terminal" title="Open local terminal" onClick={() => setTerminalOpen(true)}><span aria-hidden="true">&gt;_</span></button>
+          </section>}
+
+          {!booting && (!isCompanyComputer || facilityUnlocked) && <div className="computer-desktop__content">
             <div className="computer-desktop__heading">
-              <p>PRIVATE INVESTIGATION SYSTEM</p>
-              <span>PRIVATE LINE · ACCOUNT CHARGED</span>
+              <p>{facilityContext?.label || "PRIVATE INVESTIGATION SYSTEM"} {isBypassed && <span className="computer-bypass-inline">// SYSTEM OVERRIDDEN</span>}</p>
+              <span>{isBypassed ? "UNAUTHORIZED SESSION · BYPASSDECRYPT RUNNING" : "PRIVATE LINE · ACCOUNT CHARGED"}</span>
             </div>
             <nav className="computer-programs" aria-label="Desktop applications">
               {programs.map((program) => (
@@ -337,7 +417,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                   <span className={`computer-program__icon computer-program__icon--${program.id}`} aria-hidden="true">
                     <program.Icon className="computer-program__glyph" aria-hidden="true" />
                   </span>
-                  <span className="computer-program__label">{program.label}</span>
+                  <span className="computer-program__label">{visibleProgramLabel(program, isBypassed)}</span>
                   <span className="computer-program__state">{program.state}</span>
                 </button>
               ))}
@@ -354,25 +434,27 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 aria-label={`${program.label} application window`}
                 onMouseDown={() => focusWindow(id)}
               >
+                {isBypassed && program.id !== "whiteboard" && <div className="computer-window__corruption" aria-hidden="true">
+                  <span>ERR://BYPASS_TOKEN_REJECTED</span>
+                  <span>0x7F ▓▒░ �⿻� AUTH::FALSE</span>
+                  <span>DATA STREAM DESYNC // RETRY</span>
+                  <span>{"\uE000\uE001 // \uE017\uE018\uE019"}</span>
+                </div>}
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
-                  <span><span className="computer-status-light" /> {program.id === "whiteboard" ? "PERSONAL WHITEBOARD" : `${program.label} DATABASE`}</span>
+                  <span><span className="computer-status-light" /> {program.id === "whiteboard" ? "PERSONAL WHITEBOARD" : `${program.label} DATABASE`} <i className="computer-bypass-window-tag">BYPASS LINK</i></span>
                   <button type="button" className="computer-window__close" aria-label={`Close ${program.label}`} onClick={() => closeWindow(id)}>×</button>
                 </header>
                 <div className="computer-window__body">
                   {program.id === "case-files"
                     ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} onPin={requestPin} />
-                    : program.id === "whiteboard"
+                      : program.id === "whiteboard"
                       ? <Whiteboard key={id} initialBoardId={boardId || preferredBoardId} focusBoard={(boardId) => setPreferredBoardId(boardId)} />
-                      : program.id === "email"
+                      : program.id === "emails"
                         ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} runHack={runHack} onPin={requestPin} />
-                        : <WorldDirectory key={id} program={program.id} serverTime={serverTime} timeZone={timeZone} runHack={runHack} onPin={requestPin} />}
+                        : <WorldDirectory key={id} program={program.id} companyLocationId={program.id === "staff-directory" ? facilityContext?.locationId : undefined} companyId={program.id === "staff-directory" ? facilityContext?.companyId : undefined} serverTime={serverTime} timeZone={timeZone} runHack={runHack} onPin={requestPin} />}
                 </div>
               </section>;
             })}
-            {hacking && <section className="computer-hack-modal" style={{ zIndex: Math.max(20, ...windows.map((item) => item.zIndex + 1)) }} role="status" aria-label="Secure data access in progress">
-              <header><span>MERIDIAN SECURE LINK</span><span className="computer-status-light" /></header>
-              <div><p>ESTABLISHING SECURE TUNNEL</p><p>ROUTING THROUGH PRIVATE RELAY…</p><p>DECRYPTING REQUESTED FILE</p><div className="computer-sequence__progress"><i /></div></div>
-            </section>}
             {pinDialog && <section className="whiteboard-destination" style={{ zIndex: Math.max(20, ...windows.map((item) => item.zIndex + 1)) }} role="dialog" aria-modal="true" aria-labelledby="whiteboard-destination-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setPinDialog(null); }}>
               <div className="whiteboard-destination__panel">
                 <header><div><p className="computer-window__eyebrow">FILE DISCOVERED · {pinDialog.item.source.toUpperCase()}</p><h2 id="whiteboard-destination-title">PIN TO WHITEBOARD</h2></div><button type="button" aria-label="Close whiteboard selection" onClick={() => setPinDialog(null)}>×</button></header>
@@ -386,9 +468,11 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             </section>}
           </div>}
 
+          {terminalOpen && <LocalTerminal facility={facilityContext} variant="app" onAccessGranted={() => { setFacilityUnlocked(true); setTerminalOpen(false); }} onClose={() => setTerminalOpen(false)} />}
+
           <footer className="computer-taskbar">
             <div className="computer-taskbar__left">
-              <span className="computer-taskbar__system"><span className="computer-brand__mark">N</span> SYSTEM</span>
+              <span className="computer-taskbar__system"><span className="computer-brand__mark">N</span> {isBypassed ? "BYPASS SESSION" : isCompanyComputer ? "WORKSTATION LOGIN" : "PERSONAL SESSION"}</span>
               {windows.map((item) => <button key={item.id} className={`computer-taskbar__active${item.zIndex === Math.max(...windows.map((windowItem) => windowItem.zIndex)) ? " computer-taskbar__active--focused" : ""}`} type="button" onClick={() => focusWindow(item.id)}>{item.program.label}</button>)}
             </div>
             <button className="computer-logout" type="button" onClick={exitComputer}>Exit <span aria-hidden="true">↗</span></button>

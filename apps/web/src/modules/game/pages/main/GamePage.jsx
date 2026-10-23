@@ -10,8 +10,10 @@ import { currentIdentity } from "../../../identity/api.js";
 import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx";
 import ComputerDesktop from "./ComputerDesktop.jsx";
 import GateCityExplorer from "../../../world/components/GateCityExplorer.jsx";
-import { getCurrentWorld, movePlayer } from "../../../world/api.js";
+import { getCompanyAtLocation, getCurrentWorld, getNeighborhoodDestinations, movePlayer } from "../../../world/api.js";
 import GateTransition from "../../components/GateTransition.jsx";
+import LocalTerminal from "./LocalTerminal.jsx";
+import ModularFace from "../../../identity/components/ModularFace.jsx";
 
 function buildingVisual(building) {
   const identity = `${building.locationId} ${building.name}`.toLowerCase();
@@ -20,6 +22,36 @@ function buildingVisual(building) {
   if (identity.includes("bank")) return { icon: moneyIcon, label: "BANK" };
   if (identity.includes("gate")) return { Icon: Earth, label: "GATE CENTRAL" };
   return { icon: buildingIcon, label: "LOCAL BUILDING" };
+}
+
+function interiorProfile(place) {
+  const identity = `${place.locationId} ${place.name}`.toLowerCase();
+  if (identity.includes("police")) return { type: "police", label: "CORPORATE SECURITY OFFICE", room: "SECURITY DESK", detail: "A contracted security office serving this city.", facility: "police" };
+  if (identity.includes("bank")) return { type: "bank", label: "MERIDIAN FINANCIAL SERVICES", room: "CUSTOMER HALL", detail: "Accounts and transactions are handled under corporate service terms.", facility: "bank" };
+  if (identity.includes("hospital")) return { type: "hospital", label: "CITY HOSPITAL", room: "EMERGENCY WARD", detail: "A public medical facility serving the surrounding neighborhood." };
+  if (identity.includes("gate")) return { type: "gate", label: "MERIDIAN GLOBAL · GATE NETWORK", room: "TRANSIT CONCOURSE", detail: "Passenger access is monitored by the local GATE relay.", facility: "gate" };
+  if (identity.includes("home") || identity.includes("residence") || identity.includes("apartment")) return { label: "PRIVATE RESIDENCE", room: "ENTRY ROOM", detail: "A private interior at the selected address." };
+  return { type: "building", label: "LOCAL COMMERCIAL PREMISES", room: "RECEPTION AREA", detail: "A privately operated business at the selected address.", facility: "company" };
+}
+
+async function neighborhoodCompanies(district) {
+  const addresses = (district?.locations ?? []).map(({ address }) => address).filter((address) => address?.kind === "building");
+  const companyAddresses = addresses.filter((address) => !address.locationId?.startsWith("service:") && address.status !== "closed");
+  const companyRecords = await Promise.all(companyAddresses.map((address) => getCompanyAtLocation(address.locationId)));
+  const seenCompanies = new Set();
+  const companies = companyRecords.flat().flatMap((record) => {
+    if (!record?.company?.id || seenCompanies.has(record.company.id)) return [];
+    seenCompanies.add(record.company.id);
+    return [{ kind: "company", company: record.company, address: record.address, record }];
+  });
+  const services = addresses.filter((address) => address.locationId?.startsWith("service:")).map((address) => ({
+    kind: "service",
+    company: { id: address.locationId, name: address.name },
+    address,
+    serviceKind: interiorProfile(address).facility,
+    status: address.status,
+  }));
+  return [...companies, ...services].sort((first, second) => first.company.name.localeCompare(second.company.name));
 }
 
 function formatServerDateTime(timestamp, timeZone) {
@@ -58,12 +90,16 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [serverTime, setServerTime] = useState(initialWorld ? new Date(initialWorld.serverTime) : null);
   const [error, setError] = useState("");
   const [computerOpen, setComputerOpen] = useState(false);
+  const [computerEntry, setComputerEntry] = useState(null);
+  const [computerContext, setComputerContext] = useState(null);
   const [newspaperOpen, setNewspaperOpen] = useState(false);
   const [transitOpen, setTransitOpen] = useState(false);
   const [gateTransition, setGateTransition] = useState(null);
   const [arrival, setArrival] = useState(null);
-  const [interiorPlace, setInteriorPlace] = useState(null);
-  const closeComputer = useCallback(() => setComputerOpen(false), []);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [companyDirectoryLoading, setCompanyDirectoryLoading] = useState(false);
+  const interiorPlace = selectedCompany?.address ?? null;
+  const closeComputer = useCallback(() => { setComputerOpen(false); setComputerContext(null); }, []);
   const closeNewspaper = useCallback(() => setNewspaperOpen(false), []);
   const closeTransit = useCallback(() => setTransitOpen(false), []);
 
@@ -79,12 +115,28 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     const nextWorld = response.world ?? await getCurrentWorld();
     setWorld(nextWorld);
     setServerTime(new Date(nextWorld.serverTime));
-    setArrival({ city: destination.city, district: response.district, buildings: response.buildings ?? [] });
-    setInteriorPlace(null);
+    const companies = await neighborhoodCompanies(response.district);
+    setArrival({ city: destination.city, district: response.district, companies });
+    setSelectedCompany(null);
     closeTransit();
   }, [closeTransit]);
-  const visitPlace = useCallback((place) => setInteriorPlace(place), []);
-  const returnToDistrict = useCallback(() => setInteriorPlace(null), []);
+  const visitCompany = useCallback(async (company) => {
+    setError("");
+    setSelectedCompany(company);
+    setCompanyDirectoryLoading(company.kind === "company");
+    if (company.kind !== "company") return;
+    try {
+      const [record] = await getCompanyAtLocation(company.address.locationId, company.company.id);
+      if (record) setSelectedCompany((current) => current?.company.id === company.company.id ? { ...current, record } : current);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setCompanyDirectoryLoading(false);
+    }
+  }, []);
+  const returnToDistrict = useCallback(() => {
+    setSelectedCompany(null);
+  }, []);
   const completeGateTransition = useCallback(() => setGateTransition(null), []);
   const failGateTransition = useCallback((requestError) => {
     setError([
@@ -118,10 +170,34 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     return () => window.clearInterval(timer);
   }, [world]);
 
+  useEffect(() => {
+    if (!world || arrival || !world.cityId) return undefined;
+    let active = true;
+    const districtId = world.districtId || `${world.cityId}/district/central`;
+    getNeighborhoodDestinations(world.cityId).then((districts) => {
+      if (!active) return;
+      const district = districts.find((item) => item.id === districtId)
+        ?? districts.find((item) => item.name.toLowerCase() === "central");
+      if (!district) return;
+      return neighborhoodCompanies(district).then((companies) => {
+        if (!active) return;
+        setArrival({
+          city: { id: world.cityId, name: world.city, country: world.country },
+          district,
+          companies,
+        });
+      });
+    }).catch((requestError) => {
+      if (active) setError(requestError.message);
+    });
+    return () => { active = false; };
+  }, [world?.cityId, world?.districtId, world?.city, world?.country, arrival]);
+
   const display = world && serverTime ? formatServerDateTime(serverTime, world.timeZone) : null;
   const issueDay = localDateKey(serverTime, world?.timeZone);
   const location = world ? [world.city, world.country].filter(Boolean).join(", ") : "";
   const cityBackdrop = world?.cityId === "fr/lyon" ? 'url("/images/cities/lyon.png")' : "none";
+  const activeInteriorProfile = interiorPlace ? interiorProfile(interiorPlace) : null;
 
   return (
     <main className="game-screen pos-relative min-h-screen overflow-hidden bg-atmosphere text-primary" aria-label={interiorPlace ? `${interiorPlace.name} interior` : "Main game screen"}>
@@ -151,8 +227,8 @@ export default function GamePage({ initialWorld = null, onLogout }) {
               type="button"
               aria-label="Open computer desktop"
               aria-haspopup="dialog"
-              aria-expanded={computerOpen}
-              onClick={() => { setNewspaperOpen(false); setComputerOpen(true); }}
+              aria-expanded={computerOpen || Boolean(computerEntry)}
+              onClick={() => { setNewspaperOpen(false); setComputerEntry(null); setComputerContext({ kind: "personal", label: "NOIR PERSONAL COMPUTER", city: world?.city }); setComputerOpen(true); }}
             >
               <MonitorSharp className="computer-launch__icon" aria-hidden="true" />
             </button>
@@ -177,29 +253,62 @@ export default function GamePage({ initialWorld = null, onLogout }) {
       {error && <p className="pos-relative m-6 text-sm text-danger" role="alert">{error}</p>}
       {arrival && !interiorPlace && <section className="district-arrival" aria-labelledby="district-arrival-title">
         <header className="district-arrival__header">
-          <div><p>ARRIVAL RECORD · {arrival.city.name.toUpperCase()}, {arrival.city.country.toUpperCase()}</p><h1 id="district-arrival-title">{arrival.district?.name}</h1></div>
-          <span>{arrival.buildings.length} CONSTRUCTIONS</span>
+          <div><p>NEIGHBORHOOD DIRECTORY · {arrival.city.name.toUpperCase()}, {arrival.city.country.toUpperCase()}</p><h1 id="district-arrival-title">{arrival.district?.name}</h1></div>
+          <span>{arrival.companies.length} COMPANIES &amp; SERVICES</span>
         </header>
         <div className="district-arrival__cards">
-          {arrival.buildings.map((building) => {
-            const { Icon, icon, label } = buildingVisual(building);
-            return <article className="district-arrival__card" key={building.locationId}>
+          {arrival.companies.length === 0 && <p className="district-arrival__empty">NO COMPANIES OR PUBLIC SERVICES ARE LISTED IN THIS NEIGHBORHOOD.</p>}
+          {arrival.companies.map((company) => {
+            const { Icon, icon, label } = company.kind === "service"
+              ? buildingVisual(company.address)
+              : { icon: buildingIcon, label: "COMPANY" };
+            return <article className="district-arrival__card" key={company.company.id}>
               <div className="district-arrival__icon" aria-hidden="true">
                 {icon ? <span className="district-arrival__icon-image" style={{ "--building-icon-image": `url("${icon}")` }} /> : <Icon />}
                 <span>{label}</span>
               </div>
-              <p>{building.status === "closed" ? "PUBLIC SERVICE · CLOSED" : "LOCAL CONSTRUCTION"}</p>
-              <h2>{building.name}</h2>
-              {building.status === "closed"
+              <p>{company.status === "closed" ? "PUBLIC SERVICE · CLOSED" : company.kind === "service" ? "PUBLIC SERVICE" : "LOCAL COMPANY"}</p>
+              <h2>{company.company.name}</h2>
+              {company.status === "closed"
                 ? <span className="district-arrival__closed">CLOSED · FUTURE SERVICE</span>
-                : <button type="button" onClick={() => visitPlace(building)}>VISIT <span aria-hidden="true">↗</span></button>}
+                : <button type="button" onClick={() => visitCompany(company)}>ENTER <span aria-hidden="true">↗</span></button>}
             </article>;
           })}
         </div>
       </section>}
-      {interiorPlace && <section className="building-interior" aria-labelledby="building-interior-title">
-        <header className="building-interior__header"><div><p>INTERIOR ACCESS · {world?.city?.toUpperCase()}</p><h1 id="building-interior-title">{interiorPlace.name}</h1></div><button type="button" onClick={returnToDistrict}>RETURN TO NEIGHBORHOOD</button></header>
-        <div className="building-interior__room"><span>INTERIOR VIEW</span><p>{interiorPlace.name.toUpperCase()}</p></div>
+      {interiorPlace && selectedCompany && <section className="building-interior building-interior--company" aria-labelledby="building-interior-title">
+        <header className="building-interior__header">
+          <div><p>{selectedCompany.kind === "service" ? "PUBLIC SERVICE ACCESS" : "COMPANY WORKSPACE"} · {world?.city?.toUpperCase()}</p><h1 id="building-interior-title">{selectedCompany.company.name}</h1><span>{interiorPlace.full}</span></div>
+          <button type="button" onClick={returnToDistrict}>RETURN TO NEIGHBORHOOD</button>
+        </header>
+        <div className="building-interior__layout">
+          <div className="building-interior__room" aria-label={`${selectedCompany.company.name} personnel`}>
+            <div className="building-interior__personnel-heading"><div><span className="building-interior__room-label">PERSONNEL ON SITE</span><h2>Staff directory</h2></div><span>{companyDirectoryLoading ? "RETRIEVING FILES…" : `${selectedCompany.record?.employees?.length ?? 0} EMPLOYEES`}</span></div>
+            {companyDirectoryLoading
+              ? <p className="building-interior__personnel-status">ACCESSING COMPANY PERSONNEL FILES…</p>
+              : selectedCompany.kind === "company" && (selectedCompany.record?.employees?.length ?? 0) > 0
+                ? <div className="building-interior__personnel-list">
+                  {selectedCompany.record.employees.map((employee) => <article className="building-interior__employee" key={employee.id}>
+                    <div className="building-interior__employee-portrait">
+                      {employee.visual
+                        ? <ModularFace visual={employee.visual} name={employee.name} />
+                        : <span aria-hidden="true">{employee.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span>}
+                    </div>
+                    <div className="building-interior__employee-copy"><h3>{employee.name}</h3><p>{employee.role}</p><span>INTERROGATION SUBJECT</span></div>
+                  </article>)}
+                </div>
+                : <p className="building-interior__personnel-status">NO PERSONNEL FILES AVAILABLE AT THIS LOCATION.</p>}
+          </div>
+          <aside className="building-interior__record">
+            <p>{selectedCompany.kind === "service" ? "PUBLIC SERVICE RECORD" : "COMPANY RECORD"}</p><h2>{selectedCompany.company.name}</h2><span>{activeInteriorProfile?.detail ?? "A private company operating at this address."}</span>
+            <dl><div><dt>BUILDING</dt><dd>{interiorPlace.name}</dd></div><div><dt>ADDRESS</dt><dd>{interiorPlace.full}</dd></div><div><dt>ACCESS</dt><dd>VISIT CONTEXT · NOT SAVED</dd></div></dl>
+            <button className="building-interior__computer-access" type="button" onClick={() => { setComputerContext({ kind: selectedCompany.kind === "service" ? selectedCompany.serviceKind : "company", label: selectedCompany.company.name, city: world?.city, locationId: interiorPlace.locationId, companyId: selectedCompany.kind === "company" ? selectedCompany.company.id : undefined, district: interiorPlace.district }); setComputerEntry(null); setComputerOpen(true); }}>
+              <span className="building-interior__option-icon"><MonitorSharp className="computer-program__glyph" aria-hidden="true" /></span>
+              <span><strong>{selectedCompany.kind === "service" ? `OPEN ${activeInteriorProfile?.facility?.toUpperCase() ?? "LOCAL"} TERMINAL` : "ACCESS COMPANY COMPUTER"}</strong><small>ACCESS LOCAL SYSTEMS</small></span>
+              <span aria-hidden="true">↗</span>
+            </button>
+          </aside>
+        </div>
       </section>}
       {!interiorPlace && <footer className="game-location pos-absolute inset-x-0 bottom-0 flex items-end justify-end gap-4 p-6">
         <button className="border-0 bg-transparent text-accent underline" type="button" onClick={onLogout}>Log out</button>
@@ -212,9 +321,11 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           timeZone={world?.timeZone}
           cityId={world?.cityId}
           issueDay={issueDay}
+          facilityContext={computerContext}
           onClose={closeComputer}
         />
       )}
+      {computerEntry && <LocalTerminal facility={computerEntry} onAccessGranted={() => { setComputerContext(computerEntry); setComputerEntry(null); setComputerOpen(true); }} onClose={() => setComputerEntry(null)} />}
       {newspaperOpen && <NewspaperWindow cityId={world?.cityId} issueDay={issueDay} onClose={closeNewspaper} />}
       {transitOpen && <GateCityExplorer world={world} onTravel={travelViaGate} onClose={closeTransit} />}
       {gateTransition && <GateTransition destination={gateTransition} origin={world} onArrive={arriveAtCity} onComplete={completeGateTransition} onError={failGateTransition} />}

@@ -24,8 +24,8 @@
   --noir-warning: #d1aa46;
   --noir-modal-backdrop: color-mix(in srgb, var(--noir-ink-950) 30%, transparent);
 
-  --noir-font-mono: "IBM Plex Mono", "Courier New", monospace;
   --noir-font-sans: "Pixelify Sans", Arial, sans-serif;
+  --noir-font-mono: var(--noir-font-sans);
 
   --noir-space-0: 0;
   --noir-space-1: 0.25rem;

@@ -23,7 +23,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
   const monthDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const offset = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7;
   const days = [...Array(offset).fill(null), ...Array.from({ length: monthDays }, (_, index) => index + 1)];
-  const modal = triggerRef.current?.closest(".computer-window");
+  const modal = triggerRef.current?.closest(".computer-window, .local-terminal-screen");
 
   useEffect(() => setVisibleMonth(`${value.slice(0, 7)}-01`), [value]);
 
@@ -50,7 +50,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
       return;
     }
     const trigger = triggerRef.current;
-    const parent = trigger?.closest(".computer-window");
+    const parent = trigger?.closest(".computer-window, .local-terminal-screen");
     if (trigger && parent) {
       const triggerRect = trigger.getBoundingClientRect();
       const parentRect = parent.getBoundingClientRect();

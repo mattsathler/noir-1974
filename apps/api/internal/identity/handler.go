@@ -80,6 +80,14 @@ type WorldDirectoryReader interface {
 	SearchLocations(context.Context, string, string, string) ([]world.LocationRecord, error)
 }
 
+type companyLocationReader interface {
+	CompanyAtLocation(context.Context, string, string) ([]world.CompanyRecord, error)
+}
+
+type companyDirectoryReader interface {
+	CompanyDirectoryAtLocation(context.Context, string, string, string) ([]world.CompanyRecord, error)
+}
+
 type NewspaperReader interface {
 	Issue(context.Context, string, string, string, string, time.Time) (newspaper.Issue, error)
 }
@@ -835,11 +843,11 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 	}
 	results, err := h.worldReader.SearchNPCs(r.Context(), h.worldServerID, query)
 	if err != nil {
-		http.Error(w, "could not search people", http.StatusInternalServerError)
+		h.writeAPIError(w, r, http.StatusInternalServerError, "PERSON_SEARCH_FAILED", "could not search people", err)
 		return
 	}
-	if len(results) > world.MaxSearchResults {
-		results = results[:world.MaxSearchResults]
+	if len(results) > world.MaxNPCSearchResults {
+		results = results[:world.MaxNPCSearchResults]
 	}
 	if h.whiteboardReader != nil {
 		items := make([]cases.DiscoveredItem, 0, len(results))
@@ -894,16 +902,35 @@ func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
 	} else if !h.authorizeWorldRequest(w, r) {
 		return
 	}
-	query, ok := directoryQuery(w, r)
-	if !ok {
-		return
+	var results []world.CompanyRecord
+	var err error
+	locationLookup := strings.TrimSpace(r.URL.Query().Get("locationId")) != ""
+	if locationID := strings.TrimSpace(r.URL.Query().Get("locationId")); locationID != "" {
+		if companyID := strings.TrimSpace(r.URL.Query().Get("companyId")); companyID != "" {
+			reader, ok := h.worldReader.(companyDirectoryReader)
+			if !ok {
+				h.writeAPIError(w, r, http.StatusServiceUnavailable, "COMPANY_DIRECTORY_UNAVAILABLE", "Company directory lookup is temporarily unavailable.", nil)
+				return
+			}
+			results, err = reader.CompanyDirectoryAtLocation(r.Context(), h.worldServerID, locationID, companyID)
+		} else if reader, ok := h.worldReader.(companyLocationReader); ok {
+			results, err = reader.CompanyAtLocation(r.Context(), h.worldServerID, locationID)
+		} else {
+			h.writeAPIError(w, r, http.StatusServiceUnavailable, "COMPANY_DIRECTORY_UNAVAILABLE", "Company directory lookup is temporarily unavailable.", nil)
+			return
+		}
+	} else {
+		query, ok := directoryQuery(w, r)
+		if !ok {
+			return
+		}
+		results, err = h.worldReader.SearchCompanies(r.Context(), h.worldServerID, query)
 	}
-	results, err := h.worldReader.SearchCompanies(r.Context(), h.worldServerID, query)
 	if err != nil {
 		http.Error(w, "could not search companies", http.StatusInternalServerError)
 		return
 	}
-	if len(results) > world.MaxSearchResults {
+	if !locationLookup && len(results) > world.MaxSearchResults {
 		results = results[:world.MaxSearchResults]
 	}
 	if h.whiteboardReader != nil {
@@ -1091,7 +1118,7 @@ func (h *Handler) gateTravel(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := h.store.setPlayerLocation(r.Context(), current.ID, destination.ID); err != nil {
+	if err := h.store.setPlayerLocation(r.Context(), current.ID, selectedDistrict.ID); err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "PLAYER_LOCATION_SAVE_FAILED", "The destination was prepared, but your location could not be updated.", err)
 		return
 	}
@@ -1100,9 +1127,9 @@ func (h *Handler) gateTravel(w http.ResponseWriter, r *http.Request) {
 	state.City = destination.Name
 	state.Country = destination.Country
 	state.TimeZone = destination.TimeZone
-	state.LocationID = destination.ID
-	state.DistrictID = ""
-	state.District = ""
+	state.LocationID = selectedDistrict.ID
+	state.DistrictID = selectedDistrict.ID
+	state.District = selectedDistrict.Name
 	state.PlaceName = ""
 	buildings := make([]world.Address, 0)
 	for _, place := range selectedDistrict.Locations {
@@ -1325,11 +1352,31 @@ func (h *Handler) worldFor(ctx context.Context, accountID string) worldResponse 
 		state.City = city.Name
 		state.Country = city.Country
 		state.TimeZone = city.TimeZone
-		state.LocationID = city.ID
+		state.DistrictID = city.ID + "/district/central"
+		state.District = "Central"
+		if isDistrictLocation(locationID, city.ID) {
+			state.DistrictID = locationID
+			state.District = districtNameFromID(locationID)
+		}
+		state.LocationID = state.DistrictID
 	} else {
 		state.LocationID = locationID
 	}
 	return state
+}
+
+func districtNameFromID(districtID string) string {
+	parts := strings.Split(districtID, "/")
+	if len(parts) != 4 || parts[2] != "district" {
+		return "Central"
+	}
+	words := strings.Split(parts[3], "-")
+	for index, word := range words {
+		if word != "" {
+			words[index] = strings.ToUpper(word[:1]) + word[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }
 
 func (h *Handler) createCharacter(w http.ResponseWriter, r *http.Request) {

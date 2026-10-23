@@ -2,7 +2,13 @@ async function search(path, query) {
   const response = await fetch(`${path}?q=${encodeURIComponent(query)}`, { credentials: "same-origin" });
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
-  if (!response.ok) throw new Error(payload.message?.trim() || "The directory could not be reached.");
+  if (!response.ok) {
+    const error = new Error(payload.message?.trim() || "The directory could not be reached.");
+    error.code = payload.code;
+    error.requestId = payload.requestId;
+    error.details = payload.details;
+    throw error;
+  }
   return payload.results ?? [];
 }
 
@@ -47,6 +53,15 @@ async function cachedWorldList(key, load) {
 export const searchPeople = (query) => search("/api/world/npcs", query);
 export const searchCompanies = (query) => search("/api/world/companies", query);
 export const searchLocations = (query) => search("/api/world/locations", query);
+
+export async function getCompanyAtLocation(locationId, companyId = "") {
+  const params = new URLSearchParams({ locationId });
+  if (companyId) params.set("companyId", companyId);
+  const response = await fetch(`/api/world/companies?${params}`, { credentials: "same-origin" });
+  const payload = await responsePayload(response);
+  if (!response.ok) throw new Error(payload.message?.trim() || "The company directory could not be reached.");
+  return payload.results ?? [];
+}
 
 export async function getNeighborhoodDestinations(cityId = "unknown") {
   const key = `${worldCachePrefix}:neighborhoods:${encodeURIComponent(cityId)}`;
@@ -192,6 +207,7 @@ async function whiteboardRequest(path, options) {
   return payload;
 }
 
+const whiteboardCacheVersions = new Map();
 function readWhiteboardCache(key) {
   try {
     const cached = JSON.parse(sessionStorage.getItem(`noir:whiteboards:${key}`) || "null");
@@ -199,8 +215,13 @@ function readWhiteboardCache(key) {
   } catch { return null; }
 }
 function writeWhiteboardCache(key, value) {
+  whiteboardCacheVersions.set(key, (whiteboardCacheVersions.get(key) ?? 0) + 1);
   try { sessionStorage.setItem(`noir:whiteboards:${key}`, JSON.stringify({ savedAt: Date.now(), value })); } catch { /* Storage may be disabled. */ }
   return value;
+}
+function removeWhiteboardCache(key) {
+  whiteboardCacheVersions.set(key, (whiteboardCacheVersions.get(key) ?? 0) + 1);
+  try { sessionStorage.removeItem(`noir:whiteboards:${key}`); } catch { /* Storage may be disabled. */ }
 }
 const whiteboardSaveStates = new Map();
 function announceWhiteboardUpdate(boardId, status) {
@@ -291,21 +312,32 @@ export function renameWhiteboard(boardId, title) {
   });
 }
 
-export function deleteWhiteboard(boardId) {
-  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`, { method: "DELETE" }).then((result) => {
-    const boards = readWhiteboardCache("list");
-    if (boards) writeWhiteboardCache("list", boards.filter((board) => board.id !== boardId));
-    try { sessionStorage.removeItem(`noir:whiteboards:${boardId}`); } catch { /* Storage may be disabled. */ }
-    whiteboardSaveStates.delete(boardId);
-    announceWhiteboardUpdate(boardId, "deleted");
-    return result;
-  });
+export async function deleteWhiteboard(boardId) {
+  const previousBoards = readWhiteboardCache("list");
+  const previousBoard = readWhiteboardCache(boardId);
+  const previousSaveState = getWhiteboardSaveState(boardId);
+  if (previousBoards) writeWhiteboardCache("list", previousBoards.filter((board) => board.id !== boardId));
+  removeWhiteboardCache(boardId);
+  whiteboardSaveStates.delete(boardId);
+  announceWhiteboardUpdate(boardId, "deleted");
+  try {
+    return await whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`, { method: "DELETE" });
+  } catch (error) {
+    if (previousBoards) writeWhiteboardCache("list", previousBoards);
+    if (previousBoard) writeWhiteboardCache(boardId, previousBoard);
+    setWhiteboardSaveState(boardId, previousSaveState);
+    throw error;
+  }
 }
 
 export async function getWhiteboard(boardId) {
   const cached = readWhiteboardCache(boardId);
   if (cached && getWhiteboardSaveState(boardId) === "saving") return cached;
+  const cacheVersion = whiteboardCacheVersions.get(boardId) ?? 0;
   const payload = await whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`);
+  if ((whiteboardCacheVersions.get(boardId) ?? 0) !== cacheVersion) {
+    return readWhiteboardCache(boardId) ?? payload.whiteboard;
+  }
   return writeWhiteboardCache(boardId, payload.whiteboard);
 }
 

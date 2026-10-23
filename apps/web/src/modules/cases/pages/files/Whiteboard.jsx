@@ -11,6 +11,7 @@ import {
   deleteWhiteboard,
   discardWhiteboardDraft,
   disconnectWhiteboardPins,
+  getCachedWhiteboard,
   getWhiteboardSaveState,
   getWhiteboard,
   getWhiteboards,
@@ -83,8 +84,21 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
   useEffect(() => {
     function handleExternalBoardUpdate(event) {
       if (!board || event.detail?.boardId !== board.id) return;
+      if (event.detail.status === "deleted") return;
       if (event.detail.status) setSaveState(event.detail.status);
-      getWhiteboard(board.id).then(setBoard).catch(() => setSaveState("save"));
+      const cached = getCachedWhiteboard(board.id);
+      if (cached) setBoard((current) => {
+        if (!current || current.id !== cached.id) return current;
+        const knownPins = new Set(current.pins.map((pin) => pin.id));
+        const connectionKey = (edge) => [edge.fromId, edge.toId].sort().join(":");
+        const knownConnections = new Set(current.connections.map(connectionKey));
+        return {
+          ...current,
+          title: cached.title ?? current.title,
+          pins: [...current.pins, ...cached.pins.filter((pin) => !knownPins.has(pin.id))],
+          connections: [...current.connections, ...cached.connections.filter((edge) => !knownConnections.has(connectionKey(edge)))],
+        };
+      });
     }
     window.addEventListener("noir:whiteboard-updated", handleExternalBoardUpdate);
     return () => window.removeEventListener("noir:whiteboard-updated", handleExternalBoardUpdate);
@@ -266,24 +280,32 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
   async function confirmDeleteBoard() {
     if (!board || busy) return;
     const deletedId = board.id;
+    const previousBoard = board;
+    const previousBoards = boards;
+    const remaining = boards.filter((item) => item.id !== deletedId);
+    const nextBoard = remaining.length ? getCachedWhiteboard(remaining[0].id) : null;
+    setBoards(remaining);
+    setBoard(nextBoard);
+    setSelection([]);
+    setConfirmDelete(false);
+    setMessage(remaining.length
+      ? nextBoard ? `${nextBoard.pins.length} RECORD${nextBoard.pins.length === 1 ? "" : "S"} ON THIS BOARD` : "BOARD DELETED · OPENING NEXT BOARD…"
+      : "BOARD DELETED · CREATE A NOTE OR PIN A RECORD TO START AGAIN");
+    setSaveState("saved");
     setBusy(true);
     try {
       await deleteWhiteboard(deletedId);
-      const remaining = boards.filter((item) => item.id !== deletedId);
-      setBoards(remaining);
-      setConfirmDelete(false);
-      setSelection([]);
-      if (remaining.length) {
-        await loadBoard(remaining[0].id);
-      } else {
-        setBoard(null);
-        setMessage("BOARD DELETED · CREATE A NOTE OR PIN A RECORD TO START AGAIN");
-        setSaveState("saved");
-      }
     } catch (error) {
+      setBoards(previousBoards);
+      setBoard(previousBoard);
       setMessage(error.message || "THE BOARD COULD NOT BE DELETED");
+      setSaveState("save");
+      return;
     } finally {
       setBusy(false);
+    }
+    if (remaining.length && !nextBoard) {
+      loadBoard(remaining[0].id).catch((error) => setMessage(error.message || "THE SELECTED BOARD COULD NOT BE OPENED"));
     }
   }
 
