@@ -1,0 +1,182 @@
+{
+  "shared": {
+    "routine": [
+      "My hours have been ordinary, though the office has felt less settled lately.",
+      "I still take the same tram and arrive before the first bell.",
+      "Most days are predictable. The week before the death was harder to read.",
+      "I have been keeping to myself after work; people at the office talk too freely.",
+      "My routine has not changed, but the department has been staying later than usual.",
+      "I come in, finish my papers, and leave. I do not linger in the corridors.",
+      "The days have blurred together. I remember one late evening more clearly than the rest.",
+      "Nothing changed for me until the office began asking everyone to account for their hours.",
+      "I have worked the usual shift. A few colleagues seemed to have different hours lately.",
+      "I leave by the east entrance most evenings. I cannot say who else was still inside.",
+      "My schedule is steady. The people with keys seem to keep less regular hours.",
+      "I have been arriving earlier to avoid the questions in the lunch room.",
+      "The workday used to end on time. Recently, someone always had a reason to stay.",
+      "I do not keep track of everyone else's routine. Mine has been much the same.",
+      "I had a quiet week until the staff began whispering about the personnel files.",
+      "I was away from the building for part of that week. My own hours are in the ledger.",
+      "The morning shift was normal. The evenings felt busier, though I was already on my way home.",
+      "I have not changed my habits. I did notice that some desks were occupied after closing.",
+      "I usually go straight home. Lately I have avoided the street outside the office.",
+      "My days have been ordinary. It is the office that has started behaving differently."
+    ],
+    "associates": [
+      "I spend most of my time with the clerks in my section; we rarely talk about private matters.",
+      "A few people from the office meet for tea. {victim} came along sometimes, not every week.",
+      "I keep company with people from my own department. The senior staff tend to stay apart.",
+      "I usually walk to the tram with two colleagues. I would rather not name them.",
+      "{victim} knew more people here than I did. I was never part of their close circle.",
+      "I spend time with my family after work. At the office I am friendly, but not close, with anyone.",
+      "The typists and I share a table at lunch. The managers have their own room.",
+      "I used to speak with {victim} over lunch. We did not meet outside the building.",
+      "Most of my friends are outside this company. I only know {victim} through work.",
+      "I know the people who handle the minutes. I do not know who {victim} trusted.",
+      "There is a small group that stays after meetings. I was not always invited.",
+      "I speak with whoever needs a signature. That is not the same as knowing them well.",
+      "{victim} sometimes spoke with the records staff. I never learned what they discussed.",
+      "I have one close friend in the building, but I will not bring them into this.",
+      "I usually eat alone. The conversations at work have become uncomfortable.",
+      "I saw {victim} with different people at different times. I could not tell you who mattered most.",
+      "I am close to the people on my shift. I do not know much about the other floors.",
+      "The people I see socially are not the people who approve our work.",
+      "I knew {victim} well enough to notice when they were upset, not well enough to ask why.",
+      "I keep to a small circle. People here are cautious about being seen together."
+    ],
+    "unusual": [
+      "A page in the meeting book looked newer than the pages around it.",
+      "I heard a door close hard after a meeting, but I could not see who left.",
+      "The corridor clock and the time written in the log did not seem to agree.",
+      "Someone asked whether the old minutes were still kept in the basement.",
+      "A desk had been cleared before the end of the workday. That was unusual for this section.",
+      "There was a short argument near the records room. I only heard the last few words.",
+      "I noticed an extra signature on a copy of the rota, though I may have misread it.",
+      "The office was quiet when I left, then someone called me back about a missing folder.",
+      "A colleague asked me to forget a conversation. I do not know whether it was important.",
+      "The after-hours book had a correction in a different hand. I cannot identify the writer.",
+      "A meeting ended early, but several people remained in the room.",
+      "I saw a light on in the records office after the cleaning staff had gone.",
+      "The filing cabinet was locked when it is usually left open during the day.",
+      "One of the usual callers came to the office twice in a single afternoon.",
+      "I heard someone mention a replacement page. I did not ask what had been replaced.",
+      "A chair was left overturned near the back stair. It may have been nothing.",
+      "Someone was looking for the original copy of a set of minutes.",
+      "A parcel meant for the registry was taken upstairs instead.",
+      "The department telephone rang after closing, but nobody near me answered it.",
+      "There was talk of a late signature. I never saw the document myself."
+    ],
+    "work": [
+      "We had been arguing about who was responsible for approving the revised figures.",
+      "The workload is manageable. It is the changing instructions that make it difficult.",
+      "A set of meeting minutes was circulated twice, and the two copies were not quite alike.",
+      "People have been asked to sign off on work they did not supervise.",
+      "The department is short-staffed, so everyone has access to more files than before.",
+      "There was a disagreement about a transfer between sections. I do not know how it ended.",
+      "The personnel office has been requesting old attendance sheets.",
+      "I have had more routine paperwork than usual. Nothing that explains the attention from police.",
+      "Some approvals were delayed. The reason changed depending on who you asked.",
+      "The records are kept in several places. It takes time to compare the copies.",
+      "We had a meeting about responsibilities, but no one wrote down the final decision clearly.",
+      "The office is functioning, though people are careful about what they put in writing.",
+      "I work in a different section. I only heard about the dispute second-hand.",
+      "The rota changed twice that month. I cannot remember which version was final.",
+      "Our supervisor asked us not to discuss internal matters outside the building.",
+      "There are too many signatures on some forms and too few on others.",
+      "I have seen nothing wrong with my own work. I cannot speak for the rest of the office.",
+      "The filing system is old. A missing page does not always mean someone took it.",
+      "The department has been reviewing who can enter the records room.",
+      "I do not know whether the disagreement was serious. Everyone involved called it routine."
+    ],
+    "worries": [
+      "I am worried that the original meeting notes will be discarded during the next cleanup.",
+      "I do not want my colleagues to think I have been talking about them.",
+      "People are afraid their hours will be cut if they answer your questions.",
+      "I worry that a corrected time will be accepted without anyone checking the first entry.",
+      "I have no proof, and I do not want a guess to become part of the official record.",
+      "The records room is not secure. Anyone with a key could move a file.",
+      "I am worried that people are repeating rumours as if they were minutes from a meeting.",
+      "I would rather not be involved. I have a family to support.",
+      "The staff have stopped speaking freely when the office telephone is nearby.",
+      "I worry that the wrong copy of the rota will be treated as the original.",
+      "I am afraid someone will lose their position for telling you what they saw.",
+      "There is a lot of pressure to return everything to normal before the records are checked.",
+      "I do not know what happened, and I do not want to be asked to choose a side.",
+      "My concern is that the late entries were never reviewed by a second person.",
+      "I worry about being quoted out of context. I have already said more than I intended.",
+      "People who ask about the minutes are being watched by their supervisors.",
+      "I am concerned the office will close ranks and leave the facts buried in paperwork.",
+      "Please do not call me at work again. Someone may notice.",
+      "I am worried about the missing folder, but I cannot say who last handled it.",
+      "I cannot help you any further. I would like to end this conversation."
+    ]
+  },
+  "roles": {
+    "colleague": {
+      "routine": [
+        "My own schedule has not changed much. The office was busier than usual the week before {victim} died.",
+        "My days were ordinary, though several people started staying late at the office."
+      ],
+      "associates": [
+        "I mostly spend time with people from the office. {victim} and I were colleagues, not close friends.",
+        "I keep to a small circle at work. I cannot say who {victim} trusted outside it."
+      ],
+      "unusual": [
+        "A time in the after-hours book looks different from the other entries. I only noticed when it was pointed out.",
+        "I heard raised voices once. It could have been about work; I did not catch the words."
+      ],
+      "work": [
+        "There had been disagreement over responsibilities. That sort of thing happens here more than people admit.",
+        "The meeting notes may help. I remember a page being replaced, but not by whom."
+      ],
+      "worries": [
+        "I do not want to be quoted. People here remember who cooperates with investigators.",
+        "I am afraid the office records will be tidied up before anyone asks for them."
+      ]
+    },
+    "acquaintance": {
+      "routine": [
+        "My routine has been quiet. The last time I saw {victim}, they seemed preoccupied.",
+        "I have kept to my usual habits. {victim} stopped making plans after a difficult week at work."
+      ],
+      "associates": [
+        "I usually spend time with family and a few old friends. {victim} was one of them.",
+        "I saw {victim} now and then, but we did not share the same circle at work."
+      ],
+      "unusual": [
+        "{victim} asked me to hold onto a note, then changed their mind. It may have been about a meeting.",
+        "They said a work record had been changed. I do not know which one."
+      ],
+      "work": [
+        "They were frustrated about a decision at the office. I did not understand the details.",
+        "I only know they thought the minutes from a meeting were incomplete."
+      ],
+      "worries": [
+        "I am sorry, but I do not want to discuss their private life on a telephone line.",
+        "I worry that I will misremember something and make matters worse."
+      ]
+    },
+    "perpetrator": {
+      "routine": [
+        "My routine has not changed. I have already answered questions about my schedule that week.",
+        "I will not discuss my movements over the telephone. Speak to my representative."
+      ],
+      "associates": [
+        "I spend time with my own friends. I worked with {victim}; that is all I will say about them.",
+        "I do not want to discuss my personal circle or other employees. Stop pressing me."
+      ],
+      "unusual": [
+        "I do not recall anything unusual. You should check the official records.",
+        "I have nothing to add, and I will not speculate about the office book."
+      ],
+      "work": [
+        "Disagreements at work are routine. You are making too much of ordinary meetings.",
+        "I will not discuss internal business with an investigator over this line."
+      ],
+      "worries": [
+        "I am worried about people drawing conclusions from incomplete records.",
+        "I have said all I intend to say. Please do not call again."
+      ]
+    }
+  }
+}

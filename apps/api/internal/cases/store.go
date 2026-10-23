@@ -17,7 +17,7 @@ import (
 	"noir-1974/apps/api/internal/world"
 )
 
-//go:embed schema.sql
+//go:embed schema.sql interrogation/*.json
 var caseSchema embed.FS
 
 var (
@@ -84,9 +84,81 @@ type PublicCase struct {
 	CityID     string    `json:"cityId"`
 	CaseType   string    `json:"caseType"`
 	VictimID   string    `json:"victimId"`
-	LocationID string    `json:"locationId"`
+	LocationID string    `json:"-"`
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"createdAt"`
+}
+
+// PersonSearchScenes returns scene addresses only for case victims in the requested city.
+func (store *PostgresStore) PersonSearchScenes(ctx context.Context, serverID, cityID string, npcIDs []string) (map[string]world.PersonSearchScene, error) {
+	scenes := make(map[string]world.PersonSearchScene)
+	if len(npcIDs) == 0 {
+		return scenes, nil
+	}
+	rows, err := store.db.Query(ctx, `
+		SELECT DISTINCT ON (c.victim_entity_id) c.victim_entity_id, c.location_entity_id
+		FROM cases c JOIN case_states s USING (server_id, case_id)
+		WHERE c.server_id = $1::uuid AND c.city_id = $2
+		  AND s.status IN ('open', 'solved') AND c.victim_entity_id = ANY($3::text[])
+		ORDER BY c.victim_entity_id, c.created_at DESC, c.case_id DESC`, serverID, cityID, npcIDs)
+	if err != nil {
+		return nil, err
+	}
+	locationsByVictim := make(map[string]string)
+	for rows.Next() {
+		var victimID, locationID string
+		if err := rows.Scan(&victimID, &locationID); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		locationsByVictim[victimID] = locationID
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+	if len(locationsByVictim) == 0 {
+		return scenes, nil
+	}
+	var seed string
+	var version int
+	if err := store.db.QueryRow(ctx, `SELECT world_seed, generator_version FROM worlds WHERE server_id = $1::uuid`, serverID).Scan(&seed, &version); err != nil {
+		return nil, err
+	}
+	cityVersion := version
+	if cityID != "fr/lyon" {
+		err := store.db.QueryRow(ctx, `SELECT generator_version FROM world_city_generators WHERE server_id = $1::uuid AND city_id = $2`, serverID, cityID).Scan(&cityVersion)
+		if errors.Is(err, pgx.ErrNoRows) {
+			if version < world.LatestGeneratorVersion {
+				cityVersion = world.LatestGeneratorVersion
+			}
+		} else if err != nil {
+			return nil, err
+		}
+	}
+	generated, err := world.GenerateCity(seed, cityVersion, cityID)
+	if err != nil {
+		return nil, err
+	}
+	entities := make(map[string]world.Entity, len(generated.Entities))
+	for _, entity := range generated.Entities {
+		entities[entity.ID] = entity
+	}
+	regions := make(map[string]string, len(generated.Regions))
+	for _, region := range generated.Regions {
+		regions[region.ID] = region.Name
+	}
+	city, _ := world.CityByID(cityID)
+	for victimID, locationID := range locationsByVictim {
+		entity, ok := entities[locationID]
+		if !ok {
+			continue
+		}
+		address := strings.Trim(strings.Join([]string{entity.Name, regions[entity.RegionID], city.Name, city.Country}, ", "), ", ")
+		scenes[victimID] = world.PersonSearchScene{Name: entity.Name, Address: address}
+	}
+	return scenes, nil
 }
 
 type PublicEvidence struct {
@@ -95,6 +167,149 @@ type PublicEvidence struct {
 	Presentation string `json:"presentation"`
 	Content      string `json:"content"`
 	LocationID   string `json:"locationId"`
+}
+
+type InterrogationAnswers map[string][]string
+
+type interrogationDialogue struct {
+	Routine    []string `json:"routine"`
+	Associates []string `json:"associates"`
+	Unusual    []string `json:"unusual"`
+	Work       []string `json:"work"`
+	Worries    []string `json:"worries"`
+}
+
+type interrogationCaseFile struct {
+	Shared interrogationDialogue            `json:"shared"`
+	Roles  map[string]interrogationDialogue `json:"roles"`
+}
+
+func (dialogue interrogationDialogue) answers() InterrogationAnswers {
+	return InterrogationAnswers{
+		"routine":    dialogue.Routine,
+		"associates": dialogue.Associates,
+		"unusual":    dialogue.Unusual,
+		"work":       dialogue.Work,
+		"worries":    dialogue.Worries,
+	}
+}
+
+// InterrogationAnswersForNPC returns authored dialogue for open cases connected to this NPC.
+// The response contains only spoken lines; internal case roles and culprit IDs stay server-side.
+func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serverID, cityID, npcID string) (InterrogationAnswers, error) {
+	data, err := caseSchema.ReadFile("interrogation/default.json")
+	if err != nil {
+		return nil, err
+	}
+	var defaultDialogue interrogationDialogue
+	if err := json.Unmarshal(data, &defaultDialogue); err != nil {
+		return nil, err
+	}
+	entries, err := caseSchema.ReadDir("interrogation")
+	if err != nil {
+		return nil, err
+	}
+	caseFiles := make(map[string]interrogationCaseFile, len(entries)-1)
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || name == "default.json" || !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		archetype := strings.TrimSuffix(name, ".json")
+		caseData, err := caseSchema.ReadFile("interrogation/" + name)
+		if err != nil {
+			return nil, err
+		}
+		var caseFile interrogationCaseFile
+		if err := json.Unmarshal(caseData, &caseFile); err != nil {
+			return nil, err
+		}
+		caseFiles[archetype] = caseFile
+	}
+	answers := defaultDialogue.answers()
+	var seed string
+	var version int
+	if err := store.db.QueryRow(ctx, `SELECT world_seed, generator_version FROM worlds WHERE server_id = $1::uuid`, serverID).Scan(&seed, &version); err != nil {
+		return nil, err
+	}
+	rows, err := store.db.Query(ctx, `
+		SELECT c.archetype_id,
+		       victim.generation_key, killer.generation_key,
+	       CASE WHEN c.killer_entity_id = $3 THEN 'perpetrator'
+	            WHEN EXISTS (
+	              SELECT 1 FROM employment_relationships victim_job
+	              JOIN employment_relationships caller_job
+	                ON caller_job.server_id = victim_job.server_id
+	               AND caller_job.employer_company_id = victim_job.employer_company_id
+	              WHERE victim_job.server_id = c.server_id
+	                AND victim_job.employee_npc_id = c.victim_entity_id
+	                AND caller_job.employee_npc_id = $3
+	            ) THEN 'colleague' ELSE 'acquaintance' END
+		FROM cases c
+	JOIN case_states s USING (server_id, case_id)
+	JOIN world_entities victim ON victim.server_id = c.server_id AND victim.entity_id = c.victim_entity_id
+	JOIN world_entities killer ON killer.server_id = c.server_id AND killer.entity_id = c.killer_entity_id
+	WHERE c.server_id = $1::uuid AND c.city_id = $2 AND s.status = 'open'
+	  AND (c.killer_entity_id = $3 OR EXISTS (
+	    SELECT 1 FROM employment_relationships victim_job
+	    JOIN employment_relationships caller_job
+	      ON caller_job.server_id = victim_job.server_id
+	     AND caller_job.employer_company_id = victim_job.employer_company_id
+	    WHERE victim_job.server_id = c.server_id
+	      AND victim_job.employee_npc_id = c.victim_entity_id
+	      AND caller_job.employee_npc_id = $3
+	  ) OR EXISTS (
+	    SELECT 1 FROM personal_relationships relation
+	    WHERE relation.server_id = c.server_id
+	      AND ((relation.person_a_npc_id = $3 AND relation.person_b_npc_id = c.victim_entity_id)
+	        OR (relation.person_b_npc_id = $3 AND relation.person_a_npc_id = c.victim_entity_id))
+	  ))
+	ORDER BY c.created_at DESC, c.case_id`, serverID, cityID, npcID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	contextFound := false
+	for rows.Next() {
+		var archetype, victimKey, killerKey, role string
+		if err := rows.Scan(&archetype, &victimKey, &killerKey, &role); err != nil {
+			return nil, err
+		}
+		victim, err := world.GenerateNPC(seed, version, victimKey)
+		if err != nil {
+			return nil, err
+		}
+		killer, err := world.GenerateNPC(seed, version, killerKey)
+		if err != nil {
+			return nil, err
+		}
+		caseFile := caseFiles[archetype]
+		branch := caseFile.Roles[role]
+		if !contextFound {
+			answers = make(InterrogationAnswers, 5)
+			for question := range defaultDialogue.answers() {
+				answers[question] = []string{}
+			}
+			contextFound = true
+		}
+		mergeInterrogationAnswers(answers, caseFile.Shared.answers(), map[string]string{"victim": victim.Name})
+		mergeInterrogationAnswers(answers, branch.answers(), map[string]string{"victim": victim.Name, "suspect": killer.Name})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return answers, nil
+}
+
+func mergeInterrogationAnswers(target, source InterrogationAnswers, names map[string]string) {
+	for question, lines := range source {
+		for _, line := range lines {
+			for token, name := range names {
+				line = strings.ReplaceAll(line, "{"+token+"}", name)
+			}
+			target[question] = append(target[question], line)
+		}
+	}
 }
 
 func NewPostgresStore(db caseDatabase) *PostgresStore {

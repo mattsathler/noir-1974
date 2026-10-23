@@ -190,7 +190,7 @@
 .gate-interface__close:focus-visible,
 .gate-interface__district:focus-visible,
 .gate-interface__travel:focus-visible { outline: 2px solid var(--gate-blue-100); outline-offset: 3px; }
-.gate-interface__close svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2; shape-rendering: crispEdges; }
+.gate-interface__close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; shape-rendering: crispEdges; }
 .gate-interface__body { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 1.4fr); }
 .gate-interface__destinations,
 .gate-interface__preview { min-width: 0; overflow: auto; padding: var(--noir-space-6); }
@@ -263,7 +263,7 @@
 .district-arrival__cards { display: grid; min-height: 0; flex: 1; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); grid-auto-rows: minmax(15rem, auto); align-content: start; gap: var(--noir-space-4); overflow-y: auto; padding: 0 var(--noir-space-2) var(--noir-space-2) 0; scrollbar-color: var(--noir-brass-500) rgb(8 9 8 / 55%); scrollbar-width: thin; }
 .district-arrival__card { display: flex; min-height: 15rem; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: var(--noir-space-5); background: linear-gradient(145deg, rgb(16 20 19 / 88%), rgb(7 9 9 / 92%)); border: 1px solid var(--noir-brass-600); border-top: 3px solid var(--noir-brass-400); box-shadow: 0 1rem 3rem rgb(0 0 0 / 38%); }
 .district-arrival__icon { display: grid; width: 100%; justify-items: start; gap: var(--noir-space-3); color: var(--noir-brass-300); }
-.district-arrival__icon svg { width: 3.5rem; height: 3.5rem; fill: currentColor; shape-rendering: crispEdges; filter: drop-shadow(0 0 0.6rem rgb(202 170 88 / 20%)); }
+.district-arrival__icon svg { width: 56px; height: 56px; fill: currentColor; shape-rendering: crispEdges; filter: drop-shadow(0 0 0.6rem rgb(202 170 88 / 20%)); }
 .district-arrival__icon-image { display: block; width: 3.5rem; height: 3.5rem; background: currentColor; mask: var(--building-icon-image) center / contain no-repeat; filter: drop-shadow(0 0 0.6rem rgb(202 170 88 / 20%)); }
 .district-arrival__icon span { color: var(--noir-brass-300); font-family: var(--noir-font-mono); font-size: 0.55rem; letter-spacing: 0.14em; }
 .district-arrival__card > p { margin: 0; color: var(--noir-brass-300); font-family: var(--noir-font-mono); font-size: 0.58rem; letter-spacing: 0.13em; }
@@ -299,8 +299,8 @@
 .building-interior__personnel-heading > span { color: #9cad85; font: 0.55rem var(--noir-font-mono); letter-spacing: 0.1em; text-align: right; }
 .building-interior__personnel-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); align-content: start; gap: var(--noir-space-3); overflow-y: auto; padding: 2px var(--noir-space-2) 2px 2px; scrollbar-color: var(--noir-brass-500) rgb(8 9 8 / 55%); scrollbar-width: thin; }
 .building-interior__employee { display: flex; min-height: 6rem; align-items: center; gap: var(--noir-space-3); padding: var(--noir-space-3); background: linear-gradient(145deg, rgb(19 22 19 / 94%), rgb(7 9 8 / 96%)); border: 1px solid #454a3e; border-left: 2px solid #788d72; }
-.building-interior__employee-portrait { display: grid; width: 4.25rem; height: 4.25rem; flex: 0 0 auto; place-items: center; overflow: hidden; color: #c4d2ad; background: #121611; border: 1px solid #667458; image-rendering: pixelated; }
-.building-interior__employee-portrait .modular-face { width: 100%; }
+.building-interior__employee-portrait { display: grid; width: 82px; height: 82px; flex: 0 0 auto; place-items: center; overflow: hidden; color: #c4d2ad; background: #121611; border: 1px solid #667458; image-rendering: pixelated; }
+.building-interior__employee-portrait .modular-face { width: 80px; }
 .building-interior__employee-portrait > span { font: 0.9rem var(--noir-font-mono); }
 .building-interior__employee-copy { min-width: 0; }
 .building-interior__employee-copy h3 { margin: 0; color: var(--noir-paper-100); font-size: 0.86rem; font-weight: 400; }
@@ -600,9 +600,6 @@
   image-rendering: pixelated;
 }
 
-.computer-program__icon--case-files,
-.computer-program__icon--city-records,
-.computer-program__icon--telephone { color: var(--noir-brass-300); }
 .computer-program__glyph { width: 24px; height: 24px; flex: 0 0 auto; fill: currentColor; shape-rendering: crispEdges; }
 .computer-program__label { font-size: 0.75rem; line-height: 1.35; }
 .computer-program__state { color: var(--noir-success); font-size: 0.625rem; letter-spacing: 0.15em; }
@@ -655,6 +652,96 @@
 .computer-window__body h1 { margin: var(--noir-space-6) 0 var(--noir-space-4); color: var(--noir-brass-300); font-size: clamp(1rem, 3vw, 1.35rem); letter-spacing: 0.1em; }
 .computer-window__body p { color: var(--noir-paper-300); font-size: 0.875rem; line-height: 1.8; letter-spacing: 0.06em; }
 .computer-window__cursor { color: var(--noir-brass-300); animation: computer-cursor 1s steps(2, end) infinite; }
+
+.telephone-overlay { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(4 6 5 / 78%); }
+.telephone-device { position: relative; display: flex; width: min(34rem, 100%); height: min(40rem, calc(100svh - 2rem)); flex-direction: column; padding: 0.45rem; overflow: hidden; color: var(--noir-paper-200); background: #252a25; border: 2px solid var(--noir-ink-500); border-radius: 1.1rem; box-shadow: 8px 8px 0 #050605, inset 0 0 0 2px #383e37; }
+.telephone-device__header { display: flex; min-height: 3rem; align-items: center; justify-content: space-between; padding: 0 0.8rem; color: var(--noir-brass-300); font: 0.8rem var(--noir-font-mono); letter-spacing: 0.14em; }
+.telephone-device__header button { width: 2rem; height: 2rem; color: var(--noir-paper-200); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 1.1rem; }
+.telephone-device__body { display: grid; min-height: 0; flex: 1; grid-template-columns: 9rem minmax(0, 1fr); gap: 0.8rem; align-items: stretch; padding: 0.25rem; }
+.telephone-device__handset { display: grid; min-height: 0; place-items: center; color: var(--noir-ink-950); background: linear-gradient(180deg, #202621 0%, #394239 22%, #50594f 50%, #394239 78%, #202621 100%); border: 2px solid #111511; border-radius: 0.7rem; box-shadow: inset 0 8px 12px rgb(0 0 0 / 38%), inset 0 -8px 12px rgb(0 0 0 / 38%), inset 0 0 0 3px #4c534b; }
+.telephone-device__handset--active { background: #101511; box-shadow: inset 0 0 0 3px #1b211d; }
+.telephone-device__handset--active .telephone-device__receiver { visibility: hidden; }
+.telephone-device__handset .telephone-device__receiver { width: 4.5rem; height: 4.5rem; shape-rendering: crispEdges; filter: drop-shadow(2px 2px 0 #101310); transform: rotate(-90deg); }
+.telephone-app { display: flex; width: min(100%, 23rem); min-height: 0; height: 100%; flex-direction: column; margin-inline: auto; overflow: hidden; text-align: left; }
+.telephone-app__display {
+  display: flex;
+  min-height: 4rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.55rem 0.7rem;
+  overflow: hidden;
+  color: var(--noir-success);
+  background: #08110d;
+  border: 1px solid var(--noir-ink-500);
+  border-radius: 0.4rem;
+  box-shadow: inset 0 0 0 2px var(--noir-ink-900);
+  font: 1.2rem/1.2 var(--noir-font-mono);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+.telephone-app__display,
+.telephone-app__call-status { background: #08110d; border: 1px solid var(--noir-ink-500); border-radius: 0.4rem; box-shadow: inset 0 0 0 2px var(--noir-ink-900); }
+.telephone-app__number-input { width: 100%; min-width: 0; padding: 0; color: var(--noir-success); text-align: right; background: transparent; border: 0; outline: 0; font: inherit; letter-spacing: inherit; }
+.telephone-app__number-input:focus-visible { outline: 1px solid var(--noir-success); outline-offset: 3px; }
+.telephone-app__call-status { display: flex; height: 2rem; min-height: 2rem; align-items: center; margin: 0.5rem 0 0.65rem; padding: 0.3rem 0.6rem; color: var(--noir-success); font: 0.68rem/1.4 var(--noir-font-mono); letter-spacing: 0.06em; overflow-wrap: anywhere; text-align: left; }
+.telephone-app__call-status--calling { color: var(--noir-brass-300); }
+.telephone-app__call-status--not-found,
+.telephone-app__call-status--dead { color: var(--noir-danger); }
+.telephone-interrogation { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 0.45rem; overflow: hidden; color: var(--noir-paper-200); margin-bottom: 8px; }
+.telephone-interrogation__header { display: grid; flex: 0 0 auto; gap: 0.15rem; text-align: center; }
+.telephone-interrogation__header strong { overflow: hidden; color: var(--noir-brass-300); font-size: 1.05rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.telephone-interrogation__header span { overflow: hidden; color: var(--noir-paper-400); font-size: 0.7rem; letter-spacing: 0.06em; text-overflow: ellipsis; white-space: nowrap; }
+.telephone-interrogation__portrait { display: grid; height: 8rem; flex: 0 0 8rem; place-items: center; }
+.telephone-interrogation__portrait .modular-face { width: 8rem; border: 1px solid var(--noir-brass-500); background: var(--noir-ink-950); box-shadow: 3px 3px 0 #060706; }
+.telephone-interrogation__answer { height: 6rem; min-height: 0; max-height: 6rem; flex: 0 0 6rem; padding: 0.7rem; overflow: hidden; color: var(--noir-paper-200); background: #080b09; border: 1px solid var(--noir-ink-700); box-shadow: inset 0 0 0 2px #111713; font: 0.76rem/1.5 var(--noir-font-mono); }
+.telephone-interrogation__questions { display: grid; min-height: 0; flex: 1; grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 0.25rem; margin-top: auto; overflow: hidden; }
+.telephone-interrogation__questions button { min-height: 0; padding: 0.35rem 0.55rem; overflow: hidden; color: var(--noir-paper-200); background: var(--noir-ink-800); border: 1px solid var(--noir-ink-600); cursor: pointer; font: 0.68rem/1.3 var(--noir-font-mono); text-align: left; }
+.telephone-interrogation__questions button:hover,
+.telephone-interrogation__questions button[aria-pressed="true"] { color: var(--noir-brass-300); border-color: var(--noir-brass-500); background: var(--noir-ink-900); }
+.telephone-interrogation__questions button:focus-visible { outline: 2px solid var(--noir-brass-300); outline-offset: 1px; }
+.telephone-interrogation__hangup { display: grid; width: 2.8rem; min-width: 2.8rem; min-height: 2.2rem; flex: 0 0 2.2rem; place-items: center; align-self: flex-end; padding: 0.25rem; color: #fff0e8; background: linear-gradient(180deg, #c65b50, #85302d); border: 1px solid #d17668; border-radius: 0.4rem; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 25%), inset -1px -2px 0 rgb(0 0 0 / 32%), 2px 2px 0 #080706; cursor: pointer; }
+.telephone-interrogation__hangup svg { width: 20px; height: 20px; fill: currentColor; shape-rendering: crispEdges; }
+.telephone-interrogation__hangup:hover { background: linear-gradient(180deg, #d56a5d, #983a34); }
+.telephone-interrogation__hangup:focus-visible { outline: 2px solid var(--noir-brass-300); outline-offset: 2px; }
+.telephone-app__cursor { color: var(--noir-brass-300); animation: computer-cursor 1s steps(2, end) infinite; }
+.telephone-app__decorative-actions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.25rem; margin: 0.75rem 0 0.65rem; }
+.telephone-app__decorative-action { min-width: 0; min-height: 1.55rem; padding: 0.15rem 0.1rem; overflow: hidden; color: #e0dbcf; background: linear-gradient(180deg, #626a69 0%, #4b5353 100%); border: 1px solid #92958d; border-radius: 0.3rem; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 26%), inset -1px -2px 0 rgb(0 0 0 / 38%), 1px 1px 0 #070908; cursor: default !important; font: 700 0.42rem/1 var(--noir-font-mono); opacity: 1 !important; text-overflow: clip; white-space: nowrap; }
+.telephone-app__keypad { display: grid; width: 100%; min-height: 0; flex: 1 1 auto; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 0.75rem 1rem; margin-inline: auto; }
+.telephone-app__keypad button,
+.telephone-app__controls button {
+  min-height: 2.35rem;
+  padding: 0;
+  color: var(--noir-paper-100);
+  background: var(--noir-ink-800);
+  border: 1px solid var(--noir-ink-500);
+  border-radius: 0.4rem;
+  box-shadow: 2px 2px 0 var(--noir-ink-950);
+  cursor: pointer;
+  font: 700 1rem/1 var(--noir-font-mono);
+}
+.telephone-app__keypad button { position: relative; display: flex; min-height: 0; height: 100%; align-items: center; justify-content: center; gap: 0.3rem; color: #e7e0d4; background: linear-gradient(180deg, #626a69 0%, #4b5353 100%); border: 1px solid #92958d; border-radius: 0.42rem; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 26%), inset -1px -2px 0 rgb(0 0 0 / 38%), 2px 2px 0 #070908; text-shadow: 1px 1px 0 #202321; }
+.telephone-app__keypad button small { align-self: center; color: #d1c8b9; font: 0.42rem/1 var(--noir-font-mono); letter-spacing: 0.04em; text-shadow: none; }
+.telephone-app__keypad button:hover,
+.telephone-app__controls button:not(:disabled):hover { color: var(--noir-ink-950); background: var(--noir-brass-300); }
+.telephone-app__keypad button:hover { color: #fff8eb; background: linear-gradient(180deg, #777e79 0%, #555d58 100%); }
+.telephone-app__keypad button:active { transform: translate(1px, 1px); box-shadow: inset 1px 1px 2px rgb(0 0 0 / 45%), 1px 1px 0 #070908; }
+.telephone-app__keypad button:focus-visible,
+.telephone-app__controls button:focus-visible { outline: 2px solid var(--noir-brass-300); outline-offset: 2px; }
+.telephone-app__grille { display: grid; flex: 0 0 auto; gap: 0.7rem; margin-top: auto; }
+.telephone-app__grille span { display: block; height: 1px; background: #777d72; opacity: 0.72; }
+.telephone-app__controls { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0.65rem 0; }
+.telephone-app__controls button { min-height: 2rem; padding-inline: 0.75rem; font-size: 0.65rem; letter-spacing: 0.1em; }
+.telephone-app__controls button:disabled { opacity: 0.45; cursor: default; }
+.telephone-app__controls .telephone-app__clear { color: #fff0e8; background: linear-gradient(180deg, #c65b50, #85302d); border-color: #d17668; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 25%), inset -1px -2px 0 rgb(0 0 0 / 32%), 2px 2px 0 #080706; }
+.telephone-app__controls .telephone-app__clear:not(:disabled):hover { color: #fff; background: linear-gradient(180deg, #d56a5d, #983a34); }
+.telephone-app__controls .telephone-app__clear:disabled { color: #b88f88; background: #67312f; border-color: #85504a; opacity: 1; }
+.telephone-app__controls .telephone-app__dial { display: grid; width: 2.8rem; min-width: 2.8rem; place-items: center; padding: 0; color: #102016; background: linear-gradient(180deg, #82cf83, #529b5b); border-color: #9cdd8c; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 30%), inset -1px -2px 0 rgb(0 0 0 / 30%), 2px 2px 0 #17251a; }
+.telephone-app__dial svg { width: 20px; height: 20px; fill: currentColor; shape-rendering: crispEdges; }
+.telephone-app__controls .telephone-app__dial:not(:disabled):hover { color: #102016; background: linear-gradient(180deg, #9cdd8c, #65b36a); }
+.telephone-app__controls .telephone-app__dial:disabled { color: #8c9b8b; background: linear-gradient(180deg, #465348, #303a34); border-color: #596653; opacity: 1; }
+.telephone-app__controls .telephone-app__dial--active { color: #fff0e8; background: linear-gradient(180deg, #c65b50, #85302d); border-color: #d17668; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 25%), inset -1px -2px 0 rgb(0 0 0 / 32%), 2px 2px 0 #080706; }
+.telephone-app__controls .telephone-app__dial--active:not(:disabled):hover { color: #fff; background: linear-gradient(180deg, #d56a5d, #983a34); }
+.telephone-app__status { margin: 0.9rem 0 0; color: var(--noir-paper-400); font-size: 0.6rem !important; letter-spacing: 0.12em !important; text-align: center; }
 
 .computer-window:has(.world-directory) {
   display: flex;
@@ -761,7 +848,7 @@
 .world-record--personnel { padding: var(--noir-space-4); border: 1px solid var(--noir-ink-700); border-left: 2px solid var(--noir-brass-500); }
 .world-record__personnel-sheet { display: grid; grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr); gap: var(--noir-space-4); margin-top: var(--noir-space-3); padding: var(--noir-space-3); background: color-mix(in srgb, var(--noir-paper-100) 4%, var(--noir-ink-950)); }
 .world-record__portrait { display: grid; align-content: start; justify-items: center; gap: var(--noir-space-2); margin: 0; padding: var(--noir-space-2); border: 1px solid var(--noir-brass-500); background: var(--noir-ink-950); }
-.world-record__portrait .modular-face { width: 100%; }
+.world-record__portrait .modular-face { width: 80px; }
 .world-record__portrait figcaption { color: var(--noir-brass-300); font-size: 0.52rem; letter-spacing: 0.08em; text-align: center; }
 .world-record__personnel-facts { display: grid; align-content: start; gap: var(--noir-space-3); margin: 0; }
 .world-record__personnel-facts > div { display: grid; gap: var(--noir-space-1); padding-bottom: var(--noir-space-2); border-bottom: 1px solid var(--noir-ink-700); }
@@ -772,11 +859,17 @@
 .world-record__staff-list { display: grid; gap: var(--noir-space-2); margin-top: var(--noir-space-3); }
 .world-record__staff-list .world-record__detail { display: flex; justify-content: space-between; gap: var(--noir-space-3); margin: 0; padding: var(--noir-space-2) var(--noir-space-3); background: color-mix(in srgb, var(--noir-paper-100) 4%, var(--noir-ink-950)); }
 .world-record__staff-member { display: flex; min-width: 0; align-items: center; gap: var(--noir-space-3); padding: var(--noir-space-2) var(--noir-space-3); background: color-mix(in srgb, var(--noir-paper-100) 4%, var(--noir-ink-950)); }
-.world-record__staff-portrait { width: 3.5rem; flex: 0 0 3.5rem; margin: 0; overflow: hidden; border: 1px solid var(--noir-brass-600); background: var(--noir-ink-950); image-rendering: pixelated; }
-.world-record__staff-portrait .modular-face { width: 100%; }
+.world-record__staff-portrait { width: 82px; height: 82px; flex: 0 0 82px; margin: 0; overflow: hidden; border: 1px solid var(--noir-brass-600); background: var(--noir-ink-950); image-rendering: pixelated; }
+.world-record__staff-portrait .modular-face { width: 80px; }
 .world-record__staff-member > div { display: grid; min-width: 0; gap: var(--noir-space-1); }
 .world-record__staff-member strong { color: var(--noir-paper-100); font-weight: 400; }
 .world-record__staff-member span { color: var(--noir-brass-300); font-size: 0.58rem; }
+.world-record__staff-member small { color: var(--noir-success); font: 1rem/1.6 var(--noir-font-mono); letter-spacing: 0.05em; }
+.world-directory__person-result { display: flex; min-width: 0; align-items: center; gap: var(--noir-space-3); margin: var(--noir-space-3) 0; }
+.world-directory__person-portrait { display: grid; width: 4.5rem; height: 4.5rem; flex: 0 0 4.5rem; place-items: center; overflow: hidden; margin: 0; border: 1px solid var(--noir-brass-600); background: var(--noir-ink-950); image-rendering: pixelated; }
+.world-directory__person-portrait .modular-face { width: 4.375rem; }
+.world-directory__person-copy { display: grid; min-width: 0; gap: var(--noir-space-2); }
+.world-directory__person-copy span { color: var(--noir-paper-300); font-size: 0.62rem; letter-spacing: 0.08em; }
 .world-record__activity-toggle { margin-top: var(--noir-space-3); padding: 0; color: var(--noir-brass-300); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 0.62rem; letter-spacing: 0.08em; text-align: left; }
 .world-record__activity { margin-top: var(--noir-space-3); padding-top: var(--noir-space-3); border-top: 1px solid var(--noir-ink-700); }
 .world-record__activity-filter { display: flex; flex-wrap: wrap; align-items: end; gap: var(--noir-space-3); }
@@ -864,7 +957,7 @@
 .computer-taskbar__active--focused,
 .computer-taskbar__active:hover { color: var(--noir-brass-300); }
 .whiteboard-pin-button { display: grid; width: 2rem; height: 2rem; margin-left: auto; place-items: center; padding: 0; color: var(--noir-success); background: var(--noir-ink-950); border: 1px solid var(--noir-ink-600); cursor: pointer; }
-.whiteboard-pin-button svg { width: 1rem; height: 1rem; fill: currentColor; shape-rendering: crispEdges; }
+.whiteboard-pin-button svg { width: 16px; height: 16px; fill: currentColor; shape-rendering: crispEdges; }
 .whiteboard-pin-button:hover { color: var(--noir-success); border-color: var(--noir-success); }
 .whiteboard-pin-button:focus-visible { outline: 2px solid var(--noir-success); outline-offset: 3px; }
 .case-files__evidence button.whiteboard-pin-button { display: grid; width: 2rem; height: 2rem; margin-left: auto; place-items: center; padding: 0; color: var(--noir-success); background: var(--noir-ink-950); border: 1px solid var(--noir-ink-600); text-align: center; }
@@ -891,13 +984,13 @@
 .personal-whiteboard__title { grid-column: 1; margin: 0; color: var(--noir-brass-300); font-family: var(--noir-font-sans); font-size: clamp(1rem, 2.5vw, 1.35rem); letter-spacing: 0.1em; }
 .personal-whiteboard__title-input { width: min(28rem, 65vw); margin: 0; padding: 0.15rem 0.3rem; color: var(--noir-paper-100); background: var(--noir-ink-950); border: 1px solid var(--noir-brass-400); font-family: var(--noir-font-sans); font-size: clamp(1rem, 2.5vw, 1.35rem); letter-spacing: 0.06em; }
 .personal-whiteboard__rename { display: grid; width: 2rem; height: 2rem; grid-column: 2; place-items: center; padding: 0; color: var(--noir-brass-300); background: transparent; border: 0; cursor: pointer; }
-.personal-whiteboard__rename svg { width: 1.25rem; height: 1.25rem; fill: currentColor; shape-rendering: crispEdges; }
+.personal-whiteboard__rename svg { width: 20px; height: 20px; fill: currentColor; shape-rendering: crispEdges; }
 .personal-whiteboard__rename:hover { color: var(--noir-paper-100); }
 .personal-whiteboard__new { flex: 0 0 auto; padding: var(--noir-space-2) var(--noir-space-3); color: var(--noir-brass-300); background: var(--noir-ink-900); border: 1px solid var(--noir-ink-500); cursor: pointer; font: inherit; font-size: 0.58rem; letter-spacing: 0.08em; }
 .personal-whiteboard__new:hover { border-color: var(--noir-brass-400); }
 .personal-whiteboard__header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: var(--noir-space-2); }
 .personal-whiteboard__delete-board { display: grid; width: 2rem; height: 2rem; place-items: center; padding: 0; color: var(--noir-danger); background: transparent; border: 0; cursor: pointer; }
-.personal-whiteboard__delete-board svg { width: 1.15rem; height: 1.15rem; fill: currentColor; shape-rendering: crispEdges; }
+.personal-whiteboard__delete-board svg { width: 20px; height: 20px; fill: currentColor; shape-rendering: crispEdges; }
 .personal-whiteboard__delete-board:hover { color: color-mix(in srgb, var(--noir-danger) 72%, var(--noir-paper-100)); }
 .personal-whiteboard__delete-board:disabled { opacity: 0.4; cursor: not-allowed; }
 .personal-whiteboard__confirm-backdrop { position: absolute; z-index: 30; inset: 0; display: grid; place-items: center; padding: var(--noir-space-4); background: rgb(4 7 8 / 78%); }
@@ -955,11 +1048,11 @@
 .personal-whiteboard__tack { position: absolute; top: -0.45rem; left: calc(50% - 0.35rem); width: 0.7rem; height: 0.7rem; background: var(--noir-danger); border: 1px solid var(--noir-paper-100); box-shadow: 1px 1px 0 var(--noir-ink-950); }
 .personal-whiteboard__pin header { display: flex; align-items: center; justify-content: space-between; gap: var(--noir-space-2); color: var(--noir-ink-700); font-size: 0.5rem; letter-spacing: 0.1em; }
 .personal-whiteboard__pin header button.personal-whiteboard__remove-pin { display: grid; width: 1.65rem; height: 1.65rem; place-items: center; padding: 0; color: var(--noir-danger); background: transparent; border: 0; cursor: pointer; }
-.personal-whiteboard__remove-pin svg { width: 0.9rem; height: 0.9rem; fill: currentColor; shape-rendering: crispEdges; }
+.personal-whiteboard__remove-pin svg { width: 16px; height: 16px; fill: currentColor; shape-rendering: crispEdges; }
 .personal-whiteboard__remove-pin:hover { color: color-mix(in srgb, var(--noir-danger) 72%, var(--noir-ink-950)) !important; }
 .personal-whiteboard__pin h2 { margin: var(--noir-space-2) 0; color: var(--noir-ink-950); font-family: var(--noir-font-sans); font-size: 0.75rem; line-height: 1.3; }
-.personal-whiteboard__person-portrait { width: 3.5rem; margin: var(--noir-space-2) 0; padding: 2px; background: var(--noir-paper-300); border: 1px solid var(--noir-paper-400); image-rendering: pixelated; }
-.personal-whiteboard__person-portrait .modular-face { width: 100%; }
+.personal-whiteboard__person-portrait { width: 84px; margin: var(--noir-space-2) 0; padding: 2px; background: var(--noir-paper-300); border: 1px solid var(--noir-paper-400); image-rendering: pixelated; }
+.personal-whiteboard__person-portrait .modular-face { width: 80px; }
 .personal-whiteboard__pin--note { min-height: 10rem; padding: var(--noir-space-3); }
 .personal-whiteboard__pin--note .personal-whiteboard__note-content { display: block; box-sizing: border-box; width: 100%; min-height: 8rem; height: 100%; margin: 0; padding: var(--noir-space-2); color: var(--noir-ink-950); resize: none; background: transparent; border: 0; outline: 0; box-shadow: none; font-family: var(--noir-font-mono); font-size: 0.58rem; line-height: 1.5; touch-action: auto; }
 .personal-whiteboard__pin--note .personal-whiteboard__note-content:focus { outline: 0; }
@@ -1014,7 +1107,7 @@
   .computer-desktop__heading { align-items: flex-start; flex-direction: column; gap: var(--noir-space-2); font-size: 0.625rem; }
   .computer-desktop__heading span { text-align: left; }
   .computer-programs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--noir-space-6) var(--noir-space-3); margin-top: var(--noir-space-8); }
-  .computer-program__icon { width: 3rem; height: 3rem; }
+  .computer-program__icon { width: 48px; height: 48px; }
   .computer-taskbar { padding-inline: var(--noir-space-3); font-size: 0.625rem; }
   .computer-taskbar__left { min-width: 0; overflow-x: auto; }
   .computer-indicator { right: var(--noir-space-4); }
@@ -1046,6 +1139,18 @@
 
 @media (max-width: 42rem) {
   .local-terminal-overlay { padding: 0.5rem; }
+  .telephone-overlay { padding: 0.5rem; }
+  .telephone-device { width: min(34rem, 100%); height: min(40rem, calc(100svh - 1rem)); max-height: calc(100svh - 1rem); padding: 0.3rem; }
+  .telephone-device__body { min-height: 0; grid-template-columns: 5rem minmax(0, 1fr); gap: 0.5rem; padding: 0.15rem; }
+  .telephone-device__handset { min-height: 0; }
+  .telephone-device__handset .telephone-device__receiver { width: 3.25rem; height: 3.25rem; }
+  .telephone-interrogation { min-height: 0; }
+  .telephone-interrogation__portrait { height: 7rem; flex-basis: 7rem; }
+  .telephone-interrogation__portrait .modular-face { width: 7rem; }
+  .telephone-interrogation__answer { height: 5rem; min-height: 0; max-height: 5rem; flex-basis: 5rem; font-size: 0.7rem; }
+  .telephone-interrogation__questions button { min-height: 1.9rem; font-size: 0.64rem; }
+  .telephone-app__keypad { gap: 0.2rem; }
+  .telephone-app__keypad button { min-height: 0; }
   .local-terminal-frame { width: min(94vw, 26rem); max-height: calc(100svh - 1rem); }
   .local-terminal-frame .computer-screen { height: min(20rem, calc(100svh - 7rem)); }
   .computer-window--terminal { width: min(94%, 26rem); }

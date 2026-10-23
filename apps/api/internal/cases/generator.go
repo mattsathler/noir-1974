@@ -174,26 +174,29 @@ func cityForLocation(base world.World, locationID string) string {
 }
 
 func buildCaseEmails(seed string, worldVersion int, caseID string, selected candidate, base world.World) []mail.Message {
-	killer := npcByID(base.NPCs, selected.killerID)
 	victim := npcByID(base.NPCs, selected.victimID)
-	subject, body, relation := "Office allocation", "The revised figures are still under your name. I expect the registry to correct them before the next settlement.", "workplace_dispute"
+	firstSubject, firstBody := "A private warning", "Leave the meeting notes as they are. If you take them to the registry, you will regret it."
+	lastSubject, lastBody := "One last message", "This is your final chance to keep quiet. Do not make me come looking for you."
 	switch selected.archetypeID {
 	case "jealousy":
-		subject = "A question about last evening"
-		body = "You said the late passage was for office work. Someone from the relay saw you leave with the same clerk again. I will wait for an explanation at home."
-		relation = "jealousy_correspondence"
+		firstSubject = "Do not ask about the meeting"
+		firstBody = "You were told to leave that evening alone. Stop asking who was there, and do not show the letter to anyone."
+		lastSubject = "You have been warned"
+		lastBody = "Keep the letter to yourself. If this becomes a public matter, you will wish you had listened."
 	case "financial_extortion":
-		subject = "Private account notice"
-		body = "The weekly remittance is due before Friday. I still have the duplicate settlement copy, and I would prefer your household name not appear in a company inquiry."
-		relation = "extortion_message"
+		firstSubject = "The remittance"
+		firstBody = "The next payment is due before Friday. I still have the duplicate settlement statement. Do not take the ledger to the registry."
+		lastSubject = "Final notice"
+		lastBody = "The payment is late. Send it as agreed, or the duplicate statement will reach people you would rather not involve."
 	}
 	messageDay := 3 + caseIndex(seed+"/correspondence/day", 1, 8)
 	messageMinute := 7*60 + caseIndex(seed+"/correspondence/minute", 1, 13*60)
-	return []mail.Message{mail.CaseMessage(
-		seed, worldVersion, caseID, victim.ID, killer.ID, killer.Name, victim.Name,
-		subject, body, relation,
-		time.Date(1974, time.November, messageDay, 0, 0, 0, 0, time.UTC).Add(time.Duration(messageMinute)*time.Minute),
-	)}
+	lastSentAt := time.Date(1974, time.November, messageDay, 0, 0, 0, 0, time.UTC).Add(time.Duration(messageMinute) * time.Minute)
+	firstSentAt := lastSentAt.Add(-48 * time.Hour)
+	return []mail.Message{
+		mail.CaseMessage(seed, worldVersion, caseID, victim.ID, victim.ID, "Unknown sender", victim.Name, firstSubject, firstBody, "anonymous_warning", firstSentAt),
+		mail.CaseMessage(seed, worldVersion, caseID, victim.ID, victim.ID, "Unknown sender", victim.Name, lastSubject, lastBody, "anonymous_followup", lastSentAt),
+	}
 }
 
 // Validate checks the case archetype, world references, and reachable clues.

@@ -1,0 +1,182 @@
+{
+  "shared": {
+    "routine": [
+      "My schedule has been steady. {victim} seemed distracted whenever the weekly settlement came around.",
+      "I have been working the usual hours. The accounts section has had several late nights.",
+      "Most days are routine, though the payment papers have been taking longer to clear.",
+      "I keep to my shift. I have no reason to be near the GATE terminal after work.",
+      "The week felt ordinary until people began asking who had seen the duplicate statement.",
+      "I have been taking lunch at my desk. The account clerks have been too busy to leave.",
+      "My work is unchanged. The number of queries about remittances has increased.",
+      "I still travel the same route. I noticed a few colleagues changing theirs.",
+      "I arrive before the counters open and leave when my work is finished.",
+      "The office routine has become slower since the ledgers were requested.",
+      "I have kept to my normal hours. {victim} was often still at their desk when I left.",
+      "There were more sealed envelopes than usual in the registry that week.",
+      "My daily work is predictable. It is the questions about one payment that are not.",
+      "I have not changed my habits, though I have stopped using the company telephone.",
+      "The settlement day came and went. I thought the matter was finished then.",
+      "I have been assigned to ordinary filing. I do not handle the private accounts.",
+      "People were checking the clock more often than they checked their papers.",
+      "My routine is the same, but I have started keeping copies of anything I sign.",
+      "The week was busy. I cannot remember which day the account office stayed open late.",
+      "I have done my usual work. I cannot account for everyone else's movements."
+    ],
+    "associates": [
+      "I spend time with the clerks on my floor. We do not discuss the accounts outside work.",
+      "{victim} and I worked in different sections. We spoke when a form needed correcting.",
+      "I know several people who handle payments, but I would not guess who knew about a private entry.",
+      "I usually eat with two colleagues from the registry. They are not involved in account approvals.",
+      "I keep my friends outside the company. At work, I speak to whoever brings me a file.",
+      "A few people met {victim} after hours. I was never invited and do not know what they discussed.",
+      "I knew {victim} through paperwork, not socially.",
+      "The people in accounts keep to themselves. I do not know who they trust.",
+      "I see my family most evenings. I rarely spend time with colleagues after the shift.",
+      "I have worked with the same small group for years. We avoid discussing private payments.",
+      "{victim} once asked me about a reference number. I could not tell them who it belonged to.",
+      "I know the staff who enter figures, not the people who approve them.",
+      "There is a group that takes tea near the GATE hall. I do not know why they meet there.",
+      "I was friendly with {victim}, but we did not share personal business.",
+      "I spend time with people from the night shift. Their hours do not match mine.",
+      "I have heard names in the accounts office, but I would not want to repeat them incorrectly.",
+      "The people I trust at work are not the people who control the ledgers.",
+      "I have only spoken with {victim} a handful of times. They seemed careful about what they said.",
+      "I know who carries the sealed statements. I do not know who reads them.",
+      "I would rather not discuss my friends or colleagues on a line that may be monitored."
+    ],
+    "unusual": [
+      "A payment appeared under a reference instead of a name. I assumed that was how the system worked.",
+      "I saw a sealed statement moved from the registry before it was entered in the log.",
+      "Someone asked whether GATE records could be corrected after a journey was completed.",
+      "The account ledger was open on a desk after the office had closed.",
+      "A duplicate copy was requested, then the request disappeared from the file.",
+      "I noticed a remittance listed twice, though one entry may have been a draft.",
+      "The date on a payment query did not match the date on the attached letter.",
+      "A clerk asked me to deliver an envelope without entering it in the outgoing book.",
+      "There was a late GATE passage in the register. I do not know who was travelling.",
+      "A person from accounts came to the building on a day they were not scheduled.",
+      "The weekly settlement was delayed without the usual explanation.",
+      "A reference number was written over in pencil. I could not read what was underneath.",
+      "The payment query had a signature, but I did not recognize the hand.",
+      "Someone asked about the route taken by a traveller shortly before the death.",
+      "I heard a drawer shut when I entered the accounts room. Nobody was there when I looked.",
+      "A copy of the statement was missing from the folder, though the index still listed it.",
+      "The registry received a letter with no return address. It was sent to the accounts section.",
+      "I saw a stamp on a page that should not have left the building.",
+      "An entry was marked settled before the money had cleared.",
+      "There was talk of a message demanding payment. I never saw the message itself."
+    ],
+    "work": [
+      "I handle ordinary invoices. The private remittances go through a different desk.",
+      "The ledger and the settlement statement are maintained by separate sections.",
+      "A payment query should have a signed approval attached. That one may not have.",
+      "I do not have access to the full account register, only the pages sent to my desk.",
+      "The registry keeps a copy of outgoing documents. It may show when the statement was moved.",
+      "We are expected to report a mismatch, but the process can take several days.",
+      "The account office has been reviewing old remittances since the inquiry began.",
+      "A reference number can identify a transfer if the matching ledger is still intact.",
+      "I am not responsible for GATE records. Those are kept separately from our accounts.",
+      "The weekly settlement includes many routine payments. One unusual entry can be easy to miss.",
+      "My section has not changed its procedure. I cannot say what happens in the private office.",
+      "I have been asked to check signatures against the original forms.",
+      "The duplicate statement should be filed with the remittance authorization.",
+      "There is a delay between a GATE journey and the record reaching our office.",
+      "I do not know who approved the payment. The initials are not enough to identify them.",
+      "The accounts are difficult to follow without the date ledger and the settlement sheet together.",
+      "I was told not to discuss the payment query until the review is complete.",
+      "Some records are kept in the city office, others at the company headquarters.",
+      "A missing statement does not prove anything, but the file should still have a copy.",
+      "I can only speak to the forms I have seen. I have not seen the full account."
+    ],
+    "worries": [
+      "I am worried the duplicate statement will be destroyed before anyone compares it with the ledger.",
+      "Please do not repeat my name to the accounts office. I still need this job.",
+      "I worry that a reference number will be mistaken for a person's name.",
+      "The GATE register and the payment papers may not be kept for long.",
+      "I do not know who sent the message, and I do not want to guess.",
+      "Someone has been asking which clerk handled the sealed envelope.",
+      "I am afraid the records will be changed while everyone is waiting for approval.",
+      "There is pressure to call the payment a clerical error and close the review.",
+      "I worry that people will lose their jobs over a ledger they did not control.",
+      "I cannot tell whether the remittance was legitimate. I only saw the entry.",
+      "The account office has become very quiet whenever the duplicate is mentioned.",
+      "I am concerned that the GATE times will be treated as exact when they may be rounded.",
+      "I would rather not be involved in a dispute over money.",
+      "The person who sent the anonymous message may still have access to the registry.",
+      "I worry that the family was threatened, but I have no way to verify what I heard.",
+      "The review should include the original forms, not just the summary sheet.",
+      "I do not feel safe keeping copies at my desk.",
+      "People are asking me to remember dates from months ago. I may get them wrong.",
+      "I am afraid someone will blame the first clerk whose initials appear in the book.",
+      "I have said everything I know. Please do not call me again."
+    ]
+  },
+  "roles": {
+    "colleague": {
+      "routine": [
+        "My schedule has been steady. {victim} had been staying late with account papers.",
+        "My days were much the same, though {victim} seemed distracted when the weekly settlement came up."
+      ],
+      "associates": [
+        "I mostly spend time with people from accounts. I cannot speak for what they knew about the ledger.",
+        "I worked alongside {victim}; we were not close outside the office."
+      ],
+      "unusual": [
+        "One ledger entry used a reference instead of a name. It might have been normal; I do not know.",
+        "There was talk of a GATE trip near that time. I cannot connect it to anything myself."
+      ],
+      "work": [
+        "The settlement statements and the account ledger do not seem to tell quite the same story.",
+        "I noticed a payment entry that had been queried, then it disappeared from the desk."
+      ],
+      "worries": [
+        "Please keep my name out of this. People who handle the accounts have long memories.",
+        "I am worried someone will alter the ledger again. I cannot prove that has happened."
+      ]
+    },
+    "acquaintance": {
+      "routine": [
+        "My days have been ordinary. {victim} seemed under strain the last few times we met.",
+        "I have kept to my normal routine. {victim} once asked me how to trace a payment reference."
+      ],
+      "associates": [
+        "I usually spend time with family and a few neighbours. {victim} was an old acquaintance.",
+        "I did not know {victim}'s work circle well enough to name anyone."
+      ],
+      "unusual": [
+        "{victim} said a message had arrived asking for money. They would not show it to me.",
+        "They mentioned a journey recorded by GATE, but did not explain why it mattered."
+      ],
+      "work": [
+        "They thought an account entry had been hidden among routine payments. That is all I know.",
+        "They said a copy of a statement was important and needed to be kept somewhere safe."
+      ],
+      "worries": [
+        "I do not want to be drawn into a dispute about money. Please leave me out of it.",
+        "I worry that the records will disappear. I cannot say who would want that."
+      ]
+    },
+    "perpetrator": {
+      "routine": [
+        "I have kept to my usual schedule. I will not answer questions about private accounts.",
+        "I cannot help you. The matter has already caused enough trouble."
+      ],
+      "associates": [
+        "I spend time with people outside the office. I will not name anyone on a call that may be recorded.",
+        "I knew {victim} through work. I have nothing else to say about them."
+      ],
+      "unusual": [
+        "A payment reference proves nothing. I will not discuss it further.",
+        "I do not remember any message or unusual journey. Check the records yourself."
+      ],
+      "work": [
+        "All payments went through the proper channels, as far as I know.",
+        "I will not discuss account procedures with you. Please use the official request."
+      ],
+      "worries": [
+        "I am concerned you will accuse someone based on an incomplete ledger.",
+        "I have no comment. Do not telephone this office again."
+      ]
+    }
+  }
+}

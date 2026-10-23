@@ -6,7 +6,6 @@ import { Map as MapIcon } from "pixelarticons/react/Map";
 import { Message } from "pixelarticons/react/Message";
 import { Note } from "pixelarticons/react/Note";
 import { Notes } from "pixelarticons/react/Notes";
-import { Phone } from "pixelarticons/react/Phone";
 import { Printer } from "pixelarticons/react/Printer";
 import { User } from "pixelarticons/react/User";
 import { Users } from "pixelarticons/react/Users";
@@ -30,14 +29,12 @@ const PERSONAL_PROGRAMS = [
   { id: "case-files", label: "CASE FILES", Icon: Files, state: "UNDER REVIEW", available: false },
   { id: "whiteboard", label: "WHITEBOARD", Icon: Notes, state: "ONLINE", available: true },
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
-  { id: "telephone", label: "TELEPHONE", Icon: Phone, state: "OFFLINE", available: false },
 ];
 
 const BYPASSED_PROGRAM_LABELS = {
   "case-files": "CA\uE000E FI\uE001ES",
   whiteboard: "WHI\uE000\uE001BOAR\uE002",
   "city-records": "CI\uE003Y RECO\uE004DS",
-  telephone: "TELE\uE000ONE",
   interpol: "PERSON\uE001EL SEARCH",
   emails: "E\uE002AIL ARCHIVE",
   "bank-records": "FINANCI\uE003L RECORDS",

@@ -140,26 +140,16 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 	for _, npc := range local.NPCs {
 		npcNames[npc.ID] = npc.Name
 	}
-	locations := make(map[string]world.Entity, len(local.Entities))
-	for _, entity := range local.Entities {
-		if entity.EntityType == "location" {
-			locations[entity.ID] = entity
-		}
-	}
 	lead := Article{ID: "city-desk-" + cityID + "-" + dateKey, Section: "CITY DESK", Headline: "A quiet day for the city police", Summary: fmt.Sprintf("No new homicide inquiry has been reported in %s. Local authorities remain on duty.", city)}
 	if caseErr == nil {
 		victimName, exists := npcNames[latest.VictimID]
 		if !exists {
 			return Issue{}, fmt.Errorf("latest case victim is missing from generated city")
 		}
-		location, exists := locations[latest.LocationID]
-		if !exists {
-			return Issue{}, fmt.Errorf("latest case location is missing from generated city")
-		}
 		lead = Article{
 			ID: latest.ID, Section: "SPECIAL REPORT",
-			Headline: fmt.Sprintf("Police open homicide inquiry at %s", location.Name),
-			Summary:  fmt.Sprintf("Authorities confirmed the death of %s at %s, in %s. Detectives are asking anyone with information to come forward. The investigation remains open.", victimName, location.Name, city),
+			Headline: fmt.Sprintf("Police open homicide inquiry into death of %s", victimName),
+			Summary:  fmt.Sprintf("Authorities confirmed the death of %s. Detectives are asking anyone with information to come forward. The circumstances remain under investigation.", victimName),
 			CaseID:   latest.ID,
 		}
 	}

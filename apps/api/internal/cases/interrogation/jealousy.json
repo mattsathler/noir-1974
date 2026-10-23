@@ -1,0 +1,182 @@
+{
+  "shared": {
+    "routine": [
+      "My days have been quiet. {victim} had seemed less willing to meet friends lately.",
+      "I still take the same walk home. I used to see {victim} on that route now and then.",
+      "Nothing changed in my own routine. The couple's habits seemed to change over the past month.",
+      "I have been keeping busy. It is easier than sitting with other people's questions.",
+      "My evenings are usually spent at home. I cannot say where the spouses went each night.",
+      "I keep regular hours. {victim} once mentioned being out later than expected.",
+      "I have not been visiting the neighbourhood as often since the death.",
+      "The week was ordinary for me. I only heard about the trouble afterward.",
+      "I used to meet {victim} for coffee on Saturdays. We had not done that recently.",
+      "My routine is unchanged, though I have started avoiding the street where they lived.",
+      "I work during the day and stay home in the evenings. I was not around that night.",
+      "The couple seemed to keep different hours. I assumed it was because of work.",
+      "I have been answering the same questions from neighbours all week.",
+      "I usually see the same few people. {victim} had become harder to reach.",
+      "My days were quiet until the police began asking about a letter.",
+      "I have not changed my schedule. I cannot account for what happened in their household.",
+      "I remember a late evening, but not whether it was before or after the rain started.",
+      "The couple's routine was private. I did not keep track of their comings and goings.",
+      "I spent more time with {victim} earlier in the year. We had drifted apart lately.",
+      "I am back to my usual habits, though the neighbourhood does not feel quite the same."
+    ],
+    "associates": [
+      "I spend time with a few friends from the neighbourhood. I knew {victim} through them.",
+      "I knew both spouses socially, but I will not repeat private conversations.",
+      "Most of my friends are from work. I only saw {victim} at gatherings now and then.",
+      "I used to visit their home with a small group. We have not gathered since the death.",
+      "I keep to my family. {victim} was an acquaintance, not someone I saw every day.",
+      "There were friends who visited them separately. I could not tell who was closest to whom.",
+      "I know the neighbours on either side of their building. I would not call them close friends.",
+      "I spent time with {victim} before the marriage became strained, as far as I could tell.",
+      "I do not know who {victim} wrote to. We mostly spoke about ordinary things.",
+      "Their circle was larger than mine. I only knew a handful of people they invited over.",
+      "I knew the spouse through {victim}, but we were never friends on our own.",
+      "I have one friend who lived nearby. We sometimes saw the couple on the stairs.",
+      "I usually spend time with my sister. She knew {victim} better than I did.",
+      "I was part of a group that met in the café. The spouses did not always come together.",
+      "I do not want to name their friends. People are already being questioned by the police.",
+      "I knew {victim} from the market and the tram stop. We were friendly, not intimate.",
+      "The people who visited them most often kept to themselves.",
+      "I have not spoken with the spouse since the funeral. I would rather leave it that way.",
+      "I met {victim} through a mutual friend. I cannot say who they trusted at home.",
+      "I do not think their private circle is any of my business."
+    ],
+    "unusual": [
+      "I heard there was a letter, but I only saw the envelope.",
+      "Someone mentioned a late return. I do not know who saw it or which evening it was.",
+      "A meeting was discussed in the café. Nobody said who was expected to attend.",
+      "I noticed the couple arrive separately at a gathering. That may not mean anything.",
+      "There was a disagreement outside the building, but I could not hear what started it.",
+      "A neighbour said the stairwell door was open late. I cannot confirm the hour.",
+      "The letter people ask about was incomplete when I heard of it.",
+      "I saw someone waiting near the tram stop. I did not recognize them in the dark.",
+      "One evening, {victim} left a gathering without saying goodbye.",
+      "The caretaker asked about footsteps on the stairs. I could not help them.",
+      "I heard a rumour about a private meeting. Nobody I know was willing to say more.",
+      "There was a note tucked inside a book. I do not know who put it there.",
+      "The spouse asked whether anyone had seen {victim} that afternoon. I did not know.",
+      "A light was on in the flat later than usual, but that happens often enough.",
+      "I remember raised voices one evening. I could not tell which apartment they came from.",
+      "Someone said a letter had been torn up. I never saw the pieces.",
+      "A neighbour changed their story about the time. They may simply have remembered it wrong.",
+      "I saw the spouse walking alone after dark. I did not ask where they had been.",
+      "There was a knock at the door after the household had gone quiet.",
+      "I heard about a meeting only after the death. Before then, nobody mentioned it to me."
+    ],
+    "work": [
+      "My work has been ordinary. I cannot speak to what happened in their home.",
+      "I work across town, so I saw little of their daily routine.",
+      "{victim} sometimes talked about work, but never about the private matter you are asking about.",
+      "The office records would only show their hours, not what happened between them.",
+      "I do not know whether either spouse left work early that evening.",
+      "I have no connection to their workplace. I only knew them socially.",
+      "Work has kept me busy. I have not had time to follow the rumours.",
+      "I once heard them disagree about a work appointment, but I do not remember the date.",
+      "The couple had different schedules. That was all I knew about their work.",
+      "I cannot tell you if the meeting was connected to either person's job.",
+      "I have kept my own affairs separate from theirs.",
+      "The question of work never came up when we met socially.",
+      "I was not present at their office. You would need someone who worked there.",
+      "I heard {victim} had asked for time away from work, but I do not know why.",
+      "The spouse told me they were busy. I did not ask what the work involved.",
+      "I have nothing to add about their employment. I knew them outside that setting.",
+      "Their work hours may help establish a timeline, but I do not know the details.",
+      "I saw a work bag in the hall. I could not tell whose it was.",
+      "I am not comfortable discussing their jobs. It has nothing to do with me.",
+      "I have been working as usual. I do not know if either of them was at work that day."
+    ],
+    "worries": [
+      "I worry the letter will be read as proof of more than it actually says.",
+      "I do not want to repeat a rumour and hurt someone who is already grieving.",
+      "The neighbours are afraid of being dragged into a private dispute.",
+      "I worry people will decide what happened before the times are checked.",
+      "I have no way to know who was at the meeting. That uncertainty bothers me.",
+      "Please do not tell the spouse I spoke with you. I do not want another confrontation.",
+      "I worry the missing part of the letter matters more than the part everyone has read.",
+      "I cannot say whether the late return was unusual. I only heard about it afterward.",
+      "People are treating a troubled marriage as an answer. It may not be one.",
+      "I am concerned the neighbours will change their accounts to match what others said.",
+      "I do not want to take sides between two people I cared about.",
+      "I worry someone will mistake my silence for having something to hide.",
+      "The truth may be in the small details, but I cannot remember them clearly.",
+      "I am afraid the family will be blamed for something they did not do.",
+      "I would rather not discuss a death over a telephone line.",
+      "I worry that the meeting was arranged for a reason no one has mentioned yet.",
+      "I have nothing certain to offer. Please do not put words in my mouth.",
+      "The building has been full of strangers asking questions. It makes people nervous.",
+      "I do not know what happened, and I do not want to invent an answer.",
+      "I would like to end this call. This is all too personal."
+    ]
+  },
+  "roles": {
+    "colleague": {
+      "routine": [
+        "My routine was ordinary. {victim} seemed tired whenever I saw them at work.",
+        "I kept to my usual hours. {victim} had been leaving at different times for a while."
+      ],
+      "associates": [
+        "I mostly spend time with colleagues. I knew {victim} and their spouse only in passing.",
+        "I was not part of their private circle, and I do not trust office gossip about them."
+      ],
+      "unusual": [
+        "A torn letter was mentioned after the death. I never saw the whole thing.",
+        "Someone said there had been a late return one evening. I could not confirm it."
+      ],
+      "work": [
+        "There was no office matter that I know of. Their private life was not discussed at work.",
+        "I remember a request for time off, but not the reason given."
+      ],
+      "worries": [
+        "I do not want to repeat rumours about a marriage. Please ask someone who was there.",
+        "I am worried that a half-read letter will be treated as the whole story."
+      ]
+    },
+    "acquaintance": {
+      "routine": [
+        "My routine has been quiet. {victim} had been keeping to themselves when we met.",
+        "I have not changed my habits. {victim} once mentioned an awkward evening, then changed the subject."
+      ],
+      "associates": [
+        "I usually spend time with a few friends. I knew both of them, but will not take sides.",
+        "I saw {victim} socially now and then. I did not know what happened between the spouses."
+      ],
+      "unusual": [
+        "There was a letter about a meeting. I only saw a few words before it was put away.",
+        "I heard someone came home late, though I do not know which night or who saw it."
+      ],
+      "work": [
+        "This was not something {victim} wanted to discuss at work or with friends.",
+        "I cannot tell you whether a private meeting had anything to do with the death."
+      ],
+      "worries": [
+        "I am not comfortable discussing their marriage on a telephone line.",
+        "I worry that people will turn a rumour into a fact because it suits them."
+      ]
+    },
+    "perpetrator": {
+      "routine": [
+        "I am trying to get through each day. I will not discuss my schedule or my marriage with a stranger.",
+        "My routine is private. I have nothing to say about that week; please stop calling."
+      ],
+      "associates": [
+        "{victim} was my spouse. That is private, and I will not discuss my personal circle.",
+        "I do not want to discuss who I or {victim} spent time with."
+      ],
+      "unusual": [
+        "I have not seen that letter. I cannot help you with something I have not read.",
+        "People remember things differently after a death. I will not comment on hearsay."
+      ],
+      "work": [
+        "There is nothing about my work that relates to this. I will end the call if you continue.",
+        "I will not discuss private correspondence with you."
+      ],
+      "worries": [
+        "I am worried that grief is making people suspicious of everyone close to {victim}.",
+        "I have nothing further to say. Please respect my privacy."
+      ]
+    }
+  }
+}

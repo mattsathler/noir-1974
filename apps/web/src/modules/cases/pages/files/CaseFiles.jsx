@@ -96,7 +96,6 @@ export default function CaseFiles({ cityId, issueDay, onPin }) {
           </header>
           <p>{selectedSummary}</p>
           <p className="case-files__reference">VICTIM RECORD · {detail.case.victimId}</p>
-          <p className="case-files__reference">SCENE RECORD · {detail.case.locationId}</p>
           <h2 className="case-files__section-heading">RECORDS FILED</h2>
           {detail.evidence.map((item) => {
             const filed = filedIDs.includes(item.id);

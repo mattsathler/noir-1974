@@ -46,7 +46,7 @@ export default function ArchivePage({ initialIdentity = null, onLoaded }) {
         <p className="text-xs tracking-wide uppercase text-success m-0 mb-3">PRIVATE FILE · LYON</p>
         <h1 id="dossier-title" className="text-2xl m-0">Case file opened</h1>
         {identity?.character && <>
-          <div className="grid place-items-center py-3"><ModularFace visual={identity.character.visual} name={identity.character.displayName} /></div>
+          <div className="character-portrait-preview grid place-items-center py-3"><ModularFace visual={identity.character.visual} name={identity.character.displayName} /></div>
           <p className="world-loader__agent text-sm text-secondary">AGENT · {identity.character.displayName}</p>
         </>}
         <p className="text-xs tracking-wide uppercase text-accent m-0">{loading ? "Reading case files" : "Synchronizing world"}</p>

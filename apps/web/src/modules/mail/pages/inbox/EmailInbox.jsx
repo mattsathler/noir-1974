@@ -2,6 +2,9 @@ import { useRef, useState } from "react";
 import { MapPin } from "pixelarticons/react/MapPin";
 import { getNPCEmails, searchPeople } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
+import ModularFace from "../../../identity/components/ModularFace.jsx";
+
+const FALLBACK_NPC_VISUAL = { hairId: "hair_short_brown", skinId: "skin_white", eyesId: "eyes_brown", faceId: "", beardId: "", accessoryIds: [] };
 
 function dateBefore(value, days) {
   const date = new Date(`${value}T00:00:00Z`);
@@ -14,8 +17,10 @@ function displayDate(value, timeZone) {
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
     timeZone: timeZone || "Europe/Paris",
-    dateStyle: "medium",
-    timeStyle: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(date);
 }
 
@@ -113,6 +118,10 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
         {!mailbox && people.map(({ npc }) => (
           <article className="world-record" key={npc.id}>
             <header className="world-record__header"><h2>{npc.name}</h2><span>ACCOUNT LOCATED</span></header>
+            <div className="world-directory__person-result">
+              <figure className="world-directory__person-portrait"><ModularFace visual={npc.visual ?? FALLBACK_NPC_VISUAL} name={npc.name} /></figure>
+              <div className="world-directory__person-copy"><span>IDENTIFICATION PORTRAIT</span></div>
+            </div>
             <button className="world-record__activity-toggle" type="button" onClick={() => { setMailbox(npc); setMessage("Select an interval to consult this account's archived correspondence."); }}>
               OPEN CORRESPONDENCE FILE
             </button>

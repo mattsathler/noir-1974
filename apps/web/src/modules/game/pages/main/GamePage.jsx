@@ -3,6 +3,7 @@ import { Cross } from "pixelarticons/react/Cross";
 import { MonitorSharp } from "pixelarticons/react/MonitorSharp";
 import { Earth } from "pixelarticons/react/Earth";
 import { NotebookSharp } from "pixelarticons/react/NotebookSharp";
+import { Phone } from "pixelarticons/react/Phone";
 import moneyIcon from "pixelarticons/svg/money.svg";
 import starIcon from "pixelarticons/svg/star.svg";
 import buildingIcon from "pixelarticons/svg/building.svg";
@@ -14,6 +15,7 @@ import { getCompanyAtLocation, getCurrentWorld, getNeighborhoodDestinations, mov
 import GateTransition from "../../components/GateTransition.jsx";
 import LocalTerminal from "./LocalTerminal.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
+import Telephone from "./Telephone.jsx";
 
 function buildingVisual(building) {
   const identity = `${building.locationId} ${building.name}`.toLowerCase();
@@ -93,6 +95,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [computerEntry, setComputerEntry] = useState(null);
   const [computerContext, setComputerContext] = useState(null);
   const [newspaperOpen, setNewspaperOpen] = useState(false);
+  const [telephoneOpen, setTelephoneOpen] = useState(false);
   const [transitOpen, setTransitOpen] = useState(false);
   const [gateTransition, setGateTransition] = useState(null);
   const [arrival, setArrival] = useState(null);
@@ -233,6 +236,16 @@ export default function GamePage({ initialWorld = null, onLogout }) {
               <MonitorSharp className="computer-launch__icon" aria-hidden="true" />
             </button>
             <button
+              className="computer-launch"
+              type="button"
+              aria-label="Open telephone"
+              aria-haspopup="dialog"
+              aria-expanded={telephoneOpen}
+              onClick={() => setTelephoneOpen(true)}
+            >
+              <Phone className="computer-launch__icon" aria-hidden="true" />
+            </button>
+            <button
               className="newspaper-launch"
               type="button"
               aria-label="Read the local newspaper"
@@ -327,6 +340,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
       )}
       {computerEntry && <LocalTerminal facility={computerEntry} onAccessGranted={() => { setComputerContext(computerEntry); setComputerEntry(null); setComputerOpen(true); }} onClose={() => setComputerEntry(null)} />}
       {newspaperOpen && <NewspaperWindow cityId={world?.cityId} issueDay={issueDay} onClose={closeNewspaper} />}
+      {telephoneOpen && <Telephone onClose={() => setTelephoneOpen(false)} />}
       {transitOpen && <GateCityExplorer world={world} onTravel={travelViaGate} onClose={closeTransit} />}
       {gateTransition && <GateTransition destination={gateTransition} origin={world} onArrive={arriveAtCity} onComplete={completeGateTransition} onError={failGateTransition} />}
     </main>

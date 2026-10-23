@@ -99,6 +99,14 @@ type CaseAPIReader interface {
 	SavePlayerProgress(context.Context, string, string, string, cases.PlayerProgress) error
 }
 
+type CaseInterrogationReader interface {
+	InterrogationAnswersForNPC(context.Context, string, string, string) (cases.InterrogationAnswers, error)
+}
+
+type CasePersonSearchReader interface {
+	PersonSearchScenes(context.Context, string, string, []string) (map[string]world.PersonSearchScene, error)
+}
+
 type RecordsAPIReader interface {
 	NPCRecords(context.Context, string, string, time.Time, time.Time, string) ([]records.Record, error)
 }
@@ -183,6 +191,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/cases", handler.listOpenCases)
 		mux.HandleFunc("GET /api/cases/{caseID}", handler.getCase)
 		mux.HandleFunc("POST /api/cases/{caseID}/progress", handler.saveCaseProgress)
+		if _, ok := caseReader.(CaseInterrogationReader); ok {
+			mux.HandleFunc("GET /api/cases/interrogation/{npcID}", handler.getInterrogationAnswers)
+		}
 	}
 	if handler.whiteboardReader != nil {
 		mux.HandleFunc("GET /api/whiteboards", handler.listWhiteboards)
@@ -478,6 +489,24 @@ func (h *Handler) getCase(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, caseDetailResponse{Case: publicCase, Evidence: evidence, Progress: progress})
+}
+
+func (h *Handler) getInterrogationAnswers(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.caseReader.(CaseInterrogationReader)
+	if !ok {
+		http.Error(w, "interrogation service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	answers, err := reader.InterrogationAnswersForNPC(r.Context(), h.worldServerID, h.worldFor(r.Context(), current.ID).CityID, r.PathValue("npcID"))
+	if err != nil {
+		http.Error(w, "could not retrieve interview testimony", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"answers": answers})
 }
 
 type whiteboardCreateRequest struct {
@@ -850,6 +879,22 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 		results = results[:world.MaxNPCSearchResults]
 	}
 	if h.whiteboardReader != nil {
+		if reader, ok := h.caseReader.(CasePersonSearchReader); ok {
+			npcIDs := make([]string, 0, len(results))
+			for _, result := range results {
+				npcIDs = append(npcIDs, result.NPC.ID)
+			}
+			scenes, err := reader.PersonSearchScenes(r.Context(), h.worldServerID, h.worldFor(r.Context(), current.ID).CityID, npcIDs)
+			if err != nil {
+				h.writeAPIError(w, r, http.StatusInternalServerError, "PERSON_SEARCH_FAILED", "could not retrieve case scene references", err)
+				return
+			}
+			for index := range results {
+				if scene, ok := scenes[results[index].NPC.ID]; ok {
+					results[index].ReportedScene = &scene
+				}
+			}
+		}
 		items := make([]cases.DiscoveredItem, 0, len(results))
 		for _, result := range results {
 			metadata, _ := json.Marshal(result)
@@ -868,12 +913,17 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 			if maritalStatus == "" {
 				maritalStatus = "UNKNOWN"
 			}
-			content := strings.Join([]string{
+			personFacts := []string{
 				"AGE · " + strconv.Itoa(result.NPC.Age) + " YEARS",
+				"STATUS · " + strings.ToUpper(result.NPC.Status),
 				"DESCRIPTION · " + appearance,
 				"EMPLOYMENT · " + strings.Join(workplaces, "; "),
 				"MARITAL STATUS · " + strings.ToUpper(maritalStatus),
-			}, "\n")
+			}
+			if result.ReportedScene != nil {
+				personFacts = append(personFacts, "REPORTED SCENE · "+result.ReportedScene.Address)
+			}
+			content := strings.Join(personFacts, "\n")
 			items = append(items, cases.DiscoveredItem{
 				ID:       "person:" + result.NPC.ID,
 				Source:   "person",

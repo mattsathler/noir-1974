@@ -1,6 +1,7 @@
 .modular-face {
   position: relative;
-  width: 6.25rem;
+  // Character sprites are authored at 40×40; render at a whole 3× scale.
+  width: 120px;
   aspect-ratio: 1;
   flex: 0 0 auto;
   overflow: hidden;
@@ -15,4 +16,8 @@
   object-fit: contain;
   image-rendering: pixelated;
   user-select: none;
+}
+
+.character-portrait-preview .modular-face {
+  transform: translateY(8px);
 }

@@ -3,6 +3,7 @@ import { MapPin } from "pixelarticons/react/MapPin";
 import { getCompanyAtLocation, getNPCRecords, searchCompanies, searchLocations, searchPeople } from "../../api.js";
 import DatePicker from "../../components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
+import { phoneNumberForNPC, registerPhoneContacts } from "../../phoneDirectory.js";
 
 const FALLBACK_NPC_VISUAL = {
   hairId: "hair_short_brown",
@@ -74,6 +75,10 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
   const isPeopleSearch = !isCityRecords && !isStaffDirectory;
   const isPrivilegedSystem = isBankRecords || isGateRecords;
   const staffCompanies = companyId ? companies.filter(({ company }) => company.id === companyId) : companies;
+
+  useEffect(() => {
+    if (isStaffDirectory && companies.length) registerPhoneContacts(companies);
+  }, [companies, isStaffDirectory]);
 
   useEffect(() => {
     if (!isStaffDirectory) return undefined;
@@ -194,9 +199,13 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
       </form>}
       <p className="world-directory__message" role="status" aria-live="polite">{message}</p>
 
-      {people.map(({ npc, workplaces, maritalStatus }) => (
+      {people.map(({ npc, workplaces, maritalStatus, reportedScene }) => (
         <article className="world-record world-record--personnel" key={npc.id}>
           <header className="world-record__header"><h2>{npc.name}</h2><span>{isInterpol ? "PERSONNEL FILE" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"}</span></header>
+          {(isBankRecords || isGateRecords) && <div className="world-directory__person-result">
+            <figure className="world-directory__person-portrait"><ModularFace visual={npc.visual ?? FALLBACK_NPC_VISUAL} name={npc.name} /></figure>
+            <div className="world-directory__person-copy"><span>IDENTIFICATION PORTRAIT</span></div>
+          </div>}
           {isInterpol && <>
             <div className="world-record__personnel-sheet">
               <figure className="world-record__portrait">
@@ -204,6 +213,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
                 <figcaption>IDENTIFICATION PORTRAIT</figcaption>
               </figure>
               <dl className="world-record__personnel-facts">
+                <div><dt>STATUS</dt><dd>{npc.status?.toUpperCase() || "UNKNOWN"}</dd></div>
                 <div><dt>AGE</dt><dd>{npc.age} YEARS</dd></div>
                 <div><dt>DESCRIPTION</dt><dd>{npc.appearance || "NOT RECORDED"}</dd></div>
                 <div>
@@ -213,6 +223,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
                     : "NOT LISTED"}</dd>
                 </div>
                 <div><dt>MARITAL STATUS</dt><dd>{maritalStatus?.toUpperCase() || "UNKNOWN"}</dd></div>
+                {reportedScene && <div><dt>REPORTED SCENE</dt><dd>{reportedScene.address}</dd></div>}
               </dl>
             </div>
             <button
@@ -225,11 +236,13 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
                 title: npc.name,
                 content: [
                   `AGE · ${npc.age} YEARS`,
+                  `STATUS · ${npc.status?.toUpperCase() || "UNKNOWN"}`,
                   `DESCRIPTION · ${npc.appearance || "NOT RECORDED"}`,
                   `EMPLOYMENT · ${workplaces.length ? workplaces.map(({ company, address }) => `${company} — ${address}`).join("; ") : "NOT LISTED"}`,
                   `MARITAL STATUS · ${maritalStatus?.toUpperCase() || "UNKNOWN"}`,
+                  ...(reportedScene ? [`REPORTED SCENE · ${reportedScene.address}`] : []),
                 ].join("\n"),
-                metadata: { npc, workplaces, maritalStatus },
+                metadata: { npc, workplaces, maritalStatus, reportedScene },
               })}
             >
               <MapPin aria-hidden="true" />
@@ -300,7 +313,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               <figure className="world-record__staff-portrait">
                 <ModularFace visual={employee.visual ?? FALLBACK_NPC_VISUAL} name={employee.name} />
               </figure>
-              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span></div>
+              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span><small>TELEPHONE · {phoneNumberForNPC(employee.id)}</small></div>
             </article>)}
           </div>
         </article>

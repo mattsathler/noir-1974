@@ -15,7 +15,7 @@ async function search(path, query) {
 const worldCacheVersion = 1;
 const worldCacheLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 const worldCachePrefix = `noir:world-data:v${worldCacheVersion}`;
-const newspaperCachePrefix = "noir:newspaper:v1";
+const newspaperCachePrefix = "noir:newspaper:v2";
 const newspaperRequests = new Map();
 
 function readCachedWorldList(key) {
@@ -190,6 +190,10 @@ export async function getOpenCases() {
 
 export function getCaseFile(caseId) {
   return requestCase(`/api/cases/${encodeURIComponent(caseId)}`);
+}
+
+export function getInterrogationAnswers(npcId) {
+  return requestCase(`/api/cases/interrogation/${encodeURIComponent(npcId)}`);
 }
 
 export function saveCaseProgress(caseId, progress) {

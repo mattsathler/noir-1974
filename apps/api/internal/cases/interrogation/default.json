@@ -1,0 +1,22 @@
+{
+  "routine": [
+    "My days have been much the same. I would rather keep this call brief.",
+    "I have kept to my usual schedule. Please do not put my name in a statement."
+  ],
+  "associates": [
+    "I mostly spend time with people from work, but I will not speak for them.",
+    "That is a personal question. I do not think this line is private."
+  ],
+  "unusual": [
+    "There has been talk, but I cannot separate what I saw from what I heard.",
+    "I noticed something out of place. I am not ready to say more over the telephone."
+  ],
+  "work": [
+    "The office keeps its own records. You should look there.",
+    "I would prefer not to discuss my employer on this line."
+  ],
+  "worries": [
+    "I am worried about being involved. Please do not call again.",
+    "Nothing I can say would help you. I am sorry."
+  ]
+}

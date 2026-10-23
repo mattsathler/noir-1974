@@ -70,7 +70,7 @@ export default function CharacterCreationPage({ onComplete }) {
             <input className="w-full min-h-11 p-3 border bg-base text-primary focus-ring" id="character-name" name="displayName" autoComplete="off" minLength={2} maxLength={40} required />
             <p className="text-xs text-secondary m-0">2–40 characters.</p>
 
-            <div className="grid place-items-center py-3" aria-live="polite">
+            <div className="character-portrait-preview grid place-items-center py-3" aria-live="polite">
               <ModularFace visual={visual} name="Your detective" />
             </div>
 

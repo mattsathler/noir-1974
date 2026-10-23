@@ -66,6 +66,12 @@ type PersonSearchRecord struct {
 	NPC           PersonSearchNPC         `json:"npc"`
 	Workplaces    []PersonSearchWorkplace `json:"workplaces"`
 	MaritalStatus string                  `json:"maritalStatus"`
+	ReportedScene *PersonSearchScene      `json:"reportedScene,omitempty"`
+}
+
+type PersonSearchScene struct {
+	Name    string `json:"name"`
+	Address string `json:"address"`
 }
 
 type PersonSearchNPC struct {
@@ -73,6 +79,7 @@ type PersonSearchNPC struct {
 	Name       string          `json:"name"`
 	Age        int             `json:"age"`
 	Appearance string          `json:"appearance"`
+	Status     string          `json:"status"`
 	Visual     *VisualIdentity `json:"visual,omitempty"`
 }
 
@@ -102,6 +109,7 @@ type CompanyEmployee struct {
 	ID     string          `json:"id"`
 	Name   string          `json:"name"`
 	Role   string          `json:"role"`
+	Status string          `json:"status"`
 	Visual *VisualIdentity `json:"visual,omitempty"`
 }
 
@@ -531,7 +539,7 @@ func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query stri
 			maritalStatus = "single"
 		}
 		results = append(results, PersonSearchRecord{
-			NPC:        PersonSearchNPC{ID: npc.ID, Name: npc.Name, Age: npc.Age, Appearance: npc.Appearance, Visual: npc.Visual},
+			NPC:        PersonSearchNPC{ID: npc.ID, Name: npc.Name, Age: npc.Age, Appearance: npc.Appearance, Status: npc.Status, Visual: npc.Visual},
 			Workplaces: workplaces, MaritalStatus: maritalStatus,
 		})
 	}
@@ -1360,7 +1368,10 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 	}
 
 	rows, err := store.db.Query(ctx,
-		`SELECT e.entity_id, e.generation_key, r.role
+		`SELECT e.entity_id, e.generation_key, r.role,
+		 COALESCE((SELECT value #>> '{}' FROM world_mutations m
+		   WHERE m.server_id = e.server_id AND m.entity_id = e.entity_id AND m.field_key = 'status'
+		   ORDER BY m.mutation_order DESC LIMIT 1), 'alive')
 		 FROM employment_relationships r
 		 JOIN world_entities e
 		   ON e.server_id = r.server_id AND e.entity_id = r.employee_npc_id
@@ -1375,15 +1386,15 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 
 	employees := make([]CompanyEmployee, 0)
 	for rows.Next() {
-		var employeeID, key, role string
-		if err := rows.Scan(&employeeID, &key, &role); err != nil {
+		var employeeID, key, role, status string
+		if err := rows.Scan(&employeeID, &key, &role, &status); err != nil {
 			return nil, err
 		}
 		npc, err := GenerateNPC(seed, version, key)
 		if err != nil {
 			return nil, err
 		}
-		employees = append(employees, CompanyEmployee{ID: employeeID, Name: npc.Name, Role: role, Visual: npc.Visual})
+		employees = append(employees, CompanyEmployee{ID: employeeID, Name: npc.Name, Role: role, Status: status, Visual: npc.Visual})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
