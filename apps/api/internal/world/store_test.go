@@ -272,7 +272,7 @@ func TestPostgresStoreReconstructsNPCProfilesAndIndexedRelations(t *testing.T) {
 			rows := &fixtureRows{}
 			for _, relationship := range generated.EmploymentRelationships {
 				if relationship.EmployerCompanyID == companyID {
-					rows.rows = append(rows.rows, []any{relationship.EmployeeNPCID, entityByID[relationship.EmployeeNPCID].GenerationKey, relationship.Role})
+					rows.rows = append(rows.rows, []any{relationship.EmployeeNPCID, entityByID[relationship.EmployeeNPCID].GenerationKey, relationship.Role, "alive"})
 				}
 			}
 			return rows

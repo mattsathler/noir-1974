@@ -11,13 +11,13 @@ Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadma
 
 | Campo | Valor |
 | --- | --- |
-| Data de referência | 2026-10-22 |
-| Milestone vigente | M12 — Interações investigativas em locais |
-| Último aceito | M11 — Geografia, viagem e visita a locais |
+| Data de referência | 2026-10-23 |
+| Milestone vigente | M13 — Acusação e julgamento |
+| Último aceito | M12 — Interações investigativas em locais |
 | Primeiro playtest | M06 aceito; recorte mínimo pronto para playtest interno. |
-| Fluxo do crime até a prisão | **86%** (12 de 14 milestones) |
+| Fluxo do crime até a prisão | **93%** (13 de 14 milestones) |
 
-O catálogo de 25 países, as viagens internacionais e a listagem de empresas e serviços por Neighborhood estão aceitos. A M12 implementará os interiores e as interações investigativas dos espaços de trabalho; acusação e julgamento ainda virão.
+Interiores, buscas, apreensões e interações investigativas em locais estão aceitos. Acusação e julgamento ainda precisam fechar o fluxo criminal.
 
 ## Barra do fluxo criminal completo
 
@@ -36,9 +36,9 @@ M08 ████████████████████  aceito
 M09 ████████████████████  aceito
 M10 ████████████████████  aceito
 M11 ████████████████████  aceito
-M12 ░░░░░░░░░░░░░░░░░░░░  em curso
+M12 ████████████████████  aceito
 M13 ░░░░░░░░░░░░░░░░░░░░  não iniciado   ← fluxo completo até a prisão
-     | 86%
+     | 93%
 ```
 
 Cada milestone do fluxo pesa **1/14 ≈ 7,1%**. Só entra na conta com status **Aceito**. “Em curso” não soma porcentagem; a porcentagem mede ciclos aceitos do percurso completo.
@@ -57,7 +57,7 @@ Cada milestone do fluxo pesa **1/14 ≈ 7,1%**. Só entra na conta com status **
 | [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,1% | Aceito | 71% |
 | [M10](milestones/M10-mundo-compartilhado-e-investigacao.md) Mundo compartilhado e investigação | 7,1% | Aceito | 79% |
 | [M11](milestones/M11-geografia-internacional-e-viagem.md) Geografia, viagem e visita a locais | 7,1% | Aceito | 86% |
-| [M12](milestones/M12-busca-e-apreensao.md) Interações investigativas em locais | 7,1% | Em curso | 93% |
+| [M12](milestones/M12-busca-e-apreensao.md) Interações investigativas em locais | 7,1% | Aceito | 93% |
 | [M13](milestones/M13-acusacao-e-julgamento.md) Acusação e julgamento | 7,1% | Não iniciado | **100%** |
 
 Fórmula: `milestones_aceitos_M00_a_M13 / 14`, arredondado para inteiro. O primeiro playtest continua identificado pelo aceite do M06, em campo separado.

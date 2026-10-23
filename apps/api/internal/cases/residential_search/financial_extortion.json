@@ -1,22 +1,130 @@
 {
   "killer": [
-    {"title":"Unsent remittance note","content":"An unsigned note lists an amount and a date, with the words 'final payment' underlined twice. No recipient is named.","kind":"document"},
-    {"title":"Carbon copy of a transfer","content":"A carbon copy records a cash transfer through a local office. The account reference has been partially erased.","kind":"document"},
-    {"title":"Payment calendar","content":"Several dates are circled beside the same amount. The last date is crossed out and replaced.","kind":"paper"},
-    {"title":"Unmarked deposit envelope","content":"An empty bank envelope bears a teller's stamp and a penciled figure on its flap.","kind":"object"},
-    {"title":"Draft debt acknowledgment","content":"A draft acknowledgment accepts a debt but disputes the interest. The signature line is blank.","kind":"document"},
-    {"title":"Exchange counter receipt","content":"A receipt records a currency exchange shortly before a handwritten payment date.","kind":"document"},
-    {"title":"Torn account notation","content":"A ledger fragment lists two initials and a recurring sum. The page number is missing.","kind":"paper"},
-    {"title":"Unposted money order","content":"A money order is filled in but has no recipient or postal cancellation mark.","kind":"document"}
+    {
+      "title": "Unsent remittance note",
+      "content": "An unsigned note lists an amount and a date, with the words 'final payment' underlined twice. No recipient is named.",
+      "kind": "document"
+    },
+    {
+      "title": "Carbon copy of a transfer",
+      "content": "A carbon copy records a cash transfer through a local office. The account reference has been partially erased.",
+      "kind": "document"
+    },
+    {
+      "title": "Payment calendar",
+      "content": "Several dates are circled beside the same amount. The last date is crossed out and replaced.",
+      "kind": "paper"
+    },
+    {
+      "title": "Unmarked deposit envelope",
+      "content": "An empty bank envelope bears a teller's stamp and a penciled figure on its flap.",
+      "kind": "object"
+    },
+    {
+      "title": "Draft debt acknowledgment",
+      "content": "A draft acknowledgment accepts a debt but disputes the interest. The signature line is blank.",
+      "kind": "document"
+    },
+    {
+      "title": "Exchange counter receipt",
+      "content": "A receipt records a currency exchange shortly before a handwritten payment date.",
+      "kind": "document"
+    },
+    {
+      "title": "Torn account notation",
+      "content": "A ledger fragment lists two initials and a recurring sum. The page number is missing.",
+      "kind": "paper"
+    },
+    {
+      "title": "Unposted money order",
+      "content": "A money order is filled in but has no recipient or postal cancellation mark.",
+      "kind": "document"
+    }
   ],
   "victim": [
-    {"title":"Unmarked payment slip","content":"A payment slip is kept with household bills. The recipient line is blank, but its amount matches a penciled figure on the reverse.","kind":"document"},
-    {"title":"Anonymous demand","content":"A short typed demand requires payment by Friday and warns against contacting the police. No signature appears.","kind":"paper"},
-    {"title":"Bank withdrawal stub","content":"A withdrawal stub shows a sum larger than the usual household expenses. The teller's mark is clear.","kind":"document"},
-    {"title":"Envelope with a cut window","content":"A reused envelope has its address window cut out and a date written inside the flap.","kind":"object"},
-    {"title":"Household ledger discrepancy","content":"A household ledger records a cash withdrawal that does not appear in the matching bank statement.","kind":"document"},
-    {"title":"Unsent request for time","content":"A draft letter asks for another week to produce a sum of money. The recipient is addressed only as 'Sir'.","kind":"paper"},
-    {"title":"Pawnbroker's valuation","content":"A valuation slip lists a watch and a ring, both marked as not sold.","kind":"document"},
-    {"title":"Telephone bill notation","content":"A telephone bill has one evening call circled, with no name written beside it.","kind":"document"}
+    {
+      "title": "Unmarked payment slip",
+      "content": "A payment slip is kept with household bills. The recipient line is blank, but its amount matches a penciled figure on the reverse.",
+      "kind": "document"
+    },
+    {
+      "title": "Anonymous demand",
+      "content": "A short typed demand requires payment by Friday and warns against contacting the police. No signature appears.",
+      "kind": "paper"
+    },
+    {
+      "title": "Bank withdrawal stub",
+      "content": "A withdrawal stub shows a sum larger than the usual household expenses. The teller's mark is clear.",
+      "kind": "document"
+    },
+    {
+      "title": "Envelope with a cut window",
+      "content": "A reused envelope has its address window cut out and a date written inside the flap.",
+      "kind": "object"
+    },
+    {
+      "title": "Household ledger discrepancy",
+      "content": "A household ledger records a cash withdrawal that does not appear in the matching bank statement.",
+      "kind": "document"
+    },
+    {
+      "title": "Unsent request for time",
+      "content": "A draft letter asks for another week to produce a sum of money. The recipient is addressed only as 'Sir'.",
+      "kind": "paper"
+    },
+    {
+      "title": "Pawnbroker's valuation",
+      "content": "A valuation slip lists a watch and a ring, both marked as not sold.",
+      "kind": "document"
+    },
+    {
+      "title": "Telephone bill notation",
+      "content": "A telephone bill has one evening call circled, with no name written beside it.",
+      "kind": "document"
+    }
+  ],
+  "colleague": [
+    {
+      "title": "Counter shift copy",
+      "content": "A carbon copy of the weekly rota has Tuesday's closing shift reassigned in blue ink; the clerk's initials sit beside the correction.",
+      "kind": "paper"
+    },
+    {
+      "title": "Company dues receipt",
+      "content": "A receipt from the workers' mutual fund is dated 14 October and bears the stamp of the same office counter.",
+      "kind": "document"
+    },
+    {
+      "title": "Duplicate dispatch stub",
+      "content": "A dispatch stub lists a sealed packet delivered to the registry at 18:20; its receiving signature is smudged.",
+      "kind": "document"
+    },
+    {
+      "title": "Shared break rota",
+      "content": "Two names share the late tea interval on Thursday. One entry has been crossed out and rewritten.",
+      "kind": "paper"
+    }
+  ],
+  "associate": [
+    {
+      "title": "Club subscription card",
+      "content": "A neighborhood reading club card shows dues paid through September, with a renewal date of 1 October left blank.",
+      "kind": "paper"
+    },
+    {
+      "title": "Borrowed umbrella note",
+      "content": "A note dated 9 October records an umbrella returned at the east gate kiosk; the writer used only initials.",
+      "kind": "document"
+    },
+    {
+      "title": "Market parcel receipt",
+      "content": "A parcel receipt from Novo Mercado lists two tea tins and a collection time of 17:40 on 12 October.",
+      "kind": "document"
+    },
+    {
+      "title": "Calling card",
+      "content": "A calling card has a crease through the address and the words 'after the second bell' on its reverse.",
+      "kind": "paper"
+    }
   ]
 }

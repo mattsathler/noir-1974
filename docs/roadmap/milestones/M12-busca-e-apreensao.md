@@ -1,7 +1,7 @@
 # M12 — Interações investigativas em locais
 
 **Ciclo:** 12  
-**Status:** Em curso
+**Status:** Aceito
 **Depende de:** M11 aceito
 
 ## Objetivo
@@ -15,7 +15,7 @@ Transformar os espaços de trabalho das empresas e os serviços públicos em pon
 - [x] O telefone é uma janela independente do computador, com visor de entrada colável, keypad e controles de chamada; os números do Staff Directory são gerados proceduralmente por NPC e não são persistidos no backend.
 - [x] O jogador pode ligar para contatos obtidos no Staff Directory sem depender de horário comercial ou da presença física do NPC. O tempo até atender varia; números fora do diretório e NPCs mortos não completam a ligação.
 - [x] O interrogatório apresenta as cinco perguntas “Como tem sido sua rotina ultimamente?”, “Com quem você costuma passar o tempo?”, “Aconteceu algo fora do comum por aqui recentemente?”, “Como vão as coisas no trabalho?” e “Há algo que esteja preocupando você?”, com respostas em typewriter e botão de desligar. A altura do modal permanece fixa durante a ligação e a grade decorativa fica no rodapé.
-- [x] As respostas são selecionadas por pergunta e por relação do NPC com a vítima. NPCs sem relação direta recebem respostas gerais; colegas, pessoas ligadas à vítima e o próprio responsável têm variações próprias, incluindo respostas incompletas e recusas.
+- [x] As respostas são selecionadas por pergunta e refletem relação com a vítima, personalidade gerada, ocupação e rotina de trabalho do NPC; colegas, pessoas ligadas à vítima e o próprio responsável têm variações próprias, incluindo respostas incompletas e recusas.
 - [x] O conteúdo do interrogatório está organizado em `apps/api/internal/cases/interrogation/`: um arquivo geral e um arquivo por arquétipo de caso, com ao menos 100 respostas compartilhadas em cada arquétipo e variações adicionais por papel.
 - [x] As falas podem sugerir linhas de investigação, mas não são evidências, não são pináveis e não expõem a classificação interna nem confirmam diretamente a culpa de um NPC.
 - [x] Os casos geram emails anônimos anteriores à morte, com ameaças ou exigências de pagamento conforme o arquétipo. Falas telefônicas foram calibradas para serem menos assertivas que dados de emails, banco e GATE.
@@ -23,7 +23,7 @@ Transformar os espaços de trabalho das empresas e os serviços públicos em pon
 - [x] As listas de pessoas nos arquivos de email, banco e GATE exibem retratos para ajudar a distinguir NPCs homônimos.
 - [x] A Delegacia oferece um formulário de busca e apreensão acima do acesso ao computador; o jogador localiza um NPC por nome e pode solicitar a busca mesmo quando o cadastro indica falecimento.
 - [x] A API valida a sessão, a Delegacia da cidade persistida e o NPC pertencente à cidade, registra a autorização e executa a busca sem persistir uma localização residencial ou mostrar seu endereço.
-- [x] O inventário residencial gera oito achados estáveis por jogador, cidade e NPC a partir de catálogos JSON modulares com mais de cem itens cotidianos e contextuais; alvos ligados a casos recebem um achado contextual variável por papel e arquétipo.
+- [x] O inventário residencial gera oito achados estáveis por jogador, cidade e NPC a partir de catálogos JSON modulares com mais de cem itens cotidianos e contextuais; vítimas, responsáveis, colegas e associados ligados a casos recebem um achado contextual variável por papel e arquétipo, com detalhes de registros do próprio caso quando disponíveis.
 - [x] O email pessoal está disponível no computador do jogador. O relatório da busca é persistido na caixa de entrada e contém todos os achados, misturando itens cotidianos e contextuais.
 - [x] Cada anexo é um card no estilo visual dos pins e possui ação própria para escolher um whiteboard de destino; os itens são persistidos como descobertas antes de serem fixados.
 - [x] A API autentica a sessão e valida que o alvo pertence à cidade persistida e que a solicitação veio da Delegacia daquela cidade. Toda solicitação válida é autorizada; a decisão não consulta relações ocultas entre itens e casos.
@@ -44,12 +44,18 @@ Transformar os espaços de trabalho das empresas e os serviços públicos em pon
 - [x] Interrogatórios, buscas residenciais e dados obtidos por acesso local podem misturar conteúdo cotidiano e relacionado a casos sem expor a classificação interna dos resultados.
 - [x] Ações locais enviam o endereço ou serviço pretendido como contexto transitório; o backend valida sessão, cidade persistida, alvo e local. Não depende de visita salva nem de campo de prédio atual no perfil do jogador.
 
-### Em aberto
+### Itens fechados nesta revisão
 
-- [ ] Respostas futuras podem refletir com maior granularidade a rotina, personalidade e ocupação individual do NPC, além das relações e do contexto de caso já cobertos.
-- [ ] O gerador de achados associa mais vestígios contextuais a relações e acontecimentos do caso, além dos papéis de vítima e responsável.
-- [ ] Achados contextuais oferecem mais detalhes verificáveis — como inscrição, data, condição ou origem — para comparação com emails, registros, relatos e outros elementos.
-- [ ] O fluxo e seus acessos respeitam as [Regras 0001, 0002 e 0003](../../rules/README.md).
+- [x] Respostas refletem personalidade gerada, ocupação e rotina individual do NPC, além das relações e do contexto de caso.
+- [x] O gerador de achados associa itens contextuais a relações de trabalho e vínculos pessoais com pessoas envolvidas no caso, além dos papéis de vítima e responsável.
+- [x] Achados contextuais incluem detalhes verificáveis — inscrições, datas, horários, valores, referências, condição ou origem — e reutilizam dados de registros financeiros/GATE relacionados ao alvo quando disponíveis, para comparação com outros elementos.
+- [x] O fluxo e seus acessos respeitam as [Regras 0001, 0002 e 0003](../../rules/README.md), conforme auditoria abaixo.
+
+### Auditoria das regras (2026-10-23)
+
+- **0001 — Direção artística:** telefone, janelas e anexos usam os componentes e tokens visuais do terminal; retratos e efeitos preservam renderização pixelada. Os novos itens são conteúdo textual nos cards existentes, sem introduzir uma linguagem visual paralela.
+- **0002 — Pistas sem sinalização:** falas e itens são apresentados como conteúdo comum. Relações, papéis e ligação interna a registros são usados apenas no backend para selecionar conteúdo; respostas e metadados dos anexos não expõem classificação de pista, papel no caso ou confirmação de culpa.
+- **0003 — Universo corporativo:** as novas falas e itens citam rotas GATE, Créditos, escalas, registros, balcões, formulários, companhia e rotinas de escritório, mantendo os costumes e suportes materiais coerentes com o cenário.
 
 ## Fora de escopo
 

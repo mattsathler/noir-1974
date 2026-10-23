@@ -18,5 +18,31 @@
   "worries": [
     "I am worried about being involved. Please do not call again.",
     "Nothing I can say would help you. I am sorry."
-  ]
+  ],
+  "personalities": {
+    "patient and observant": {"routine":["I keep a small timebook and mark each company bell; the order of a day helps me notice when something is out of place."],"associates":["I listen longer than I speak. People often tell me more once they have finished their first answer."],"unusual":["A detail can look ordinary until it appears twice. I have learned to keep the first copy."],"work":["I prefer to check the ledger before I answer for the office."],"worries":["I worry when a record is altered without a countersignature."]},
+    "charming but guarded": {"routine":["I make the rounds, exchange a few courtesies, and keep the rest of my day to myself."],"associates":["I know plenty of names at the counter. Knowing a name is not the same as knowing a person."],"unusual":["There was a curious little interruption, though I would not care to repeat the story secondhand."],"work":["The company keeps excellent books. I let the proper desk speak for itself."],"worries":["Loose talk travels farther than a sealed letter."]},
+    "methodical and reserved": {"routine":["My schedule is written in the same pocket diary every week. I leave a margin for delays."],"associates":["I keep my acquaintances and my private correspondence in separate books."],"unusual":["I noted the date, but I cannot say what it meant."],"work":["I check the figures twice before the office seal goes on."],"worries":["A missing receipt causes more trouble than an honest mistake."]},
+    "quick-witted and impatient": {"routine":["Same tram, same bell, same queue at the company kiosk. There, that is the short version."],"associates":["If you want names, ask the directory. I have work to get back to."],"unusual":["I noticed it. I also noticed nobody wanted to file a report."],"work":["The figures are fine until a manager changes the form halfway through the shift."],"worries":["I worry about delays; every office charges somebody for them."]},
+    "generous with a stubborn streak": {"routine":["I usually carry an extra ration chit for someone who missed the company counter."],"associates":["I help my neighbors, but I will not name them to a stranger on the wire."],"unusual":["I offered to help settle it. They were determined to manage alone."],"work":["I will cover a colleague's shift, but I still expect the rota to be corrected."],"worries":["People should not have to choose between a bill and a meal."]},
+    "ambitious and watchful": {"routine":["I arrive early enough to read the notices before the senior clerks gather."],"associates":["I remember who attends each meeting. It is useful to know where decisions begin."],"unusual":["A sealed envelope changed hands after the office bell. I did not see its contents."],"work":["I am waiting for the next grade and keeping my evaluations in order."],"worries":["A careless signature can close doors for years."]},
+    "soft-spoken and perceptive": {"routine":["I take the quieter streets and notice which shop shutters are open on my way in."],"associates":["I spend time with a few people who do not ask me to raise my voice."],"unusual":["The room went quiet when one particular name was mentioned."],"work":["I do careful copying for the office; people forget the copyist can read."],"worries":["I worry when someone is being hurried into signing a form."]},
+    "outgoing but easily distracted": {"routine":["I start with the morning notices, then someone at the kiosk always pulls me into a conversation."],"associates":["I know people from every floor, though I can never remember who introduced whom."],"unusual":["I meant to write it down, but the GATE announcement interrupted me."],"work":["I enjoy the company floor, even when I mislay the requisition slips."],"worries":["I keep forgetting to ask the registry about my delayed Credits."]}
+  },
+  "occupations": {
+    "driver":{"routine":["My route follows the delivery docket and the GATE bell schedule."],"work":["The dispatch office stamps each change to my route; I do not choose the addresses."]},
+    "messenger":{"routine":["I carry sealed packets between company counters and keep the receipt stubs in order."],"work":["A packet is delivered when the receiving desk signs for it. That is the whole of my authority."]},
+    "accountant":{"routine":["I reconcile the household and company ledgers before the evening bell."],"work":["Every transfer in my office needs a reference number and a second set of initials."]},
+    "clerk":{"routine":["I sort the morning forms before the public counter opens."],"work":["The company registry keeps duplicate copies; I only enter what is presented to me."]},
+    "manager":{"routine":["I review the floor rota and the day's requisitions before staff arrive."],"work":["My authority ends at the company seal; matters beyond it go to the corporate office."]},
+    "receptionist":{"routine":["I open the visitor book and check appointments against the office clock."],"work":["Visitors leave their company pass number at the desk, even when they say they are in a hurry."]},
+    "secretary":{"routine":["I prepare correspondence and the day's appointment cards before the first bell."],"work":["I keep carbon copies of signed instructions in the office file."]},
+    "typist":{"routine":["I type the daily notices from approved copy and leave the original with the registry."],"work":["I can confirm a page was typed, but its author must answer for its contents."]}
+  },
+  "routines": {
+    "route":{"routine":["My day is measured in stops, stamped receipts, and the next GATE departure notice."]},
+    "office":{"routine":["I follow the company bell, counter hours, and the printed rota."]},
+    "supervisory":{"routine":["I begin with the staff rota and finish by checking that the office seal is accounted for."]},
+    "independent":{"routine":["I set my own hours, though the company counters still close when their bell says so."]}
+  }
 }

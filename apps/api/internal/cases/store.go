@@ -214,6 +214,12 @@ type interrogationCaseFile struct {
 	Roles  map[string]interrogationDialogue `json:"roles"`
 }
 
+type interrogationProfiles struct {
+	Personalities map[string]interrogationDialogue `json:"personalities"`
+	Occupations   map[string]interrogationDialogue `json:"occupations"`
+	Routines      map[string]interrogationDialogue `json:"routines"`
+}
+
 func (dialogue interrogationDialogue) answers() InterrogationAnswers {
 	return InterrogationAnswers{
 		"routine":    dialogue.Routine,
@@ -233,6 +239,10 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 	}
 	var defaultDialogue interrogationDialogue
 	if err := json.Unmarshal(data, &defaultDialogue); err != nil {
+		return nil, err
+	}
+	var profiles interrogationProfiles
+	if err := json.Unmarshal(data, &profiles); err != nil {
 		return nil, err
 	}
 	entries, err := caseSchema.ReadDir("interrogation")
@@ -259,20 +269,47 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 	answers := defaultDialogue.answers()
 	var seed string
 	var version int
-	if err := store.db.QueryRow(ctx, `SELECT world_seed, generator_version FROM worlds WHERE server_id = $1::uuid`, serverID).Scan(&seed, &version); err != nil {
+	var generationKey, occupation, employerKey string
+	if err := store.db.QueryRow(ctx, `SELECT w.world_seed,w.generator_version,e.generation_key,COALESCE(j.role,''),COALESCE(company.generation_key,'')
+		FROM worlds w JOIN world_entities e ON e.server_id=w.server_id AND e.entity_id=$2 AND e.entity_type='npc'
+		LEFT JOIN LATERAL (SELECT role,employer_company_id FROM employment_relationships WHERE server_id=e.server_id AND employee_npc_id=e.entity_id ORDER BY relationship_id LIMIT 1) j ON true
+		LEFT JOIN world_entities company ON company.server_id=e.server_id AND company.entity_id=j.employer_company_id
+		WHERE w.server_id=$1::uuid`, serverID, npcID).Scan(&seed, &version, &generationKey, &occupation, &employerKey); err != nil {
 		return nil, err
 	}
+	npc, err := world.GenerateNPCFromKey(seed, version, generationKey)
+	if err != nil {
+		return nil, err
+	}
+	employer := ""
+	if employerKey != "" {
+		company, err := world.GenerateCompanyFromKey(seed, version, employerKey)
+		if err == nil {
+			employer = company.Name
+		}
+	}
+	routine := "independent"
+	switch occupation {
+	case "driver", "messenger":
+		routine = "route"
+	case "manager":
+		routine = "supervisory"
+	case "accountant", "clerk", "receptionist", "secretary", "typist":
+		routine = "office"
+	}
+	profileAnswers := []InterrogationAnswers{profiles.Personalities[npc.Personality].answers(), profiles.Occupations[occupation].answers(), profiles.Routines[routine].answers()}
 	rows, err := store.db.Query(ctx, `
 		SELECT c.archetype_id,
 		       victim.generation_key, killer.generation_key,
 	       CASE WHEN c.killer_entity_id = $3 THEN 'perpetrator'
+	            WHEN c.victim_entity_id = $3 THEN 'acquaintance'
 	            WHEN EXISTS (
-	              SELECT 1 FROM employment_relationships victim_job
+	              SELECT 1 FROM employment_relationships principal_job
 	              JOIN employment_relationships caller_job
-	                ON caller_job.server_id = victim_job.server_id
-	               AND caller_job.employer_company_id = victim_job.employer_company_id
-	              WHERE victim_job.server_id = c.server_id
-	                AND victim_job.employee_npc_id = c.victim_entity_id
+	                ON caller_job.server_id = principal_job.server_id
+	               AND caller_job.employer_company_id = principal_job.employer_company_id
+	              WHERE principal_job.server_id = c.server_id
+	                AND principal_job.employee_npc_id IN (c.victim_entity_id,c.killer_entity_id)
 	                AND caller_job.employee_npc_id = $3
 	            ) THEN 'colleague' ELSE 'acquaintance' END
 		FROM cases c
@@ -280,19 +317,19 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 	JOIN world_entities victim ON victim.server_id = c.server_id AND victim.entity_id = c.victim_entity_id
 	JOIN world_entities killer ON killer.server_id = c.server_id AND killer.entity_id = c.killer_entity_id
 	WHERE c.server_id = $1::uuid AND c.city_id = $2 AND s.status = 'open'
-	  AND (c.killer_entity_id = $3 OR EXISTS (
+	  AND (c.killer_entity_id = $3 OR c.victim_entity_id = $3 OR EXISTS (
 	    SELECT 1 FROM employment_relationships victim_job
 	    JOIN employment_relationships caller_job
 	      ON caller_job.server_id = victim_job.server_id
 	     AND caller_job.employer_company_id = victim_job.employer_company_id
 	    WHERE victim_job.server_id = c.server_id
-	      AND victim_job.employee_npc_id = c.victim_entity_id
+	      AND victim_job.employee_npc_id IN (c.victim_entity_id,c.killer_entity_id)
 	      AND caller_job.employee_npc_id = $3
 	  ) OR EXISTS (
 	    SELECT 1 FROM personal_relationships relation
 	    WHERE relation.server_id = c.server_id
-	      AND ((relation.person_a_npc_id = $3 AND relation.person_b_npc_id = c.victim_entity_id)
-	        OR (relation.person_b_npc_id = $3 AND relation.person_a_npc_id = c.victim_entity_id))
+	      AND ((relation.person_a_npc_id = $3 AND relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
+	        OR (relation.person_b_npc_id = $3 AND relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
 	  ))
 	ORDER BY c.created_at DESC, c.case_id`, serverID, cityID, npcID)
 	if err != nil {
@@ -327,6 +364,10 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	profileTokens := map[string]string{"npc": npc.Name, "occupation": occupation, "employer": employer, "personality": npc.Personality, "routine": routine}
+	for _, profile := range profileAnswers {
+		mergeInterrogationAnswers(answers, profile, profileTokens)
 	}
 	return answers, nil
 }
@@ -460,7 +501,7 @@ func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, server
 		WHERE w.server_id=$1::uuid AND w.account_id=$2::uuid AND w.city_id=$3 AND w.target_npc_id=$4
 		ORDER BY w.created_at LIMIT 1`, serverID, accountID, cityID, npcID).Scan(&priorID, &priorStatus, &priorCatalogVersion, &priorMessage.ID, &priorMessage.SentAt, &priorMessage.Subject, &priorMessage.Body, &priorAttachments)
 	if err == nil {
-		if priorCatalogVersion >= 2 {
+		if priorCatalogVersion >= 3 {
 			if err := json.Unmarshal(priorAttachments, &priorMessage.Attachments); err != nil {
 				return WarrantRequest{}, err
 			}
@@ -480,10 +521,17 @@ func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, server
 	}
 	var archetype string
 	var isKiller, isVictim bool
-	err = store.db.QueryRow(ctx, `SELECT c.archetype_id, c.killer_entity_id=$3, c.victim_entity_id=$3
+	var caseRole string
+	var caseID string
+	err = store.db.QueryRow(ctx, `SELECT c.case_id,c.archetype_id, c.killer_entity_id=$3, c.victim_entity_id=$3,
+		CASE WHEN c.killer_entity_id=$3 THEN 'killer' WHEN c.victim_entity_id=$3 THEN 'victim'
+		WHEN EXISTS (SELECT 1 FROM employment_relationships a JOIN employment_relationships b ON b.server_id=a.server_id AND b.employer_company_id=a.employer_company_id WHERE a.server_id=c.server_id AND a.employee_npc_id=$3 AND b.employee_npc_id IN (c.killer_entity_id,c.victim_entity_id)) THEN 'colleague'
+		ELSE 'associate' END
 		FROM cases c JOIN case_states s USING (server_id, case_id)
-		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND (c.killer_entity_id=$3 OR c.victim_entity_id=$3)
-		AND s.status='open' ORDER BY c.created_at DESC LIMIT 1`, serverID, cityID, npcID).Scan(&archetype, &isKiller, &isVictim)
+		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND (c.killer_entity_id=$3 OR c.victim_entity_id=$3
+		OR EXISTS (SELECT 1 FROM employment_relationships a JOIN employment_relationships b ON b.server_id=a.server_id AND b.employer_company_id=a.employer_company_id WHERE a.server_id=c.server_id AND a.employee_npc_id=$3 AND b.employee_npc_id IN (c.killer_entity_id,c.victim_entity_id))
+		OR EXISTS (SELECT 1 FROM personal_relationships r WHERE r.server_id=c.server_id AND ((r.person_a_npc_id=$3 AND r.person_b_npc_id IN (c.killer_entity_id,c.victim_entity_id)) OR (r.person_b_npc_id=$3 AND r.person_a_npc_id IN (c.killer_entity_id,c.victim_entity_id)))) )
+		AND s.status='open' ORDER BY c.created_at DESC LIMIT 1`, serverID, cityID, npcID).Scan(&caseID, &archetype, &isKiller, &isVictim, &caseRole)
 	if errors.Is(err, pgx.ErrNoRows) {
 		archetype = ""
 	} else if err != nil {
@@ -511,20 +559,39 @@ func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, server
 		items = append(items, makeResidentialAttachment(warrantID, index, commonFindings[order[index]]))
 	}
 	var contextualFindings []residentialFinding
-	if (isKiller || isVictim) && archetype != "" {
+	if archetype != "" {
 		caseFindings, err := readResidentialCaseFindings(archetype)
 		if err != nil {
 			return WarrantRequest{}, fmt.Errorf("load case-specific residential findings: %w", err)
 		}
-		if isKiller {
+		switch caseRole {
+		case "killer":
 			contextualFindings = caseFindings.Killer
-		} else {
+		case "victim":
 			contextualFindings = caseFindings.Victim
+		case "colleague":
+			contextualFindings = caseFindings.Colleague
+		case "associate":
+			contextualFindings = caseFindings.Associate
 		}
 	}
 	lastFinding := commonFindings[order[7]]
 	if len(contextualFindings) > 0 {
 		lastFinding = contextualFindings[random.Intn(len(contextualFindings))]
+	}
+	if caseID != "" {
+		var recordData []byte
+		err := store.db.QueryRow(ctx, `SELECT record_data FROM case_activity_records
+			WHERE server_id=$1::uuid AND case_id=$2 AND (npc_entity_id=$3 OR related_npc_entity_id=$3)
+			ORDER BY occurred_at,record_id LIMIT 1`, serverID, caseID, npcID).Scan(&recordData)
+		if err == nil {
+			var record records.Record
+			if json.Unmarshal(recordData, &record) == nil {
+				lastFinding = residentialFindingFromRecord(record)
+			}
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return WarrantRequest{}, fmt.Errorf("load residential record detail: %w", err)
+		}
 	}
 	items = append(items, makeResidentialAttachment(warrantID, 7, lastFinding))
 	attachmentsJSON, err := json.Marshal(items)
@@ -538,14 +605,14 @@ func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, server
 	defer func() { _ = tx.Rollback(context.Background()) }()
 	if existingReport {
 		warrantID = priorID
-		if _, err := tx.Exec(ctx, `UPDATE player_search_warrants SET catalog_version=2,station_location_id=$5,created_at=$6
+		if _, err := tx.Exec(ctx, `UPDATE player_search_warrants SET catalog_version=3,station_location_id=$5,created_at=$6
 			WHERE server_id=$1::uuid AND account_id=$2::uuid AND warrant_id=$3 AND city_id=$4`, serverID, accountID, warrantID, cityID, stationLocationID, stamp); err != nil {
 			return WarrantRequest{}, fmt.Errorf("update residential search report: %w", err)
 		}
 	} else if _, err := tx.Exec(ctx, `INSERT INTO player_search_warrants (server_id,account_id,warrant_id,city_id,station_location_id,target_npc_id,status,catalog_version,created_at)
-		VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,'granted',2,$7)
+		VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,'granted',3,$7)
 		ON CONFLICT (server_id,account_id,warrant_id) DO UPDATE SET
-		station_location_id=EXCLUDED.station_location_id,status='granted',catalog_version=2,created_at=EXCLUDED.created_at`, serverID, accountID, warrantID, cityID, stationLocationID, npcID, stamp); err != nil {
+		station_location_id=EXCLUDED.station_location_id,status='granted',catalog_version=3,created_at=EXCLUDED.created_at`, serverID, accountID, warrantID, cityID, stationLocationID, npcID, stamp); err != nil {
 		return WarrantRequest{}, fmt.Errorf("record residential search authorization: %w", err)
 	}
 	message := PlayerMailMessage{ID: warrantID + ":mail", SentAt: stamp, Subject: "Residential search report · " + person.Name, Body: "The authorized residential search concerning " + person.Name + " is complete. The enclosed inventory lists all items recovered and secured. Review each item in context; routine household effects were included in the same report.", Attachments: items}
@@ -563,6 +630,25 @@ func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, server
 		return WarrantRequest{}, fmt.Errorf("commit residential search: %w", err)
 	}
 	return WarrantRequest{WarrantID: warrantID, Status: "granted", Message: &message}, nil
+}
+
+func residentialFindingFromRecord(record records.Record) residentialFinding {
+	date := record.OccurredAt.UTC().Format("2 January 2006")
+	content := fmt.Sprintf("A folded %s copy is dated %s. %s", record.Source, date, strings.TrimSpace(record.Description))
+	if record.Reference != "" {
+		content += " The reference is " + record.Reference + "."
+	}
+	if record.Amount != 0 {
+		content += fmt.Sprintf(" The amount entered is %d Credits.", record.Amount)
+	}
+	if record.Origin != "" || record.Destination != "" {
+		content += fmt.Sprintf(" The route fields read %s to %s.", record.Origin, record.Destination)
+	}
+	kind := "document"
+	if record.Source == "gate" {
+		kind = "paper"
+	}
+	return residentialFinding{Title: "Folded " + strings.ToUpper(record.Source[:1]) + record.Source[1:] + " copy", Content: content, Kind: kind}
 }
 
 // RecordLocalAccessAttempt stores the backend's authorization outcome for a restricted local system.

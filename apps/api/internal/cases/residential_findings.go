@@ -16,8 +16,10 @@ type residentialFindingList struct {
 }
 
 type residentialCaseFindings struct {
-	Killer []residentialFinding `json:"killer"`
-	Victim []residentialFinding `json:"victim"`
+	Killer    []residentialFinding `json:"killer"`
+	Victim    []residentialFinding `json:"victim"`
+	Colleague []residentialFinding `json:"colleague"`
+	Associate []residentialFinding `json:"associate"`
 }
 
 func readResidentialFindingList(path string) ([]residentialFinding, error) {

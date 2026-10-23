@@ -1,22 +1,130 @@
 {
   "killer": [
-    {"title":"Carbon copy of revised minutes","content":"A carbon copy of meeting minutes has a paragraph about the victim's dismissal crossed out and rewritten in a different hand.","kind":"document"},
-    {"title":"Marked staff roster","content":"A staff roster bears pencil marks beside the victim's name and two late shifts.","kind":"document"},
-    {"title":"Unsent grievance","content":"A draft grievance complains that a promotion was promised privately and withdrawn in front of the office.","kind":"paper"},
-    {"title":"Office key receipt","content":"A receipt records a replacement key ordered after a disagreement about who could enter the records room.","kind":"document"},
-    {"title":"Torn meeting agenda","content":"A torn agenda lists a closed meeting on the day the victim was removed from a committee.","kind":"paper"},
-    {"title":"Carbon-stained memo","content":"A memo refers to a missing personnel folder and asks that the matter be settled before the next review.","kind":"document"},
-    {"title":"Unclaimed desk nameplate","content":"A company nameplate bearing the victim's surname is wrapped in newspaper and kept in a cupboard.","kind":"object"},
-    {"title":"Marked office calendar","content":"An office calendar has the victim's last scheduled shift crossed through and replaced with another name.","kind":"paper"}
+    {
+      "title": "Carbon copy of revised minutes",
+      "content": "A carbon copy of meeting minutes has a paragraph about the victim's dismissal crossed out and rewritten in a different hand.",
+      "kind": "document"
+    },
+    {
+      "title": "Marked staff roster",
+      "content": "A staff roster bears pencil marks beside the victim's name and two late shifts.",
+      "kind": "document"
+    },
+    {
+      "title": "Unsent grievance",
+      "content": "A draft grievance complains that a promotion was promised privately and withdrawn in front of the office.",
+      "kind": "paper"
+    },
+    {
+      "title": "Office key receipt",
+      "content": "A receipt records a replacement key ordered after a disagreement about who could enter the records room.",
+      "kind": "document"
+    },
+    {
+      "title": "Torn meeting agenda",
+      "content": "A torn agenda lists a closed meeting on the day the victim was removed from a committee.",
+      "kind": "paper"
+    },
+    {
+      "title": "Carbon-stained memo",
+      "content": "A memo refers to a missing personnel folder and asks that the matter be settled before the next review.",
+      "kind": "document"
+    },
+    {
+      "title": "Unclaimed desk nameplate",
+      "content": "A company nameplate bearing the victim's surname is wrapped in newspaper and kept in a cupboard.",
+      "kind": "object"
+    },
+    {
+      "title": "Marked office calendar",
+      "content": "An office calendar has the victim's last scheduled shift crossed through and replaced with another name.",
+      "kind": "paper"
+    }
   ],
   "victim": [
-    {"title":"Folded office memorandum","content":"A memorandum about a disputed dismissal is folded into a personal notebook. The margin carries a second set of initials.","kind":"document"},
-    {"title":"Private salary calculation","content":"A penciled calculation compares two salaries and circles a figure that does not match the latest pay statement.","kind":"paper"},
-    {"title":"Unsent appeal","content":"A draft appeal asks for a personnel decision to be reviewed before the end of the month.","kind":"paper"},
-    {"title":"Marked staff roster","content":"A staff roster bears a question mark beside a colleague assigned to the victim's last shift.","kind":"document"},
-    {"title":"Meeting reminder","content":"A reminder requests a private meeting about the victim's work record. No room is specified.","kind":"paper"},
-    {"title":"Photostat of a warning","content":"A photostat copy of a company warning is annotated with the words 'not my initials'.", "kind":"document"},
-    {"title":"Desk inventory list","content":"A list of office property returned by the victim includes one missing ledger and a brass cabinet key.","kind":"document"},
-    {"title":"Torn appointment card","content":"An appointment card for a meeting with a supervisor has its time torn away.","kind":"paper"}
+    {
+      "title": "Folded office memorandum",
+      "content": "A memorandum about a disputed dismissal is folded into a personal notebook. The margin carries a second set of initials.",
+      "kind": "document"
+    },
+    {
+      "title": "Private salary calculation",
+      "content": "A penciled calculation compares two salaries and circles a figure that does not match the latest pay statement.",
+      "kind": "paper"
+    },
+    {
+      "title": "Unsent appeal",
+      "content": "A draft appeal asks for a personnel decision to be reviewed before the end of the month.",
+      "kind": "paper"
+    },
+    {
+      "title": "Marked staff roster",
+      "content": "A staff roster bears a question mark beside a colleague assigned to the victim's last shift.",
+      "kind": "document"
+    },
+    {
+      "title": "Meeting reminder",
+      "content": "A reminder requests a private meeting about the victim's work record. No room is specified.",
+      "kind": "paper"
+    },
+    {
+      "title": "Photostat of a warning",
+      "content": "A photostat copy of a company warning is annotated with the words 'not my initials'.",
+      "kind": "document"
+    },
+    {
+      "title": "Desk inventory list",
+      "content": "A list of office property returned by the victim includes one missing ledger and a brass cabinet key.",
+      "kind": "document"
+    },
+    {
+      "title": "Torn appointment card",
+      "content": "An appointment card for a meeting with a supervisor has its time torn away.",
+      "kind": "paper"
+    }
+  ],
+  "colleague": [
+    {
+      "title": "Revised duty roster",
+      "content": "A roster dated 15 October moves one clerk from the morning ledger desk to the evening registry window.",
+      "kind": "paper"
+    },
+    {
+      "title": "Damaged typewriter ribbon",
+      "content": "A company inventory slip records a replacement ribbon issued on 16 October after a jam during the afternoon shift.",
+      "kind": "document"
+    },
+    {
+      "title": "Disputed requisition copy",
+      "content": "A carbon requisition for ledger paper bears two different initials and the date 14 October.",
+      "kind": "document"
+    },
+    {
+      "title": "Union notice clipping",
+      "content": "A clipping from the staff notice board records a meeting at the company hall on 12 October, 20:00.",
+      "kind": "paper"
+    }
+  ],
+  "associate": [
+    {
+      "title": "Repair estimate",
+      "content": "A cobbler's estimate for a repaired left heel is dated 13 October; collection was marked for the following day.",
+      "kind": "document"
+    },
+    {
+      "title": "Laundry claim tag",
+      "content": "A laundry tag numbered 62 lists a dark coat received on 15 October, with the return signature missing.",
+      "kind": "paper"
+    },
+    {
+      "title": "Shared lending note",
+      "content": "A note dated 10 October records a borrowed book due back after the Sunday bell service.",
+      "kind": "document"
+    },
+    {
+      "title": "Apothecary receipt",
+      "content": "A receipt for soothing balm is stamped 16 October at 17:10; the purchaser name is abbreviated.",
+      "kind": "document"
+    }
   ]
 }

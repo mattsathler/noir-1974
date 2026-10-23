@@ -1431,7 +1431,7 @@ func (h *Handler) gateTravel(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := h.store.setPlayerLocation(r.Context(), current.ID, selectedDistrict.ID); err != nil {
+	if err := h.store.setPlayerLocation(r.Context(), current.ID, destination.ID); err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "PLAYER_LOCATION_SAVE_FAILED", "The destination was prepared, but your location could not be updated.", err)
 		return
 	}
@@ -1440,9 +1440,7 @@ func (h *Handler) gateTravel(w http.ResponseWriter, r *http.Request) {
 	state.City = destination.Name
 	state.Country = destination.Country
 	state.TimeZone = destination.TimeZone
-	state.LocationID = selectedDistrict.ID
-	state.DistrictID = selectedDistrict.ID
-	state.District = selectedDistrict.Name
+	state.LocationID = destination.ID
 	state.PlaceName = ""
 	buildings := make([]world.Address, 0)
 	for _, place := range selectedDistrict.Locations {
@@ -1664,13 +1662,11 @@ func (h *Handler) worldFor(ctx context.Context, accountID string) worldResponse 
 		state.City = city.Name
 		state.Country = city.Country
 		state.TimeZone = city.TimeZone
-		state.DistrictID = city.ID + "/district/central"
-		state.District = "Central"
 		if isDistrictLocation(locationID, city.ID) {
 			state.DistrictID = locationID
 			state.District = districtNameFromID(locationID)
 		}
-		state.LocationID = state.DistrictID
+		state.LocationID = city.ID
 	} else {
 		state.LocationID = locationID
 	}
