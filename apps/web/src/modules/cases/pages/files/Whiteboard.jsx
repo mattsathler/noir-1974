@@ -56,6 +56,11 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
     setMessage(`${result.pins.length} RECORD${result.pins.length === 1 ? "" : "S"} ON THIS BOARD`);
   }
 
+  function selectBoard(id) {
+    focusBoard?.(id);
+    loadBoard(id).catch((error) => setMessage(error.message || "THE SELECTED BOARD COULD NOT BE OPENED"));
+  }
+
   useEffect(() => {
     let active = true;
     getWhiteboards().then(async (results) => {
@@ -424,7 +429,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
               if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); }
               if (event.key === "Escape") { setRenameValue(board.title); setRenamingBoardId(null); }
             }} />
-            : <h1 className="personal-whiteboard__title">{board?.title || "WHITEBOARD"}</h1>}
+        : <h1 className="personal-whiteboard__title">{board?.title || "WHITEBOARD"}</h1>}
           {board && renamingBoardId !== board.id && <button className="personal-whiteboard__rename" type="button" aria-label={`Rename ${board.title}`} title="Rename board" onClick={() => startRename(board)}><Pencil aria-hidden="true" /></button>}
         </div>
         <div className="personal-whiteboard__header-actions">
@@ -433,7 +438,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
         </div>
       </header>
       <nav className="personal-whiteboard__pages" aria-label="Investigation boards">
-        {boards.map((item) => <button type="button" key={item.id} aria-current={item.id === board?.id ? "page" : undefined} onClick={() => loadBoard(item.id).catch((error) => setMessage(error.message || "THE SELECTED BOARD COULD NOT BE OPENED"))}>{item.title}</button>)}
+        {boards.map((item) => <button type="button" key={item.id} aria-current={item.id === board?.id ? "page" : undefined} onClick={() => selectBoard(item.id)}>{item.title}</button>)}
       </nav>
       <p className="personal-whiteboard__status" role="status" aria-live="polite">{message}</p>
       {!board ? <div className="personal-whiteboard__empty"><span aria-hidden="true">＋</span><p>Create a board, then add a blank note or pin a personnel file, email, or record.</p></div> : <>

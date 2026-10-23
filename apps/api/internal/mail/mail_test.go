@@ -10,7 +10,7 @@ import (
 func TestRoleCluesAreOccasionalAndDoNotStateTheTitle(t *testing.T) {
 	clues := 0
 	for index := 0; index < 128; index++ {
-		rng := newStream("role-hint-seed", 1, fmt.Sprintf("role-hint/%d", index), time.Date(1974, time.November, 1, 0, 0, 0, 0, time.UTC))
+		rng := newStream("role-hint-seed", 1, fmt.Sprintf("role-hint/%d", index), time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC))
 		item := addSubtleRoleClue(messageTemplate{Subject: "Office notice", Body: "Please return the revised file."}, "accountant", &rng)
 		if item.Body != "Please return the revised file." {
 			clues++
@@ -49,7 +49,7 @@ func TestTemplateCatalogContainsFourHundredNewTemplatesPerType(t *testing.T) {
 }
 
 func TestPairedCorrespondenceIsIdenticalInBothMailboxes(t *testing.T) {
-	from := time.Date(1974, time.November, 1, 0, 0, 0, 0, time.UTC)
+	from := time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC)
 	for _, test := range []struct {
 		name     string
 		relation string

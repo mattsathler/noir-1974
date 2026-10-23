@@ -6,7 +6,7 @@
 
 ## Objetivo
 
-Transformar os espaços de trabalho das empresas e os serviços públicos em pontos de investigação. O jogador seleciona uma empresa diretamente no Neighborhood; não há etapa intermediária de visita ao prédio. O computador e as interações pertencem à empresa escolhida, enquanto bancos, Delegacia e Central da GATE são destinos de serviço próprios em Central. Para interrogar um NPC, o jogador invade o computador da empresa e consulta o Staff Directory. Cada NPC tem um telefone gerado proceduralmente no cliente, sem persistência no backend. O telefone é uma janela independente; a presença física e o horário de funcionamento da empresa não condicionam a ligação. As respostas variam por pergunta, relação com a vítima e arquétipo dos casos abertos na cidade, com conteúdo organizado em arquivos JSON e sem confirmar diretamente o culpado. Emails anônimos podem trazer ameaças e extorsões anteriores à morte; registros bancários e GATE oferecem dados mais verificáveis. O jornal omite o local da morte, que pode ser descoberto na ficha da vítima pelo Person Search. Também poderá solicitar na Delegacia uma autorização de busca e apreensão, investigar residências e burlar controles de acesso a sistemas restritos. A seleção do bairro, endereço e empresa continua transitória; cada ação envia o contexto necessário e o backend valida cidade, alvo e permissões. Buscas podem revelar artefatos e vestígios pináveis; respostas do interrogatório são texto contextual e não viram elementos do whiteboard. Achados, falas e resultados misturam fatos cotidianos e elementos ligados a crimes sem sinalizar ao jogador o que é pista.
+Transformar os espaços de trabalho das empresas e os serviços públicos em pontos de investigação. O jogador seleciona uma empresa diretamente no Neighborhood; não há etapa intermediária de visita ao prédio. O computador e as interações pertencem à empresa escolhida, enquanto bancos, Delegacia e Central da GATE são destinos de serviço próprios em Central. Para interrogar um NPC, o jogador invade o computador da empresa e consulta o Staff Directory. Cada NPC tem um telefone gerado proceduralmente no cliente, sem persistência no backend. O telefone é uma janela independente; a presença física e o horário de funcionamento da empresa não condicionam a ligação. As respostas variam por pergunta, relação com a vítima e arquétipo dos casos abertos na cidade, com conteúdo organizado em arquivos JSON e sem confirmar diretamente o culpado. Emails anônimos podem trazer ameaças e extorsões anteriores à morte; registros bancários e GATE oferecem dados mais verificáveis. O jornal omite o local da morte, que pode ser descoberto na ficha da vítima pelo Person Search. Na Delegacia, o jogador solicita uma busca residencial pelo nome do NPC; a execução não depende de sua localização ou estado vital, e o endereço residencial não é apresentado. O relatório chega ao email pessoal do computador do jogador, com anexos individuais que podem ser fixados em qualquer whiteboard. Inventários determinísticos misturam objetos cotidianos e achados contextuais sem sinalizar quais têm relação com o crime. A seleção do bairro, endereço e empresa continua transitória; cada ação envia o contexto necessário e o backend valida cidade, alvo e permissões. Respostas do interrogatório são texto contextual e não viram elementos do whiteboard.
 
 ## Critérios de aceite
 
@@ -21,34 +21,36 @@ Transformar os espaços de trabalho das empresas e os serviços públicos em pon
 - [x] Os casos geram emails anônimos anteriores à morte, com ameaças ou exigências de pagamento conforme o arquétipo. Falas telefônicas foram calibradas para serem menos assertivas que dados de emails, banco e GATE.
 - [x] O jornal noticia a morte sem informar o local. O Person Search mostra o local reportado da cena na ficha da vítima; o arquivo público do caso não revela esse local.
 - [x] As listas de pessoas nos arquivos de email, banco e GATE exibem retratos para ajudar a distinguir NPCs homônimos.
+- [x] A Delegacia oferece um formulário de busca e apreensão acima do acesso ao computador; o jogador localiza um NPC por nome e pode solicitar a busca mesmo quando o cadastro indica falecimento.
+- [x] A API valida a sessão, a Delegacia da cidade persistida e o NPC pertencente à cidade, registra a autorização e executa a busca sem persistir uma localização residencial ou mostrar seu endereço.
+- [x] O inventário residencial gera oito achados estáveis por jogador, cidade e NPC a partir de catálogos JSON modulares com mais de cem itens cotidianos e contextuais; alvos ligados a casos recebem um achado contextual variável por papel e arquétipo.
+- [x] O email pessoal está disponível no computador do jogador. O relatório da busca é persistido na caixa de entrada e contém todos os achados, misturando itens cotidianos e contextuais.
+- [x] Cada anexo é um card no estilo visual dos pins e possui ação própria para escolher um whiteboard de destino; os itens são persistidos como descobertas antes de serem fixados.
+- [x] A API autentica a sessão e valida que o alvo pertence à cidade persistida e que a solicitação veio da Delegacia daquela cidade. Toda solicitação válida é autorizada; a decisão não consulta relações ocultas entre itens e casos.
+- [x] Cada empresa disponível abre um espaço de trabalho; entrar e sair dele não persiste bairro, prédio ou empresa atual. O Hospital permanece fechado e não pode ser aberto nesta milestone.
+- [x] O Neighborhood lista empresas ligadas ao endereço exato, sem deduzir ocupantes pelo bairro e sem limitar a cinco resultados quando a consulta for por localização.
+- [x] Selecionar uma empresa abre diretamente seu espaço de trabalho; não existe lobby, elevador ou tela intermediária de prédio.
+- [x] As opções de interação com a empresa aparecem no desktop do computador, com os aplicativos apresentados no padrão visual do desktop.
+- [x] O espaço de trabalho recebe a empresa selecionada no Neighborhood e oferece os funcionários daquela empresa, sem carregar funcionários de outra cidade.
+- [x] O computador pessoal oferece a caixa de email privada do jogador para relatórios da investigação; busca de pessoas e arquivo de correspondência de NPCs continuam restritos à Delegacia, registros bancários ao Banco e registros GATE à Central GATE.
+- [x] O acesso a sistemas locais abre uma janela de terminal; o jogador digita um comando para estabelecer a sessão restrita e recebe saída textual simulando a negociação com o sistema. Depois do acesso, os dados são solicitados pelos aplicativos disponíveis naquele computador.
+- [x] O jogador acessa o computador da empresa pelo fluxo de hacking existente e consulta o Staff Directory para obter o telefone de um funcionário daquela empresa; o diretório não oferece funcionários de outras empresas.
+- [x] A Delegacia concede qualquer solicitação válida depois de validar a sessão, a cidade, o alvo e o local; a autorização não depende de evidências descobertas nem da classificação interna dos itens.
+- [x] A busca persiste os elementos efetivamente encontrados e disponíveis para o jogador, sem revelar sua classificação interna.
+- [x] Sistemas locais exigem o comando de acesso no terminal; o jogador só recebe ou tem negado o acesso após a resposta da API. O prédio selecionado permanece contexto transitório e não é gravado como localização do jogador.
+- [x] O backend valida a cidade atual, o endereço e a empresa ou serviço solicitado, decide o resultado e persiste cada tentativa de acesso; o frontend só abre os aplicativos após autorização.
+- [x] As rotas de dados de sistemas restritos exigem uma autorização recente da mesma conta, cidade, empresa ou serviço; chamadas diretas sem a sessão de acesso são negadas.
+- [x] A caixa pessoal recebe uma notificação quando um novo caso é aberto na cidade do jogador, além dos relatórios de busca e apreensão.
+- [x] Interrogatórios, buscas residenciais e dados obtidos por acesso local podem misturar conteúdo cotidiano e relacionado a casos sem expor a classificação interna dos resultados.
+- [x] Ações locais enviam o endereço ou serviço pretendido como contexto transitório; o backend valida sessão, cidade persistida, alvo e local. Não depende de visita salva nem de campo de prédio atual no perfil do jogador.
 
 ### Em aberto
 
-- [ ] API valida o alvo, o local, a sessão do jogador e as condições de acesso antes de executar uma busca.
-- [ ] Cada empresa disponível possui um espaço de trabalho compatível com a direção visual do jogo; entrar e sair dele não persiste bairro, prédio ou empresa atual. O Hospital permanece fechado e não pode ser aberto nesta milestone.
-- [ ] O Neighborhood lista empresas ligadas ao endereço exato, sem deduzir ocupantes pelo bairro e sem limitar a cinco resultados quando a consulta for por localização.
-- [ ] Selecionar uma empresa abre diretamente seu espaço de trabalho; não existe lobby, elevador ou tela intermediária de prédio.
-- [ ] As opções de interação com a empresa aparecem no centro da tela, com os aplicativos apresentados no padrão visual do desktop do computador.
-- [ ] O espaço de trabalho recebe a empresa selecionada no Neighborhood e oferece os NPCs, serviços ou sistemas pertinentes àquela empresa, sem carregar conteúdo de outra cidade.
-- [ ] O computador pessoal não oferece banco, registros GATE, emails ou busca de pessoas; registros bancários só podem ser consultados no Banco, registros GATE na Central GATE e emails/busca de pessoas na Delegacia da cidade atual.
-- [ ] O acesso a sistemas locais abre uma janela de terminal; o jogador digita comandos para estabelecer a sessão restrita e solicitar dados, com saída textual simulando a negociação e a resposta do sistema.
-- [ ] Ações enviam o local pretendido como contexto transitório; o backend valida sessão, cidade persistida, cidade do local e permissões. Não depende de uma visita salva nem de um campo de prédio atual no perfil do jogador.
-- [x] O jogador acessa o computador da empresa pelo fluxo de hacking existente e consulta o Staff Directory para obter o telefone de um funcionário daquela empresa; o diretório não oferece funcionários de outras empresas.
 - [ ] Respostas futuras podem refletir com maior granularidade a rotina, personalidade e ocupação individual do NPC, além das relações e do contexto de caso já cobertos.
-- [ ] A solicitação de busca e apreensão identifica a Delegacia da cidade atual como local de protocolo; o backend valida a cidade persistida e registra a autorização concedida ou negada, sem persistir que o jogador está dentro da Delegacia.
-- [ ] Uma autorização concedida identifica o local residencial e permite ao jogador viajar até lá para realizar a busca.
-- [ ] O inventário de cada residência é procedural, estável e consultado por local; a cidade inteira não é materializada para responder à ação.
-- [ ] Crime Generator pode incluir objetos ligados ao crime no inventário do local correto.
-- [ ] Objetos relevantes e cotidianos são apresentados sem distinção visual, textual ou comportamental.
-- [ ] A busca pode revelar artefatos físicos, documentos e vestígios do local, incluindo achados cotidianos e relacionados ao caso.
-- [ ] Achados investigativos persistidos pela busca podem ser pinados no whiteboard como elementos do caso; sua apresentação registra descrição observável e contexto da descoberta, sem revelar classificação ou validade interna.
-- [ ] Artefatos e vestígios podem fornecer detalhes verificáveis — por exemplo, inscrição, data, condição ou local de origem — que o jogador pode comparar com emails, registros, relatos e outros achados.
-- [ ] A busca persiste os elementos efetivamente encontrados e disponíveis para o jogador, sem revelar sua classificação interna.
-- [ ] Sistemas e áreas restritas exigem credenciais; ao solicitar invasão, o jogador passa pelo fluxo de hacking antes de receber ou ter negado acesso, conforme as regras existentes de hacking. O prédio selecionado permanece contexto da ação e não é gravado como localização do jogador.
-- [ ] O backend autoriza e registra tentativas de acesso restrito; o frontend não concede acesso nem determina o resultado da invasão.
-- [ ] Interrogatórios, buscas e invasões podem produzir resultados cotidianos ou relacionados a casos, sem revelar a classificação interna de nenhum resultado.
+- [ ] O gerador de achados associa mais vestígios contextuais a relações e acontecimentos do caso, além dos papéis de vítima e responsável.
+- [ ] Achados contextuais oferecem mais detalhes verificáveis — como inscrição, data, condição ou origem — para comparação com emails, registros, relatos e outros elementos.
 - [ ] O fluxo e seus acessos respeitam as [Regras 0001, 0002 e 0003](../../rules/README.md).
 
 ## Fora de escopo
 
-Arbitragem da acusação. A organização dos elementos em whiteboards é coberta pelo M10; M12 apenas disponibiliza novos elementos pináveis encontrados em buscas. Análise forense especializada, comparação automática de artefatos e julgamento de credibilidade de depoimentos. Viagem entre cidades e visita inicial a locais são cobertas pelo M11.
+Arbitragem da acusação. A organização dos elementos em whiteboards é coberta pelo M10; M12 apenas disponibiliza novos elementos pináveis encontrados em buscas. Análise forense especializada, comparação automática de artefatos e julgamento de credibilidade de depoimentos. Limites ou custos contra pedidos repetidos de mandados ficam para uma regra futura. Viagem entre cidades e visita inicial a locais são cobertas pelo M11.

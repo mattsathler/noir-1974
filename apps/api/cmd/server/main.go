@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"noir-1974/apps/api/internal/cases"
@@ -41,7 +42,15 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), startupTimeout)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, databaseURL)
+	poolConfig, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		log.Fatalf("parse database pool config: %v", err)
+	}
+	// Neon pooled connections use PgBouncer transaction pooling. Use unnamed
+	// extended-protocol statements so server-side prepared statement state is
+	// not tied to a backend connection that PgBouncer may later reassign.
+	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		log.Fatalf("create database pool: %v", err)
 	}

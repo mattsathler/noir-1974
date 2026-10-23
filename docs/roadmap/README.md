@@ -32,8 +32,11 @@ Ordem e regras de entrada/saída: [`ciclos.md`](ciclos.md).
 | 12 | Interações investigativas em locais | [M12](milestones/M12-busca-e-apreensao.md) |
 | 13 | Acusação e julgamento | [M13](milestones/M13-acusacao-e-julgamento.md) |
 | 14 | Otimização, cache e estabilidade | [M14](milestones/M14-otimizacao-cache-e-estabilidade.md) |
+| 15 | Animações das ações do jogo | [M15](milestones/M15-animacoes-de-acoes.md) |
+| 16 | Auditoria integral de estabilidade e consistência pré-beta | [M16](milestones/M16-auditoria-integral-pre-beta.md) |
+| 17 | Identidade visual procedural e customização do personagem | [M17](milestones/M17-identidade-visual-e-customizacao.md) |
 
-Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável para playtest, não a conclusão do jogo. M07–M13 constroem o fluxo investigativo completo: registros, correio, deslocamento, organização de elementos, expansão geográfica, visita e investigação de locais, acusação e prisão do culpado. O M10 também entrega identidades visuais modulares para personagens e geração recorrente de casos compartilhados. M14 vem depois do fluxo criminal completo e consolida desempenho, cache e estabilidade da plataforma; ele não altera a porcentagem de conclusão desse fluxo. Tutorial (Vesper), auth completa, simulação temporal geral e outros sistemas continuam exigindo milestones próprios.
+Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável para playtest, não a conclusão do jogo. M07–M13 constroem o fluxo investigativo completo: registros, correio, deslocamento, organização de elementos, expansão geográfica, visita e investigação de locais, acusação e prisão do culpado. O M10 também entrega identidades visuais modulares para personagens e geração recorrente de casos compartilhados. M14 vem depois do fluxo criminal completo e consolida desempenho, cache e estabilidade da plataforma; ele não altera a porcentagem de conclusão desse fluxo. M15 adiciona animações às ações de viagem, busca e apreensão e mandado de prisão sem alterar suas regras. M16 realiza uma auditoria ampla de estabilidade, bugs e consistência visual no front e no back antes da prontidão para beta. M17 amplia a geração visual de NPCs e permite editar a aparência do personagem do jogador após a criação. Tutorial (Vesper), auth completa, simulação temporal geral e outros sistemas continuam exigindo milestones próprios.
 
 ## Status
 

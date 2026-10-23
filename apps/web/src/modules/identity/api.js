@@ -26,7 +26,7 @@ async function request(path, options = {}) {
       country: "France",
       timeZone: "Europe/Paris",
       locationId: "lyon",
-      serverTime: "1974-11-12T20:15:00.000Z",
+      serverTime: new Date().toISOString(),
     };
   }
 

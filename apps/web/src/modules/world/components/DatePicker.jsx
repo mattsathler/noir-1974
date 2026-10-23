@@ -6,8 +6,7 @@ function dateKey(year, month, day) {
 }
 
 function monthLabel(month) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" })
-    .format(new Date(Date.UTC(1974, month - 1, 1)));
+  return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month - 1];
 }
 
 export default function DatePicker({ label, value, onChange, minDate, maxDate }) {

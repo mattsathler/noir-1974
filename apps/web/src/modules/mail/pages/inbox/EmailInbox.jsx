@@ -24,7 +24,7 @@ function displayDate(value, timeZone) {
   }).format(date);
 }
 
-export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z"), timeZone = "Europe/Paris", runHack, onPin }) {
+export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe/Paris", facilityLocationId = "", accessAttemptId = "", runHack, onPin }) {
   const throughToday = serverTime.toISOString().slice(0, 10);
   const rangeStart = `${throughToday.slice(0, 4)}-01-01`;
   const [query, setQuery] = useState("");
@@ -90,7 +90,7 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
     setMessages([]);
     setMessage("REQUESTING PRIVATE CORRESPONDENCE…");
     try {
-      const loadMessages = () => getNPCEmails(mailbox.id, from, through);
+      const loadMessages = () => getNPCEmails(mailbox.id, from, through, facilityLocationId, accessAttemptId);
       const results = await hackRequest(loadMessages);
       if (request !== requestId.current) return;
       setMessages(results);
@@ -106,14 +106,14 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
     <div className="email-inbox">
       <p className="computer-window__eyebrow">MERIDIAN GLOBAL · PRIVATE CORRESPONDENCE EXCHANGE</p>
       <h1>MAILROOM ARCHIVE</h1>
-        <form className="world-directory__search" onSubmit={searchMailbox}>
+        {!mailbox && <form className="world-directory__search" onSubmit={searchMailbox}>
           <label className="world-directory__label" htmlFor="mail-search-person">PERSON NAME</label>
           <div className="world-directory__searchline">
             <input id="mail-search-person" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search correspondence files" />
             <button type="submit" disabled={busy}>{busy ? "SEARCHING…" : "SEARCH"}</button>
           </div>
-        </form>
-        <p className="world-directory__message" role="status" aria-live="polite">{message}</p>
+        </form>}
+        {!mailbox && <p className="world-directory__message" role="status" aria-live="polite">{message}</p>}
 
         {!mailbox && people.map(({ npc }) => (
           <article className="world-record" key={npc.id}>
@@ -128,11 +128,12 @@ export default function EmailInbox({ serverTime = new Date("1974-11-12T20:15:00Z
           </article>
         ))}
 
-        {mailbox && <section className="email-inbox__mailbox" aria-label={`Correspondence file for ${mailbox.name}`}>
-          <header className="world-record__header">
-            <h2>{mailbox.name}</h2>
-            <button className="email-inbox__back" type="button" onClick={() => { requestId.current++; setBusy(false); setMailbox(null); setMessages([]); setMessage("Select a correspondence file."); }}>BACK TO FILES</button>
-          </header>
+        {mailbox && <section className="email-inbox__mailbox world-person-file" aria-label={`Correspondence file for ${mailbox.name}`}>
+          <header className="world-person-file__toolbar"><button type="button" onClick={() => { requestId.current++; setBusy(false); setMailbox(null); setMessages([]); setMessage("Select a correspondence file."); }}>← BACK TO RESULTS</button><span>CORRESPONDENCE FILE</span></header>
+          <div className="world-person-file__identity email-inbox__person-file">
+            <figure className="world-directory__person-portrait"><ModularFace visual={mailbox.visual ?? FALLBACK_NPC_VISUAL} name={mailbox.name} /></figure>
+            <div><h2>{mailbox.name}</h2><p>{mailbox.status?.toUpperCase() || "STATUS UNKNOWN"} · PRIVATE ACCOUNT</p></div>
+          </div>
           <form className="world-record__activity-filter" onSubmit={readMailbox}>
             <DatePicker label="FROM" value={from} minDate={rangeStart} maxDate={throughToday} onChange={updateFrom} />
             <DatePicker label="THROUGH" value={through} minDate={rangeStart} maxDate={throughToday} onChange={updateThrough} />

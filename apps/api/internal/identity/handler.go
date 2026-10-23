@@ -32,18 +32,17 @@ var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{3,24}$`)
 var whiteboardIDPattern = regexp.MustCompile(`^board_[A-Za-z0-9_-]+$`)
 
 type Handler struct {
-	store               store
-	secureCookie        bool
-	now                 func() time.Time
-	worldClockStartedAt time.Time
-	worldReader         WorldDirectoryReader
-	newspaperReader     NewspaperReader
-	caseReader          CaseAPIReader
-	whiteboardReader    WhiteboardAPIReader
-	recordsReader       RecordsAPIReader
-	emailsReader        EmailsAPIReader
-	worldServerID       string
-	exposeErrorDetails  bool
+	store              store
+	secureCookie       bool
+	now                func() time.Time
+	worldReader        WorldDirectoryReader
+	newspaperReader    NewspaperReader
+	caseReader         CaseAPIReader
+	whiteboardReader   WhiteboardAPIReader
+	recordsReader      RecordsAPIReader
+	emailsReader       EmailsAPIReader
+	worldServerID      string
+	exposeErrorDetails bool
 }
 
 type requestIDContextKey struct{}
@@ -80,6 +79,14 @@ type WorldDirectoryReader interface {
 	SearchLocations(context.Context, string, string, string) ([]world.LocationRecord, error)
 }
 
+type cityCompanySearchReader interface {
+	SearchCompaniesInCity(context.Context, string, string, string) ([]world.CompanyRecord, error)
+}
+
+type cityNPCReader interface {
+	NPCBelongsToCity(context.Context, string, string, string) (bool, error)
+}
+
 type companyLocationReader interface {
 	CompanyAtLocation(context.Context, string, string) ([]world.CompanyRecord, error)
 }
@@ -105,6 +112,16 @@ type CaseInterrogationReader interface {
 
 type CasePersonSearchReader interface {
 	PersonSearchScenes(context.Context, string, string, []string) (map[string]world.PersonSearchScene, error)
+}
+
+type ResidentialSearchReader interface {
+	RequestResidentialSearch(context.Context, string, string, string, string, string, time.Time) (cases.WarrantRequest, error)
+	ListPlayerMail(context.Context, string, string) ([]cases.PlayerMailMessage, error)
+}
+
+type LocalAccessAttemptReader interface {
+	RecordLocalAccessAttempt(context.Context, string, string, string, string, string, string, string, time.Time) (cases.LocalAccessAttempt, error)
+	ValidateLocalAccessAttempt(context.Context, string, string, int64, string, string, string, string, time.Time) (bool, error)
 }
 
 type RecordsAPIReader interface {
@@ -159,7 +176,7 @@ func NewHandlerWithGameAndMailDiagnostics(repository store, secureCookie bool, r
 
 func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, emailsReader EmailsAPIReader, exposeErrorDetails bool) http.Handler {
 	now := time.Now
-	handler := &Handler{store: repository, secureCookie: secureCookie, now: now, worldClockStartedAt: now(), worldReader: reader, newspaperReader: newspaperReader, caseReader: caseReader, recordsReader: recordsReader, emailsReader: emailsReader, worldServerID: serverID, exposeErrorDetails: exposeErrorDetails}
+	handler := &Handler{store: repository, secureCookie: secureCookie, now: now, worldReader: reader, newspaperReader: newspaperReader, caseReader: caseReader, recordsReader: recordsReader, emailsReader: emailsReader, worldServerID: serverID, exposeErrorDetails: exposeErrorDetails}
 	if whiteboardReader, ok := caseReader.(WhiteboardAPIReader); ok {
 		handler.whiteboardReader = whiteboardReader
 	}
@@ -194,6 +211,13 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		if _, ok := caseReader.(CaseInterrogationReader); ok {
 			mux.HandleFunc("GET /api/cases/interrogation/{npcID}", handler.getInterrogationAnswers)
 		}
+		if _, ok := caseReader.(ResidentialSearchReader); ok {
+			mux.HandleFunc("POST /api/police/warrants", handler.requestResidentialSearch)
+			mux.HandleFunc("GET /api/player/emails", handler.playerEmails)
+		}
+		if _, ok := caseReader.(LocalAccessAttemptReader); ok {
+			mux.HandleFunc("POST /api/facilities/access", handler.requestLocalAccess)
+		}
 	}
 	if handler.whiteboardReader != nil {
 		mux.HandleFunc("GET /api/whiteboards", handler.listWhiteboards)
@@ -216,6 +240,115 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
 	return apiErrorMiddleware(api)
+}
+
+type residentialSearchRequest struct {
+	TargetNPCID       string `json:"targetNpcId"`
+	StationLocationID string `json:"stationLocationId"`
+}
+
+type localAccessRequest struct {
+	LocationID string `json:"locationId"`
+	CompanyID  string `json:"companyId"`
+	Facility   string `json:"facility"`
+	Command    string `json:"command"`
+}
+
+func (h *Handler) requestLocalAccess(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input localAccessRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	reader, ok := h.caseReader.(LocalAccessAttemptReader)
+	if !ok {
+		http.Error(w, "local access service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	state := h.worldFor(r.Context(), current.ID)
+	if state.CityID == "" || strings.TrimSpace(input.LocationID) == "" || strings.TrimSpace(input.Facility) == "" {
+		h.writeAPIError(w, r, http.StatusBadRequest, "LOCAL_ACCESS_CONTEXT_REQUIRED", "a local address and system are required", nil)
+		return
+	}
+	valid := input.Command == "run bypassdecrypt.exe" && input.LocationID != "" && state.CityID != ""
+	switch input.Facility {
+	case "company":
+		valid = valid && input.CompanyID != ""
+		companyReader, available := h.worldReader.(companyDirectoryReader)
+		if !available {
+			valid = false
+			break
+		}
+		records, err := companyReader.CompanyDirectoryAtLocation(r.Context(), h.worldServerID, input.LocationID, input.CompanyID)
+		if err != nil {
+			h.writeAPIError(w, r, http.StatusInternalServerError, "LOCAL_ACCESS_FAILED", "could not validate local system", err)
+			return
+		}
+		city, exists := world.CityByID(state.CityID)
+		valid = valid && exists && len(records) == 1 && records[0].Address.City == city.Name
+	case "police", "bank", "gate":
+		valid = valid && input.CompanyID == "" && input.LocationID == expectedServiceLocationID(state.CityID, input.Facility)
+	default:
+		valid = false
+	}
+	status := "denied"
+	if valid {
+		status = "granted"
+	}
+	attempt, err := reader.RecordLocalAccessAttempt(r.Context(), h.worldServerID, current.ID, state.CityID, input.LocationID, input.CompanyID, input.Facility, status, h.now().UTC())
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "LOCAL_ACCESS_FAILED", "could not record local system access", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, attempt)
+}
+
+func (h *Handler) requestResidentialSearch(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input residentialSearchRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	reader, ok := h.caseReader.(ResidentialSearchReader)
+	if !ok {
+		http.Error(w, "residential search unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	state := h.worldFor(r.Context(), current.ID)
+	result, err := reader.RequestResidentialSearch(r.Context(), h.worldServerID, current.ID, state.CityID, input.StationLocationID, input.TargetNPCID, state.ServerTime)
+	if errors.Is(err, cases.ErrCaseNotFound) {
+		http.Error(w, "the target or police station is not valid for the current city", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "RESIDENTIAL_SEARCH_FAILED", "could not complete the residential search", err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, result)
+}
+
+func (h *Handler) playerEmails(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.caseReader.(ResidentialSearchReader)
+	if !ok {
+		http.Error(w, "personal mailbox unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	messages, err := reader.ListPlayerMail(r.Context(), h.worldServerID, current.ID)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "PLAYER_EMAIL_FAILED", "could not retrieve personal mail", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": messages})
 }
 
 func apiErrorMiddleware(next http.Handler) http.Handler {
@@ -300,6 +433,9 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !h.validateNPCCity(w, r, current.ID, r.PathValue("npcID")) {
+		return
+	}
 	from, err := time.Parse("2006-01-02", r.URL.Query().Get("from"))
 	if err != nil {
 		http.Error(w, "from must be a date in YYYY-MM-DD format", http.StatusBadRequest)
@@ -318,6 +454,17 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 	if source != "" && source != "bank" && source != "gate" {
 		http.Error(w, "source must be bank or gate", http.StatusBadRequest)
 		return
+	}
+	if source != "" {
+		locationID := strings.TrimSpace(r.URL.Query().Get("locationId"))
+		_, canValidateCity := h.worldReader.(cityNPCReader)
+		if (locationID == "" && canValidateCity) || (locationID != "" && locationID != expectedServiceLocationID(h.worldFor(r.Context(), current.ID).CityID, source)) {
+			h.writeAPIError(w, r, http.StatusBadRequest, "RECORDS_LOCATION_REQUIRED", "select the matching local records service", nil)
+			return
+		}
+		if locationID != "" && !h.requireLocalAccessAttempt(w, r, current.ID, source, locationID, "") {
+			return
+		}
 	}
 	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
 	results, err := h.recordsReader.NPCRecords(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through, source)
@@ -383,6 +530,18 @@ func (h *Handler) characterVisuals(w http.ResponseWriter, _ *http.Request) {
 func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 	current, ok := h.authorizedPlayer(w, r)
 	if !ok {
+		return
+	}
+	if !h.validateNPCCity(w, r, current.ID, r.PathValue("npcID")) {
+		return
+	}
+	locationID := strings.TrimSpace(r.URL.Query().Get("locationId"))
+	_, canValidateCity := h.worldReader.(cityNPCReader)
+	if (locationID == "" && canValidateCity) || (locationID != "" && locationID != expectedServiceLocationID(h.worldFor(r.Context(), current.ID).CityID, "police")) {
+		h.writeAPIError(w, r, http.StatusBadRequest, "CORRESPONDENCE_LOCATION_REQUIRED", "select the local police station to retrieve correspondence", nil)
+		return
+	}
+	if locationID != "" && !h.requireLocalAccessAttempt(w, r, current.ID, "police", locationID, "") {
 		return
 	}
 	from, err := time.Parse("2006-01-02", r.URL.Query().Get("from"))
@@ -496,6 +655,9 @@ func (h *Handler) getInterrogationAnswers(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
+	if !h.validateNPCCity(w, r, current.ID, r.PathValue("npcID")) {
+		return
+	}
 	reader, ok := h.caseReader.(CaseInterrogationReader)
 	if !ok {
 		http.Error(w, "interrogation service unavailable", http.StatusServiceUnavailable)
@@ -507,6 +669,59 @@ func (h *Handler) getInterrogationAnswers(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"answers": answers})
+}
+
+func (h *Handler) validateNPCCity(w http.ResponseWriter, r *http.Request, accountID, npcID string) bool {
+	reader, ok := h.worldReader.(cityNPCReader)
+	if !ok {
+		return true
+	}
+	valid, err := reader.NPCBelongsToCity(r.Context(), h.worldServerID, h.worldFor(r.Context(), accountID).CityID, npcID)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "NPC_CITY_VALIDATION_FAILED", "could not validate the selected person", err)
+		return false
+	}
+	if !valid {
+		http.NotFound(w, r)
+		return false
+	}
+	return true
+}
+
+func expectedServiceLocationID(cityID, facility string) string {
+	cityKey := cityID
+	if cityID == "fr/lyon" {
+		cityKey = "lyon"
+	}
+	suffix := map[string]string{"police": "police-station", "bank": "meridian-bank", "gate": "gate-station"}[facility]
+	if suffix == "" || cityKey == "" {
+		return ""
+	}
+	return "service:" + cityKey + "/" + suffix
+}
+
+func (h *Handler) requireLocalAccessAttempt(w http.ResponseWriter, r *http.Request, accountID, facility, locationID, companyID string) bool {
+	attemptID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("accessAttemptId")), 10, 64)
+	if err != nil || attemptID < 1 {
+		h.writeAPIError(w, r, http.StatusForbidden, "LOCAL_ACCESS_REQUIRED", "authenticate with the local terminal before requesting these records", nil)
+		return false
+	}
+	reader, ok := h.caseReader.(LocalAccessAttemptReader)
+	if !ok {
+		h.writeAPIError(w, r, http.StatusServiceUnavailable, "LOCAL_ACCESS_UNAVAILABLE", "local access validation is unavailable", nil)
+		return false
+	}
+	state := h.worldFor(r.Context(), accountID)
+	valid, err := reader.ValidateLocalAccessAttempt(r.Context(), h.worldServerID, accountID, attemptID, state.CityID, locationID, companyID, facility, h.now().UTC())
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "LOCAL_ACCESS_VALIDATION_FAILED", "could not validate local terminal access", err)
+		return false
+	}
+	if !valid {
+		h.writeAPIError(w, r, http.StatusForbidden, "LOCAL_ACCESS_REQUIRED", "authenticate with the local terminal before requesting these records", nil)
+		return false
+	}
+	return true
 }
 
 type whiteboardCreateRequest struct {
@@ -942,11 +1157,28 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
+	locationID := strings.TrimSpace(r.URL.Query().Get("locationId"))
+	locationLookup := locationID != ""
+	requestedCityID := strings.TrimSpace(r.URL.Query().Get("cityId"))
 	var current account
-	if h.whiteboardReader != nil {
+	if h.whiteboardReader != nil || locationLookup || requestedCityID != "" {
 		var ok bool
 		current, ok = h.caseAccount(w, r)
 		if !ok {
+			return
+		}
+		if locationLookup {
+			locationCity, exists := world.CityForLocation(locationID)
+			if !exists || locationCity.ID != h.worldFor(r.Context(), current.ID).CityID {
+				h.writeAPIError(w, r, http.StatusBadRequest, "COMPANY_LOCATION_UNAVAILABLE", "the selected address is not in your current city", nil)
+				return
+			}
+			if companyID := strings.TrimSpace(r.URL.Query().Get("companyId")); companyID != "" && !h.requireLocalAccessAttempt(w, r, current.ID, "company", locationID, companyID) {
+				return
+			}
+		}
+		if requestedCityID != "" && requestedCityID != h.worldFor(r.Context(), current.ID).CityID {
+			h.writeAPIError(w, r, http.StatusBadRequest, "COMPANY_CITY_UNAVAILABLE", "the requested city is not your current city", nil)
 			return
 		}
 	} else if !h.authorizeWorldRequest(w, r) {
@@ -954,8 +1186,7 @@ func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
 	}
 	var results []world.CompanyRecord
 	var err error
-	locationLookup := strings.TrimSpace(r.URL.Query().Get("locationId")) != ""
-	if locationID := strings.TrimSpace(r.URL.Query().Get("locationId")); locationID != "" {
+	if locationLookup {
 		if companyID := strings.TrimSpace(r.URL.Query().Get("companyId")); companyID != "" {
 			reader, ok := h.worldReader.(companyDirectoryReader)
 			if !ok {
@@ -974,7 +1205,15 @@ func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
-		results, err = h.worldReader.SearchCompanies(r.Context(), h.worldServerID, query)
+		if requestedCityID != "" {
+			if reader, ok := h.worldReader.(cityCompanySearchReader); ok {
+				results, err = reader.SearchCompaniesInCity(r.Context(), h.worldServerID, requestedCityID, query)
+			} else {
+				results, err = h.worldReader.SearchCompanies(r.Context(), h.worldServerID, query)
+			}
+		} else {
+			results, err = h.worldReader.SearchCompanies(r.Context(), h.worldServerID, query)
+		}
 	}
 	if err != nil {
 		http.Error(w, "could not search companies", http.StatusInternalServerError)
@@ -1378,8 +1617,7 @@ func (h *Handler) world(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) worldAt() worldResponse {
-	parisTime := time.Date(1974, time.November, 12, 21, 15, 0, 0, time.FixedZone("CET", 60*60))
-	gameTime := parisTime.Add(h.now().Sub(h.worldClockStartedAt))
+	gameTime := h.now()
 	lyon, _ := world.CityByID("fr/lyon")
 	return worldResponse{
 		CityID:     lyon.ID,

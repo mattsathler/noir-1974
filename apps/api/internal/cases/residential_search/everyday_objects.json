@@ -1,0 +1,24 @@
+{
+  "items": [
+    {"title":"Cigarette tin","content":"An empty cigarette tin holding a few ordinary sewing needles.","kind":"object"},
+    {"title":"Loose key","content":"A brass key with no tag, found in a kitchen drawer. Its lock is unknown.","kind":"object"},
+    {"title":"Broken fountain pen","content":"A fountain pen with a cracked barrel. It no longer writes.","kind":"object"},
+    {"title":"Spare radio dial","content":"A loose Bakelite radio dial wrapped in a piece of newspaper.","kind":"object"},
+    {"title":"Unpaired glove","content":"A single wool glove, worn at the fingertips. No matching glove was located.","kind":"object"},
+    {"title":"Matchbook","content":"A nearly empty matchbook from a café. The last match is damp and unusable.","kind":"object"},
+    {"title":"Cracked spectacles case","content":"An empty spectacles case with a split hinge and no glasses inside.","kind":"object"},
+    {"title":"Brass button","content":"A single brass button in a sewing tin. It does not match the household coats nearby.","kind":"object"},
+    {"title":"Pocket comb","content":"A chipped pocket comb with several missing teeth.","kind":"object"},
+    {"title":"Dull kitchen knife","content":"A common kitchen knife with a worn wooden handle. It is clean and stored with the cutlery.","kind":"object"},
+    {"title":"Broken alarm clock","content":"A bedside alarm clock stopped at an unknown time. Its winding key is missing.","kind":"object"},
+    {"title":"Tin toy car","content":"A small tin car with one bent wheel, kept on a high shelf.","kind":"object"},
+    {"title":"Empty perfume bottle","content":"A small glass perfume bottle, dry and without a label.","kind":"object"},
+    {"title":"Radio valve","content":"A used radio valve in its cardboard sleeve. The glass is intact.","kind":"object"},
+    {"title":"Worn pocket watch chain","content":"A short watch chain without a watch, tangled around a drawer handle.","kind":"object"},
+    {"title":"Darning needle case","content":"A wooden needle case with two needles and a length of black thread.","kind":"object"},
+    {"title":"Bent teaspoon","content":"A teaspoon bent near the handle, stored with ordinary kitchen utensils.","kind":"object"},
+    {"title":"Small padlock","content":"A rusted padlock with no key. It opens under light pressure.","kind":"object"},
+    {"title":"Worn leather wallet","content":"An old wallet containing no money, only a few blank visiting cards.","kind":"object"},
+    {"title":"Pocket mirror","content":"A small pocket mirror with a cracked corner and a worn metal case.","kind":"object"}
+  ]
+}

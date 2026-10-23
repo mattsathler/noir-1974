@@ -5,7 +5,7 @@
 
 ## Regra
 
-Noir 1974 se passa em um mundo **extremamente anarcocapitalista, comandado totalmente por grandes empresas**. O poder corporativo organiza e controla a vida social. Essa condição é estrutural e deve ser percebida pelo jogador em tudo que o jogo apresenta; não é apenas pano de fundo, referência ocasional ou tema de alguns casos.
+O universo de Noir 1974 é **extremamente anarcocapitalista, comandado totalmente por grandes empresas**. O poder corporativo organiza e controla a vida social. Essa condição é estrutural e deve ser percebida pelo jogador em tudo que o jogo apresenta; não é apenas pano de fundo, referência ocasional ou tema de alguns casos.
 
 A lore canônica do GATE, da Meridian Global e de Adrian Voss está em [Lore — Noir 1974](../project/lore.md) e deve ser respeitada em toda criação. Como princípio obrigatório, a tecnologia avançou muito mais rápido que os costumes: capacidades extraordinárias convivem com roupas, hábitos e formas antiquadas. Essa tensão deve permanecer intencional e coerente.
 

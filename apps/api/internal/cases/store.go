@@ -2,10 +2,14 @@ package cases
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sort"
 	"strings"
 	"time"
@@ -17,13 +21,14 @@ import (
 	"noir-1974/apps/api/internal/world"
 )
 
-//go:embed schema.sql interrogation/*.json
+//go:embed schema.sql interrogation/*.json residential_search/*.json
 var caseSchema embed.FS
 
 var (
 	ErrCaseNotFound          = errors.New("case not found")
 	ErrInvalidCaseState      = errors.New("invalid shared case state")
 	ErrInvalidProgress       = errors.New("invalid player case progress")
+	ErrInvalidLocalAccess    = errors.New("invalid local access result")
 	ErrInvalidWhiteboardNote = errors.New("invalid whiteboard note")
 	ErrEvidenceNotFound      = errors.New("case evidence not found")
 	ErrPersistedConflict     = errors.New("persisted case does not match generated definition")
@@ -76,6 +81,31 @@ type Whiteboard struct {
 	CreatedAt   time.Time              `json:"createdAt"`
 	Pins        []WhiteboardPin        `json:"pins"`
 	Connections []WhiteboardConnection `json:"connections"`
+}
+
+type PlayerMailAttachment struct {
+	DiscoveredItem
+	Kind string `json:"kind"`
+}
+
+type PlayerMailMessage struct {
+	ID          string                 `json:"id"`
+	SentAt      time.Time              `json:"sentAt"`
+	Subject     string                 `json:"subject"`
+	Body        string                 `json:"body"`
+	Attachments []PlayerMailAttachment `json:"attachments"`
+}
+
+type WarrantRequest struct {
+	WarrantID string             `json:"warrantId"`
+	Status    string             `json:"status"`
+	Message   *PlayerMailMessage `json:"message,omitempty"`
+}
+
+type LocalAccessAttempt struct {
+	AttemptID int64     `json:"attemptId"`
+	Status    string    `json:"status"`
+	Attempted time.Time `json:"attemptedAt"`
 }
 
 // PublicCase contains only facts safe for the newspaper headline.
@@ -316,6 +346,19 @@ func NewPostgresStore(db caseDatabase) *PostgresStore {
 	return &PostgresStore{db: db}
 }
 
+func (store *PostgresStore) worldSeedAndVersion(ctx context.Context, serverID string) (string, int, error) {
+	var seed string
+	var version int
+	err := store.db.QueryRow(ctx,
+		`SELECT world_seed, generator_version FROM worlds WHERE server_id = $1::uuid`,
+		serverID,
+	).Scan(&seed, &version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", 0, world.ErrEntityNotFound
+	}
+	return seed, version, err
+}
+
 func (store *PostgresStore) EnsureGenerationSchedule(ctx context.Context, serverID string, interval time.Duration) error {
 	_, err := store.db.Exec(ctx, `INSERT INTO case_generation_schedule(server_id,next_run_at) VALUES($1::uuid,now()+make_interval(secs=>$2::double precision)) ON CONFLICT(server_id) DO NOTHING`, serverID, interval.Seconds())
 	return err
@@ -381,6 +424,212 @@ func (store *PostgresStore) Migrate(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// RequestResidentialSearch records a police authorization and delivers the inventory to the player's mailbox.
+// NPC status is deliberately not checked here: a deceased person's residence remains searchable.
+func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, serverID, accountID, cityID, stationLocationID, npcID string, now time.Time) (WarrantRequest, error) {
+	cityKey := cityID
+	if cityID == "fr/lyon" {
+		cityKey = "lyon"
+	}
+	if stationLocationID != "service:"+cityKey+"/police-station" || npcID == "" {
+		return WarrantRequest{}, ErrCaseNotFound
+	}
+	var targetExists bool
+	if err := store.db.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM world_entities e JOIN world_regions r USING (server_id, region_id)
+		WHERE e.server_id=$1::uuid AND e.entity_id=$2 AND e.entity_type='npc'
+		AND (r.region_id=$3 OR r.region_id LIKE $3 || '/district/%')
+	)`, serverID, npcID, cityID).Scan(&targetExists); err != nil {
+		return WarrantRequest{}, fmt.Errorf("validate residential search target: %w", err)
+	}
+	if !targetExists {
+		return WarrantRequest{}, ErrCaseNotFound
+	}
+	var generationKey string
+	if err := store.db.QueryRow(ctx, `SELECT generation_key FROM world_entities WHERE server_id=$1::uuid AND entity_id=$2`, serverID, npcID).Scan(&generationKey); err != nil {
+		return WarrantRequest{}, fmt.Errorf("load residential subject: %w", err)
+	}
+	var priorID, priorStatus string
+	var priorCatalogVersion int
+	var priorMessage PlayerMailMessage
+	var priorAttachments []byte
+	err := store.db.QueryRow(ctx, `SELECT w.warrant_id,w.status,w.catalog_version,m.message_id,m.sent_at,m.subject,m.body,m.attachments
+		FROM player_search_warrants w JOIN player_inbox_messages m USING (server_id,account_id,warrant_id)
+		WHERE w.server_id=$1::uuid AND w.account_id=$2::uuid AND w.city_id=$3 AND w.target_npc_id=$4
+		ORDER BY w.created_at LIMIT 1`, serverID, accountID, cityID, npcID).Scan(&priorID, &priorStatus, &priorCatalogVersion, &priorMessage.ID, &priorMessage.SentAt, &priorMessage.Subject, &priorMessage.Body, &priorAttachments)
+	if err == nil {
+		if priorCatalogVersion >= 2 {
+			if err := json.Unmarshal(priorAttachments, &priorMessage.Attachments); err != nil {
+				return WarrantRequest{}, err
+			}
+			return WarrantRequest{WarrantID: priorID, Status: priorStatus, Message: &priorMessage}, nil
+		}
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return WarrantRequest{}, fmt.Errorf("check prior residential search: %w", err)
+	}
+	seed, worldVersion, err := store.worldSeedAndVersion(ctx, serverID)
+	if err != nil {
+		return WarrantRequest{}, err
+	}
+	person, err := world.GenerateNPCFromKey(seed, worldVersion, generationKey)
+	if err != nil {
+		return WarrantRequest{}, fmt.Errorf("reconstruct residential search subject: %w", err)
+	}
+	var archetype string
+	var isKiller, isVictim bool
+	err = store.db.QueryRow(ctx, `SELECT c.archetype_id, c.killer_entity_id=$3, c.victim_entity_id=$3
+		FROM cases c JOIN case_states s USING (server_id, case_id)
+		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND (c.killer_entity_id=$3 OR c.victim_entity_id=$3)
+		AND s.status='open' ORDER BY c.created_at DESC LIMIT 1`, serverID, cityID, npcID).Scan(&archetype, &isKiller, &isVictim)
+	if errors.Is(err, pgx.ErrNoRows) {
+		archetype = ""
+	} else if err != nil {
+		return WarrantRequest{}, fmt.Errorf("load residential search context: %w", err)
+	}
+	stamp := now.UTC()
+	identity := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s", accountID, cityID, npcID)))
+	warrantID := "warrant:" + hex.EncodeToString(identity[:12])
+	existingReport := priorID != ""
+	commonFindings := make([]residentialFinding, 0, 60)
+	for _, path := range []string{"everyday_documents.json", "everyday_papers.json", "everyday_objects.json"} {
+		findings, err := readResidentialFindingList("residential_search/" + path)
+		if err != nil {
+			return WarrantRequest{}, fmt.Errorf("load residential inventory catalog: %w", err)
+		}
+		commonFindings = append(commonFindings, findings...)
+	}
+	if len(commonFindings) < 8 {
+		return WarrantRequest{}, errors.New("residential inventory catalog must contain at least eight findings")
+	}
+	random := rand.New(rand.NewSource(int64(binary.BigEndian.Uint64(identity[:8]))))
+	order := random.Perm(len(commonFindings))
+	items := make([]PlayerMailAttachment, 0, 8)
+	for index := 0; index < 7; index++ {
+		items = append(items, makeResidentialAttachment(warrantID, index, commonFindings[order[index]]))
+	}
+	var contextualFindings []residentialFinding
+	if (isKiller || isVictim) && archetype != "" {
+		caseFindings, err := readResidentialCaseFindings(archetype)
+		if err != nil {
+			return WarrantRequest{}, fmt.Errorf("load case-specific residential findings: %w", err)
+		}
+		if isKiller {
+			contextualFindings = caseFindings.Killer
+		} else {
+			contextualFindings = caseFindings.Victim
+		}
+	}
+	lastFinding := commonFindings[order[7]]
+	if len(contextualFindings) > 0 {
+		lastFinding = contextualFindings[random.Intn(len(contextualFindings))]
+	}
+	items = append(items, makeResidentialAttachment(warrantID, 7, lastFinding))
+	attachmentsJSON, err := json.Marshal(items)
+	if err != nil {
+		return WarrantRequest{}, err
+	}
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return WarrantRequest{}, fmt.Errorf("begin residential search: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if existingReport {
+		warrantID = priorID
+		if _, err := tx.Exec(ctx, `UPDATE player_search_warrants SET catalog_version=2,station_location_id=$5,created_at=$6
+			WHERE server_id=$1::uuid AND account_id=$2::uuid AND warrant_id=$3 AND city_id=$4`, serverID, accountID, warrantID, cityID, stationLocationID, stamp); err != nil {
+			return WarrantRequest{}, fmt.Errorf("update residential search report: %w", err)
+		}
+	} else if _, err := tx.Exec(ctx, `INSERT INTO player_search_warrants (server_id,account_id,warrant_id,city_id,station_location_id,target_npc_id,status,catalog_version,created_at)
+		VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,'granted',2,$7)
+		ON CONFLICT (server_id,account_id,warrant_id) DO UPDATE SET
+		station_location_id=EXCLUDED.station_location_id,status='granted',catalog_version=2,created_at=EXCLUDED.created_at`, serverID, accountID, warrantID, cityID, stationLocationID, npcID, stamp); err != nil {
+		return WarrantRequest{}, fmt.Errorf("record residential search authorization: %w", err)
+	}
+	message := PlayerMailMessage{ID: warrantID + ":mail", SentAt: stamp, Subject: "Residential search report · " + person.Name, Body: "The authorized residential search concerning " + person.Name + " is complete. The enclosed inventory lists all items recovered and secured. Review each item in context; routine household effects were included in the same report.", Attachments: items}
+	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages (server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
+		VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8::jsonb)
+		ON CONFLICT (server_id,account_id,message_id) DO UPDATE SET sent_at=EXCLUDED.sent_at,subject=EXCLUDED.subject,body=EXCLUDED.body,attachments=EXCLUDED.attachments`, serverID, accountID, message.ID, warrantID, stamp, message.Subject, message.Body, string(attachmentsJSON)); err != nil {
+		return WarrantRequest{}, fmt.Errorf("deliver residential search report: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO player_discovered_items (server_id,account_id,item_id,item_source,item_data)
+		SELECT $1::uuid,$2::uuid,item->>'id',item->>'source',item FROM jsonb_array_elements($3::jsonb) AS items(item)
+		ON CONFLICT (server_id,account_id,item_id) DO UPDATE SET item_source=EXCLUDED.item_source,item_data=EXCLUDED.item_data`, serverID, accountID, string(attachmentsJSON)); err != nil {
+		return WarrantRequest{}, fmt.Errorf("save search attachments: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return WarrantRequest{}, fmt.Errorf("commit residential search: %w", err)
+	}
+	return WarrantRequest{WarrantID: warrantID, Status: "granted", Message: &message}, nil
+}
+
+// RecordLocalAccessAttempt stores the backend's authorization outcome for a restricted local system.
+func (store *PostgresStore) RecordLocalAccessAttempt(ctx context.Context, serverID, accountID, cityID, locationID, companyID, facilityKind, status string, attemptedAt time.Time) (LocalAccessAttempt, error) {
+	if status != "granted" && status != "denied" {
+		return LocalAccessAttempt{}, ErrInvalidLocalAccess
+	}
+	var attempt LocalAccessAttempt
+	err := store.db.QueryRow(ctx, `INSERT INTO player_local_access_attempts
+		(server_id,account_id,city_id,location_id,company_id,facility_kind,status,attempted_at)
+		VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8)
+		RETURNING attempt_id,status,attempted_at`, serverID, accountID, cityID, locationID, companyID, facilityKind, status, attemptedAt.UTC()).Scan(&attempt.AttemptID, &attempt.Status, &attempt.Attempted)
+	if err != nil {
+		return LocalAccessAttempt{}, fmt.Errorf("record local access attempt: %w", err)
+	}
+	return attempt, nil
+}
+
+// ValidateLocalAccessAttempt checks ownership, scope, result, and the short local-session lifetime.
+func (store *PostgresStore) ValidateLocalAccessAttempt(ctx context.Context, serverID, accountID string, attemptID int64, cityID, locationID, companyID, facilityKind string, now time.Time) (bool, error) {
+	var valid bool
+	err := store.db.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM player_local_access_attempts
+		WHERE server_id=$1::uuid AND account_id=$2::uuid AND attempt_id=$3
+		  AND city_id=$4 AND location_id=$5 AND company_id=$6 AND facility_kind=$7
+		  AND status='granted' AND attempted_at >= $8::timestamptz - interval '30 minutes' AND attempted_at <= $8::timestamptz
+	)`, pgx.QueryExecModeSimpleProtocol, serverID, accountID, attemptID, cityID, locationID, companyID, facilityKind, now.UTC()).Scan(&valid)
+	if err != nil {
+		return false, fmt.Errorf("validate local access attempt: %w", err)
+	}
+	return valid, nil
+}
+
+func makeResidentialAttachment(warrantID string, index int, finding residentialFinding) PlayerMailAttachment {
+	metadata, _ := json.Marshal(map[string]string{"kind": finding.Kind, "origin": "residential search", "warrantId": warrantID})
+	return PlayerMailAttachment{
+		DiscoveredItem: DiscoveredItem{
+			ID:       fmt.Sprintf("%s:%02d", warrantID, index+1),
+			Source:   "case",
+			Title:    finding.Title,
+			Content:  finding.Content,
+			Metadata: metadata,
+		},
+		Kind: finding.Kind,
+	}
+}
+
+func (store *PostgresStore) ListPlayerMail(ctx context.Context, serverID, accountID string) ([]PlayerMailMessage, error) {
+	rows, err := store.db.Query(ctx, `SELECT message_id,sent_at,subject,body,attachments FROM player_inbox_messages
+		WHERE server_id=$1::uuid AND account_id=$2::uuid ORDER BY sent_at DESC,message_id DESC`, serverID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	messages := make([]PlayerMailMessage, 0)
+	for rows.Next() {
+		var message PlayerMailMessage
+		var attachments []byte
+		if err := rows.Scan(&message.ID, &message.SentAt, &message.Subject, &message.Body, &attachments); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(attachments, &message.Attachments); err != nil {
+			return nil, err
+		}
+		messages = append(messages, message)
+	}
+	return messages, rows.Err()
 }
 
 // Create persists a compact case definition and its relationships and evidence references.
@@ -511,6 +760,15 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 		serverID, definition.ID,
 	); err != nil {
 		return fmt.Errorf("persist initial shared case state: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages
+		(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
+		SELECT $1::uuid,location.account_id,$2,NULL,now(),$3,$4,'[]'::jsonb
+		FROM player_locations location
+		WHERE location.location_id=$5 OR location.location_id LIKE $5 || '/district/%'
+			OR ($5='fr/lyon' AND location.location_id='lyon')
+		ON CONFLICT (server_id,account_id,message_id) DO NOTHING`, serverID, "case:"+definition.ID+":opened", "New homicide case file available", "A new homicide case has been opened in your city. A briefing is waiting in the case archive.", definition.CityID); err != nil {
+		return fmt.Errorf("notify players about new case: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit case creation: %w", err)

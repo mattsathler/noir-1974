@@ -212,7 +212,7 @@ func TestNPCRecordsQueryIsScopedAndOmitsBackendClassification(t *testing.T) {
 	fixture := newCasePersistenceFixture()
 	publicRecord := records.Record{
 		ID: "record:extortion", NPCID: "npc:victim", Source: "bank",
-		OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
+		OccurredAt: time.Date(2026, 11, 10, 16, 42, 0, 0, time.UTC),
 		Operator:   "Meridian Global Settlement Office", Description: "A private remittance cleared.",
 	}
 	data, err := json.Marshal(publicRecord)
@@ -221,8 +221,8 @@ func TestNPCRecordsQueryIsScopedAndOmitsBackendClassification(t *testing.T) {
 	}
 	fixture.activityRows = [][]any{{data}}
 	store := NewPostgresStore(fixture)
-	from := time.Date(1974, 11, 1, 0, 0, 0, 0, time.UTC)
-	through := time.Date(1974, 11, 12, 23, 59, 0, 0, time.UTC)
+	from := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	through := time.Date(2026, 11, 12, 23, 59, 0, 0, time.UTC)
 	result, err := store.NPCRecords(context.Background(), "server-1", "npc:victim", from, through, "")
 	if err != nil {
 		t.Fatalf("NPCRecords() error = %v", err)

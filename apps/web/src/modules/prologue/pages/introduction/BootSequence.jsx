@@ -44,7 +44,7 @@ export default function BootSequence({ onComplete }) {
     <section className="boot-console" aria-label="Meridian system startup" aria-live="polite">
       <div className="boot-console__titlebar">
         <span>MERIDIAN GLOBAL</span>
-        <span>GATE TERMINAL / 1974</span>
+        <span>GATE TERMINAL</span>
       </div>
       <div className="boot-console__output">
         {BOOT_LINES.slice(0, visibleLines).map((line) => (

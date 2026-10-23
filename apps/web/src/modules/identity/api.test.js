@@ -44,7 +44,7 @@ describe("identity API", () => {
   });
 
   it("requests the current authenticated identity", async () => {
-    const identity = { character: null, world: { country: "France", city: "Lyon", timeZone: "Europe/Paris", locationId: "lyon", serverTime: "1974-11-12T20:15:00.000Z" } };
+    const identity = { character: null, world: { country: "France", city: "Lyon", timeZone: "Europe/Paris", locationId: "lyon", serverTime: "2026-11-12T20:15:00.000Z" } };
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(identity), {
       headers: { "content-type": "application/json" },
     }));

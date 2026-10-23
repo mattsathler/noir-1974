@@ -20,9 +20,9 @@ describe("WorldDirectory activity records", () => {
       maritalStatus: "married",
     }]);
     getNPCRecords.mockResolvedValue([
-      { id: "record:other", source: "bank", occurredAt: "1974-11-10T16:42:00.000Z", operator: "Meridian Global Settlement Office", description: "A private remittance cleared.", amount: 68, direction: "outgoing" },
+      { id: "record:other", source: "bank", occurredAt: "2026-11-10T16:42:00.000Z", operator: "Meridian Global Settlement Office", description: "A private remittance cleared.", amount: 68, direction: "outgoing" },
     ]);
-    render(<div className="computer-window"><WorldDirectory program="bank-records" serverTime={new Date("1974-11-12T20:15:00Z")} /></div>);
+    render(<div className="computer-window"><WorldDirectory program="bank-records" serverTime={new Date("2026-11-12T20:15:00Z")} /></div>);
     expect(await screen.findByText("CREDENTIALS REQUIRED · RESTRICTED SYSTEM")).toBeInTheDocument();
     await screen.findByRole("button", { name: "HACK SYSTEM" });
     fireEvent.click(screen.getByRole("button", { name: "HACK SYSTEM" }));
@@ -33,18 +33,18 @@ describe("WorldDirectory activity records", () => {
     expect(screen.queryByText(/WORKPLACE|MARITAL STATUS|41 YEARS|dark hair/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "OPEN FINANCIAL LEDGER" }));
     fireEvent.click(screen.getByRole("button", { name: "Select date FROM" }));
-    fireEvent.click(screen.getByRole("button", { name: "1974-11-08" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-11-08" }));
     fireEvent.click(screen.getByRole("button", { name: "READ RECORDS" }));
 
     expect(await screen.findByText("A private remittance cleared.")).toBeInTheDocument();
-    expect(getNPCRecords).toHaveBeenCalledWith("npc:ada", "1974-11-08", "1974-11-12", "bank");
+    expect(getNPCRecords).toHaveBeenCalledWith("npc:ada", "2026-11-08", "2026-11-12", "bank");
     expect(screen.queryByText("MAXIMUM INTERVAL · 7 DAYS")).not.toBeInTheDocument();
     expect(screen.getByText("DEBIT · SENT")).toBeInTheDocument();
     expect(screen.getByText("−68 CREDITS")).toBeInTheDocument();
     expect(screen.getByText("Sun, Nov 10, 5:42 PM")).toBeInTheDocument();
     expect(screen.getByText("FINANCIAL LEDGER")).toBeInTheDocument();
     expect(screen.queryByText(/case|extortion|evidence|clue/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/1974/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\b\d{4}\b/)).not.toBeInTheDocument();
   });
 
   it("requests only GATE records in the GATE app", async () => {
@@ -54,9 +54,9 @@ describe("WorldDirectory activity records", () => {
       maritalStatus: "single",
     }]);
     getNPCRecords.mockResolvedValue([
-      { id: "record:gate", source: "gate", occurredAt: "1974-11-10T13:00:00.000Z", operator: "Meridian Global · GATE Network", description: "A public terminal session ended.", origin: "Bellecour", destination: "Part-Dieu" },
+      { id: "record:gate", source: "gate", occurredAt: "2026-11-10T13:00:00.000Z", operator: "Meridian Global · GATE Network", description: "A public terminal session ended.", origin: "Bellecour", destination: "Part-Dieu" },
     ]);
-    render(<div className="computer-window"><WorldDirectory program="gate-records" serverTime={new Date("1974-11-12T20:15:00Z")} /></div>);
+    render(<div className="computer-window"><WorldDirectory program="gate-records" serverTime={new Date("2026-11-12T20:15:00Z")} /></div>);
     await screen.findByText("CREDENTIALS REQUIRED · RESTRICTED SYSTEM");
     fireEvent.click(screen.getByRole("button", { name: "HACK SYSTEM" }));
     await screen.findByLabelText("PERSON NAME");
@@ -67,7 +67,7 @@ describe("WorldDirectory activity records", () => {
     fireEvent.click(screen.getByRole("button", { name: "READ RECORDS" }));
 
     await screen.findByText("A public terminal session ended.");
-    expect(getNPCRecords).toHaveBeenCalledWith("npc:ada", "1974-11-06", "1974-11-12", "gate");
+    expect(getNPCRecords).toHaveBeenCalledWith("npc:ada", "2026-11-06", "2026-11-12", "gate");
     expect(screen.getByText("RECORDED PASSAGE")).toBeInTheDocument();
     expect(screen.getByText("Bellecour")).toBeInTheDocument();
     expect(screen.getByText("Part-Dieu")).toBeInTheDocument();

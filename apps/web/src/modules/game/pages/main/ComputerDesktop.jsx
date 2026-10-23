@@ -16,10 +16,11 @@ import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
 import Whiteboard from "../../../cases/pages/files/Whiteboard.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
+import PlayerMailbox from "../../../mail/pages/inbox/PlayerMailbox.jsx";
 import LocalTerminal from "./LocalTerminal.jsx";
 
 const BOOT_LINES = [
-  "NOIR PERSONAL TERMINAL · 1974",
+  "NOIR PERSONAL TERMINAL · PRIVATE SESSION",
   "CHECKING RELAY CONNECTION…",
   "LYON NODE FOUND",
   "PRIVATE SYSTEM READY",
@@ -27,6 +28,7 @@ const BOOT_LINES = [
 
 const PERSONAL_PROGRAMS = [
   { id: "case-files", label: "CASE FILES", Icon: Files, state: "UNDER REVIEW", available: false },
+  { id: "personal-mail", label: "PERSONAL MAIL", Icon: Mail, state: "ONLINE", available: true },
   { id: "whiteboard", label: "WHITEBOARD", Icon: Notes, state: "ONLINE", available: true },
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
 ];
@@ -87,6 +89,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const [facilityUnlocked, setFacilityUnlocked] = useState(!isCompanyComputer);
   const isBypassed = isCompanyComputer && facilityUnlocked;
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [accessAttemptId, setAccessAttemptId] = useState("");
   const [loginError, setLoginError] = useState("");
   const [windows, setWindows] = useState(() => {
     try {
@@ -261,7 +264,11 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     if (!program.available) return;
     if (boardId) setPreferredBoardId(boardId);
     const existing = windows.find((item) => item.program.id === program.id);
-    if (existing) { focusWindow(existing.id); return; }
+    if (existing) {
+      if (boardId && existing.boardId !== boardId) setWindows((previous) => previous.map((item) => item.id === existing.id ? { ...item, boardId } : item));
+      focusWindow(existing.id);
+      return;
+    }
     const zIndex = nextZIndexRef.current++;
     const id = `${program.id}:${zIndex}`;
     const offset = windows.length;
@@ -438,17 +445,22 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                   <span>{"\uE000\uE001 // \uE017\uE018\uE019"}</span>
                 </div>}
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
-                  <span><span className="computer-status-light" /> {program.id === "whiteboard" ? "PERSONAL WHITEBOARD" : `${program.label} DATABASE`} <i className="computer-bypass-window-tag">BYPASS LINK</i></span>
+                  <span><span className="computer-status-light" /> {program.id === "whiteboard" ? "PERSONAL WHITEBOARD" : program.id === "personal-mail" ? "PERSONAL MAILBOX" : `${program.label} DATABASE`} {isBypassed && <i className="computer-bypass-window-tag">BYPASS LINK</i>}</span>
                   <button type="button" className="computer-window__close" aria-label={`Close ${program.label}`} onClick={() => closeWindow(id)}>×</button>
                 </header>
                 <div className="computer-window__body">
                   {program.id === "case-files"
                     ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} onPin={requestPin} />
                       : program.id === "whiteboard"
-                      ? <Whiteboard key={id} initialBoardId={boardId || preferredBoardId} focusBoard={(boardId) => setPreferredBoardId(boardId)} />
+                      ? <Whiteboard key={id} initialBoardId={boardId || preferredBoardId} focusBoard={(selectedBoardId) => {
+                        setPreferredBoardId(selectedBoardId);
+                        setWindows((previous) => previous.map((item) => item.id === id ? { ...item, boardId: selectedBoardId } : item));
+                      }} />
                       : program.id === "emails"
-                        ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} runHack={runHack} onPin={requestPin} />
-                        : <WorldDirectory key={id} program={program.id} companyLocationId={program.id === "staff-directory" ? facilityContext?.locationId : undefined} companyId={program.id === "staff-directory" ? facilityContext?.companyId : undefined} serverTime={serverTime} timeZone={timeZone} runHack={runHack} onPin={requestPin} />}
+                        ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} runHack={runHack} onPin={requestPin} />
+                        : program.id === "personal-mail"
+                          ? <PlayerMailbox key={id} timeZone={timeZone} onPin={requestPin} />
+                        : <WorldDirectory key={id} program={program.id} companyLocationId={program.id === "staff-directory" ? facilityContext?.locationId : undefined} companyId={program.id === "staff-directory" ? facilityContext?.companyId : undefined} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} cityId={cityId} serverTime={serverTime} timeZone={timeZone} runHack={runHack} onPin={requestPin} />}
                 </div>
               </section>;
             })}
@@ -465,7 +477,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             </section>}
           </div>}
 
-          {terminalOpen && <LocalTerminal facility={facilityContext} variant="app" onAccessGranted={() => { setFacilityUnlocked(true); setTerminalOpen(false); }} onClose={() => setTerminalOpen(false)} />}
+          {terminalOpen && <LocalTerminal facility={facilityContext} variant="app" onAccessGranted={(attempt) => { setAccessAttemptId(String(attempt.attemptId)); setFacilityUnlocked(true); setTerminalOpen(false); }} onClose={() => setTerminalOpen(false)} />}
 
           <footer className="computer-taskbar">
             <div className="computer-taskbar__left">

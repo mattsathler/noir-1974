@@ -155,7 +155,7 @@ func GenerateForSource(seed string, worldVersion int, npcID string, context Cont
 
 // ExtortionEvents creates ordinary-looking ledger and movement entries for a
 // murder scenario. Their links remain available only to server-side case logic.
-func ExtortionEvents(seed string, worldVersion int, caseID, killerID, victimID, sceneDistrict string) []Record {
+func ExtortionEvents(seed string, worldVersion int, caseID, killerID, victimID, sceneDistrict string, caseDate time.Time) []Record {
 	key := fmt.Sprintf("noir-records/v%d/%s/%d/%s", GeneratorVersion, seed, worldVersion, caseID)
 	transferID := stableEventID(key, "transfer", victimID)
 	travelID := stableEventID(key, "gate", killerID)
@@ -168,7 +168,7 @@ func ExtortionEvents(seed string, worldVersion int, caseID, killerID, victimID, 
 	return []Record{
 		{
 			ID: transferID, NPCID: victimID, Source: "bank",
-			OccurredAt:  time.Date(1974, time.November, 9+intFromKey(key, "transfer-day", 2), 0, 0, 0, 0, time.UTC).Add(time.Duration(transferMinute) * time.Minute),
+			OccurredAt:  caseDate.AddDate(0, 0, -3+intFromKey(key, "transfer-day", 2)).Add(time.Duration(transferMinute) * time.Minute),
 			Operator:    "Meridian Global Settlement Office",
 			Description: "A private remittance cleared to a personal account.",
 			Reference:   "private account transfer", Amount: 45 + intFromKey(key, "transfer-amount", 46), Direction: "outgoing",
@@ -176,7 +176,7 @@ func ExtortionEvents(seed string, worldVersion int, caseID, killerID, victimID, 
 		},
 		{
 			ID: travelID, NPCID: killerID, Source: "gate",
-			OccurredAt:  time.Date(1974, time.November, 12, 0, 0, 0, 0, time.UTC).Add(time.Duration(travelMinute) * time.Minute),
+			OccurredAt:  caseDate.Add(time.Duration(travelMinute) * time.Minute),
 			Operator:    "Meridian Global · GATE Network",
 			Description: "A single passenger passage was recorded on the local relay.",
 			Origin:      origin, Destination: sceneDistrict,

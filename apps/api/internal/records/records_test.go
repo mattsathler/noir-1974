@@ -26,8 +26,8 @@ func (reader fixtureCaseReader) NPCRecords(context.Context, string, string, time
 }
 
 func TestGenerateIsDeterministicAndLimitedToNPCAndInterval(t *testing.T) {
-	from := time.Date(1974, time.November, 1, 0, 0, 0, 0, time.UTC)
-	through := time.Date(1974, time.November, 7, 23, 59, 59, 0, time.UTC)
+	from := time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC)
+	through := time.Date(2026, time.November, 7, 23, 59, 59, 0, time.UTC)
 	context := Context{RegionName: "Bellecour", HomeDistrict: "Bellecour", Employer: "Aurore Industries"}
 	first, err := Generate("records-seed", 2, "npc:ada", context, from, through)
 	if err != nil {
@@ -59,7 +59,7 @@ func TestGenerateIsDeterministicAndLimitedToNPCAndInterval(t *testing.T) {
 }
 
 func TestExtortionEventsKeepCaseLinksOutOfPublicJSON(t *testing.T) {
-	events := ExtortionEvents("case-seed", 2, "case:123", "npc:killer", "npc:victim", "Bellecour")
+	events := ExtortionEvents("case-seed", 2, "case:123", "npc:killer", "npc:victim", "Bellecour", time.Date(2026, time.November, 12, 0, 0, 0, 0, time.UTC))
 	if len(events) != 2 || events[0].InternalRelation != "extortion_payment" || events[1].InternalRelation != "precrime_route" {
 		t.Fatalf("unexpected internal event relationships: %+v", events)
 	}
@@ -85,7 +85,7 @@ func TestExtortionEventsKeepCaseLinksOutOfPublicJSON(t *testing.T) {
 }
 
 func TestGenerateRejectsInvalidAndOversizedIntervals(t *testing.T) {
-	from := time.Date(1974, time.January, 1, 0, 0, 0, 0, time.UTC)
+	from := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	if _, err := Generate("seed", 2, "npc:ada", Context{}, from, from.AddDate(0, 0, MaxRangeDays)); err != ErrRangeTooLarge {
 		t.Fatalf("Generate() eight calendar day interval error = %v, want %v", err, ErrRangeTooLarge)
 	}
@@ -106,12 +106,12 @@ func TestServiceMergesAndSortsRoutineAndCaseEvents(t *testing.T) {
 	profile := world.NPCRecordsProfile{NPC: npc, WorldSeed: "records-seed", GeneratorVersion: world.GeneratorVersion2, Employer: base.Companies[0].Name}
 	linked := Record{
 		ID: "record:linked", NPCID: npc.ID, Source: "bank",
-		OccurredAt:  time.Date(1974, 11, 6, 12, 0, 0, 0, time.UTC),
+		OccurredAt:  time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC),
 		Description: "A private remittance cleared.", CaseID: "case:secret", InternalRelation: "extortion_payment",
 	}
 	service := NewService(fixtureWorldReader{base: base, profile: profile}, fixtureCaseReader{items: []Record{linked}})
-	from := time.Date(1974, 11, 6, 0, 0, 0, 0, time.UTC)
-	through := time.Date(1974, 11, 12, 23, 59, 0, 0, time.UTC)
+	from := time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC)
+	through := time.Date(2026, 11, 12, 23, 59, 0, 0, time.UTC)
 	result, err := service.NPCRecords(context.Background(), "server", npc.ID, from, through, "")
 	if err != nil {
 		t.Fatalf("NPCRecords() error = %v", err)

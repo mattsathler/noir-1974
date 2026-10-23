@@ -1,0 +1,24 @@
+{
+  "items": [
+    {"title":"Household account book","content":"A small ledger of coal, lamp oil and grocery expenses. Several entries are crossed out and rewritten.","kind":"document"},
+    {"title":"Pharmacy receipt","content":"A folded receipt for cough syrup and adhesive tape. The ink has faded at the edges.","kind":"document"},
+    {"title":"Drugstore receipt","content":"A receipt for aspirin and throat lozenges, folded twice and kept in a coat pocket.","kind":"document"},
+    {"title":"Milk delivery card","content":"A household delivery card marked paid through the end of the week.","kind":"document"},
+    {"title":"Repair estimate","content":"An estimate for a replacement radio valve. No repair was recorded.","kind":"document"},
+    {"title":"Rent ledger","content":"A rent ledger with regular monthly payments and one corrected total.","kind":"document"},
+    {"title":"Insurance notice","content":"A routine household insurance notice, folded along the original mailing crease.","kind":"document"},
+    {"title":"Appliance warranty","content":"A warranty card for a table fan. The serial number is intact and the guarantee has expired.","kind":"document"},
+    {"title":"Tailor's receipt","content":"A receipt for a jacket lining and two replaced buttons. No measurements are included.","kind":"document"},
+    {"title":"Hardware bill","content":"A small bill for nails, lamp cord and a replacement latch.","kind":"document"},
+    {"title":"Utility statement","content":"A monthly electricity statement showing an ordinary household balance.","kind":"document"},
+    {"title":"Shoemaker's ticket","content":"A repair ticket for a pair of work shoes. The collection stamp is smudged.","kind":"document"},
+    {"title":"Dry cleaner's slip","content":"A dry-cleaning slip listing one coat and one scarf, both marked collected.","kind":"document"},
+    {"title":"Bakery account card","content":"A bakery card with several small purchases entered in pencil.","kind":"document"},
+    {"title":"Radio service card","content":"A service card records a routine tuning and a replaced fuse from several months ago.","kind":"document"},
+    {"title":"Parcel notice","content":"A postal notice for a parcel already collected. The sender's name is worn away.","kind":"document"},
+    {"title":"Coal merchant's receipt","content":"A receipt for one delivery of coal, stamped paid in blue ink.","kind":"document"},
+    {"title":"Medical appointment card","content":"An old appointment card for a routine examination. The date has passed.","kind":"document"},
+    {"title":"Furniture installment stub","content":"A payment stub for a kitchen table bought on installments. The balance is nearly settled.","kind":"document"},
+    {"title":"Household inventory sheet","content":"A handwritten list of crockery, linens and two lamps. Several quantities have been updated.","kind":"document"}
+  ]
+}

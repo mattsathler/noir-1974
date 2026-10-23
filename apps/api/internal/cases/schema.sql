@@ -148,6 +148,51 @@ CREATE TABLE IF NOT EXISTS player_case_progress (
 CREATE INDEX IF NOT EXISTS player_case_progress_by_account_idx
     ON player_case_progress(account_id, server_id, updated_at);
 
+CREATE TABLE IF NOT EXISTS player_search_warrants (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    warrant_id text NOT NULL CHECK (warrant_id <> ''),
+    city_id text NOT NULL CHECK (city_id <> ''),
+    station_location_id text NOT NULL CHECK (station_location_id <> ''),
+    target_npc_id text NOT NULL CHECK (target_npc_id <> ''),
+    status text NOT NULL CHECK (status IN ('granted', 'denied')),
+    catalog_version integer NOT NULL DEFAULT 2 CHECK (catalog_version > 0),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, warrant_id)
+);
+ALTER TABLE player_search_warrants ADD COLUMN IF NOT EXISTS catalog_version integer NOT NULL DEFAULT 1;
+
+CREATE TABLE IF NOT EXISTS player_inbox_messages (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    message_id text NOT NULL CHECK (message_id <> ''),
+    warrant_id text,
+    sent_at timestamptz NOT NULL DEFAULT now(),
+    subject text NOT NULL CHECK (subject <> ''),
+    body text NOT NULL,
+    attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
+    PRIMARY KEY (server_id, account_id, message_id),
+    FOREIGN KEY (server_id, account_id, warrant_id)
+        REFERENCES player_search_warrants(server_id, account_id, warrant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS player_inbox_messages_by_date_idx
+    ON player_inbox_messages(server_id, account_id, sent_at DESC);
+
+CREATE TABLE IF NOT EXISTS player_local_access_attempts (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    attempt_id bigint GENERATED ALWAYS AS IDENTITY,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    city_id text NOT NULL CHECK (city_id <> ''),
+    location_id text NOT NULL CHECK (location_id <> ''),
+    company_id text NOT NULL DEFAULT '',
+    facility_kind text NOT NULL CHECK (facility_kind <> ''),
+    status text NOT NULL CHECK (status IN ('granted', 'denied')),
+    attempted_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, attempt_id)
+);
+CREATE INDEX IF NOT EXISTS player_local_access_attempts_by_player_idx
+    ON player_local_access_attempts(server_id, account_id, attempted_at DESC);
+
 CREATE TABLE IF NOT EXISTS player_discovered_items (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
     account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,

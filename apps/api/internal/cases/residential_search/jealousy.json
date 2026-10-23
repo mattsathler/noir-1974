@@ -1,0 +1,22 @@
+{
+  "killer": [
+    {"title":"Torn correspondence","content":"A letter fragment mentions the victim and an appointment that was not meant to be discussed. The writer's name is missing.","kind":"paper"},
+    {"title":"Duplicate photograph","content":"A duplicate photograph of the victim has a second figure cut from its edge.","kind":"object"},
+    {"title":"Unsent apology","content":"A draft apology asks that a private meeting not be repeated. The salutation has been removed.","kind":"paper"},
+    {"title":"Dance hall receipt","content":"A receipt for two entries at a dance hall is dated the evening before the victim's death.","kind":"document"},
+    {"title":"Marked appointment book","content":"A name is written beside the victim's initials and then scratched out hard enough to tear the paper.","kind":"paper"},
+    {"title":"Unclaimed scarf","content":"A scarf unfamiliar to the household is folded inside a drawer with no note or label.","kind":"object"},
+    {"title":"Photostat of a letter","content":"A copied letter asks the victim to stop seeing someone. The signature is cut off in the copy.","kind":"document"},
+    {"title":"Two cinema stubs","content":"Two adjacent cinema stubs are kept with a receipt for a different date. The names are not recorded.","kind":"paper"}
+  ],
+  "victim": [
+    {"title":"Private appointment note","content":"A note records an appointment the victim had tried to keep private. The other person's name has been torn away.","kind":"paper"},
+    {"title":"Unmailed photograph","content":"A photograph of two people has been placed face down in an envelope. No message is enclosed.","kind":"object"},
+    {"title":"Unsigned warning","content":"A handwritten warning asks the victim to leave a relationship alone. The writer gives no reason.","kind":"paper"},
+    {"title":"Duplicate key tag","content":"A spare key tag carries a room number that has been crossed out and rewritten.","kind":"object"},
+    {"title":"Torn dance card","content":"A dance card has one partner's name removed, leaving only the first initial.","kind":"paper"},
+    {"title":"Unsent letter","content":"A letter asks for an explanation about a meeting at the riverfront. The final paragraph is missing.","kind":"paper"},
+    {"title":"Theatre ticket pair","content":"Two seats were booked together for a performance. Only one ticket stub remains.","kind":"paper"},
+    {"title":"Calling card","content":"A visiting card has a telephone number written on its reverse and no name on the front.","kind":"document"}
+  ]
+}

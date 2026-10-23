@@ -1,5 +1,7 @@
-async function search(path, query) {
-  const response = await fetch(`${path}?q=${encodeURIComponent(query)}`, { credentials: "same-origin" });
+async function search(path, query, cityId = "") {
+  const params = new URLSearchParams({ q: query });
+  if (cityId) params.set("cityId", cityId);
+  const response = await fetch(`${path}?${params}`, { credentials: "same-origin" });
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
   if (!response.ok) {
@@ -51,12 +53,13 @@ async function cachedWorldList(key, load) {
 }
 
 export const searchPeople = (query) => search("/api/world/npcs", query);
-export const searchCompanies = (query) => search("/api/world/companies", query);
+export const searchCompanies = (query, cityId) => search("/api/world/companies", query, cityId);
 export const searchLocations = (query) => search("/api/world/locations", query);
 
-export async function getCompanyAtLocation(locationId, companyId = "") {
+export async function getCompanyAtLocation(locationId, companyId = "", accessAttemptId = "") {
   const params = new URLSearchParams({ locationId });
   if (companyId) params.set("companyId", companyId);
+  if (accessAttemptId) params.set("accessAttemptId", accessAttemptId);
   const response = await fetch(`/api/world/companies?${params}`, { credentials: "same-origin" });
   const payload = await responsePayload(response);
   if (!response.ok) throw new Error(payload.message?.trim() || "The company directory could not be reached.");
@@ -115,8 +118,10 @@ async function responsePayload(response) {
     : { message: await response.text() };
 }
 
-export async function getNPCEmails(npcId, from, to) {
+export async function getNPCEmails(npcId, from, to, locationId = "", accessAttemptId = "") {
   const params = new URLSearchParams({ from, to });
+  if (locationId) params.set("locationId", locationId);
+  if (accessAttemptId) params.set("accessAttemptId", accessAttemptId);
   const response = await fetch(`/api/world/npcs/${encodeURIComponent(npcId)}/emails?${params}`, { credentials: "same-origin" });
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
@@ -124,9 +129,11 @@ export async function getNPCEmails(npcId, from, to) {
   return payload.results ?? [];
 }
 
-export async function getNPCRecords(npcId, from, to, source) {
+export async function getNPCRecords(npcId, from, to, source, locationId = "", accessAttemptId = "") {
   const params = new URLSearchParams({ from, to });
   if (source) params.set("source", source);
+  if (locationId) params.set("locationId", locationId);
+  if (accessAttemptId) params.set("accessAttemptId", accessAttemptId);
   const response = await fetch(`/api/world/npcs/${encodeURIComponent(npcId)}/records?${params}`, { credentials: "same-origin" });
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
@@ -194,6 +201,32 @@ export function getCaseFile(caseId) {
 
 export function getInterrogationAnswers(npcId) {
   return requestCase(`/api/cases/interrogation/${encodeURIComponent(npcId)}`);
+}
+
+export function requestResidentialSearch(targetNpcId, stationLocationId) {
+  return requestCase("/api/police/warrants", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ targetNpcId, stationLocationId }),
+  });
+}
+
+export function requestLocalSystemAccess(facility, command) {
+  return requestCase("/api/facilities/access", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      locationId: facility.locationId,
+      companyId: facility.companyId ?? "",
+      facility: facility.kind,
+      command,
+    }),
+  });
+}
+
+export async function getPlayerEmails() {
+  const payload = await requestCase("/api/player/emails");
+  return payload.results ?? [];
 }
 
 export function saveCaseProgress(caseId, progress) {

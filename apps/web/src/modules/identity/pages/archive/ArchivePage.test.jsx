@@ -8,7 +8,7 @@ afterEach(cleanup);
 
 describe("ArchivePage", () => {
   it("loads the saved character dossier before entering the world", async () => {
-    const world = { city: "Lyon", country: "France", timeZone: "Europe/Paris", locationId: "lyon", serverTime: "1974-11-12T20:15:00.000Z" };
+    const world = { city: "Lyon", country: "France", timeZone: "Europe/Paris", locationId: "lyon", serverTime: "2026-11-12T20:15:00.000Z" };
     currentIdentity.mockResolvedValue({ account: { username: "detective" }, character: { displayName: "Ada", portraitId: 4 }, world });
     const onLoaded = vi.fn();
     render(<ArchivePage onLoaded={onLoaded} />);

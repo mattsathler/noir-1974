@@ -14,8 +14,8 @@ import GateCityExplorer from "../../../world/components/GateCityExplorer.jsx";
 import { getCompanyAtLocation, getCurrentWorld, getNeighborhoodDestinations, movePlayer } from "../../../world/api.js";
 import GateTransition from "../../components/GateTransition.jsx";
 import LocalTerminal from "./LocalTerminal.jsx";
-import ModularFace from "../../../identity/components/ModularFace.jsx";
 import Telephone from "./Telephone.jsx";
+import ResidentialSearchWindow from "./ResidentialSearchWindow.jsx";
 
 function buildingVisual(building) {
   const identity = `${building.locationId} ${building.name}`.toLowerCase();
@@ -44,7 +44,7 @@ async function neighborhoodCompanies(district) {
   const companies = companyRecords.flat().flatMap((record) => {
     if (!record?.company?.id || seenCompanies.has(record.company.id)) return [];
     seenCompanies.add(record.company.id);
-    return [{ kind: "company", company: record.company, address: record.address, record }];
+    return [{ kind: "company", company: record.company, address: record.address }];
   });
   const services = addresses.filter((address) => address.locationId?.startsWith("service:")).map((address) => ({
     kind: "service",
@@ -96,11 +96,11 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [computerContext, setComputerContext] = useState(null);
   const [newspaperOpen, setNewspaperOpen] = useState(false);
   const [telephoneOpen, setTelephoneOpen] = useState(false);
+  const [warrantOpen, setWarrantOpen] = useState(false);
   const [transitOpen, setTransitOpen] = useState(false);
   const [gateTransition, setGateTransition] = useState(null);
   const [arrival, setArrival] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState(null);
-  const [companyDirectoryLoading, setCompanyDirectoryLoading] = useState(false);
   const interiorPlace = selectedCompany?.address ?? null;
   const closeComputer = useCallback(() => { setComputerOpen(false); setComputerContext(null); }, []);
   const closeNewspaper = useCallback(() => setNewspaperOpen(false), []);
@@ -123,19 +123,9 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     setSelectedCompany(null);
     closeTransit();
   }, [closeTransit]);
-  const visitCompany = useCallback(async (company) => {
+  const visitCompany = useCallback((company) => {
     setError("");
     setSelectedCompany(company);
-    setCompanyDirectoryLoading(company.kind === "company");
-    if (company.kind !== "company") return;
-    try {
-      const [record] = await getCompanyAtLocation(company.address.locationId, company.company.id);
-      if (record) setSelectedCompany((current) => current?.company.id === company.company.id ? { ...current, record } : current);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setCompanyDirectoryLoading(false);
-    }
   }, []);
   const returnToDistrict = useCallback(() => {
     setSelectedCompany(null);
@@ -296,25 +286,15 @@ export default function GamePage({ initialWorld = null, onLogout }) {
         </header>
         <div className="building-interior__layout">
           <div className="building-interior__room" aria-label={`${selectedCompany.company.name} personnel`}>
-            <div className="building-interior__personnel-heading"><div><span className="building-interior__room-label">PERSONNEL ON SITE</span><h2>Staff directory</h2></div><span>{companyDirectoryLoading ? "RETRIEVING FILES…" : `${selectedCompany.record?.employees?.length ?? 0} EMPLOYEES`}</span></div>
-            {companyDirectoryLoading
-              ? <p className="building-interior__personnel-status">ACCESSING COMPANY PERSONNEL FILES…</p>
-              : selectedCompany.kind === "company" && (selectedCompany.record?.employees?.length ?? 0) > 0
-                ? <div className="building-interior__personnel-list">
-                  {selectedCompany.record.employees.map((employee) => <article className="building-interior__employee" key={employee.id}>
-                    <div className="building-interior__employee-portrait">
-                      {employee.visual
-                        ? <ModularFace visual={employee.visual} name={employee.name} />
-                        : <span aria-hidden="true">{employee.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span>}
-                    </div>
-                    <div className="building-interior__employee-copy"><h3>{employee.name}</h3><p>{employee.role}</p><span>INTERROGATION SUBJECT</span></div>
-                  </article>)}
-                </div>
-                : <p className="building-interior__personnel-status">NO PERSONNEL FILES AVAILABLE AT THIS LOCATION.</p>}
+            <div className="building-interior__personnel-heading"><div><span className="building-interior__room-label">LOCAL RECORDS</span><h2>Staff directory</h2></div><span>ACCESS RESTRICTED</span></div>
+            <p className="building-interior__personnel-status">PERSONNEL FILES ARE AVAILABLE THROUGH THE LOCAL COMPUTER AFTER AUTHENTICATION.</p>
           </div>
           <aside className="building-interior__record">
             <p>{selectedCompany.kind === "service" ? "PUBLIC SERVICE RECORD" : "COMPANY RECORD"}</p><h2>{selectedCompany.company.name}</h2><span>{activeInteriorProfile?.detail ?? "A private company operating at this address."}</span>
             <dl><div><dt>BUILDING</dt><dd>{interiorPlace.name}</dd></div><div><dt>ADDRESS</dt><dd>{interiorPlace.full}</dd></div><div><dt>ACCESS</dt><dd>VISIT CONTEXT · NOT SAVED</dd></div></dl>
+            {selectedCompany.kind === "service" && selectedCompany.serviceKind === "police" && <button className="building-interior__warrant-access" type="button" onClick={() => setWarrantOpen(true)}>
+              <span aria-hidden="true">⌕</span><span><strong>REQUEST RESIDENTIAL SEARCH</strong><small>POLICE AUTHORIZATION · FORM 74-B</small></span><span aria-hidden="true">↗</span>
+            </button>}
             <button className="building-interior__computer-access" type="button" onClick={() => { setComputerContext({ kind: selectedCompany.kind === "service" ? selectedCompany.serviceKind : "company", label: selectedCompany.company.name, city: world?.city, locationId: interiorPlace.locationId, companyId: selectedCompany.kind === "company" ? selectedCompany.company.id : undefined, district: interiorPlace.district }); setComputerEntry(null); setComputerOpen(true); }}>
               <span className="building-interior__option-icon"><MonitorSharp className="computer-program__glyph" aria-hidden="true" /></span>
               <span><strong>{selectedCompany.kind === "service" ? `OPEN ${activeInteriorProfile?.facility?.toUpperCase() ?? "LOCAL"} TERMINAL` : "ACCESS COMPANY COMPUTER"}</strong><small>ACCESS LOCAL SYSTEMS</small></span>
@@ -339,6 +319,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
         />
       )}
       {computerEntry && <LocalTerminal facility={computerEntry} onAccessGranted={() => { setComputerContext(computerEntry); setComputerEntry(null); setComputerOpen(true); }} onClose={() => setComputerEntry(null)} />}
+      {warrantOpen && <ResidentialSearchWindow cityId={world?.cityId} stationLocationId={interiorPlace?.locationId} onClose={() => setWarrantOpen(false)} />}
       {newspaperOpen && <NewspaperWindow cityId={world?.cityId} issueDay={issueDay} onClose={closeNewspaper} />}
       {telephoneOpen && <Telephone onClose={() => setTelephoneOpen(false)} />}
       {transitOpen && <GateCityExplorer world={world} onTravel={travelViaGate} onClose={closeTransit} />}

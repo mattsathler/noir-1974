@@ -1,0 +1,24 @@
+{
+  "items": [
+    {"title":"Ration coupons","content":"A bundle of household ration coupons, clipped together and partly used.","kind":"paper"},
+    {"title":"Laundry ticket","content":"A blue laundry ticket with a date stamp and no garment description.","kind":"paper"},
+    {"title":"Train timetable","content":"A pocket timetable, creased along the evening departures. No route is marked.","kind":"paper"},
+    {"title":"Bus timetable","content":"A pocket timetable, creased along the evening departures. No route is marked.","kind":"paper"},
+    {"title":"Cinema stub","content":"A faded ticket stub from a neighborhood matinee. The seat number is barely legible.","kind":"paper"},
+    {"title":"Unsent postcard","content":"A postcard with a picture of the riverfront. The address side is blank.","kind":"paper"},
+    {"title":"Grocery list","content":"A short list in pencil: onions, soap, tea and matches. The bottom half is torn away.","kind":"paper"},
+    {"title":"Newspaper clipping","content":"A clipping about a local football result, folded into quarters and yellowed at the edges.","kind":"paper"},
+    {"title":"Calendar page","content":"A page from a wall calendar with a dentist appointment circled in red.","kind":"paper"},
+    {"title":"Dance hall ticket","content":"A ticket for an ordinary Saturday dance. The entry stamp is half missing.","kind":"paper"},
+    {"title":"Library due slip","content":"A library slip for a borrowed gardening book. The return date has been stamped.","kind":"paper"},
+    {"title":"Recipe card","content":"A handwritten recipe for onion soup, stained with cooking oil.","kind":"paper"},
+    {"title":"Bus transfer","content":"A used bus transfer with two punched holes and no legible route number.","kind":"paper"},
+    {"title":"Post office queue ticket","content":"A queue ticket from the central post office. No service number is written on it.","kind":"paper"},
+    {"title":"Church fair leaflet","content":"A leaflet advertising a neighborhood church fair held last month.","kind":"paper"},
+    {"title":"Weather almanac","content":"A small almanac with several days marked as rainy in the margin.","kind":"paper"},
+    {"title":"Theatre program","content":"A folded program from a touring comedy, with one corner used as a bookmark.","kind":"paper"},
+    {"title":"Parcel wrapping label","content":"A detached parcel label with the address rubbed off and a postal stamp still visible.","kind":"paper"},
+    {"title":"Torn envelope","content":"An empty envelope with a local postmark. The addressee line has been torn away.","kind":"paper"},
+    {"title":"Pencil note","content":"A brief reminder to collect a repaired watch. No name or date appears.","kind":"paper"}
+  ]
+}

@@ -34,6 +34,7 @@ Não tratar estes itens como decididos. Cada fechamento vira um ADR em `docs/dec
 - Como crimes resolvidos afetam emprego, relações, reputação, empresas, novos casos.
 - Simulação temporal (emprego, casamento, natalidade, empresas, casos automáticos).
 - Condições de autorização e consequências de busca e apreensão em residências, coerentes com a ordem corporativa e o passado do detetive na Interpol.
+- Como limitar pedidos repetidos de mandados residenciais sem consultar relações ocultas entre provas e casos; avaliar custos em créditos, suborno às autoridades ou invasão ao sistema policial.
 
 ## Segurança
 

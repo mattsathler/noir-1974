@@ -1,0 +1,22 @@
+{
+  "killer": [
+    {"title":"Carbon copy of revised minutes","content":"A carbon copy of meeting minutes has a paragraph about the victim's dismissal crossed out and rewritten in a different hand.","kind":"document"},
+    {"title":"Marked staff roster","content":"A staff roster bears pencil marks beside the victim's name and two late shifts.","kind":"document"},
+    {"title":"Unsent grievance","content":"A draft grievance complains that a promotion was promised privately and withdrawn in front of the office.","kind":"paper"},
+    {"title":"Office key receipt","content":"A receipt records a replacement key ordered after a disagreement about who could enter the records room.","kind":"document"},
+    {"title":"Torn meeting agenda","content":"A torn agenda lists a closed meeting on the day the victim was removed from a committee.","kind":"paper"},
+    {"title":"Carbon-stained memo","content":"A memo refers to a missing personnel folder and asks that the matter be settled before the next review.","kind":"document"},
+    {"title":"Unclaimed desk nameplate","content":"A company nameplate bearing the victim's surname is wrapped in newspaper and kept in a cupboard.","kind":"object"},
+    {"title":"Marked office calendar","content":"An office calendar has the victim's last scheduled shift crossed through and replaced with another name.","kind":"paper"}
+  ],
+  "victim": [
+    {"title":"Folded office memorandum","content":"A memorandum about a disputed dismissal is folded into a personal notebook. The margin carries a second set of initials.","kind":"document"},
+    {"title":"Private salary calculation","content":"A penciled calculation compares two salaries and circles a figure that does not match the latest pay statement.","kind":"paper"},
+    {"title":"Unsent appeal","content":"A draft appeal asks for a personnel decision to be reviewed before the end of the month.","kind":"paper"},
+    {"title":"Marked staff roster","content":"A staff roster bears a question mark beside a colleague assigned to the victim's last shift.","kind":"document"},
+    {"title":"Meeting reminder","content":"A reminder requests a private meeting about the victim's work record. No room is specified.","kind":"paper"},
+    {"title":"Photostat of a warning","content":"A photostat copy of a company warning is annotated with the words 'not my initials'.", "kind":"document"},
+    {"title":"Desk inventory list","content":"A list of office property returned by the victim includes one missing ledger and a brass cabinet key.","kind":"document"},
+    {"title":"Torn appointment card","content":"An appointment card for a meeting with a supervisor has its time torn away.","kind":"paper"}
+  ]
+}

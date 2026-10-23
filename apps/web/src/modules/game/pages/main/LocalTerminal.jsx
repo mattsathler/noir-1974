@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
+import { requestLocalSystemAccess } from "../../../world/api.js";
 
 const ACCESS_LINES = [
   "LOADING BYPASSDECRYPT.EXE",
   "SCANNING AUTHENTICATION LAYERS…",
   "RECONSTRUCTING LOCAL CREDENTIAL TOKEN…",
-  "DECRYPTION COMPLETE · LOCAL SESSION UNLOCKED",
-  "ACCESS GRANTED!",
+  "DECRYPTION COMPLETE · NEGOTIATING WITH LOCAL SECURITY…",
+  "AWAITING SYSTEM RESPONSE…",
 ];
 
 export default function LocalTerminal({ facility, onAccessGranted, onClose, variant = "monitor" }) {
@@ -22,6 +23,7 @@ export default function LocalTerminal({ facility, onAccessGranted, onClose, vari
   const inputRef = useRef(null);
   const outputRef = useRef(null);
   const timerRef = useRef(null);
+  const pendingCommandRef = useRef("");
 
   useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => { if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight; }, [lines, busy]);
@@ -44,16 +46,34 @@ export default function LocalTerminal({ facility, onAccessGranted, onClose, vari
       return;
     }
     if (normalized !== "run bypassdecrypt.exe") {
-      setLines((current) => [...current, "ACCESS DENIED · UNKNOWN COMMAND", "TRY: run bypassdecrypt.exe"]);
+      setBusy(true);
+      requestLocalSystemAccess(facility, entered)
+        .then((result) => setLines((current) => [...current, `ACCESS DENIED · UNKNOWN COMMAND · ATTEMPT ${result.attemptId}`]))
+        .catch((error) => setLines((current) => [...current, `ACCESS REQUEST FAILED · ${error.message || "SYSTEM UNAVAILABLE"}`]))
+        .finally(() => setBusy(false));
       return;
     }
+    pendingCommandRef.current = entered;
     setBusy(true);
     setShowAccess(true);
   }
 
-  function finishAccess() {
-    setBusy(false);
-    timerRef.current = window.setTimeout(() => onAccessGranted?.(), 450);
+  async function finishAccess() {
+    try {
+      const result = await requestLocalSystemAccess(facility, pendingCommandRef.current);
+      if (result.status === "granted") {
+        setLines((current) => [...current, `ACCESS GRANTED · ATTEMPT ${result.attemptId}`]);
+        timerRef.current = window.setTimeout(() => onAccessGranted?.(result), 450);
+      } else {
+        setLines((current) => [...current, "ACCESS DENIED · LOCAL AUTHORITY REFUSED THE SESSION"]);
+        setShowAccess(false);
+        setBusy(false);
+      }
+    } catch (error) {
+      setLines((current) => [...current, `ACCESS REQUEST FAILED · ${error.message || "SYSTEM UNAVAILABLE"}`]);
+      setShowAccess(false);
+      setBusy(false);
+    }
   }
 
   const terminalPanel = (

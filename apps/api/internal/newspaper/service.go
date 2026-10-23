@@ -133,7 +133,7 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 	}
 	localTime := serverTime.In(location)
 	dateKey := localTime.Format("2006-01-02")
-	dateLabel := localTime.Format("Monday, January 2, 2006")
+	dateLabel := localTime.Format("Monday, January 2")
 
 	local := base
 	npcNames := make(map[string]string, len(local.NPCs))

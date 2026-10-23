@@ -422,6 +422,17 @@ func (store *PostgresStore) GetNPC(ctx context.Context, serverID, npcID string) 
 	return profile, nil
 }
 
+// NPCBelongsToCity validates the canonical generated ID prefix against a player's current city.
+func (store *PostgresStore) NPCBelongsToCity(_ context.Context, _ string, cityID, npcID string) (bool, error) {
+	if cityID == "" || npcID == "" {
+		return false, nil
+	}
+	if strings.HasPrefix(npcID, "npc:"+cityID+"/") {
+		return true, nil
+	}
+	return cityID == "fr/lyon" && strings.HasPrefix(npcID, "npc:lyon/"), nil
+}
+
 // GetNPCForRecords reconstructs the requested NPC and optional employer with a
 // single indexed query, without loading unrelated relationships or mutations.
 func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcID string, includeEmployer bool) (NPCRecordsProfile, error) {
@@ -575,6 +586,40 @@ func (store *PostgresStore) SearchCompanies(ctx context.Context, serverID, query
 	if err != nil {
 		return nil, err
 	}
+	return searchCompaniesInWorld(ctx, store, serverID, base, query)
+}
+
+// SearchCompaniesInCity limits company records to the city where the player is currently using City Records.
+func (store *PostgresStore) SearchCompaniesInCity(ctx context.Context, serverID, cityID, query string) ([]CompanyRecord, error) {
+	base, err := store.generatedWorld(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	city, ok := CityByID(cityID)
+	if !ok && cityID == "lyon" {
+		city, ok = CityByID("fr/lyon")
+	}
+	if !ok {
+		return []CompanyRecord{}, nil
+	}
+	if city.ID != "fr/lyon" {
+		seed, version, err := store.worldSeedAndVersion(ctx, serverID)
+		if err != nil {
+			return nil, err
+		}
+		version, err = store.cityGeneratorVersion(ctx, serverID, city.ID, version)
+		if err != nil {
+			return nil, err
+		}
+		base, err = GenerateCity(seed, version, city.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return searchCompaniesInWorld(ctx, store, serverID, base, query)
+}
+
+func searchCompaniesInWorld(ctx context.Context, store *PostgresStore, serverID string, base World, query string) ([]CompanyRecord, error) {
 	query = strings.ToLower(strings.TrimSpace(query))
 	if query == "" {
 		return []CompanyRecord{}, nil

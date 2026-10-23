@@ -136,6 +136,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	candidates := archetype.candidates(candidateWorld)
 	selected := candidates[caseIndex(seed+"/"+archetype.id, version, len(candidates))]
 	caseID := makeCaseID(seed, version)
+	caseDate := time.Now().UTC().Truncate(24 * time.Hour)
 	definition := Definition{
 		ID:               caseID,
 		CityID:           cityForLocation(base, selected.locationID),
@@ -152,9 +153,9 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	}
 	if selected.archetypeID == "financial_extortion" {
 		region := regionName(base, npcByID(base.NPCs, selected.killerID).RegionID)
-		definition.Records = records.ExtortionEvents(seed, base.GeneratorVersion, caseID, selected.killerID, selected.victimID, region)
+		definition.Records = records.ExtortionEvents(seed, base.GeneratorVersion, caseID, selected.killerID, selected.victimID, region, caseDate)
 	}
-	definition.Emails = buildCaseEmails(seed, base.GeneratorVersion, caseID, selected, base)
+	definition.Emails = buildCaseEmails(seed, base.GeneratorVersion, caseID, selected, base, caseDate)
 	if err := Validate(definition, base); err != nil {
 		return Definition{}, err
 	}
@@ -173,7 +174,7 @@ func cityForLocation(base world.World, locationID string) string {
 	return "fr/lyon"
 }
 
-func buildCaseEmails(seed string, worldVersion int, caseID string, selected candidate, base world.World) []mail.Message {
+func buildCaseEmails(seed string, worldVersion int, caseID string, selected candidate, base world.World, caseDate time.Time) []mail.Message {
 	victim := npcByID(base.NPCs, selected.victimID)
 	firstSubject, firstBody := "A private warning", "Leave the meeting notes as they are. If you take them to the registry, you will regret it."
 	lastSubject, lastBody := "One last message", "This is your final chance to keep quiet. Do not make me come looking for you."
@@ -191,7 +192,7 @@ func buildCaseEmails(seed string, worldVersion int, caseID string, selected cand
 	}
 	messageDay := 3 + caseIndex(seed+"/correspondence/day", 1, 8)
 	messageMinute := 7*60 + caseIndex(seed+"/correspondence/minute", 1, 13*60)
-	lastSentAt := time.Date(1974, time.November, messageDay, 0, 0, 0, 0, time.UTC).Add(time.Duration(messageMinute) * time.Minute)
+	lastSentAt := caseDate.AddDate(0, 0, messageDay-12).Add(time.Duration(messageMinute) * time.Minute)
 	firstSentAt := lastSentAt.Add(-48 * time.Hour)
 	return []mail.Message{
 		mail.CaseMessage(seed, worldVersion, caseID, victim.ID, victim.ID, "Unknown sender", victim.Name, firstSubject, firstBody, "anonymous_warning", firstSentAt),
