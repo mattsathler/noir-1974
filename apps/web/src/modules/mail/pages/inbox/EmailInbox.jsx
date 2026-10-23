@@ -24,7 +24,7 @@ function displayDate(value, timeZone) {
   }).format(date);
 }
 
-export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe/Paris", facilityLocationId = "", accessAttemptId = "", runHack, onPin }) {
+export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe/Paris", cityId = "", facilityLocationId = "", accessAttemptId = "", runHack, onPin }) {
   const throughToday = serverTime.toISOString().slice(0, 10);
   const rangeStart = `${throughToday.slice(0, 4)}-01-01`;
   const [query, setQuery] = useState("");
@@ -73,8 +73,11 @@ export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe
     try {
       const results = await hackRequest(() => searchPeople(term));
       if (request !== requestId.current) return;
-      setPeople(results);
-      setMessage(results.length ? "CORRESPONDENCE FILES LOCATED" : "NO CORRESPONDENCE FILES LOCATED");
+      const cityResults = cityId
+        ? results.filter(({ npc }) => npc?.id.startsWith(`npc:${cityId}/`) || (cityId === "fr/lyon" && npc?.id.startsWith("npc:lyon/")))
+        : results;
+      setPeople(cityResults);
+      setMessage(cityResults.length ? "CORRESPONDENCE FILES LOCATED IN THIS CITY" : "NO CORRESPONDENCE FILES LOCATED IN THIS CITY");
     } catch (error) {
       if (request === requestId.current) setMessage(error.message || "The exchange could not be reached.");
     } finally {

@@ -457,7 +457,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         setWindows((previous) => previous.map((item) => item.id === id ? { ...item, boardId: selectedBoardId } : item));
                       }} />
                       : program.id === "emails"
-                        ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} runHack={runHack} onPin={requestPin} />
+                        ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} cityId={cityId} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} runHack={runHack} onPin={requestPin} />
                         : program.id === "personal-mail"
                           ? <PlayerMailbox key={id} timeZone={timeZone} onPin={requestPin} />
                         : <WorldDirectory key={id} program={program.id} companyLocationId={program.id === "staff-directory" ? facilityContext?.locationId : undefined} companyId={program.id === "staff-directory" ? facilityContext?.companyId : undefined} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} cityId={cityId} serverTime={serverTime} timeZone={timeZone} runHack={runHack} onPin={requestPin} />}

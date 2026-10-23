@@ -2,6 +2,8 @@ package mail
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"noir-1974/apps/api/internal/world"
@@ -11,6 +13,10 @@ type worldReader interface {
 	WorldConfig(context.Context, string) (string, int, error)
 	GetNPC(context.Context, string, string) (world.NPCProfile, error)
 	EmployeesOfCompany(context.Context, string, string) ([]world.CompanyEmployee, error)
+}
+
+type generatedWorldReader interface {
+	WorldForCases(context.Context, string) (world.World, error)
 }
 
 type caseReader interface {
@@ -34,35 +40,50 @@ func (service *Service) NPCEmails(ctx context.Context, serverID, npcID string, f
 		return nil, err
 	}
 	profile, err := service.worlds.GetNPC(ctx, serverID, npcID)
-	if err != nil {
+	var mailboxContext Context
+	if errors.Is(err, world.ErrEntityNotFound) {
+		reader, ok := service.worlds.(generatedWorldReader)
+		if !ok {
+			return nil, err
+		}
+		generated, loadErr := reader.WorldForCases(ctx, serverID)
+		if loadErr != nil {
+			return nil, fmt.Errorf("reconstruct email subject from generated world: %w", loadErr)
+		}
+		mailboxContext, ok = mailContextFromWorld(generated, npcID)
+		if !ok {
+			return nil, err
+		}
+	} else if err != nil {
 		return nil, err
-	}
-	context := Context{NPCName: profile.NPC.Name}
-	if len(profile.Employment) > 0 {
-		context.Employer = profile.Employment[0].Company.Name
-		context.EmploymentRole = profile.Employment[0].Role
-		for _, job := range profile.Employment {
-			employees, err := service.worlds.EmployeesOfCompany(ctx, serverID, job.Company.ID)
-			if err != nil {
-				return nil, err
-			}
-			for _, employee := range employees {
-				if employee.ID == npcID {
-					continue
+	} else {
+		mailboxContext = Context{NPCName: profile.NPC.Name}
+		if len(profile.Employment) > 0 {
+			mailboxContext.Employer = profile.Employment[0].Company.Name
+			mailboxContext.EmploymentRole = profile.Employment[0].Role
+			for _, job := range profile.Employment {
+				employees, err := service.worlds.EmployeesOfCompany(ctx, serverID, job.Company.ID)
+				if err != nil {
+					return nil, err
 				}
-				context.Colleagues = append(context.Colleagues, Correspondent{
-					ID: employee.ID, Name: employee.Name, Role: employee.Role,
-					CompanyID: job.Company.ID,
-				})
+				for _, employee := range employees {
+					if employee.ID == npcID {
+						continue
+					}
+					mailboxContext.Colleagues = append(mailboxContext.Colleagues, Correspondent{
+						ID: employee.ID, Name: employee.Name, Role: employee.Role,
+						CompanyID: job.Company.ID,
+					})
+				}
 			}
 		}
+		for _, relation := range profile.PersonalRelationships {
+			mailboxContext.Personal = append(mailboxContext.Personal, Correspondent{
+				ID: relation.NPC.ID, Name: relation.NPC.Name, RelationshipType: relation.RelationshipType,
+			})
+		}
 	}
-	for _, relation := range profile.PersonalRelationships {
-		context.Personal = append(context.Personal, Correspondent{
-			ID: relation.NPC.ID, Name: relation.NPC.Name, RelationshipType: relation.RelationshipType,
-		})
-	}
-	ordinary, err := Generate(seed, version, npcID, context, from, through)
+	ordinary, err := Generate(seed, version, npcID, mailboxContext, from, through)
 	if err != nil {
 		return nil, err
 	}
@@ -73,4 +94,50 @@ func (service *Service) NPCEmails(ctx context.Context, serverID, npcID string, f
 	all := append(ordinary, linked...)
 	SortMessages(all)
 	return all, nil
+}
+
+func mailContextFromWorld(generated world.World, npcID string) (Context, bool) {
+	npcs := make(map[string]world.NPC, len(generated.NPCs))
+	companies := make(map[string]world.Company, len(generated.Companies))
+	for _, npc := range generated.NPCs {
+		npcs[npc.ID] = npc
+	}
+	for _, company := range generated.Companies {
+		companies[company.ID] = company
+	}
+	person, ok := npcs[npcID]
+	if !ok {
+		return Context{}, false
+	}
+	result := Context{NPCName: person.Name}
+	employerIDs := make(map[string]bool)
+	for _, job := range generated.EmploymentRelationships {
+		if job.EmployeeNPCID == npcID {
+			employerIDs[job.EmployerCompanyID] = true
+			if company, exists := companies[job.EmployerCompanyID]; exists && result.Employer == "" {
+				result.Employer = company.Name
+				result.EmploymentRole = job.Role
+			}
+		}
+	}
+	for _, job := range generated.EmploymentRelationships {
+		if job.EmployeeNPCID == npcID || !employerIDs[job.EmployerCompanyID] {
+			continue
+		}
+		if colleague, exists := npcs[job.EmployeeNPCID]; exists {
+			result.Colleagues = append(result.Colleagues, Correspondent{ID: colleague.ID, Name: colleague.Name, Role: job.Role, CompanyID: job.EmployerCompanyID})
+		}
+	}
+	for _, relation := range generated.PersonalRelationships {
+		otherID := relation.PersonANPCID
+		if otherID == npcID {
+			otherID = relation.PersonBNPCID
+		} else if relation.PersonBNPCID != npcID {
+			continue
+		}
+		if other, exists := npcs[otherID]; exists {
+			result.Personal = append(result.Personal, Correspondent{ID: other.ID, Name: other.Name, RelationshipType: relation.RelationshipType})
+		}
+	}
+	return result, true
 }

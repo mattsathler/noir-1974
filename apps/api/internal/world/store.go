@@ -424,13 +424,17 @@ func (store *PostgresStore) GetNPC(ctx context.Context, serverID, npcID string) 
 
 // NPCBelongsToCity validates the canonical generated ID prefix against a player's current city.
 func (store *PostgresStore) NPCBelongsToCity(_ context.Context, _ string, cityID, npcID string) (bool, error) {
+	return npcBelongsToCity(cityID, npcID), nil
+}
+
+func npcBelongsToCity(cityID, npcID string) bool {
 	if cityID == "" || npcID == "" {
-		return false, nil
+		return false
 	}
 	if strings.HasPrefix(npcID, "npc:"+cityID+"/") {
-		return true, nil
+		return true
 	}
-	return cityID == "fr/lyon" && strings.HasPrefix(npcID, "npc:lyon/"), nil
+	return cityID == "fr/lyon" && strings.HasPrefix(npcID, "npc:lyon/")
 }
 
 // GetNPCForRecords reconstructs the requested NPC and optional employer with a
@@ -486,6 +490,14 @@ func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcI
 
 // SearchNPCs reconstructs matching NPCs and their persisted relations from the server's world seed.
 func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query string) ([]PersonSearchRecord, error) {
+	return store.searchNPCs(ctx, serverID, "", query)
+}
+
+func (store *PostgresStore) SearchNPCsInCity(ctx context.Context, serverID, cityID, query string) ([]PersonSearchRecord, error) {
+	return store.searchNPCs(ctx, serverID, cityID, query)
+}
+
+func (store *PostgresStore) searchNPCs(ctx context.Context, serverID, cityID, query string) ([]PersonSearchRecord, error) {
 	base, err := store.WorldForCases(ctx, serverID)
 	if err != nil {
 		return nil, fmt.Errorf("reconstruct world for person search: %w", err)
@@ -510,6 +522,9 @@ func (store *PostgresStore) SearchNPCs(ctx context.Context, serverID, query stri
 	}
 	matches := make([]NPC, 0)
 	for _, npc := range base.NPCs {
+		if cityID != "" && !npcBelongsToCity(cityID, npc.ID) {
+			continue
+		}
 		if !strings.Contains(strings.ToLower(npc.Name), query) {
 			continue
 		}

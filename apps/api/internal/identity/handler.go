@@ -87,6 +87,10 @@ type cityNPCReader interface {
 	NPCBelongsToCity(context.Context, string, string, string) (bool, error)
 }
 
+type cityPersonSearchReader interface {
+	SearchNPCsInCity(context.Context, string, string, string) ([]world.PersonSearchRecord, error)
+}
+
 type companyLocationReader interface {
 	CompanyAtLocation(context.Context, string, string) ([]world.CompanyRecord, error)
 }
@@ -561,7 +565,7 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
 	results, err := h.emailsReader.NPCEmails(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through)
 	if errors.Is(err, world.ErrEntityNotFound) {
-		http.NotFound(w, r)
+		h.writeAPIError(w, r, http.StatusNotFound, "NPC_EMAIL_PROFILE_NOT_FOUND", "the selected person has no correspondence profile in this city", err)
 		return
 	}
 	if errors.Is(err, correspondence.ErrInvalidQuery) || errors.Is(err, correspondence.ErrRangeTooLarge) {
@@ -682,7 +686,7 @@ func (h *Handler) validateNPCCity(w http.ResponseWriter, r *http.Request, accoun
 		return false
 	}
 	if !valid {
-		http.NotFound(w, r)
+		h.writeAPIError(w, r, http.StatusNotFound, "NPC_NOT_IN_CURRENT_CITY", "the selected person is not available in the current city", nil)
 		return false
 	}
 	return true
@@ -1085,7 +1089,27 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	results, err := h.worldReader.SearchNPCs(r.Context(), h.worldServerID, query)
+	var results []world.PersonSearchRecord
+	var err error
+	if h.whiteboardReader != nil {
+		cityID := h.worldFor(r.Context(), current.ID).CityID
+		if cityReader, ok := h.worldReader.(cityPersonSearchReader); ok {
+			results, err = cityReader.SearchNPCsInCity(r.Context(), h.worldServerID, cityID, query)
+		} else {
+			results, err = h.worldReader.SearchNPCs(r.Context(), h.worldServerID, query)
+			for index := 0; err == nil && index < len(results); {
+				npc := results[index].NPC
+				valid := strings.HasPrefix(npc.ID, "npc:"+cityID+"/") || (cityID == "fr/lyon" && strings.HasPrefix(npc.ID, "npc:lyon/"))
+				if !valid {
+					results = append(results[:index], results[index+1:]...)
+					continue
+				}
+				index++
+			}
+		}
+	} else {
+		results, err = h.worldReader.SearchNPCs(r.Context(), h.worldServerID, query)
+	}
 	if err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "PERSON_SEARCH_FAILED", "could not search people", err)
 		return
