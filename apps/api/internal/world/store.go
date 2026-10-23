@@ -1181,7 +1181,7 @@ func (store *PostgresStore) CityWorldForCases(ctx context.Context, serverID, cit
 	}
 	for index := range base.NPCs {
 		if status, ok := statuses[base.NPCs[index].ID]; ok {
-			if status != "alive" && status != "dead" {
+			if status != "alive" && status != "dead" && status != "arrested" {
 				return World{}, ErrInvalidMutation
 			}
 			base.NPCs[index].Status = status
@@ -1325,7 +1325,7 @@ func makeAddress(entity Entity, regions map[string]string) Address {
 
 // SetNPCStatus appends a persistent status change scoped to one server.
 func (store *PostgresStore) SetNPCStatus(ctx context.Context, serverID, npcID, status string) error {
-	if status != "alive" && status != "dead" {
+	if status != "alive" && status != "dead" && status != "arrested" {
 		return ErrInvalidMutation
 	}
 	value, err := json.Marshal(status)
@@ -1362,7 +1362,7 @@ func (store *PostgresStore) applyNPCStatus(ctx context.Context, serverID, npcID 
 	if err != nil {
 		return err
 	}
-	if status != "alive" && status != "dead" {
+	if status != "alive" && status != "dead" && status != "arrested" {
 		return ErrInvalidMutation
 	}
 	npc.Status = status
@@ -1393,7 +1393,7 @@ func (store *PostgresStore) applyNPCStatuses(ctx context.Context, serverID strin
 		if err := rows.Scan(&id, &status); err != nil {
 			return err
 		}
-		if status != "alive" && status != "dead" {
+		if status != "alive" && status != "dead" && status != "arrested" {
 			return ErrInvalidMutation
 		}
 		byID[id].Status = status

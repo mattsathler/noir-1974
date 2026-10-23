@@ -71,8 +71,14 @@ type DiscoveredItem struct {
 
 type WhiteboardPin struct {
 	DiscoveredItem
-	X int `json:"x"`
-	Y int `json:"y"`
+	X           int    `json:"x"`
+	Y           int    `json:"y"`
+	Designation string `json:"designation,omitempty"`
+}
+
+type AccusationResult struct {
+	Accepted bool   `json:"-"`
+	Message  string `json:"message"`
 }
 
 type Whiteboard struct {
@@ -957,6 +963,18 @@ func (store *PostgresStore) LatestPublicCase(ctx context.Context, serverID, city
 	return result, err
 }
 
+func (store *PostgresStore) LatestPublicArrest(ctx context.Context, serverID, cityID string) (PublicCase, error) {
+	var result PublicCase
+	err := store.db.QueryRow(ctx, `SELECT c.case_id,c.city_id,c.case_type,c.victim_entity_id,c.location_entity_id,s.status,c.created_at
+		FROM player_case_accusations a JOIN cases c USING(server_id,case_id) JOIN case_states s USING(server_id,case_id)
+		WHERE a.server_id=$1::uuid AND c.city_id=$2 AND a.accepted=true ORDER BY a.created_at DESC,a.case_id DESC LIMIT 1`, serverID, cityID).
+		Scan(&result.ID, &result.CityID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PublicCase{}, ErrCaseNotFound
+	}
+	return result, err
+}
+
 // ListOpenPublicCases returns active cases without exposing their solutions.
 func (store *PostgresStore) ListOpenPublicCases(ctx context.Context, serverID, cityID string) ([]PublicCase, error) {
 	rows, err := store.db.Query(ctx,
@@ -1355,7 +1373,7 @@ func (store *PostgresStore) GetWhiteboard(ctx context.Context, serverID, account
 	err := store.db.QueryRow(ctx,
 		`SELECT board.title, board.created_at,
 		        COALESCE((
-		          SELECT jsonb_agg(item.item_data || jsonb_build_object('x', pin.position_x, 'y', pin.position_y)
+			          SELECT jsonb_agg(item.item_data || jsonb_build_object('x', pin.position_x, 'y', pin.position_y, 'designation', pin.designation)
 		                           ORDER BY pin.pinned_at, pin.item_id)
 		          FROM player_whiteboard_pins pin
 		          JOIN player_discovered_items item USING (server_id, account_id, item_id)
@@ -1384,6 +1402,149 @@ func (store *PostgresStore) GetWhiteboard(ctx context.Context, serverID, account
 		return Whiteboard{}, fmt.Errorf("decode whiteboard connections: %w", err)
 	}
 	return board, nil
+}
+
+func (store *PostgresStore) SetWhiteboardPinDesignation(ctx context.Context, serverID, accountID, boardID, itemID, designation string) error {
+	if designation != "" && designation != "proof" && designation != "accused" && designation != "victim" {
+		return ErrInvalidProgress
+	}
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if designation == "accused" || designation == "victim" {
+		var personPin bool
+		err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM player_whiteboard_pins p JOIN player_discovered_items i USING(server_id,account_id,item_id)
+			WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3 AND p.item_id=$4
+			AND i.item_source='person' AND COALESCE(i.item_data #>> '{metadata,npc,id}','')<>'')`, serverID, accountID, boardID, itemID).Scan(&personPin)
+		if err != nil {
+			return err
+		}
+		if !personPin {
+			return ErrInvalidProgress
+		}
+		if _, err := tx.Exec(ctx, `UPDATE player_whiteboard_pins SET designation='' WHERE server_id=$1::uuid AND account_id=$2::uuid AND whiteboard_id=$3 AND designation=$4`, serverID, accountID, boardID, designation); err != nil {
+			return err
+		}
+	}
+	result, err := tx.Exec(ctx, `UPDATE player_whiteboard_pins SET designation=$5 WHERE server_id=$1::uuid AND account_id=$2::uuid AND whiteboard_id=$3 AND item_id=$4`, serverID, accountID, boardID, itemID, designation)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrEvidenceNotFound
+	}
+	return tx.Commit(ctx)
+}
+
+// SubmitAccusation derives the homicide from the marked victim and resolves one account's accusation exactly once.
+// Version 1 uses a deterministic roll so retries cannot change the verdict.
+func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, accountID, cityID, boardID string, now time.Time) (AccusationResult, error) {
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return AccusationResult{}, err
+	}
+	defer tx.Rollback(ctx)
+	var accusedID, markedVictimID string
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(max(i.item_data #>> '{metadata,npc,id}') FILTER(WHERE p.designation='accused'),''),
+		COALESCE(max(i.item_data #>> '{metadata,npc,id}') FILTER(WHERE p.designation='victim'),'')
+		FROM player_whiteboard_pins p JOIN player_discovered_items i USING(server_id,account_id,item_id)
+		WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3 AND i.item_source='person'`, serverID, accountID, boardID).Scan(&accusedID, &markedVictimID); err != nil {
+		return AccusationResult{}, err
+	}
+	if accusedID == "" || markedVictimID == "" {
+		return AccusationResult{}, ErrInvalidProgress
+	}
+	var markedProofs int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM player_whiteboard_pins WHERE server_id=$1::uuid AND account_id=$2::uuid AND whiteboard_id=$3 AND designation='proof'`, serverID, accountID, boardID).Scan(&markedProofs); err != nil {
+		return AccusationResult{}, err
+	}
+	if markedProofs < 1 {
+		return AccusationResult{}, ErrInvalidProgress
+	}
+	var caseID, killerID, victimID string
+	err = tx.QueryRow(ctx, `SELECT c.case_id,c.killer_entity_id,c.victim_entity_id FROM cases c JOIN case_states s USING(server_id,case_id)
+		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND c.victim_entity_id=$3 AND s.status='open'
+		ORDER BY c.created_at DESC,c.case_id LIMIT 1`, serverID, cityID, markedVictimID).Scan(&caseID, &killerID, &victimID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		identity := sha256.Sum256([]byte(fmt.Sprintf("unmatched-accusation|%s|%s|%s|%s", accountID, boardID, accusedID, markedVictimID)))
+		messageID := "accusation:unmatched:" + hex.EncodeToString(identity[:12])
+		_, err = tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
+			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, messageID, now.UTC(), "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant.")
+		if err != nil {
+			return AccusationResult{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return AccusationResult{}, err
+		}
+		return AccusationResult{Message: "Your accusation has been submitted for corporate review. Check the personal mailbox for the decision."}, nil
+	}
+	if err != nil {
+		return AccusationResult{}, err
+	}
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))`, accountID, caseID); err != nil {
+		return AccusationResult{}, err
+	}
+	var prior bool
+	err = tx.QueryRow(ctx, `SELECT accepted FROM player_case_accusations WHERE server_id=$1::uuid AND account_id=$2::uuid AND case_id=$3`, serverID, accountID, caseID).Scan(&prior)
+	if err == nil {
+		result := AccusationResult{Accepted: prior, Message: "Your accusation has been submitted for corporate review. Check the personal mailbox for the decision."}
+		if err := tx.Commit(ctx); err != nil {
+			return AccusationResult{}, err
+		}
+		return result, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return AccusationResult{}, err
+	}
+	var totalProofs, validProofs int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FILTER(WHERE p.designation='proof'),
+		count(*) FILTER(WHERE p.designation='proof' AND (
+		EXISTS(SELECT 1 FROM case_evidence e WHERE e.server_id=$1::uuid AND e.case_id=$4 AND e.evidence_id=p.item_id)
+		OR EXISTS(SELECT 1 FROM case_activity_records a WHERE a.server_id=$1::uuid AND a.case_id=$4 AND a.record_id=p.item_id)
+		OR EXISTS(SELECT 1 FROM case_mail_messages m WHERE m.server_id=$1::uuid AND m.case_id=$4 AND m.message_id=p.item_id)))
+		FROM player_whiteboard_pins p WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3`, serverID, accountID, boardID, caseID).Scan(&totalProofs, &validProofs); err != nil {
+		return AccusationResult{}, err
+	}
+	// The odds rule is tuned centrally; a true suspect with one authentic pin gains 65 points,
+	// while each unrelated pin marked as proof removes 40 points. Innocent suspects always score zero.
+	chance := 0
+	if accusedID == killerID && markedVictimID == victimID {
+		chance = 10 + validProofs*65 - (totalProofs-validProofs)*40
+	}
+	if chance < 0 {
+		chance = 0
+	}
+	if chance > 99 {
+		chance = 99
+	}
+	roll := sha256.Sum256([]byte(fmt.Sprintf("judgment-v1|%s|%s|%s", serverID, accountID, caseID)))
+	accepted := int(binary.BigEndian.Uint64(roll[:8])%100) < chance
+	outcome, subject, body := "insufficient", "Accusation review · Case decision", "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant."
+	if accepted {
+		outcome = "arrested"
+		body = "The corporate review has authorized the arrest. The accused has been taken into custody, and the city police have been notified."
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,board_id,accepted,outcome,created_at) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7)`, serverID, accountID, caseID, boardID, accepted, outcome, now.UTC()); err != nil {
+		return AccusationResult{}, err
+	}
+	if accepted {
+		statusJSON, _ := json.Marshal("arrested")
+		if _, err := tx.Exec(ctx, `INSERT INTO world_mutations(server_id,entity_id,field_key,value) VALUES($1::uuid,$2,'status',$3::jsonb)`, serverID, accusedID, string(statusJSON)); err != nil {
+			return AccusationResult{}, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE case_states SET status='solved',updated_at=$3 WHERE server_id=$1::uuid AND case_id=$2`, serverID, caseID, now.UTC()); err != nil {
+			return AccusationResult{}, err
+		}
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments) VALUES($1::uuid,$2::uuid,$3,NULL,$4,$5,$6,'[]'::jsonb)`, serverID, accountID, "accusation:"+caseID, now.UTC(), subject, body); err != nil {
+		return AccusationResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return AccusationResult{}, err
+	}
+	return AccusationResult{Accepted: accepted, Message: "Your accusation has been submitted for corporate review. Check the personal mailbox for the decision."}, nil
 }
 
 func (store *PostgresStore) PinDiscoveredItem(ctx context.Context, serverID, accountID, boardID, itemID string, x, y int) error {

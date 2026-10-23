@@ -21,6 +21,9 @@ type worldReader interface {
 type caseReader interface {
 	LatestPublicCase(context.Context, string, string) (cases.PublicCase, error)
 }
+type arrestReader interface {
+	LatestPublicArrest(context.Context, string, string) (cases.PublicCase, error)
+}
 
 type Service struct {
 	worlds worldReader
@@ -61,6 +64,17 @@ type newsTemplate struct {
 
 func NewService(worlds worldReader, cases caseReader) *Service {
 	return &Service{worlds: worlds, cases: cases, issues: make(map[string]Issue), flight: make(map[string]*issueFlight)}
+}
+
+func (service *Service) InvalidateCity(serverID, cityID string) {
+	prefix := serverID + "/" + cityID + "/"
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	for key := range service.issues {
+		if len(key) >= len(prefix) && key[:len(prefix)] == prefix {
+			delete(service.issues, key)
+		}
+	}
 }
 
 // Issue caches one generated edition per server, city, and in-game calendar day.
@@ -146,14 +160,31 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 		if !exists {
 			return Issue{}, fmt.Errorf("latest case victim is missing from generated city")
 		}
+		headline := fmt.Sprintf("Police open homicide inquiry into death of %s", victimName)
+		summary := fmt.Sprintf("Authorities confirmed the death of %s. Detectives are asking anyone with information to come forward. The circumstances remain under investigation.", victimName)
+		if latest.Status == "solved" {
+			headline = fmt.Sprintf("Police announce arrest in the death of %s", victimName)
+			summary = fmt.Sprintf("City authorities confirmed that a suspect has been taken into custody in the case concerning %s. The corporate review is complete.", victimName)
+		}
 		lead = Article{
 			ID: latest.ID, Section: "SPECIAL REPORT",
-			Headline: fmt.Sprintf("Police open homicide inquiry into death of %s", victimName),
-			Summary:  fmt.Sprintf("Authorities confirmed the death of %s. Detectives are asking anyone with information to come forward. The circumstances remain under investigation.", victimName),
+			Headline: headline,
+			Summary:  summary,
 			CaseID:   latest.ID,
 		}
 	}
 	articles := makeLightStories(local, serverID+"/"+cityID, dateKey)
+	if reader, ok := service.cases.(arrestReader); ok {
+		arrest, err := reader.LatestPublicArrest(ctx, serverID, cityID)
+		if err != nil && !errors.Is(err, cases.ErrCaseNotFound) {
+			return Issue{}, fmt.Errorf("query city arrest notice: %w", err)
+		}
+		if err == nil && arrest.ID != latest.ID {
+			if name, found := npcNames[arrest.VictimID]; found {
+				articles = append([]Article{{ID: arrest.ID + "-arrest", Section: "CITY POLICE", Headline: fmt.Sprintf("Police announce arrest in the death of %s", name), Summary: fmt.Sprintf("A suspect has been taken into custody in the homicide inquiry concerning %s. The corporate review has concluded.", name), CaseID: arrest.ID}}, articles...)
+			}
+		}
+	}
 	return Issue{
 		Publication: fmt.Sprintf("THE %s GAZETTE", city),
 		City:        city,

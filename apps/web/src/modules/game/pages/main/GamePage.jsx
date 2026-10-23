@@ -16,6 +16,7 @@ import GateTransition from "../../components/GateTransition.jsx";
 import LocalTerminal from "./LocalTerminal.jsx";
 import Telephone from "./Telephone.jsx";
 import ResidentialSearchWindow from "./ResidentialSearchWindow.jsx";
+import AccusationWindow from "./AccusationWindow.jsx";
 
 function buildingVisual(building) {
   const identity = `${building.locationId} ${building.name}`.toLowerCase();
@@ -97,6 +98,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [newspaperOpen, setNewspaperOpen] = useState(false);
   const [telephoneOpen, setTelephoneOpen] = useState(false);
   const [warrantOpen, setWarrantOpen] = useState(false);
+  const [accusationOpen, setAccusationOpen] = useState(false);
   const [transitOpen, setTransitOpen] = useState(false);
   const [gateTransition, setGateTransition] = useState(null);
   const [arrival, setArrival] = useState(null);
@@ -295,6 +297,9 @@ export default function GamePage({ initialWorld = null, onLogout }) {
             {selectedCompany.kind === "service" && selectedCompany.serviceKind === "police" && <button className="building-interior__warrant-access" type="button" onClick={() => setWarrantOpen(true)}>
               <span aria-hidden="true">⌕</span><span><strong>REQUEST RESIDENTIAL SEARCH</strong><small>POLICE AUTHORIZATION · FORM 74-B</small></span><span aria-hidden="true">↗</span>
             </button>}
+            {selectedCompany.kind === "service" && selectedCompany.serviceKind === "police" && <button className="building-interior__warrant-access building-interior__accusation-access" type="button" onClick={() => setAccusationOpen(true)}>
+              <span aria-hidden="true">⚖</span><span><strong>SUBMIT MURDER ACCUSATION</strong><small>DELIVER AN INVESTIGATION BOARD · FORM 74-C</small></span><span aria-hidden="true">↗</span>
+            </button>}
             <button className="building-interior__computer-access" type="button" onClick={() => { setComputerContext({ kind: selectedCompany.kind === "service" ? selectedCompany.serviceKind : "company", label: selectedCompany.company.name, city: world?.city, locationId: interiorPlace.locationId, companyId: selectedCompany.kind === "company" ? selectedCompany.company.id : undefined, district: interiorPlace.district }); setComputerEntry(null); setComputerOpen(true); }}>
               <span className="building-interior__option-icon"><MonitorSharp className="computer-program__glyph" aria-hidden="true" /></span>
               <span><strong>{selectedCompany.kind === "service" ? `OPEN ${activeInteriorProfile?.facility?.toUpperCase() ?? "LOCAL"} TERMINAL` : "ACCESS COMPANY COMPUTER"}</strong><small>ACCESS LOCAL SYSTEMS</small></span>
@@ -320,6 +325,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
       )}
       {computerEntry && <LocalTerminal facility={computerEntry} onAccessGranted={() => { setComputerContext(computerEntry); setComputerEntry(null); setComputerOpen(true); }} onClose={() => setComputerEntry(null)} />}
       {warrantOpen && <ResidentialSearchWindow cityId={world?.cityId} stationLocationId={interiorPlace?.locationId} onClose={() => setWarrantOpen(false)} />}
+      {accusationOpen && <AccusationWindow stationLocationId={interiorPlace?.locationId} onClose={() => setAccusationOpen(false)} />}
       {newspaperOpen && <NewspaperWindow cityId={world?.cityId} issueDay={issueDay} onClose={closeNewspaper} />}
       {telephoneOpen && <Telephone onClose={() => setTelephoneOpen(false)} />}
       {transitOpen && <GateCityExplorer world={world} onTravel={travelViaGate} onClose={closeTransit} />}

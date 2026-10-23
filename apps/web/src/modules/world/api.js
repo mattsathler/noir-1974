@@ -154,15 +154,6 @@ export function getNewspaperIssue(cityId, issueDay) {
 
   const cityKey = encodeURIComponent(cityId);
   const cacheKey = `${newspaperCachePrefix}:${cityKey}:${issueDay}`;
-  try {
-    const cached = JSON.parse(window.localStorage.getItem(cacheKey) ?? "null");
-    if (cached?.cityId === cityId && cached?.issueDay === issueDay && cached.issue) {
-      return Promise.resolve(cached.issue);
-    }
-  } catch {
-    // Storage may be disabled or contain an incomplete cached issue.
-  }
-
   if (newspaperRequests.has(cacheKey)) return newspaperRequests.get(cacheKey);
 
   const request = requestNewspaperIssue().then((issue) => {
@@ -234,6 +225,15 @@ export function saveCaseProgress(caseId, progress) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(progress),
+  });
+}
+
+export function submitCaseAccusation(boardId, stationLocationId) {
+  return requestCase("/api/accusations", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ boardId, stationLocationId }),
+  }).then((payload) => {
+    try { for (const key of Object.keys(localStorage)) if (key.startsWith(`${newspaperCachePrefix}:`)) localStorage.removeItem(key); } catch { /* Storage may be disabled. */ }
+    return payload.result;
   });
 }
 
@@ -383,6 +383,18 @@ export function pinWhiteboardItem(boardId, itemId, x = 700, y = 700) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ itemId, x, y }),
+  });
+}
+
+export function designateWhiteboardPin(boardId, itemId, designation) {
+  return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/pins/${encodeURIComponent(itemId)}/designation`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ designation }),
+  }).then((result) => {
+    updateWhiteboardCache(boardId, (board) => ({
+      ...board,
+      pins: board.pins.map((pin) => pin.id === itemId ? { ...pin, designation } : (designation === "accused" || designation === "victim") && pin.designation === designation ? { ...pin, designation: "" } : pin),
+    }));
+    return result;
   });
 }
 

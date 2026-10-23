@@ -178,6 +178,18 @@ CREATE TABLE IF NOT EXISTS player_inbox_messages (
 CREATE INDEX IF NOT EXISTS player_inbox_messages_by_date_idx
     ON player_inbox_messages(server_id, account_id, sent_at DESC);
 
+CREATE TABLE IF NOT EXISTS player_case_accusations (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    case_id text NOT NULL,
+    board_id text NOT NULL,
+    accepted boolean NOT NULL,
+    outcome text NOT NULL CHECK (outcome IN ('arrested','insufficient')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id,account_id,case_id),
+    FOREIGN KEY (server_id,case_id) REFERENCES cases(server_id,case_id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS player_local_access_attempts (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
     attempt_id bigint GENERATED ALWAYS AS IDENTITY,
@@ -222,6 +234,7 @@ CREATE TABLE IF NOT EXISTS player_whiteboard_pins (
     account_id uuid NOT NULL,
     whiteboard_id text NOT NULL,
     item_id text NOT NULL,
+    designation text NOT NULL DEFAULT '' CHECK (designation IN ('', 'proof', 'accused', 'victim')),
     position_x integer NOT NULL DEFAULT 80 CHECK (position_x >= 0),
     position_y integer NOT NULL DEFAULT 80 CHECK (position_y >= 0),
     pinned_at timestamptz NOT NULL DEFAULT now(),
@@ -231,6 +244,11 @@ CREATE TABLE IF NOT EXISTS player_whiteboard_pins (
     FOREIGN KEY (server_id, account_id, item_id)
         REFERENCES player_discovered_items(server_id, account_id, item_id) ON DELETE CASCADE
 );
+ALTER TABLE player_whiteboard_pins ADD COLUMN IF NOT EXISTS designation text NOT NULL DEFAULT '';
+ALTER TABLE player_whiteboard_pins DROP CONSTRAINT IF EXISTS player_whiteboard_pins_designation_check;
+ALTER TABLE player_whiteboard_pins ADD CONSTRAINT player_whiteboard_pins_designation_check CHECK (designation IN ('', 'proof', 'accused', 'victim'));
+CREATE UNIQUE INDEX IF NOT EXISTS player_whiteboard_one_accused_idx ON player_whiteboard_pins(server_id,account_id,whiteboard_id) WHERE designation='accused';
+CREATE UNIQUE INDEX IF NOT EXISTS player_whiteboard_one_victim_idx ON player_whiteboard_pins(server_id,account_id,whiteboard_id) WHERE designation='victim';
 
 CREATE TABLE IF NOT EXISTS player_whiteboard_connections (
     server_id uuid NOT NULL,

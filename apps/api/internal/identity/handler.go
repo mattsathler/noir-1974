@@ -103,6 +103,16 @@ type NewspaperReader interface {
 	Issue(context.Context, string, string, string, string, time.Time) (newspaper.Issue, error)
 }
 
+type newspaperInvalidator interface{ InvalidateCity(string, string) }
+
+type CaseAccusationReader interface {
+	SubmitAccusation(context.Context, string, string, string, string, time.Time) (cases.AccusationResult, error)
+}
+
+type WhiteboardDesignationReader interface {
+	SetWhiteboardPinDesignation(context.Context, string, string, string, string, string) error
+}
+
 type CaseAPIReader interface {
 	ListOpenPublicCases(context.Context, string, string) ([]cases.PublicCase, error)
 	GetPublicCase(context.Context, string, string) (cases.PublicCase, []cases.PublicEvidence, error)
@@ -212,6 +222,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/cases", handler.listOpenCases)
 		mux.HandleFunc("GET /api/cases/{caseID}", handler.getCase)
 		mux.HandleFunc("POST /api/cases/{caseID}/progress", handler.saveCaseProgress)
+		if _, ok := caseReader.(CaseAccusationReader); ok {
+			mux.HandleFunc("POST /api/accusations", handler.submitAccusation)
+		}
 		if _, ok := caseReader.(CaseInterrogationReader); ok {
 			mux.HandleFunc("GET /api/cases/interrogation/{npcID}", handler.getInterrogationAnswers)
 		}
@@ -233,6 +246,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("PATCH /api/whiteboards/{boardID}/notes/{itemID}", handler.updateWhiteboardNote)
 		mux.HandleFunc("POST /api/whiteboards/{boardID}/pins", handler.pinWhiteboardItem)
 		mux.HandleFunc("PATCH /api/whiteboards/{boardID}/pins/{itemID}", handler.moveWhiteboardPin)
+		if _, ok := handler.whiteboardReader.(WhiteboardDesignationReader); ok {
+			mux.HandleFunc("PUT /api/whiteboards/{boardID}/pins/{itemID}/designation", handler.setWhiteboardPinDesignation)
+		}
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/pins/{itemID}", handler.removeWhiteboardPin)
 		mux.HandleFunc("POST /api/whiteboards/{boardID}/connections", handler.connectWhiteboardPins)
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/connections/{fromID}/{toID}", handler.disconnectWhiteboardPins)
@@ -744,6 +760,13 @@ type whiteboardPositionRequest struct {
 	X int `json:"x"`
 	Y int `json:"y"`
 }
+type whiteboardDesignationRequest struct {
+	Designation string `json:"designation"`
+}
+type accusationRequest struct {
+	BoardID           string `json:"boardId"`
+	StationLocationID string `json:"stationLocationId"`
+}
 type whiteboardNoteRequest struct {
 	Title   string `json:"title"`
 	Content string `json:"content"`
@@ -856,6 +879,32 @@ func (h *Handler) getWhiteboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"whiteboard": board})
+}
+
+func (h *Handler) setWhiteboardPinDesignation(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input whiteboardDesignationRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	reader, ok := h.whiteboardReader.(WhiteboardDesignationReader)
+	if !ok {
+		http.Error(w, "whiteboard service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	err := reader.SetWhiteboardPinDesignation(r.Context(), h.worldServerID, current.ID, r.PathValue("boardID"), r.PathValue("itemID"), input.Designation)
+	if errors.Is(err, cases.ErrEvidenceNotFound) || errors.Is(err, cases.ErrInvalidProgress) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "WHITEBOARD_DESIGNATION_FAILED", "could not update the pin designation", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"designation": input.Designation})
 }
 
 func (h *Handler) pinWhiteboardItem(w http.ResponseWriter, r *http.Request) {
@@ -1031,6 +1080,54 @@ func (h *Handler) saveCaseProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"progress": progress})
+}
+
+func (h *Handler) submitAccusation(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input accusationRequest
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if input.BoardID == "" {
+		http.Error(w, "boardId is required", http.StatusBadRequest)
+		return
+	}
+	reader, ok := h.caseReader.(CaseAccusationReader)
+	if !ok {
+		http.Error(w, "accusation service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	cityID := h.worldFor(r.Context(), current.ID).CityID
+	cityKey := cityID
+	if cityID == "fr/lyon" {
+		cityKey = "lyon"
+	}
+	if input.StationLocationID != "service:"+cityKey+"/police-station" {
+		http.Error(w, "a valid police station in the current city is required", http.StatusBadRequest)
+		return
+	}
+	result, err := reader.SubmitAccusation(r.Context(), h.worldServerID, current.ID, cityID, input.BoardID, h.now())
+	if errors.Is(err, cases.ErrCaseNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if errors.Is(err, cases.ErrInvalidProgress) || errors.Is(err, cases.ErrEvidenceNotFound) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "ACCUSATION_FAILED", "could not submit the accusation", err)
+		return
+	}
+	if result.Accepted {
+		if invalidator, ok := h.newspaperReader.(newspaperInvalidator); ok {
+			invalidator.InvalidateCity(h.worldServerID, cityID)
+		}
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"result": result})
 }
 
 func (h *Handler) caseAccount(w http.ResponseWriter, r *http.Request) (account, bool) {

@@ -40,10 +40,11 @@ M00 docs + monorepo
                                     → M15 animações das ações do jogo
                                       → M16 auditoria integral de estabilidade e consistência pré-beta
                                         → M17 identidade visual procedural e customização do personagem
+                                          → M18 áudio e efeitos sonoros
 ```
 
 M06 é o primeiro recorte atravessável para playtest. A porcentagem geral acompanha o fluxo criminal completo até o aceite do M13, quando uma acusação válida pode levar à prisão do culpado. M14 é uma etapa posterior de qualidade técnica e não entra nesse cálculo. M10 reúne whiteboards, identidade visual modular e geração recorrente de casos compartilhados. M11 expande o catálogo fixo para 25 países e 100 cidades e oferece a viagem do GATE por país, cidade e bairro, seguida por cards de construções. M12 implementa as telas de interior e as ações dentro desses locais: interrogatórios, buscas e apreensões e acesso a sistemas restritos. M13 depende do M12 para garantir que whiteboard e busca estejam disponíveis para acusação.
 
-M15 é uma etapa posterior ao fluxo criminal completo e à consolidação de estabilidade; suas animações apresentam ações já existentes sem decidir ou substituir seus resultados. M16 audita o produto após as mudanças de M14 e M15 e funciona como etapa de prontidão técnica e visual antes do beta. M17 aprimora a identidade visual procedural e permite que o jogador personalize novamente seu personagem.
+M15 é uma etapa posterior ao fluxo criminal completo e à consolidação de estabilidade; suas animações apresentam ações já existentes sem decidir ou substituir seus resultados. M16 audita o produto após as mudanças de M14 e M15 e funciona como etapa de prontidão técnica e visual antes do beta. M17 aprimora a identidade visual procedural e permite que o jogador personalize novamente seu personagem. M18 acrescenta efeitos sonoros breves às interações e transições do jogo, sincronizados com seus estados confirmados e acompanhados por controles acessíveis de volume e silenciamento; trilha contínua, dublagem e áudio espacial ficam fora do ciclo.
 
 Pular um ciclo só com ADR explicando por que o critério deixou de ser necessário.

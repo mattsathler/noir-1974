@@ -7,6 +7,7 @@ import {
   cacheWhiteboardDraft,
   createWhiteboard,
   createWhiteboardDraft,
+  designateWhiteboardPin,
   createWhiteboardNote,
   deleteWhiteboard,
   discardWhiteboardDraft,
@@ -47,6 +48,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
   const activeNoteSavesRef = useRef(0);
 
   useEffect(() => () => noteTimersRef.current.forEach((timer) => clearTimeout(timer)), []);
+
 
   async function loadBoard(id) {
     const result = await getWhiteboard(id);
@@ -324,6 +326,16 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
     finally { setBusy(false); }
   }
 
+  async function changeDesignation(pin, designation) {
+    if (!board || busy) return;
+    const boardID=board.id;
+    setBoard((previous) => previous?.id===boardID ? {...previous,pins:previous.pins.map((item)=>item.id===pin.id?{...item,designation}:((designation==="accused"||designation==="victim")&&item.designation===designation)?{...item,designation:""}:item)} : previous);
+    setBusy(true);
+    try { await designateWhiteboardPin(boardID,pin.id,designation); await loadBoard(boardID); }
+    catch(error) { await loadBoard(boardID).catch(()=>{}); setMessage(error.message||"THE PIN DESIGNATION COULD NOT BE SAVED"); }
+    finally { setBusy(false); }
+  }
+
   async function connectSelected() {
     if (!board || busy || selection.length !== 2) return;
     const [fromId, toId] = selection;
@@ -481,10 +493,21 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
                   disabled={pin.pending}
                   onChange={(event) => updateNoteDraft(pin, "content", event.target.value)}
                 />
+                <label className="personal-whiteboard__designation">MARK PIN
+                  <select aria-label="Mark note" value={pin.designation||""} disabled={busy} onChange={(event)=>changeDesignation(pin,event.target.value)}>
+                    <option value="">UNMARKED</option><option value="proof">PROOF</option>
+                  </select>
+                </label>
               </> : <>
                 <header><span>{pin.source.toUpperCase()} · PINNED</span><button className="personal-whiteboard__remove-pin" type="button" aria-label={`Remove ${pin.title} from board`} disabled={busy} onClick={() => removePin(pin.id)}><Trash aria-hidden="true" /></button></header>
                 {pin.source === "person" && pin.metadata?.npc?.visual && <div className="personal-whiteboard__person-portrait"><ModularFace visual={pin.metadata.npc.visual} name={pin.metadata.npc.name || pin.title} /></div>}
                 <h2>{pin.title}</h2><p>{pin.content}</p>
+                <label className="personal-whiteboard__designation">MARK PIN
+                  <select aria-label={`Mark ${pin.title}`} value={pin.designation||""} disabled={busy} onChange={(event)=>changeDesignation(pin,event.target.value)}>
+                    <option value="">UNMARKED</option><option value="proof">PROOF</option>
+                    {pin.source==="person"&&<><option value="accused">ACCUSED</option><option value="victim">VICTIM</option></>}
+                  </select>
+                </label>
               </>}
               <button className="personal-whiteboard__connect" type="button" aria-pressed={selected} onClick={() => setSelection((previous) => selected ? previous.filter((id) => id !== pin.id) : previous.length < 2 ? [...previous, pin.id] : [previous[1], pin.id])}>{selected ? "SELECTED" : "SELECT TO CONNECT"}</button>
             </article>;

@@ -76,7 +76,7 @@ export default function Telephone({ onClose }) {
       setCallState("not-found");
       return;
     }
-    if (match.status === "dead") {
+    if (match.status !== "alive") {
       setContact(null);
       setCallState("dead");
       return;
