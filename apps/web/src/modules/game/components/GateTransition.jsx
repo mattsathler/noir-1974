@@ -1,46 +1,58 @@
 import { useEffect, useRef, useState } from "react";
 import Typewriter from "../../../../../@noir-ui/components/Typewriter.jsx";
-
-const wait = (duration) => new Promise((resolve) => window.setTimeout(resolve, duration));
+import "./GateTransition.scss";
 
 export default function GateTransition({ destination, origin, onArrive, onComplete, onError }) {
   const [phase, setPhase] = useState("entering");
+  const [bootReady, setBootReady] = useState(false);
+  const [arrivalConfirmed, setArrivalConfirmed] = useState(false);
   const handled = useRef(false);
   const arrivalPromise = useRef(null);
 
   useEffect(() => {
+    let active = true;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!arrivalPromise.current) {
-      arrivalPromise.current = Promise.resolve()
-        .then(() => onArrive(destination))
-        .then((value) => ({ value }), (error) => ({ error }));
-    }
     const fadeTimer = window.setTimeout(() => setPhase("booting"), 420);
-    const bootTimer = window.setTimeout(() => setPhase("typing"), 420 + (reducedMotion ? 700 : 2800));
+    const bootTimer = window.setTimeout(() => setBootReady(true), 420 + (reducedMotion ? 700 : 2800));
+    let errorTimer;
+    let exitTimer;
+
+    if (!arrivalPromise.current) {
+      arrivalPromise.current = Promise.resolve().then(() => onArrive(destination));
+    }
+    arrivalPromise.current
+      .then(() => {
+        if (active) setArrivalConfirmed(true);
+      })
+      .catch((error) => {
+        if (!active) return;
+        onError(error);
+        setPhase("error");
+        errorTimer = window.setTimeout(() => {
+          if (!active) return;
+          setPhase("leaving");
+          exitTimer = window.setTimeout(onComplete, 520);
+        }, 1000);
+      });
+
     return () => {
+      active = false;
       window.clearTimeout(fadeTimer);
       window.clearTimeout(bootTimer);
+      window.clearTimeout(errorTimer);
+      window.clearTimeout(exitTimer);
     };
   }, []);
 
-  async function finishTypewriter() {
+  useEffect(() => {
+    if (phase === "booting" && bootReady && arrivalConfirmed) setPhase("typing");
+  }, [phase, bootReady, arrivalConfirmed]);
+
+  function finishTypewriter() {
     if (handled.current) return;
     handled.current = true;
-    try {
-      const arrival = await arrivalPromise.current;
-      if (arrival?.error) throw arrival.error;
-    } catch (error) {
-      onError(error);
-      setPhase("error");
-      await wait(1000);
-      setPhase("leaving");
-      await wait(520);
-      onComplete();
-      return;
-    }
     setPhase("leaving");
-    await wait(520);
-    onComplete();
+    window.setTimeout(onComplete, 520);
   }
 
   return (
@@ -59,6 +71,7 @@ export default function GateTransition({ destination, origin, onArrive, onComple
       ) : phase === "typing" ? (
         <div className="screen-transition__content">
           <p className="screen-transition__message"><Typewriter className="screen-transition__text" text={`ARRIVING IN ${destination.district.name.toUpperCase()}, ${destination.city.name.toUpperCase()}`} speed={48} onComplete={finishTypewriter} /></p>
+          <button className="screen-transition__skip" type="button" onClick={finishTypewriter}>COMPLETE INTRODUCTION</button>
         </div>
       ) : (
         <div className="screen-transition__content">

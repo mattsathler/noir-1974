@@ -48,14 +48,14 @@ function displayRecordDate(value, timeZone) {
   }).format(date);
 }
 
-export default function WorldDirectory({ program, companyLocationId = "", companyId = "", facilityLocationId = "", accessAttemptId = "", cityId = "", serverTime = new Date(), timeZone = "Europe/Paris", runHack, onPin }) {
+export default function WorldDirectory({ program, companyLocationId = "", companyId = "", facilityLocationId = "", accessAttemptId = "", cityId = "", countryName = "", serverTime = new Date(), timeZone = "Europe/Paris", runHack, onPin }) {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState([]);
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [locations, setLocations] = useState([]);
   const isStaffDirectory = program === "staff-directory";
-  const [message, setMessage] = useState(isStaffDirectory ? "Enter a company name to search its staff directory." : "Enter a name or address to search the city records.");
+  const [message, setMessage] = useState(isStaffDirectory ? "Enter a company name to search its staff directory." : program === "interpol" ? "Enter a name to search countrywide personnel files." : "Enter a name or address to search the city records.");
   const [busy, setBusy] = useState(false);
   const [recordRange, setRecordRange] = useState(() => {
     const through = inputDate(serverTime, timeZone);
@@ -184,8 +184,9 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
 
   return (
     <div className="world-directory">
-      <p className="computer-window__eyebrow">{isInterpol ? "CORPORATE SECURITY OFFICE · PERSONNEL SEARCH" : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "MERIDIAN GLOBAL SETTLEMENT OFFICE · PRIVILEGED SESSION" : "MERIDIAN GLOBAL · GATE CONTROL ARCHIVE · PRIVILEGED SESSION"}</p>
-      <h1>{isInterpol ? "PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE MOVEMENT SEARCH"}</h1>
+      <p className="computer-window__eyebrow">{isInterpol ? `CORPORATE SECURITY OFFICE · ${countryName ? `${countryName.toUpperCase()} ` : "COUNTRYWIDE "}PERSONNEL SEARCH` : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "MERIDIAN GLOBAL SETTLEMENT OFFICE · PRIVILEGED SESSION" : "MERIDIAN GLOBAL · GATE CONTROL ARCHIVE · PRIVILEGED SESSION"}</p>
+      <h1>{isInterpol ? "COUNTRYWIDE PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE MOVEMENT SEARCH"}</h1>
+      {isInterpol && <p className="world-directory__scope">SEARCH JURISDICTION · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</p>}
       {!isStaffDirectory && !selectedPerson && <form className="world-directory__search" onSubmit={submitSearch}>
         <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
         <div className="world-directory__searchline">

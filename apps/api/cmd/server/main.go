@@ -20,6 +20,7 @@ import (
 	"noir-1974/apps/api/internal/identity"
 	"noir-1974/apps/api/internal/mail"
 	"noir-1974/apps/api/internal/newspaper"
+	"noir-1974/apps/api/internal/observability"
 	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
 )
@@ -42,6 +43,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), startupTimeout)
 	defer cancel()
 
+	httpMetrics := observability.NewHTTPRecorder()
 	poolConfig, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		log.Fatalf("parse database pool config: %v", err)
@@ -50,6 +52,7 @@ func main() {
 	// extended-protocol statements so server-side prepared statement state is
 	// not tied to a backend connection that PgBouncer may later reassign.
 	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+	poolConfig.ConnConfig.Tracer = observability.NewPGXQueryTracer(httpMetrics)
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		log.Fatalf("create database pool: %v", err)
@@ -64,7 +67,7 @@ func main() {
 	if err := identityStore.Migrate(ctx); err != nil {
 		log.Fatalf("migrate identity schema: %v", err)
 	}
-	worldStore := world.NewPostgresStore(pool)
+	worldStore := world.NewPostgresStoreWithCacheObserver(pool, httpMetrics)
 	if err := worldStore.Migrate(ctx); err != nil {
 		log.Fatalf("migrate world schema: %v", err)
 	}
@@ -147,8 +150,9 @@ func main() {
 	mailService := mail.NewService(worldStore, caseStore)
 	appEnvironment := os.Getenv("APP_ENV")
 	exposeErrorDetails := appEnvironment == "" || appEnvironment == "development"
-	mux.Handle("/api/", identity.NewHandlerWithGameAndMailDiagnostics(identityStore, appEnvironment == "production", worldStore, newsService, caseStore, recordsService, mailService, worldServerID, exposeErrorDetails))
-	mux.Handle("GET /api/health", health.NewHandler(pool))
+	mux.Handle("/api/", identity.NewHandlerWithGameAndMailMetrics(identityStore, appEnvironment == "production", worldStore, newsService, caseStore, recordsService, mailService, worldServerID, exposeErrorDetails, httpMetrics))
+	mux.Handle("GET /api/health", httpMetrics.Middleware(func(*http.Request) string { return "/api/health" }, health.NewHandler(pool)))
+	mux.Handle("GET /metrics", httpMetrics)
 	server := &http.Server{
 		Addr:              ":8080",
 		Handler:           mux,

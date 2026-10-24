@@ -237,6 +237,10 @@
 .gate-interface__error { color: #ff9b91; font-family: var(--noir-font-mono); font-size: 0.7rem; }
 .gate-interface__error p { margin: 0 0 0.35rem; }
 .gate-interface__error small { display: block; overflow-wrap: anywhere; margin-top: 0.2rem; }
+.gate-interface__error .api-error-notice__retry,
+.game-api-error .api-error-notice__retry { margin-top: 0.55rem; padding: 0.45rem 0.7rem; color: var(--gate-blue-050); background: rgb(9 39 59 / 72%); border: 1px solid var(--gate-blue-300); font: inherit; letter-spacing: 0.08em; cursor: pointer; }
+.gate-interface__error .api-error-notice__retry:disabled,
+.game-api-error .api-error-notice__retry:disabled { opacity: 0.6; cursor: wait; }
 .gate-interface__footer { min-height: 5rem; padding: var(--noir-space-3) var(--noir-space-6); background: rgb(4 21 34 / 94%); border-top: 1px solid var(--gate-blue-500); }
 .gate-interface__footer p { display: flex; flex-wrap: wrap; gap: var(--noir-space-3); margin: 0; color: var(--gate-blue-100); font-family: var(--noir-font-mono); font-size: 0.62rem; letter-spacing: 0.08em; }
 .gate-interface__footer p span { color: var(--gate-blue-300); }
@@ -885,6 +889,7 @@
 .computer-window.computer-window--positioned { transform: none; }
 .world-directory { color: var(--noir-paper-200); font-family: var(--noir-font-mono); font-size: 0.75rem; letter-spacing: 0.04em; }
 .world-directory > h1 { margin: var(--noir-space-3) 0 var(--noir-space-6); color: var(--noir-brass-300); font-family: var(--noir-font-sans); font-size: clamp(1rem, 2.5vw, 1.35rem); letter-spacing: 0.1em; }
+.world-directory__scope { margin: calc(-1 * var(--noir-space-4)) 0 var(--noir-space-4); color: var(--noir-ink-200); font-size: 0.58rem; letter-spacing: 0.12em; }
 .world-directory__label { display: block; margin-bottom: var(--noir-space-2); color: var(--noir-paper-400); font-size: 0.65rem; letter-spacing: 0.12em; }
 .world-directory__searchline { display: flex; align-items: stretch; gap: var(--noir-space-4); }
 .world-directory__searchline input { width: 100%; min-width: 0; padding: var(--noir-space-2) 0; color: var(--noir-paper-100); background: transparent; border: 0; border-bottom: 1px solid var(--noir-ink-500); border-radius: 0; font: inherit; }

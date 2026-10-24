@@ -153,6 +153,49 @@ func (s *postgresStore) accountForSession(ctx context.Context, token string, now
 	return result, characterResult, nil
 }
 
+func (s *postgresStore) accountForSessionAndLocation(ctx context.Context, token string, now time.Time) (account, *character, string, error) {
+	hash := sha256.Sum256([]byte(token))
+	var result account
+	var displayName pgtype.Text
+	var portraitID pgtype.Int2
+	var visualJSON []byte
+	var locationID pgtype.Text
+	err := s.db.QueryRow(ctx,
+		`SELECT a.id::text, a.username, a.email,
+		       c.display_name, c.portrait_id, c.visual_identity, pl.location_id
+		 FROM player_sessions s
+		 JOIN player_accounts a ON a.id = s.account_id
+		 LEFT JOIN player_characters c ON c.account_id = a.id
+		 LEFT JOIN player_locations pl ON pl.account_id = a.id
+		 WHERE s.token_hash = $1 AND s.expires_at > $2`, hash[:], now,
+	).Scan(&result.ID, &result.Username, &result.Email, &displayName, &portraitID, &visualJSON, &locationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return account{}, nil, "", ErrNotFound
+	}
+	if err != nil {
+		return account{}, nil, "", err
+	}
+	var characterResult *character
+	if displayName.Valid && portraitID.Valid {
+		visual, decodeErr := decodeVisualIdentity(visualJSON)
+		if decodeErr != nil {
+			return account{}, nil, "", decodeErr
+		}
+		characterResult = &character{DisplayName: displayName.String, PortraitID: int(portraitID.Int16), Visual: visual}
+	}
+	resolvedLocation := "fr/lyon/district/central"
+	if locationID.Valid {
+		resolvedLocation = locationID.String
+		if city, ok := world.CityForLocation(resolvedLocation); ok && city.ID != resolvedLocation && !isDistrictLocation(resolvedLocation, city.ID) {
+			if _, err := s.db.Exec(ctx, `UPDATE player_locations SET location_id=$2, updated_at=now() WHERE account_id=$1::uuid`, result.ID, city.ID); err != nil {
+				return account{}, nil, "", err
+			}
+			resolvedLocation = city.ID
+		}
+	}
+	return result, characterResult, resolvedLocation, nil
+}
+
 func (s *postgresStore) createCharacter(ctx context.Context, accountID, name string, visual world.VisualIdentity) (character, error) {
 	visualJSON, err := json.Marshal(visual)
 	if err != nil {

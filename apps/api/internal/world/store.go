@@ -2,15 +2,19 @@ package world
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 //go:embed schema.sql
@@ -33,8 +37,92 @@ type worldDatabase interface {
 	Begin(context.Context) (pgx.Tx, error)
 }
 
+type CacheObserver interface {
+	ObserveCache(cache, outcome string)
+}
+
 type PostgresStore struct {
-	db worldDatabase
+	db                       worldDatabase
+	cacheObserver            CacheObserver
+	countryWorldCacheMu      sync.Mutex
+	countryWorldCache        map[string]countryWorldCacheEntry
+	cityWorldCache           map[string]countryWorldCacheEntry
+	countryExpansionCache    map[string]countryExpansionCacheEntry
+	cityExpansionCache       map[string]cityWorldExpansionCacheEntry
+	countryExpansionRevision map[string]uint64
+	worldForCasesCache       map[string]worldForCasesCacheEntry
+	worldCasesExpansionCache map[string]worldCasesExpansionCacheEntry
+	worldCasesRevision       map[string]uint64
+}
+
+const (
+	countryWorldCacheTTL      = 10 * time.Minute
+	countryWorldCacheSize     = 16
+	cityWorldCacheSize        = 32
+	countryExpansionCacheSize = 64
+	cityExpansionCacheSize    = 64
+	worldForCasesCacheSize    = 8
+	worldCasesExpansionSize   = 32
+)
+
+type countryWorldCacheEntry struct {
+	world       World
+	districtIDs []string
+	knownNPCs   map[string]bool
+	expiresAt   time.Time
+}
+
+type countryExpansionCacheEntry struct {
+	npcs      []NPC
+	revision  uint64
+	expiresAt time.Time
+}
+
+type cityWorldExpansionCacheEntry struct {
+	npcs       []NPC
+	employment []EmploymentRelationship
+	personal   []PersonalRelationship
+	revision   uint64
+	expiresAt  time.Time
+}
+
+type worldForCasesCacheEntry struct {
+	world     World
+	knownNPCs map[string]bool
+	expiresAt time.Time
+}
+
+type worldCasesExpansionCacheEntry struct {
+	npcs       []NPC
+	employment []EmploymentRelationship
+	personal   []PersonalRelationship
+	revision   uint64
+	expiresAt  time.Time
+}
+
+type persistedNPCGeneration struct {
+	ID  string `json:"id"`
+	Key string `json:"key"`
+}
+
+type persistedNPCStatus struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
+type generatedMailEmployment struct {
+	RelationshipID string `json:"relationshipId"`
+	Role           string `json:"role"`
+	CompanyID      string `json:"companyId"`
+	CompanyKey     string `json:"companyKey"`
+}
+
+type generatedMailPersonalRelationship struct {
+	RelationshipType string    `json:"relationshipType"`
+	NPCID            string    `json:"npcId"`
+	GenerationKey    string    `json:"generationKey"`
+	Status           string    `json:"status"`
+	StatusChangedAt  time.Time `json:"statusChangedAt"`
 }
 
 type EmploymentView struct {
@@ -106,11 +194,12 @@ type CompanyRecord struct {
 }
 
 type CompanyEmployee struct {
-	ID     string          `json:"id"`
-	Name   string          `json:"name"`
-	Role   string          `json:"role"`
-	Status string          `json:"status"`
-	Visual *VisualIdentity `json:"visual,omitempty"`
+	ID              string          `json:"id"`
+	Name            string          `json:"name"`
+	Role            string          `json:"role"`
+	Status          string          `json:"status"`
+	StatusChangedAt time.Time       `json:"-"`
+	Visual          *VisualIdentity `json:"visual,omitempty"`
 }
 
 type PhoneContact struct {
@@ -133,6 +222,21 @@ type DistrictDestination struct {
 
 func NewPostgresStore(db worldDatabase) *PostgresStore {
 	return &PostgresStore{db: db}
+}
+
+func NewPostgresStoreWithCacheObserver(db worldDatabase, observer CacheObserver) *PostgresStore {
+	return &PostgresStore{db: db, cacheObserver: observer}
+}
+
+func (store *PostgresStore) observeCache(cache string, hit bool) {
+	if store.cacheObserver == nil {
+		return
+	}
+	outcome := "miss"
+	if hit {
+		outcome = "hit"
+	}
+	store.cacheObserver.ObserveCache(cache, outcome)
 }
 
 func (store *PostgresStore) Migrate(ctx context.Context) error {
@@ -388,46 +492,153 @@ func persistGeneratedCity(ctx context.Context, tx pgx.Tx, serverID string, gener
 
 // GetNPC rebuilds one person's generated fields and loads persisted relationships by indexed IDs.
 func (store *PostgresStore) GetNPC(ctx context.Context, serverID, npcID string) (NPCProfile, error) {
+	profile, _, _, err := store.getNPCWithWorldConfig(ctx, serverID, npcID, false)
+	return profile, err
+}
+
+// GetNPCWithWorldConfig returns the NPC profile and the world configuration
+// needed by deterministic consumers without issuing a second worlds query.
+func (store *PostgresStore) GetNPCWithWorldConfig(ctx context.Context, serverID, npcID string) (NPCProfile, string, int, error) {
+	return store.getNPCWithWorldConfig(ctx, serverID, npcID, true)
+}
+
+func (store *PostgresStore) getNPCWithWorldConfig(ctx context.Context, serverID, npcID string, combineWorldAndStatus bool) (NPCProfile, string, int, error) {
 	var seed string
-	var version int
-	var generationKey string
-	err := store.db.QueryRow(ctx,
-		`SELECT w.world_seed, COALESCE(city_generator.generator_version, w.generator_version), e.generation_key
-		 FROM world_entities e JOIN worlds w ON w.server_id = e.server_id
-		 LEFT JOIN world_city_generators city_generator
-		   ON city_generator.server_id=e.server_id
-		  AND city_generator.city_id=split_part(e.region_id, '/district/', 1)
-		 WHERE e.server_id = $1::uuid AND e.entity_id = $2 AND e.entity_type = 'npc'`,
-		serverID, npcID,
-	).Scan(&seed, &version, &generationKey)
+	var version, worldVersion int
+	var generationKey, status string
+	var statusChangedAt pgtype.Timestamptz
+	var employmentJSON, personalJSON []byte
+	var err error
+	if combineWorldAndStatus {
+		err = store.db.QueryRow(ctx,
+			`WITH target AS (
+			 SELECT w.world_seed AS seed, w.generator_version AS world_version,
+			        COALESCE(city_generator.generator_version, w.generator_version) AS city_version,
+			        e.entity_id, e.generation_key,
+				 COALESCE(status.value #>> '{}', 'alive') AS status, status.created_at
+			 FROM world_entities e JOIN worlds w ON w.server_id=e.server_id
+			 LEFT JOIN world_city_generators city_generator
+			   ON city_generator.server_id=e.server_id
+			  AND city_generator.city_id=split_part(e.region_id, '/district/', 1)
+			 LEFT JOIN LATERAL (
+			   SELECT m.value, m.created_at FROM world_mutations m
+			   WHERE m.server_id=e.server_id AND m.entity_id=e.entity_id AND m.field_key='status'
+			   ORDER BY m.mutation_order DESC LIMIT 1
+			 ) status ON true
+			 WHERE e.server_id=$1::uuid AND e.entity_id=$2 AND e.entity_type='npc'
+			)
+			SELECT target.seed, target.world_version, target.city_version, target.generation_key, target.status,
+		        COALESCE((SELECT jsonb_agg(jsonb_build_object(
+		          'relationshipId', r.relationship_id, 'role', COALESCE(r.role,''),
+		          'companyId', c.entity_id, 'companyKey', c.generation_key) ORDER BY r.relationship_id)
+		          FROM employment_relationships r JOIN world_entities c
+		            ON c.server_id=r.server_id AND c.entity_id=r.employer_company_id
+		          WHERE r.server_id=$1::uuid AND r.employee_npc_id=target.entity_id), '[]'::jsonb),
+		        COALESCE((SELECT jsonb_agg(jsonb_build_object(
+		          'relationshipType', r.relationship_type, 'npcId', other.entity_id,
+		          'generationKey', other.generation_key,
+		          'status', COALESCE((SELECT m.value #>> '{}' FROM world_mutations m
+		            WHERE m.server_id=other.server_id AND m.entity_id=other.entity_id AND m.field_key='status'
+		            ORDER BY m.mutation_order DESC LIMIT 1), 'alive'),
+		          'statusChangedAt', (SELECT m.created_at FROM world_mutations m
+		            WHERE m.server_id=other.server_id AND m.entity_id=other.entity_id AND m.field_key='status'
+		            ORDER BY m.mutation_order DESC LIMIT 1)) ORDER BY r.relationship_type, other.entity_id)
+		          FROM personal_relationships r JOIN world_entities other
+		            ON other.server_id=r.server_id AND other.entity_id=CASE
+		              WHEN r.person_a_npc_id=target.entity_id THEN r.person_b_npc_id ELSE r.person_a_npc_id END
+		          WHERE r.server_id=$1::uuid AND (r.person_a_npc_id=target.entity_id OR r.person_b_npc_id=target.entity_id)), '[]'::jsonb)
+			FROM target`,
+			serverID, npcID,
+		).Scan(&seed, &worldVersion, &version, &generationKey, &status, &statusChangedAt, &employmentJSON, &personalJSON)
+	} else {
+		err = store.db.QueryRow(ctx,
+			`SELECT w.world_seed, COALESCE(city_generator.generator_version, w.generator_version), e.generation_key
+			 FROM world_entities e JOIN worlds w ON w.server_id = e.server_id
+			 LEFT JOIN world_city_generators city_generator
+			   ON city_generator.server_id=e.server_id
+			  AND city_generator.city_id=split_part(e.region_id, '/district/', 1)
+			 WHERE e.server_id = $1::uuid AND e.entity_id = $2 AND e.entity_type = 'npc'`,
+			serverID, npcID,
+		).Scan(&seed, &version, &generationKey)
+		worldVersion = version
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		return NPCProfile{}, ErrEntityNotFound
+		return NPCProfile{}, "", 0, ErrEntityNotFound
 	}
 	if err != nil {
-		return NPCProfile{}, err
+		return NPCProfile{}, "", 0, err
 	}
 	npc, err := GenerateNPCFromKey(seed, version, generationKey)
 	if err != nil {
-		return NPCProfile{}, err
+		return NPCProfile{}, "", 0, err
 	}
 	if npc.ID != npcID {
-		return NPCProfile{}, ErrGeneratedConflict
+		return NPCProfile{}, "", 0, ErrGeneratedConflict
 	}
-	if err := store.applyNPCStatus(ctx, serverID, npcID, &npc); err != nil {
-		return NPCProfile{}, err
+	if combineWorldAndStatus {
+		if status != "alive" && status != "dead" && status != "arrested" {
+			return NPCProfile{}, "", 0, ErrInvalidMutation
+		}
+		npc.Status = status
+		if statusChangedAt.Valid {
+			npc.StatusChangedAt = statusChangedAt.Time
+		}
 	}
 	profile := NPCProfile{
 		NPC:                   npc,
 		Employment:            make([]EmploymentView, 0),
 		PersonalRelationships: make([]PersonalRelationshipView, 0),
 	}
-	if err := store.loadEmployment(ctx, serverID, seed, version, npcID, &profile); err != nil {
-		return NPCProfile{}, err
+	if !combineWorldAndStatus {
+		if err := store.applyNPCStatus(ctx, serverID, npcID, &profile.NPC); err != nil {
+			return NPCProfile{}, "", 0, err
+		}
+		if err := store.loadEmployment(ctx, serverID, seed, version, npcID, &profile); err != nil {
+			return NPCProfile{}, "", 0, err
+		}
+		if err := store.loadPersonalRelationships(ctx, serverID, seed, version, npcID, &profile); err != nil {
+			return NPCProfile{}, "", 0, err
+		}
+		return profile, seed, worldVersion, nil
 	}
-	if err := store.loadPersonalRelationships(ctx, serverID, seed, version, npcID, &profile); err != nil {
-		return NPCProfile{}, err
+	var generatedEmployment []generatedMailEmployment
+	if err := json.Unmarshal(employmentJSON, &generatedEmployment); err != nil {
+		return NPCProfile{}, "", 0, fmt.Errorf("decode NPC employment profile: %w", err)
 	}
-	return profile, nil
+	for _, relation := range generatedEmployment {
+		company, err := GenerateCompany(seed, version, relation.CompanyKey)
+		if err != nil {
+			return NPCProfile{}, "", 0, err
+		}
+		if company.ID != relation.CompanyID {
+			return NPCProfile{}, "", 0, ErrGeneratedConflict
+		}
+		profile.Employment = append(profile.Employment, EmploymentView{
+			RelationshipID: relation.RelationshipID, Role: relation.Role, Company: company,
+		})
+	}
+	var generatedPersonal []generatedMailPersonalRelationship
+	if err := json.Unmarshal(personalJSON, &generatedPersonal); err != nil {
+		return NPCProfile{}, "", 0, fmt.Errorf("decode NPC personal relationships: %w", err)
+	}
+	for _, relation := range generatedPersonal {
+		other, err := GenerateNPC(seed, version, relation.GenerationKey)
+		if err != nil {
+			return NPCProfile{}, "", 0, err
+		}
+		if other.ID != relation.NPCID {
+			return NPCProfile{}, "", 0, ErrGeneratedConflict
+		}
+		if relation.Status != "alive" && relation.Status != "dead" && relation.Status != "arrested" {
+			return NPCProfile{}, "", 0, ErrInvalidMutation
+		}
+		other.Status = relation.Status
+		other.StatusChangedAt = relation.StatusChangedAt
+		profile.PersonalRelationships = append(profile.PersonalRelationships, PersonalRelationshipView{
+			RelationshipType: relation.RelationshipType, NPC: other,
+		})
+	}
+	return profile, seed, worldVersion, nil
 }
 
 // NPCBelongsToCity validates the canonical generated ID prefix against a player's current city.
@@ -505,12 +716,605 @@ func (store *PostgresStore) SearchNPCsInCity(ctx context.Context, serverID, city
 	return store.searchNPCs(ctx, serverID, cityID, query)
 }
 
+// SearchNPCsInCountry searches generated and persisted NPCs within one country.
+func (store *PostgresStore) SearchNPCsInCountry(ctx context.Context, serverID, countryID, query string) ([]PersonSearchRecord, error) {
+	cities := make([]WorldCity, 0)
+	for _, city := range Cities() {
+		if city.CountryID == countryID {
+			cities = append(cities, city)
+		}
+	}
+	if len(cities) == 0 {
+		return nil, ErrEntityNotFound
+	}
+
+	cityIDs := make([]string, 0, len(cities))
+	for _, city := range cities {
+		cityIDs = append(cityIDs, city.ID)
+	}
+	cityVersions := make(map[string]int, len(cityIDs))
+	rows, err := store.db.Query(ctx,
+		`SELECT w.world_seed, w.generator_version, COALESCE(city_generator.city_id, ''),
+		        COALESCE(city_generator.generator_version, 0)
+		 FROM worlds w
+		 LEFT JOIN world_city_generators city_generator
+		   ON city_generator.server_id = w.server_id AND city_generator.city_id=ANY($2::text[])
+		 WHERE w.server_id=$1::uuid ORDER BY city_generator.city_id`, serverID, cityIDs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var seed string
+	var worldVersion int
+	scanCityVersion := func() error {
+		var cityID string
+		var version int
+		if err := rows.Scan(&seed, &worldVersion, &cityID, &version); err != nil {
+			return err
+		}
+		if cityID != "" {
+			cityVersions[cityID] = version
+		}
+		return nil
+	}
+	if !rows.Next() {
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return nil, ErrEntityNotFound
+	}
+	if err := scanCityVersion(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	for rows.Next() {
+		if err := scanCityVersion(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	cacheKey := countryWorldCacheKey(seed, worldVersion, cities, cityVersions)
+	base, districtIDs, known, cached := store.cachedCountryWorld(cacheKey)
+	store.observeCache("country_world_base", cached)
+	if !cached {
+		base = World{GeneratorVersion: worldVersion}
+		districtIDs = make([]string, 0, len(cities)*20)
+		known = make(map[string]bool)
+		for _, city := range cities {
+			version := countryCityGeneratorVersion(city, worldVersion, cityVersions)
+			cityWorld, err := GenerateCity(seed, version, city.ID)
+			if err != nil {
+				return nil, err
+			}
+			base.Regions = append(base.Regions, cityWorld.Regions...)
+			base.Entities = append(base.Entities, cityWorld.Entities...)
+			base.NPCs = append(base.NPCs, cityWorld.NPCs...)
+			base.Companies = append(base.Companies, cityWorld.Companies...)
+			base.CompanyLocations = append(base.CompanyLocations, cityWorld.CompanyLocations...)
+			base.EmploymentRelationships = append(base.EmploymentRelationships, cityWorld.EmploymentRelationships...)
+			base.PersonalRelationships = append(base.PersonalRelationships, cityWorld.PersonalRelationships...)
+			for _, region := range cityWorld.Regions {
+				if region.Kind == "district" {
+					districtIDs = append(districtIDs, region.ID)
+				}
+			}
+			for _, npc := range cityWorld.NPCs {
+				known[npc.ID] = true
+			}
+		}
+		store.cacheCountryWorld(cacheKey, base, districtIDs, known)
+	}
+	if len(districtIDs) == 0 {
+		return nil, ErrEntityNotFound
+	}
+	expansionKey := serverID + "\x00" + countryID + "\x00" + cacheKey
+	expandedNPCs, expansionsCached, expansionRevision := store.cachedCountryExpansions(serverID, countryID, expansionKey)
+	store.observeCache("country_world_expansions", expansionsCached)
+	if !expansionsCached {
+		rows, err = store.db.Query(ctx,
+			`SELECT entity_id, generation_key FROM world_entities
+			 WHERE server_id=$1::uuid AND entity_type='npc' AND region_id=ANY($2::text[])
+			 ORDER BY entity_id`, serverID, districtIDs,
+		)
+		if err != nil {
+			return nil, err
+		}
+		expandedNPCs = make([]NPC, 0)
+		for rows.Next() {
+			var id, key string
+			if err := rows.Scan(&id, &key); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if known[id] {
+				continue
+			}
+			npc, err := GenerateNPCFromKey(seed, worldVersion, key)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if npc.ID != id {
+				rows.Close()
+				return nil, ErrGeneratedConflict
+			}
+			expandedNPCs = append(expandedNPCs, npc)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		store.cacheCountryExpansions(expansionKey, serverID, countryID, expansionRevision, expandedNPCs)
+	}
+
+	matches := personSearchMatchesWithAdditional(base.NPCs, expandedNPCs, "", query)
+	base.NPCs = matches
+	npcIDs := make([]string, 0, len(matches))
+	matchedIDs := make(map[string]bool, len(matches))
+	for _, npc := range matches {
+		npcIDs = append(npcIDs, npc.ID)
+		matchedIDs[npc.ID] = true
+	}
+	var employmentRows []EmploymentRelationship
+	var personalRows []PersonalRelationship
+	var statusErr, employmentErr, personalErr error
+	var reads sync.WaitGroup
+	reads.Add(3)
+	go func() {
+		defer reads.Done()
+		statusErr = store.applyNPCStatuses(ctx, serverID, base.NPCs)
+	}()
+	go func() {
+		defer reads.Done()
+		employmentRows, employmentErr = store.cityEmploymentRelationships(ctx, serverID, npcIDs)
+	}()
+	go func() {
+		defer reads.Done()
+		personalRows, personalErr = store.cityPersonalRelationships(ctx, serverID, npcIDs)
+	}()
+	reads.Wait()
+	if statusErr != nil {
+		return nil, statusErr
+	}
+	if employmentErr != nil {
+		return nil, employmentErr
+	}
+	if personalErr != nil {
+		return nil, personalErr
+	}
+
+	employmentByID := make(map[string]bool)
+	employment := make([]EmploymentRelationship, 0)
+	for _, relation := range base.EmploymentRelationships {
+		if matchedIDs[relation.EmployeeNPCID] {
+			employment = append(employment, relation)
+			employmentByID[relation.ID] = true
+		}
+	}
+	for _, relation := range employmentRows {
+		if !employmentByID[relation.ID] {
+			employment = append(employment, relation)
+			employmentByID[relation.ID] = true
+		}
+	}
+	base.EmploymentRelationships = employment
+
+	personalByID := make(map[string]bool)
+	personal := make([]PersonalRelationship, 0)
+	for _, relation := range base.PersonalRelationships {
+		if relation.RelationshipType == "marriage" && (matchedIDs[relation.PersonANPCID] || matchedIDs[relation.PersonBNPCID]) {
+			personal = append(personal, relation)
+			personalByID[relation.ID] = true
+		}
+	}
+	for _, relation := range personalRows {
+		if relation.RelationshipType == "marriage" && !personalByID[relation.ID] {
+			personal = append(personal, relation)
+			personalByID[relation.ID] = true
+		}
+	}
+	base.PersonalRelationships = personal
+	return personSearchRecords(base, matches), nil
+}
+
+func countryCityGeneratorVersion(city WorldCity, worldVersion int, cityVersions map[string]int) int {
+	if city.ID == "fr/lyon" {
+		return worldVersion
+	}
+	if version, ok := cityVersions[city.ID]; ok {
+		return version
+	}
+	if worldVersion < GeneratorVersion5 {
+		return GeneratorVersion5
+	}
+	return worldVersion
+}
+
+func countryWorldCacheKey(seed string, worldVersion int, cities []WorldCity, cityVersions map[string]int) string {
+	var scope strings.Builder
+	for _, city := range cities {
+		fmt.Fprintf(&scope, "%s:%d;", city.ID, countryCityGeneratorVersion(city, worldVersion, cityVersions))
+	}
+	seedHash := sha256.Sum256([]byte(seed))
+	return fmt.Sprintf("%x:%d:%s", seedHash, worldVersion, scope.String())
+}
+
+func (store *PostgresStore) cachedCountryWorld(key string) (World, []string, map[string]bool, bool) {
+	now := time.Now()
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	entry, exists := store.countryWorldCache[key]
+	if !exists {
+		return World{}, nil, nil, false
+	}
+	if !now.Before(entry.expiresAt) {
+		delete(store.countryWorldCache, key)
+		return World{}, nil, nil, false
+	}
+	generated := entry.world
+	generated.NPCs = append([]NPC(nil), entry.world.NPCs...)
+	return generated, entry.districtIDs, entry.knownNPCs, true
+}
+
+func (store *PostgresStore) cacheCountryWorld(key string, generated World, districtIDs []string, knownNPCs map[string]bool) {
+	generated.NPCs = append([]NPC(nil), generated.NPCs...)
+	entry := countryWorldCacheEntry{
+		world: generated, districtIDs: districtIDs,
+		knownNPCs: knownNPCs, expiresAt: time.Now().Add(countryWorldCacheTTL),
+	}
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	if store.countryWorldCache == nil {
+		store.countryWorldCache = make(map[string]countryWorldCacheEntry)
+	}
+	if _, exists := store.countryWorldCache[key]; !exists && len(store.countryWorldCache) >= countryWorldCacheSize {
+		oldestKey := ""
+		var oldestExpiry time.Time
+		for cachedKey, cachedEntry := range store.countryWorldCache {
+			if oldestKey == "" || cachedEntry.expiresAt.Before(oldestExpiry) {
+				oldestKey, oldestExpiry = cachedKey, cachedEntry.expiresAt
+			}
+		}
+		delete(store.countryWorldCache, oldestKey)
+	}
+	store.countryWorldCache[key] = entry
+}
+
+func cityWorldCacheKey(seed string, worldVersion, cityVersion int, cityID string) string {
+	seedHash := sha256.Sum256([]byte(seed))
+	return fmt.Sprintf("city:%x:%d:%d:%s", seedHash, worldVersion, cityVersion, cityID)
+}
+
+func cloneCityBase(generated World) World {
+	generated.NPCs = append([]NPC(nil), generated.NPCs...)
+	generated.EmploymentRelationships = append([]EmploymentRelationship(nil), generated.EmploymentRelationships...)
+	generated.PersonalRelationships = append([]PersonalRelationship(nil), generated.PersonalRelationships...)
+	return generated
+}
+
+func (store *PostgresStore) cachedCityWorld(key string) (World, []string, map[string]bool, bool) {
+	now := time.Now()
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	entry, exists := store.cityWorldCache[key]
+	if !exists {
+		return World{}, nil, nil, false
+	}
+	if !now.Before(entry.expiresAt) {
+		delete(store.cityWorldCache, key)
+		return World{}, nil, nil, false
+	}
+	return cloneCityBase(entry.world), entry.districtIDs, entry.knownNPCs, true
+}
+
+func (store *PostgresStore) cacheCityWorld(key string, generated World, districtIDs []string, knownNPCs map[string]bool) {
+	entry := countryWorldCacheEntry{
+		world: cloneCityBase(generated), districtIDs: districtIDs,
+		knownNPCs: knownNPCs, expiresAt: time.Now().Add(countryWorldCacheTTL),
+	}
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	if store.cityWorldCache == nil {
+		store.cityWorldCache = make(map[string]countryWorldCacheEntry)
+	}
+	if _, exists := store.cityWorldCache[key]; !exists && len(store.cityWorldCache) >= cityWorldCacheSize {
+		oldestKey := ""
+		var oldestExpiry time.Time
+		for cachedKey, cachedEntry := range store.cityWorldCache {
+			if oldestKey == "" || cachedEntry.expiresAt.Before(oldestExpiry) {
+				oldestKey, oldestExpiry = cachedKey, cachedEntry.expiresAt
+			}
+		}
+		delete(store.cityWorldCache, oldestKey)
+	}
+	store.cityWorldCache[key] = entry
+}
+
+func countryExpansionScope(serverID, countryID string) string {
+	return serverID + "\x00" + countryID + "\x00"
+}
+
+func (store *PostgresStore) cachedCityExpansions(serverID, countryID, key string) ([]NPC, []EmploymentRelationship, []PersonalRelationship, bool, uint64) {
+	now := time.Now()
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	scope := countryExpansionScope(serverID, countryID)
+	revision := store.countryExpansionRevision[scope]
+	entry, exists := store.cityExpansionCache[key]
+	if !exists || entry.revision != revision || !now.Before(entry.expiresAt) {
+		if exists && !now.Before(entry.expiresAt) {
+			delete(store.cityExpansionCache, key)
+		}
+		return nil, nil, nil, false, revision
+	}
+	return append([]NPC(nil), entry.npcs...), append([]EmploymentRelationship(nil), entry.employment...), append([]PersonalRelationship(nil), entry.personal...), true, revision
+}
+
+func (store *PostgresStore) cacheCityExpansions(key, serverID, countryID string, revision uint64, npcs []NPC, employment []EmploymentRelationship, personal []PersonalRelationship) {
+	scope := countryExpansionScope(serverID, countryID)
+	entry := cityWorldExpansionCacheEntry{
+		npcs:       append([]NPC(nil), npcs...),
+		employment: append([]EmploymentRelationship(nil), employment...),
+		personal:   append([]PersonalRelationship(nil), personal...),
+		revision:   revision, expiresAt: time.Now().Add(countryWorldCacheTTL),
+	}
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	if store.countryExpansionRevision[scope] != revision {
+		return
+	}
+	if store.cityExpansionCache == nil {
+		store.cityExpansionCache = make(map[string]cityWorldExpansionCacheEntry)
+	}
+	if _, exists := store.cityExpansionCache[key]; !exists && len(store.cityExpansionCache) >= cityExpansionCacheSize {
+		oldestKey := ""
+		var oldestExpiry time.Time
+		for cachedKey, cachedEntry := range store.cityExpansionCache {
+			if oldestKey == "" || cachedEntry.expiresAt.Before(oldestExpiry) {
+				oldestKey, oldestExpiry = cachedKey, cachedEntry.expiresAt
+			}
+		}
+		delete(store.cityExpansionCache, oldestKey)
+	}
+	store.cityExpansionCache[key] = entry
+}
+
+func worldForCasesCacheKey(seed string, worldVersion int, cityVersions map[string]int) string {
+	cityIDs := make([]string, 0, len(cityVersions))
+	for cityID := range cityVersions {
+		cityIDs = append(cityIDs, cityID)
+	}
+	sort.Strings(cityIDs)
+	var cityScope strings.Builder
+	for _, cityID := range cityIDs {
+		fmt.Fprintf(&cityScope, "%s:%d;", cityID, cityVersions[cityID])
+	}
+	seedHash := sha256.Sum256([]byte(seed))
+	return fmt.Sprintf("world:%x:%d:%s", seedHash, worldVersion, cityScope.String())
+}
+
+func worldCasesScope(serverID string) string {
+	return serverID + "\x00"
+}
+
+func cloneWorldForCasesBase(base World) World {
+	base.NPCs = append([]NPC(nil), base.NPCs...)
+	base.EmploymentRelationships = append([]EmploymentRelationship(nil), base.EmploymentRelationships...)
+	base.PersonalRelationships = append([]PersonalRelationship(nil), base.PersonalRelationships...)
+	return base
+}
+
+func (store *PostgresStore) cachedWorldForCases(key string) (World, map[string]bool, bool) {
+	now := time.Now()
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	entry, exists := store.worldForCasesCache[key]
+	if !exists {
+		return World{}, nil, false
+	}
+	if !now.Before(entry.expiresAt) {
+		delete(store.worldForCasesCache, key)
+		return World{}, nil, false
+	}
+	return cloneWorldForCasesBase(entry.world), entry.knownNPCs, true
+}
+
+func (store *PostgresStore) cacheWorldForCases(key string, base World, knownNPCs map[string]bool) {
+	entry := worldForCasesCacheEntry{
+		world: cloneWorldForCasesBase(base), knownNPCs: knownNPCs,
+		expiresAt: time.Now().Add(countryWorldCacheTTL),
+	}
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	if store.worldForCasesCache == nil {
+		store.worldForCasesCache = make(map[string]worldForCasesCacheEntry)
+	}
+	if _, exists := store.worldForCasesCache[key]; !exists && len(store.worldForCasesCache) >= worldForCasesCacheSize {
+		oldestKey := ""
+		var oldestExpiry time.Time
+		for cachedKey, cachedEntry := range store.worldForCasesCache {
+			if oldestKey == "" || cachedEntry.expiresAt.Before(oldestExpiry) {
+				oldestKey, oldestExpiry = cachedKey, cachedEntry.expiresAt
+			}
+		}
+		delete(store.worldForCasesCache, oldestKey)
+	}
+	store.worldForCasesCache[key] = entry
+}
+
+func (store *PostgresStore) cachedWorldCasesExpansions(serverID, key string) ([]NPC, []EmploymentRelationship, []PersonalRelationship, bool, uint64) {
+	now := time.Now()
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	revision := store.worldCasesRevision[serverID]
+	entry, exists := store.worldCasesExpansionCache[key]
+	if !exists || entry.revision != revision || !now.Before(entry.expiresAt) {
+		if exists && !now.Before(entry.expiresAt) {
+			delete(store.worldCasesExpansionCache, key)
+		}
+		return nil, nil, nil, false, revision
+	}
+	return append([]NPC(nil), entry.npcs...), append([]EmploymentRelationship(nil), entry.employment...), append([]PersonalRelationship(nil), entry.personal...), true, revision
+}
+
+func (store *PostgresStore) cacheWorldCasesExpansions(serverID, key string, revision uint64, npcs []NPC, employment []EmploymentRelationship, personal []PersonalRelationship) {
+	entry := worldCasesExpansionCacheEntry{
+		npcs: append([]NPC(nil), npcs...), employment: append([]EmploymentRelationship(nil), employment...),
+		personal: append([]PersonalRelationship(nil), personal...), revision: revision,
+		expiresAt: time.Now().Add(countryWorldCacheTTL),
+	}
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	if store.worldCasesRevision[serverID] != revision {
+		return
+	}
+	if store.worldCasesExpansionCache == nil {
+		store.worldCasesExpansionCache = make(map[string]worldCasesExpansionCacheEntry)
+	}
+	if _, exists := store.worldCasesExpansionCache[key]; !exists && len(store.worldCasesExpansionCache) >= worldCasesExpansionSize {
+		oldestKey := ""
+		var oldestExpiry time.Time
+		for cachedKey, cachedEntry := range store.worldCasesExpansionCache {
+			if oldestKey == "" || cachedEntry.expiresAt.Before(oldestExpiry) {
+				oldestKey, oldestExpiry = cachedKey, cachedEntry.expiresAt
+			}
+		}
+		delete(store.worldCasesExpansionCache, oldestKey)
+	}
+	store.worldCasesExpansionCache[key] = entry
+}
+
+func (store *PostgresStore) invalidateWorldForCases(serverID string) {
+	scope := serverID + "\x00"
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	if store.worldCasesRevision == nil {
+		store.worldCasesRevision = make(map[string]uint64)
+	}
+	store.worldCasesRevision[serverID]++
+	for key := range store.worldCasesExpansionCache {
+		if strings.HasPrefix(key, scope) {
+			delete(store.worldCasesExpansionCache, key)
+		}
+	}
+}
+
+func (store *PostgresStore) cachedCountryExpansions(serverID, countryID, key string) ([]NPC, bool, uint64) {
+	now := time.Now()
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	scope := countryExpansionScope(serverID, countryID)
+	revision := store.countryExpansionRevision[scope]
+	entry, exists := store.countryExpansionCache[key]
+	if !exists || entry.revision != revision || !now.Before(entry.expiresAt) {
+		if exists && !now.Before(entry.expiresAt) {
+			delete(store.countryExpansionCache, key)
+		}
+		return nil, false, revision
+	}
+	return entry.npcs, true, revision
+}
+
+func (store *PostgresStore) cacheCountryExpansions(key, serverID, countryID string, revision uint64, npcs []NPC) {
+	scope := countryExpansionScope(serverID, countryID)
+	entry := countryExpansionCacheEntry{
+		npcs: append([]NPC(nil), npcs...), revision: revision,
+		expiresAt: time.Now().Add(countryWorldCacheTTL),
+	}
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	if store.countryExpansionRevision[scope] != revision {
+		return
+	}
+	if store.countryExpansionCache == nil {
+		store.countryExpansionCache = make(map[string]countryExpansionCacheEntry)
+	}
+	if _, exists := store.countryExpansionCache[key]; !exists && len(store.countryExpansionCache) >= countryExpansionCacheSize {
+		oldestKey := ""
+		var oldestExpiry time.Time
+		for cachedKey, cachedEntry := range store.countryExpansionCache {
+			if oldestKey == "" || cachedEntry.expiresAt.Before(oldestExpiry) {
+				oldestKey, oldestExpiry = cachedKey, cachedEntry.expiresAt
+			}
+		}
+		delete(store.countryExpansionCache, oldestKey)
+	}
+	store.countryExpansionCache[key] = entry
+}
+
+func (store *PostgresStore) invalidateCountryExpansions(serverID, countryID string) {
+	scope := countryExpansionScope(serverID, countryID)
+	store.countryWorldCacheMu.Lock()
+	defer store.countryWorldCacheMu.Unlock()
+	if store.countryExpansionRevision == nil {
+		store.countryExpansionRevision = make(map[string]uint64)
+	}
+	store.countryExpansionRevision[scope]++
+	for key := range store.countryExpansionCache {
+		if strings.HasPrefix(key, scope) {
+			delete(store.countryExpansionCache, key)
+		}
+	}
+	for key := range store.cityExpansionCache {
+		if strings.HasPrefix(key, scope) {
+			delete(store.cityExpansionCache, key)
+		}
+	}
+}
+
 func (store *PostgresStore) searchNPCs(ctx context.Context, serverID, cityID, query string) ([]PersonSearchRecord, error) {
-	base, err := store.WorldForCases(ctx, serverID)
+	var base World
+	var err error
+	if cityID != "" {
+		if cityID == "lyon" {
+			cityID = "fr/lyon"
+		}
+		base, err = store.CityWorldForCases(ctx, serverID, cityID)
+	} else {
+		base, err = store.WorldForCases(ctx, serverID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("reconstruct world for person search: %w", err)
 	}
+	return personSearchRecords(base, personSearchMatches(base.NPCs, cityID, query)), nil
+}
+
+func personSearchMatches(npcs []NPC, cityID, query string) []NPC {
+	return personSearchMatchesWithAdditional(npcs, nil, cityID, query)
+}
+
+func personSearchMatchesWithAdditional(npcs, additional []NPC, cityID, query string) []NPC {
 	query = strings.ToLower(strings.TrimSpace(query))
+	matches := make([]NPC, 0, MaxNPCSearchResults)
+	for _, group := range [][]NPC{npcs, additional} {
+		for _, npc := range group {
+			if cityID != "" && !npcBelongsToCity(cityID, npc.ID) {
+				continue
+			}
+			if strings.Contains(strings.ToLower(npc.Name), query) {
+				matches = append(matches, npc)
+			}
+		}
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].Name == matches[j].Name {
+			return matches[i].ID < matches[j].ID
+		}
+		return matches[i].Name < matches[j].Name
+	})
+	if len(matches) > MaxNPCSearchResults {
+		matches = matches[:MaxNPCSearchResults]
+	}
+	return matches
+}
+
+func personSearchRecords(base World, matches []NPC) []PersonSearchRecord {
 	regions := make(map[string]string, len(base.Regions))
 	entities := make(map[string]Entity, len(base.Entities))
 	for _, region := range base.Regions {
@@ -527,25 +1331,6 @@ func (store *PostgresStore) searchNPCs(ctx context.Context, serverID, cityID, qu
 				Address: makeAddress(entities[relation.LocationID], regions).Full,
 			}
 		}
-	}
-	matches := make([]NPC, 0)
-	for _, npc := range base.NPCs {
-		if cityID != "" && !npcBelongsToCity(cityID, npc.ID) {
-			continue
-		}
-		if !strings.Contains(strings.ToLower(npc.Name), query) {
-			continue
-		}
-		matches = append(matches, npc)
-	}
-	sort.Slice(matches, func(i, j int) bool {
-		if matches[i].Name == matches[j].Name {
-			return matches[i].ID < matches[j].ID
-		}
-		return matches[i].Name < matches[j].Name
-	})
-	if len(matches) > MaxNPCSearchResults {
-		matches = matches[:MaxNPCSearchResults]
 	}
 	results := make([]PersonSearchRecord, 0, len(matches))
 	married := make(map[string]bool)
@@ -577,7 +1362,7 @@ func (store *PostgresStore) searchNPCs(ctx context.Context, serverID, cityID, qu
 			Workplaces: workplaces, MaritalStatus: maritalStatus,
 		})
 	}
-	return results, nil
+	return results
 }
 
 func personMaritalStatus(profile NPCProfile) string {
@@ -975,18 +1760,24 @@ func regionNames(regions map[string]Region) map[string]string {
 }
 
 func (store *PostgresStore) generatedWorld(ctx context.Context, serverID string) (World, error) {
+	base, _, _, err := store.generatedWorldWithConfig(ctx, serverID)
+	return base, err
+}
+
+func (store *PostgresStore) generatedWorldWithConfig(ctx context.Context, serverID string) (World, string, int, error) {
 	var seed string
 	var version int
 	err := store.db.QueryRow(ctx,
 		`SELECT world_seed, generator_version FROM worlds WHERE server_id = $1::uuid`, serverID,
 	).Scan(&seed, &version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return World{}, ErrEntityNotFound
+		return World{}, "", 0, ErrEntityNotFound
 	}
 	if err != nil {
-		return World{}, err
+		return World{}, "", 0, err
 	}
-	return Generate(seed, version)
+	base, err := Generate(seed, version)
+	return base, seed, version, err
 }
 
 // GeneratedWorld reconstructs the small, deterministic world assigned to a server.
@@ -996,112 +1787,152 @@ func (store *PostgresStore) GeneratedWorld(ctx context.Context, serverID string)
 
 // WorldForCases reconstructs the seeded world plus NPCs added by on-demand growth.
 func (store *PostgresStore) WorldForCases(ctx context.Context, serverID string) (World, error) {
-	base, err := store.generatedWorld(ctx, serverID)
+	cityRows, err := store.db.Query(ctx,
+		`SELECT w.world_seed, w.generator_version, COALESCE(c.city_id,''), COALESCE(c.generator_version,0)
+		 FROM worlds w LEFT JOIN world_city_generators c ON c.server_id=w.server_id
+		 WHERE w.server_id=$1::uuid ORDER BY c.city_id`, serverID,
+	)
 	if err != nil {
 		return World{}, err
 	}
-	seed, version, err := store.worldSeedAndVersion(ctx, serverID)
-	if err != nil {
-		return World{}, err
+	var seed string
+	var version int
+	cityVersions := make(map[string]int)
+	if !cityRows.Next() {
+		cityRows.Close()
+		if err := cityRows.Err(); err != nil {
+			return World{}, err
+		}
+		return World{}, ErrEntityNotFound
 	}
-	cityRows, err := store.db.Query(ctx, `SELECT city_id, generator_version FROM world_city_generators WHERE server_id=$1::uuid ORDER BY city_id`, serverID)
-	if err != nil {
+	scanCityVersion := func() error {
+		var cityID string
+		var cityVersion int
+		if err := cityRows.Scan(&seed, &version, &cityID, &cityVersion); err != nil {
+			return err
+		}
+		if cityID != "" {
+			cityVersions[cityID] = cityVersion
+		}
+		return nil
+	}
+	if err := scanCityVersion(); err != nil {
+		cityRows.Close()
 		return World{}, err
 	}
 	for cityRows.Next() {
-		var cityID string
-		var cityVersion int
-		if err := cityRows.Scan(&cityID, &cityVersion); err != nil {
+		if err := scanCityVersion(); err != nil {
 			cityRows.Close()
 			return World{}, err
 		}
-		cityWorld, err := GenerateCity(seed, cityVersion, cityID)
-		if err != nil {
-			cityRows.Close()
-			return World{}, err
-		}
-		base.Regions = append(base.Regions, cityWorld.Regions...)
-		base.Entities = append(base.Entities, cityWorld.Entities...)
-		base.NPCs = append(base.NPCs, cityWorld.NPCs...)
-		base.Companies = append(base.Companies, cityWorld.Companies...)
-		base.CompanyLocations = append(base.CompanyLocations, cityWorld.CompanyLocations...)
-		base.EmploymentRelationships = append(base.EmploymentRelationships, cityWorld.EmploymentRelationships...)
-		base.PersonalRelationships = append(base.PersonalRelationships, cityWorld.PersonalRelationships...)
 	}
 	cityRows.Close()
 	if err := cityRows.Err(); err != nil {
 		return World{}, err
 	}
-	known := make(map[string]bool, len(base.NPCs))
-	for _, npc := range base.NPCs {
-		known[npc.ID] = true
-	}
-	rows, err := store.db.Query(ctx, `SELECT entity_id, generation_key FROM world_entities WHERE server_id=$1::uuid AND entity_type='npc' ORDER BY entity_id`, serverID)
-	if err != nil {
-		return World{}, err
-	}
-	for rows.Next() {
-		var id, key string
-		if err := rows.Scan(&id, &key); err != nil {
-			rows.Close()
-			return World{}, err
-		}
-		if known[id] {
-			continue
-		}
-		npc, err := GenerateNPCFromKey(seed, version, key)
+	cacheKey := worldForCasesCacheKey(seed, version, cityVersions)
+	base, known, generatedCached := store.cachedWorldForCases(cacheKey)
+	store.observeCache("world_for_cases_base", generatedCached)
+	if !generatedCached {
+		base, err = Generate(seed, version)
 		if err != nil {
-			rows.Close()
 			return World{}, err
 		}
-		if npc.ID != id {
-			rows.Close()
-			return World{}, ErrGeneratedConflict
+		cityIDs := make([]string, 0, len(cityVersions))
+		for cityID := range cityVersions {
+			cityIDs = append(cityIDs, cityID)
 		}
-		base.NPCs = append(base.NPCs, npc)
-		known[id] = true
+		sort.Strings(cityIDs)
+		for _, cityID := range cityIDs {
+			cityWorld, err := GenerateCity(seed, cityVersions[cityID], cityID)
+			if err != nil {
+				return World{}, err
+			}
+			base.Regions = append(base.Regions, cityWorld.Regions...)
+			base.Entities = append(base.Entities, cityWorld.Entities...)
+			base.NPCs = append(base.NPCs, cityWorld.NPCs...)
+			base.Companies = append(base.Companies, cityWorld.Companies...)
+			base.CompanyLocations = append(base.CompanyLocations, cityWorld.CompanyLocations...)
+			base.EmploymentRelationships = append(base.EmploymentRelationships, cityWorld.EmploymentRelationships...)
+			base.PersonalRelationships = append(base.PersonalRelationships, cityWorld.PersonalRelationships...)
+		}
+		known = make(map[string]bool, len(base.NPCs))
+		for _, npc := range base.NPCs {
+			known[npc.ID] = true
+		}
+		store.cacheWorldForCases(cacheKey, base, known)
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return World{}, err
-	}
-	if err := store.applyNPCStatuses(ctx, serverID, base.NPCs); err != nil {
-		return World{}, err
-	}
-	rows, err = store.db.Query(ctx, `SELECT relationship_id, employee_npc_id, employer_company_id, role FROM employment_relationships WHERE server_id=$1::uuid ORDER BY relationship_id`, serverID)
-	if err != nil {
-		return World{}, err
-	}
-	base.EmploymentRelationships = base.EmploymentRelationships[:0]
-	for rows.Next() {
-		var r EmploymentRelationship
-		if err := rows.Scan(&r.ID, &r.EmployeeNPCID, &r.EmployerCompanyID, &r.Role); err != nil {
-			rows.Close()
+	expansionKey := worldCasesScope(serverID) + cacheKey
+	expandedNPCs, employmentRows, personalRows, expansionsCached, expansionRevision := store.cachedWorldCasesExpansions(serverID, expansionKey)
+	store.observeCache("world_for_cases_expansions", expansionsCached)
+	var expansionStatuses map[string]string
+	if !expansionsCached {
+		var entitiesJSON, employmentJSON, personalJSON, statusesJSON []byte
+		err := store.db.QueryRow(ctx,
+			`SELECT
+			 COALESCE((SELECT jsonb_agg(jsonb_build_object('id', entity_id, 'key', generation_key) ORDER BY entity_id)
+			           FROM world_entities WHERE server_id=$1::uuid AND entity_type='npc'), '[]'::jsonb),
+			 COALESCE((SELECT jsonb_agg(jsonb_build_object('id', relationship_id, 'employeeNpcId', employee_npc_id,
+			             'employerCompanyId', employer_company_id, 'role', COALESCE(role,'')) ORDER BY relationship_id)
+			           FROM employment_relationships WHERE server_id=$1::uuid), '[]'::jsonb),
+			 COALESCE((SELECT jsonb_agg(jsonb_build_object('id', relationship_id, 'personANpcId', person_a_npc_id,
+			             'personBNpcId', person_b_npc_id, 'relationshipType', relationship_type) ORDER BY relationship_id)
+			           FROM personal_relationships WHERE server_id=$1::uuid), '[]'::jsonb),
+			 COALESCE((SELECT jsonb_agg(jsonb_build_object('id', entity_id, 'status', status) ORDER BY entity_id)
+			           FROM (
+			             SELECT DISTINCT ON (m.entity_id) m.entity_id, m.value #>> '{}' AS status
+			             FROM world_mutations m JOIN world_entities e ON e.server_id=m.server_id AND e.entity_id=m.entity_id
+			             WHERE m.server_id=$1::uuid AND m.field_key='status' AND e.entity_type='npc'
+			             ORDER BY m.entity_id, m.mutation_order DESC
+			           ) latest_statuses), '[]'::jsonb)`, serverID,
+		).Scan(&entitiesJSON, &employmentJSON, &personalJSON, &statusesJSON)
+		if err != nil {
 			return World{}, err
 		}
-		base.EmploymentRelationships = append(base.EmploymentRelationships, r)
+		var entityRows []persistedNPCGeneration
+		var employmentRowsLoaded []EmploymentRelationship
+		var personalRowsLoaded []PersonalRelationship
+		var statusRows []persistedNPCStatus
+		for _, result := range []struct {
+			data   []byte
+			target any
+		}{{entitiesJSON, &entityRows}, {employmentJSON, &employmentRowsLoaded}, {personalJSON, &personalRowsLoaded}, {statusesJSON, &statusRows}} {
+			if err := json.Unmarshal(result.data, result.target); err != nil {
+				return World{}, fmt.Errorf("decode world expansion rows: %w", err)
+			}
+		}
+		statusesLoaded := make(map[string]string, len(statusRows))
+		for _, status := range statusRows {
+			statusesLoaded[status.ID] = status.Status
+		}
+		expandedNPCs = make([]NPC, 0)
+		for _, entity := range entityRows {
+			if known[entity.ID] {
+				continue
+			}
+			npc, err := GenerateNPCFromKey(seed, version, entity.Key)
+			if err != nil {
+				return World{}, err
+			}
+			if npc.ID != entity.ID {
+				return World{}, ErrGeneratedConflict
+			}
+			expandedNPCs = append(expandedNPCs, npc)
+		}
+		employmentRows, personalRows = employmentRowsLoaded, personalRowsLoaded
+		expansionStatuses = statusesLoaded
+		store.cacheWorldCasesExpansions(serverID, expansionKey, expansionRevision, expandedNPCs, employmentRows, personalRows)
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return World{}, err
-	}
-	rows, err = store.db.Query(ctx, `SELECT relationship_id, person_a_npc_id, person_b_npc_id, relationship_type FROM personal_relationships WHERE server_id=$1::uuid ORDER BY relationship_id`, serverID)
-	if err != nil {
-		return World{}, err
-	}
-	base.PersonalRelationships = base.PersonalRelationships[:0]
-	for rows.Next() {
-		var r PersonalRelationship
-		if err := rows.Scan(&r.ID, &r.PersonANPCID, &r.PersonBNPCID, &r.RelationshipType); err != nil {
-			rows.Close()
+	base.NPCs = append(base.NPCs, expandedNPCs...)
+	if expansionsCached {
+		if err := store.applyNPCStatuses(ctx, serverID, base.NPCs); err != nil {
 			return World{}, err
 		}
-		base.PersonalRelationships = append(base.PersonalRelationships, r)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
+	} else if err := applyNPCStatusMap(base.NPCs, expansionStatuses); err != nil {
 		return World{}, err
 	}
+	base.EmploymentRelationships = employmentRows
+	base.PersonalRelationships = personalRows
 	sort.Slice(base.NPCs, func(i, j int) bool { return base.NPCs[i].ID < base.NPCs[j].ID })
 	return base, nil
 }
@@ -1112,80 +1943,128 @@ func (store *PostgresStore) CityWorldForCases(ctx context.Context, serverID, cit
 	if _, ok := CityByID(cityID); !ok {
 		return World{}, ErrEntityNotFound
 	}
-	seed, worldVersion, err := store.worldSeedAndVersion(ctx, serverID)
+	var seed string
+	var worldVersion, cityVersion int
+	err := store.db.QueryRow(ctx,
+		`SELECT w.world_seed, w.generator_version,
+	        COALESCE(city_generator.generator_version,
+	                 CASE WHEN $2::text = 'fr/lyon' OR w.generator_version >= $3::int
+	                      THEN w.generator_version ELSE $3::int END)
+		 FROM worlds w
+		 LEFT JOIN world_city_generators city_generator
+		   ON city_generator.server_id = w.server_id AND city_generator.city_id = $2
+		 WHERE w.server_id = $1::uuid`,
+		serverID, cityID, GeneratorVersion5,
+	).Scan(&seed, &worldVersion, &cityVersion)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return World{}, ErrEntityNotFound
+	}
 	if err != nil {
 		return World{}, err
 	}
-	cityVersion, err := store.cityGeneratorVersion(ctx, serverID, cityID, worldVersion)
-	if err != nil {
-		return World{}, err
-	}
-	base, err := GenerateCity(seed, cityVersion, cityID)
-	if err != nil {
-		return World{}, err
-	}
-	known := make(map[string]bool, len(base.NPCs))
-	for _, npc := range base.NPCs {
-		known[npc.ID] = true
-	}
-	rows, err := store.db.Query(ctx,
-		`SELECT entity_id, generation_key FROM world_entities
-		 WHERE server_id=$1::uuid AND entity_type='npc' AND region_id LIKE $2 ORDER BY entity_id`,
-		serverID, cityID+"/district/%",
-	)
-	if err != nil {
-		return World{}, err
-	}
-	for rows.Next() {
-		var id, key string
-		if err := rows.Scan(&id, &key); err != nil {
-			rows.Close()
-			return World{}, err
-		}
-		if known[id] {
-			continue
-		}
-		npc, err := GenerateNPCFromKey(seed, worldVersion, key)
+	cityKey := cityWorldCacheKey(seed, worldVersion, cityVersion, cityID)
+	base, districtIDs, known, generatedCached := store.cachedCityWorld(cityKey)
+	store.observeCache("city_world_base", generatedCached)
+	if !generatedCached {
+		base, err = GenerateCity(seed, cityVersion, cityID)
 		if err != nil {
-			rows.Close()
 			return World{}, err
 		}
-		if npc.ID != id {
-			rows.Close()
-			return World{}, ErrGeneratedConflict
+		known = make(map[string]bool, len(base.NPCs))
+		districtIDs = make([]string, 0, len(base.Regions))
+		for _, npc := range base.NPCs {
+			known[npc.ID] = true
 		}
-		base.NPCs = append(base.NPCs, npc)
-		known[id] = true
+		for _, region := range base.Regions {
+			if region.Kind == "district" {
+				districtIDs = append(districtIDs, region.ID)
+			}
+		}
+		store.cacheCityWorld(cityKey, base, districtIDs, known)
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return World{}, err
+	if len(districtIDs) == 0 {
+		return World{}, ErrEntityNotFound
+	}
+	city, _ := CityByID(cityID)
+	cityExpansionKey := countryExpansionScope(serverID, city.CountryID) + "city:" + cityKey
+	expandedNPCs, employmentRows, personalRows, expansionsCached, expansionRevision := store.cachedCityExpansions(serverID, city.CountryID, cityExpansionKey)
+	store.observeCache("city_world_expansions", expansionsCached)
+	if !expansionsCached {
+		rows, err := store.db.Query(ctx,
+			`SELECT entity_id, generation_key FROM world_entities
+			 WHERE server_id=$1::uuid AND entity_type='npc' AND region_id=ANY($2::text[]) ORDER BY entity_id`,
+			serverID, districtIDs,
+		)
+		if err != nil {
+			return World{}, err
+		}
+		expandedNPCs = make([]NPC, 0)
+		for rows.Next() {
+			var id, key string
+			if err := rows.Scan(&id, &key); err != nil {
+				rows.Close()
+				return World{}, err
+			}
+			if known[id] {
+				continue
+			}
+			npc, err := GenerateNPCFromKey(seed, worldVersion, key)
+			if err != nil {
+				rows.Close()
+				return World{}, err
+			}
+			if npc.ID != id {
+				rows.Close()
+				return World{}, ErrGeneratedConflict
+			}
+			expandedNPCs = append(expandedNPCs, npc)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return World{}, err
+		}
+	}
+	base.NPCs = append(base.NPCs, expandedNPCs...)
+	expandedNPCIDs := make([]string, 0, len(expandedNPCs))
+	for _, npc := range expandedNPCs {
+		expandedNPCIDs = append(expandedNPCIDs, npc.ID)
 	}
 
 	npcIDs := make([]string, 0, len(base.NPCs))
 	for _, npc := range base.NPCs {
 		npcIDs = append(npcIDs, npc.ID)
 	}
-	rows, err = store.db.Query(ctx,
-		`SELECT DISTINCT ON (entity_id) entity_id, value #>> '{}'
-		 FROM world_mutations WHERE server_id=$1::uuid AND field_key='status'
-		 AND entity_id=ANY($2::text[]) ORDER BY entity_id, mutation_order DESC`, serverID, npcIDs,
-	)
-	if err != nil {
-		return World{}, err
+	var statuses map[string]string
+	var statusErr, employmentErr, personalErr error
+	var reads sync.WaitGroup
+	reads.Add(1)
+	go func() {
+		defer reads.Done()
+		statuses, statusErr = store.cityNPCStatuses(ctx, serverID, npcIDs)
+	}()
+	if !expansionsCached {
+		reads.Add(2)
+		go func() {
+			defer reads.Done()
+			employmentRows, employmentErr = store.cityEmploymentRelationships(ctx, serverID, expandedNPCIDs)
+		}()
+		go func() {
+			defer reads.Done()
+			personalRows, personalErr = store.cityPersonalRelationships(ctx, serverID, expandedNPCIDs)
+		}()
 	}
-	statuses := make(map[string]string)
-	for rows.Next() {
-		var id, status string
-		if err := rows.Scan(&id, &status); err != nil {
-			rows.Close()
-			return World{}, err
-		}
-		statuses[id] = status
+	reads.Wait()
+	if statusErr != nil {
+		return World{}, statusErr
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return World{}, err
+	if employmentErr != nil {
+		return World{}, employmentErr
+	}
+	if personalErr != nil {
+		return World{}, personalErr
+	}
+	if !expansionsCached {
+		store.cacheCityExpansions(cityExpansionKey, serverID, city.CountryID, expansionRevision, expandedNPCs, employmentRows, personalRows)
 	}
 	for index := range base.NPCs {
 		if status, ok := statuses[base.NPCs[index].ID]; ok {
@@ -1200,60 +2079,95 @@ func (store *PostgresStore) CityWorldForCases(ctx context.Context, serverID, cit
 	for _, relation := range base.EmploymentRelationships {
 		employmentIDs[relation.ID] = true
 	}
-	rows, err = store.db.Query(ctx,
-		`SELECT relationship_id, employee_npc_id, employer_company_id, COALESCE(role,'')
-		 FROM employment_relationships WHERE server_id=$1::uuid AND employee_npc_id=ANY($2::text[])
-		 ORDER BY relationship_id`, serverID, npcIDs,
-	)
-	if err != nil {
-		return World{}, err
-	}
-	for rows.Next() {
-		var relation EmploymentRelationship
-		if err := rows.Scan(&relation.ID, &relation.EmployeeNPCID, &relation.EmployerCompanyID, &relation.Role); err != nil {
-			rows.Close()
-			return World{}, err
-		}
+	for _, relation := range employmentRows {
 		if !employmentIDs[relation.ID] {
 			base.EmploymentRelationships = append(base.EmploymentRelationships, relation)
 			employmentIDs[relation.ID] = true
 		}
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return World{}, err
 	}
 
 	personalIDs := make(map[string]bool, len(base.PersonalRelationships))
 	for _, relation := range base.PersonalRelationships {
 		personalIDs[relation.ID] = true
 	}
-	rows, err = store.db.Query(ctx,
+	for _, relation := range personalRows {
+		if !personalIDs[relation.ID] {
+			base.PersonalRelationships = append(base.PersonalRelationships, relation)
+			personalIDs[relation.ID] = true
+		}
+	}
+	sort.Slice(base.NPCs, func(i, j int) bool { return base.NPCs[i].ID < base.NPCs[j].ID })
+	return base, nil
+}
+
+func (store *PostgresStore) cityNPCStatuses(ctx context.Context, serverID string, npcIDs []string) (map[string]string, error) {
+	rows, err := store.db.Query(ctx,
+		`SELECT DISTINCT ON (entity_id) entity_id, value #>> '{}'
+		 FROM world_mutations WHERE server_id=$1::uuid AND field_key='status'
+		 AND entity_id=ANY($2::text[]) ORDER BY entity_id, mutation_order DESC`, serverID, npcIDs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	statuses := make(map[string]string)
+	for rows.Next() {
+		var id, status string
+		if err := rows.Scan(&id, &status); err != nil {
+			return nil, err
+		}
+		statuses[id] = status
+	}
+	return statuses, rows.Err()
+}
+
+func (store *PostgresStore) cityEmploymentRelationships(ctx context.Context, serverID string, npcIDs []string) ([]EmploymentRelationship, error) {
+	if len(npcIDs) == 0 {
+		return []EmploymentRelationship{}, nil
+	}
+	rows, err := store.db.Query(ctx,
+		`SELECT relationship_id, employee_npc_id, employer_company_id, COALESCE(role,'')
+		 FROM employment_relationships WHERE server_id=$1::uuid AND employee_npc_id=ANY($2::text[])
+		 ORDER BY relationship_id`, serverID, npcIDs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	relationships := make([]EmploymentRelationship, 0)
+	for rows.Next() {
+		var relation EmploymentRelationship
+		if err := rows.Scan(&relation.ID, &relation.EmployeeNPCID, &relation.EmployerCompanyID, &relation.Role); err != nil {
+			return nil, err
+		}
+		relationships = append(relationships, relation)
+	}
+	return relationships, rows.Err()
+}
+
+func (store *PostgresStore) cityPersonalRelationships(ctx context.Context, serverID string, npcIDs []string) ([]PersonalRelationship, error) {
+	if len(npcIDs) == 0 {
+		return []PersonalRelationship{}, nil
+	}
+	rows, err := store.db.Query(ctx,
 		`SELECT relationship_id, person_a_npc_id, person_b_npc_id, relationship_type
 		 FROM personal_relationships WHERE server_id=$1::uuid
 		 AND (person_a_npc_id=ANY($2::text[]) OR person_b_npc_id=ANY($2::text[]))
 		 ORDER BY relationship_id`, serverID, npcIDs,
 	)
 	if err != nil {
-		return World{}, err
+		return nil, err
 	}
+	defer rows.Close()
+	relationships := make([]PersonalRelationship, 0)
 	for rows.Next() {
 		var relation PersonalRelationship
 		if err := rows.Scan(&relation.ID, &relation.PersonANPCID, &relation.PersonBNPCID, &relation.RelationshipType); err != nil {
-			rows.Close()
-			return World{}, err
+			return nil, err
 		}
-		if !personalIDs[relation.ID] {
-			base.PersonalRelationships = append(base.PersonalRelationships, relation)
-			personalIDs[relation.ID] = true
-		}
+		relationships = append(relationships, relation)
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return World{}, err
-	}
-	sort.Slice(base.NPCs, func(i, j int) bool { return base.NPCs[i].ID < base.NPCs[j].ID })
-	return base, nil
+	return relationships, rows.Err()
 }
 
 // PhoneContactByNumber resolves a generated employee telephone number within the caller's city.
@@ -1310,7 +2224,9 @@ func (store *PostgresStore) ExpandDistrictSociety(ctx context.Context, serverID,
 	if err != nil {
 		return err
 	}
+	countryID := ""
 	if city, _, _, ok := cityForDistrict(seed, districtID); ok {
+		countryID = city.CountryID
 		version, err = store.cityGeneratorVersion(ctx, serverID, city.ID, version)
 		if err != nil {
 			return err
@@ -1359,7 +2275,14 @@ func (store *PostgresStore) ExpandDistrictSociety(ctx context.Context, serverID,
 		return err
 	}
 	_ = districtExists
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	if countryID != "" {
+		store.invalidateCountryExpansions(serverID, countryID)
+	}
+	store.invalidateWorldForCases(serverID)
+	return nil
 }
 
 // WorldConfig returns the seed and generator version for one server's world.
@@ -1422,6 +2345,20 @@ func (store *PostgresStore) applyNPCStatus(ctx context.Context, serverID, npcID 
 		return ErrInvalidMutation
 	}
 	npc.Status = status
+	return nil
+}
+
+func applyNPCStatusMap(npcs []NPC, statuses map[string]string) error {
+	for index := range npcs {
+		status, exists := statuses[npcs[index].ID]
+		if !exists {
+			continue
+		}
+		if status != "alive" && status != "dead" && status != "arrested" {
+			return ErrInvalidMutation
+		}
+		npcs[index].Status = status
+	}
 	return nil
 }
 
@@ -1516,6 +2453,53 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 		return nil, err
 	}
 	return employees, nil
+}
+
+// EmployeesOfCompanies loads staff for several employers in one query, reusing the caller's world config.
+func (store *PostgresStore) EmployeesOfCompanies(ctx context.Context, serverID, seed string, version int, companyIDs []string) (map[string][]CompanyEmployee, error) {
+	result := make(map[string][]CompanyEmployee, len(companyIDs))
+	if len(companyIDs) == 0 {
+		return result, nil
+	}
+	rows, err := store.db.Query(ctx,
+		`SELECT r.employer_company_id, e.entity_id, e.generation_key, r.role,
+		 COALESCE(status.value #>> '{}', 'alive'), status.created_at
+		 FROM employment_relationships r
+		 JOIN world_entities e
+		   ON e.server_id = r.server_id AND e.entity_id = r.employee_npc_id AND e.entity_type = 'npc'
+		 LEFT JOIN LATERAL (
+			SELECT value, created_at FROM world_mutations m
+		   WHERE m.server_id = e.server_id AND m.entity_id = e.entity_id AND m.field_key = 'status'
+		   ORDER BY m.mutation_order DESC LIMIT 1
+		 ) status ON true
+		 WHERE r.server_id = $1::uuid AND r.employer_company_id = ANY($2::text[])
+		 ORDER BY r.employer_company_id, e.entity_id`,
+		serverID, companyIDs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var companyID, employeeID, key, role, status string
+		var statusChangedAt pgtype.Timestamptz
+		if err := rows.Scan(&companyID, &employeeID, &key, &role, &status, &statusChangedAt); err != nil {
+			return nil, err
+		}
+		npc, err := GenerateNPC(seed, version, key)
+		if err != nil {
+			return nil, err
+		}
+		employee := CompanyEmployee{ID: employeeID, Name: npc.Name, Role: role, Status: status, Visual: npc.Visual}
+		if statusChangedAt.Valid {
+			employee.StatusChangedAt = statusChangedAt.Time
+		}
+		result[companyID] = append(result[companyID], employee)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (store *PostgresStore) loadEmployment(ctx context.Context, serverID, seed string, version int, npcID string, profile *NPCProfile) error {

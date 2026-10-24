@@ -63,7 +63,10 @@ SET visual_identity = jsonb_set(
             WHEN 'face_glasses_02' THEN 'face_glasses_black_02'
             ELSE value
         END)), '[]'::jsonb)
-        FROM jsonb_array_elements_text(visual_identity->'accessoryIds') AS item(value)
+        FROM jsonb_array_elements_text(CASE
+            WHEN jsonb_typeof(visual_identity->'accessoryIds') = 'array' THEN visual_identity->'accessoryIds'
+            ELSE '[]'::jsonb
+        END) AS item(value)
     ),
     true
 )
@@ -112,7 +115,10 @@ SET visual_identity = jsonb_set(
                 THEN regexp_replace(value, '^face_glasses_(.*)_02$', 'face_glasses_square_\1')
             ELSE regexp_replace(value, '_01$', '')
         END)), '[]'::jsonb)
-        FROM jsonb_array_elements_text(COALESCE(visual_identity->'accessoryIds', '[]'::jsonb)) AS item(value)
+        FROM jsonb_array_elements_text(CASE
+            WHEN jsonb_typeof(visual_identity->'accessoryIds') = 'array' THEN visual_identity->'accessoryIds'
+            ELSE '[]'::jsonb
+        END) AS item(value)
     ),
     true
 )

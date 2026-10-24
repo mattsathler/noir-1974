@@ -8,6 +8,23 @@ vi.mock("../api.js", () => ({ getGateDestinations: vi.fn(), getNeighborhoodDesti
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("GateCityExplorer", () => {
+  it("hides internal API details and retries a failed registry read", async () => {
+    const lyon = { id: "fr/lyon", countryId: "fr", country: "France", name: "Lyon", timeZone: "Europe/Paris" };
+    getGateDestinations
+      .mockRejectedValueOnce({ message: "The GATE registry could not be reached.", code: "GATE_REGISTRY_FAILED", requestId: "req-gate-1", details: "SELECT * FROM private_table" })
+      .mockResolvedValueOnce([lyon]);
+    getNeighborhoodDestinations.mockResolvedValue([{ id: "fr/lyon/district/central", name: "Central", locations: [] }]);
+
+    render(<GateCityExplorer world={{ cityId: lyon.id, city: lyon.name, country: lyon.country }} onTravel={vi.fn()} onClose={vi.fn()} />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("REFERENCE req-gate-1 · GATE_REGISTRY_FAILED");
+    expect(alert).not.toHaveTextContent("private_table");
+
+    fireEvent.click(screen.getByRole("button", { name: "RETRY GATE REQUEST" }));
+    await waitFor(() => expect(getGateDestinations).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("button", { name: /Lyon/ })).toBeInTheDocument();
+  });
+
   it("keeps country, city, and neighborhood columns visible and starts at the current city", async () => {
     const tokyo = { id: "jp/tokyo", countryId: "jp", country: "Japan", name: "Tokyo", timeZone: "Asia/Tokyo" };
     const lyon = { id: "fr/lyon", countryId: "fr", country: "France", name: "Lyon", timeZone: "Europe/Paris" };

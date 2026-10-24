@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getGateDestinations, getNeighborhoodDestinations } from "../api.js";
+import APIErrorNotice from "../../../shared/APIErrorNotice.jsx";
 
 export default function GateCityExplorer({ world, onTravel, onClose }) {
   const [cities, setCities] = useState([]);
@@ -11,6 +12,7 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
   const [loading, setLoading] = useState(true);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [error, setError] = useState(null);
+  const [registryAttempt, setRegistryAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const closeRef = useRef(null);
   const districtRequest = useRef(0);
@@ -31,6 +33,8 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError(null);
     getGateDestinations().then((items) => {
       if (!active) return;
       setCities(items);
@@ -42,17 +46,17 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
       getNeighborhoodDestinations(currentCity.id).then((destinations) => {
         if (active) setDistricts(destinations);
       }).catch((requestError) => {
-        if (active) setError(requestError);
+        if (active) setError({ cause: requestError, retry: () => selectCity(currentCity) });
       }).finally(() => {
         if (active) setLoadingDistricts(false);
       });
     }).catch((requestError) => {
-      if (active) setError(requestError);
+      if (active) setError({ cause: requestError, retry: () => setRegistryAttempt((attempt) => attempt + 1) });
     }).finally(() => {
       if (active) setLoading(false);
     });
     return () => { active = false; };
-  }, [world?.cityId]);
+  }, [world?.cityId, registryAttempt]);
 
   const countries = useMemo(() => {
     const grouped = new Map();
@@ -83,7 +87,7 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
       const items = await getNeighborhoodDestinations(city.id);
       if (request === districtRequest.current) setDistricts(items);
     } catch (requestError) {
-      if (request === districtRequest.current) setError(requestError);
+      if (request === districtRequest.current) setError({ cause: requestError, retry: () => selectCity(city) });
     } finally {
       if (request === districtRequest.current) setLoadingDistricts(false);
     }
@@ -96,7 +100,7 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
     try {
       await onTravel?.({ city: selectedCity, district: selectedDistrict });
     } catch (requestError) {
-      setError(requestError);
+      setError({ cause: requestError });
       setBusy(false);
     }
   }
@@ -133,7 +137,7 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
           </section>
           <section className="gate-interface__column" aria-labelledby="gate-neighborhoods-heading">
             <div className="gate-interface__section-heading"><span id="gate-neighborhoods-heading">03 / NEIGHBORHOOD</span><small>{loadingDistricts ? "LOADING" : selectedCity ? `${districts.length} AVAILABLE` : "SELECT A CITY"}</small></div>
-            {error && <div className="gate-interface__error" role="alert"><p>{error.message}</p>{error.requestId && <small>REFERENCE {error.requestId}{error.code ? ` · ${error.code}` : ""}</small>}{error.details && <small>{error.details}</small>}</div>}
+            {error && <APIErrorNotice error={error.cause ?? error} onRetry={error.retry} retrying={loading || loadingDistricts} retryLabel="RETRY GATE REQUEST" className="gate-interface__error" />}
             {loadingDistricts ? <p className="gate-interface__loading" role="status">Loading neighborhoods<span>…</span></p> : selectedCity ? <>
               <label className="gate-interface__search"><span>SEARCH NEIGHBORHOODS</span><input type="search" value={districtSearch} onChange={(event) => setDistrictSearch(event.target.value)} placeholder="Filter neighborhoods" /></label>
               {filteredDistricts.length ? <nav className="gate-interface__districts" aria-label={`Neighborhoods in ${selectedCity.name}`}>

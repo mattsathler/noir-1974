@@ -17,6 +17,7 @@ import LocalTerminal from "./LocalTerminal.jsx";
 import Telephone from "./Telephone.jsx";
 import ResidentialSearchWindow from "./ResidentialSearchWindow.jsx";
 import AccusationWindow from "./AccusationWindow.jsx";
+import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
 
 function buildingVisual(building) {
   const identity = `${building.locationId} ${building.name}`.toLowerCase();
@@ -91,7 +92,9 @@ function localDateKey(timestamp, timeZone) {
 export default function GamePage({ initialWorld = null, onLogout }) {
   const [world, setWorld] = useState(initialWorld);
   const [serverTime, setServerTime] = useState(initialWorld ? new Date(initialWorld.serverTime) : null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
+  const [identityAttempt, setIdentityAttempt] = useState(0);
+  const [arrivalAttempt, setArrivalAttempt] = useState(0);
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerEntry, setComputerEntry] = useState(null);
   const [computerContext, setComputerContext] = useState(null);
@@ -109,7 +112,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const closeTransit = useCallback(() => setTransitOpen(false), []);
 
   const travelViaGate = useCallback((destination) => {
-    setError("");
+    setError(null);
     setGateTransition(destination);
   }, []);
   const arriveAtCity = useCallback(async (destination) => {
@@ -126,7 +129,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     closeTransit();
   }, [closeTransit]);
   const visitCompany = useCallback((company) => {
-    setError("");
+    setError(null);
     setSelectedCompany(company);
   }, []);
   const returnToDistrict = useCallback(() => {
@@ -134,17 +137,14 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   }, []);
   const completeGateTransition = useCallback(() => setGateTransition(null), []);
   const failGateTransition = useCallback((requestError) => {
-    setError([
-      requestError.message,
-      requestError.code && `CODE ${requestError.code}`,
-      requestError.requestId && `REFERENCE ${requestError.requestId}`,
-      requestError.details,
-    ].filter(Boolean).join(" · "));
+    setTransitOpen(false);
+    setError({ cause: requestError, retry: () => setTransitOpen(true), retryLabel: "REOPEN GATE" });
   }, []);
 
   useEffect(() => {
     let active = true;
     if (initialWorld) return undefined;
+    setError(null);
     currentIdentity()
       .then((identity) => {
         if (!active) return;
@@ -154,10 +154,10 @@ export default function GamePage({ initialWorld = null, onLogout }) {
         setServerTime(new Date(loadedWorld.serverTime));
       })
       .catch((requestError) => {
-        if (active) setError(requestError.message);
+        if (active) setError({ cause: requestError, retry: () => setIdentityAttempt((attempt) => attempt + 1) });
       });
     return () => { active = false; };
-  }, [initialWorld]);
+  }, [initialWorld, identityAttempt]);
 
   useEffect(() => {
     if (!world) return undefined;
@@ -168,6 +168,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   useEffect(() => {
     if (!world || arrival || !world.cityId) return undefined;
     let active = true;
+    setError(null);
     const districtId = world.districtId || `${world.cityId}/district/central`;
     getNeighborhoodDestinations(world.cityId).then((districts) => {
       if (!active) return;
@@ -183,10 +184,10 @@ export default function GamePage({ initialWorld = null, onLogout }) {
         });
       });
     }).catch((requestError) => {
-      if (active) setError(requestError.message);
+      if (active) setError({ cause: requestError, retry: () => setArrivalAttempt((attempt) => attempt + 1) });
     });
     return () => { active = false; };
-  }, [world?.cityId, world?.districtId, world?.city, world?.country, arrival]);
+  }, [world?.cityId, world?.districtId, world?.city, world?.country, arrival, arrivalAttempt]);
 
   const display = world && serverTime ? formatServerDateTime(serverTime, world.timeZone) : null;
   const issueDay = localDateKey(serverTime, world?.timeZone);
@@ -255,7 +256,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           </aside>
         )}
       </header>}
-      {error && <p className="pos-relative m-6 text-sm text-danger" role="alert">{error}</p>}
+      {error && <APIErrorNotice error={error.cause ?? error} onRetry={error.retry} retryLabel={error.retryLabel} className="game-api-error pos-relative m-6 text-sm text-danger" />}
       {arrival && !interiorPlace && <section className="district-arrival" aria-labelledby="district-arrival-title">
         <header className="district-arrival__header">
           <div><p>NEIGHBORHOOD DIRECTORY · {arrival.city.name.toUpperCase()}, {arrival.city.country.toUpperCase()}</p><h1 id="district-arrival-title">{arrival.district?.name}</h1></div>
@@ -318,6 +319,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           serverTime={serverTime}
           timeZone={world?.timeZone}
           cityId={world?.cityId}
+          countryName={world?.country}
           issueDay={issueDay}
           facilityContext={computerContext}
           onClose={closeComputer}

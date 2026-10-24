@@ -21,12 +21,14 @@ import (
 	"noir-1974/apps/api/internal/cases"
 	correspondence "noir-1974/apps/api/internal/mail"
 	"noir-1974/apps/api/internal/newspaper"
+	"noir-1974/apps/api/internal/observability"
 	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
 )
 
 const sessionCookie = "noir_session"
 const sessionDuration = 30 * 24 * time.Hour
+const apiRequestTimeout = 30 * time.Second
 
 var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{3,24}$`)
 var whiteboardIDPattern = regexp.MustCompile(`^board_[A-Za-z0-9_-]+$`)
@@ -91,6 +93,10 @@ type cityPersonSearchReader interface {
 	SearchNPCsInCity(context.Context, string, string, string) ([]world.PersonSearchRecord, error)
 }
 
+type countryPersonSearchReader interface {
+	SearchNPCsInCountry(context.Context, string, string, string) ([]world.PersonSearchRecord, error)
+}
+
 type phoneDirectoryReader interface {
 	PhoneContactByNumber(context.Context, string, string, string) (world.PhoneContact, error)
 }
@@ -122,6 +128,14 @@ type CaseAPIReader interface {
 	GetPublicCase(context.Context, string, string) (cases.PublicCase, []cases.PublicEvidence, error)
 	GetPlayerProgress(context.Context, string, string, string) (cases.PlayerProgress, error)
 	SavePlayerProgress(context.Context, string, string, string, cases.PlayerProgress) error
+}
+
+type caseSessionLocationReader interface {
+	accountForSessionAndLocation(context.Context, string, time.Time) (account, *character, string, error)
+}
+
+type sessionCaseListReader interface {
+	ListOpenPublicCasesForSession(context.Context, string, string, time.Time) ([]cases.PublicCase, error)
 }
 
 type CaseInterrogationReader interface {
@@ -168,20 +182,20 @@ type WhiteboardAPIReader interface {
 
 // NewHandler creates the identity API. Cookies are secure in production deployments.
 func NewHandler(repository store, secureCookie bool) http.Handler {
-	return newHandler(repository, secureCookie, nil, "", nil, nil, nil, nil, false)
+	return newHandler(repository, secureCookie, nil, "", nil, nil, nil, nil, false, nil)
 }
 
 // NewHandlerWithWorld composes authenticated world directory routes into the identity API.
 func NewHandlerWithWorld(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string) http.Handler {
-	return newHandler(repository, secureCookie, reader, serverID, nil, nil, nil, nil, false)
+	return newHandler(repository, secureCookie, reader, serverID, nil, nil, nil, nil, false, nil)
 }
 
 func NewHandlerWithNewspaper(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, serverID string) http.Handler {
-	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, nil, nil, nil, false)
+	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, nil, nil, nil, false, nil)
 }
 
 func NewHandlerWithGame(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, serverID string) http.Handler {
-	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, caseReader, recordsReader, nil, false)
+	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, caseReader, recordsReader, nil, false, nil)
 }
 
 func NewHandlerWithGameAndMail(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, emailsReader EmailsAPIReader, serverID string) http.Handler {
@@ -189,10 +203,15 @@ func NewHandlerWithGameAndMail(repository store, secureCookie bool, reader World
 }
 
 func NewHandlerWithGameAndMailDiagnostics(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, emailsReader EmailsAPIReader, serverID string, exposeErrorDetails bool) http.Handler {
-	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, caseReader, recordsReader, emailsReader, exposeErrorDetails)
+	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, caseReader, recordsReader, emailsReader, exposeErrorDetails, nil)
 }
 
-func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, emailsReader EmailsAPIReader, exposeErrorDetails bool) http.Handler {
+// NewHandlerWithGameAndMailMetrics composes the game API with route-level latency recording.
+func NewHandlerWithGameAndMailMetrics(repository store, secureCookie bool, reader WorldDirectoryReader, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, emailsReader EmailsAPIReader, serverID string, exposeErrorDetails bool, recorder *observability.HTTPRecorder) http.Handler {
+	return newHandler(repository, secureCookie, reader, serverID, newspaperReader, caseReader, recordsReader, emailsReader, exposeErrorDetails, recorder)
+}
+
+func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader, serverID string, newspaperReader NewspaperReader, caseReader CaseAPIReader, recordsReader RecordsAPIReader, emailsReader EmailsAPIReader, exposeErrorDetails bool, recorder *observability.HTTPRecorder) http.Handler {
 	now := time.Now
 	handler := &Handler{store: repository, secureCookie: secureCookie, now: now, worldReader: reader, newspaperReader: newspaperReader, caseReader: caseReader, recordsReader: recordsReader, emailsReader: emailsReader, worldServerID: serverID, exposeErrorDetails: exposeErrorDetails}
 	if whiteboardReader, ok := caseReader.(WhiteboardAPIReader); ok {
@@ -261,12 +280,26 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/connections/{fromID}/{toID}", handler.disconnectWhiteboardPins)
 	}
 	mux.HandleFunc("POST /api/characters", handler.createCharacter)
-	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	measured := http.Handler(apiErrorMiddleware(mux))
+	measured = requestTimeoutMiddleware(apiRequestTimeout, measured)
+	if recorder != nil {
+		measured = recorder.Middleware(func(request *http.Request) string {
+			_, pattern := mux.Handler(request)
+			if _, route, ok := strings.Cut(pattern, " "); ok {
+				return route
+			}
+			return pattern
+		}, measured)
+	}
+	return measured
+}
+
+func requestTimeoutMiddleware(timeout time.Duration, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()
-		mux.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-	return apiErrorMiddleware(api)
 }
 
 type residentialSearchRequest struct {
@@ -396,6 +429,17 @@ func apiErrorMiddleware(next http.Handler) http.Handler {
 			}
 		}()
 		next.ServeHTTP(response, r.WithContext(ctx))
+		if errors.Is(r.Context().Err(), context.DeadlineExceeded) {
+			log.Printf("api_error request_id=%s method=%s path=%s code=REQUEST_TIMEOUT error=request deadline exceeded", requestID, r.Method, r.URL.Path)
+			response.body.Reset()
+			response.status = http.StatusGatewayTimeout
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(response.status)
+			_ = json.NewEncoder(w).Encode(apiErrorResponse{
+				Code: "REQUEST_TIMEOUT", Message: "The request exceeded its time limit.", RequestID: requestID,
+			})
+			return
+		}
 		if response.status == 0 {
 			response.status = http.StatusOK
 		}
@@ -434,6 +478,8 @@ func apiErrorCode(status int) string {
 		return "CONFLICT"
 	case http.StatusServiceUnavailable:
 		return "SERVICE_UNAVAILABLE"
+	case http.StatusGatewayTimeout:
+		return "REQUEST_TIMEOUT"
 	default:
 		if status >= http.StatusInternalServerError {
 			return "INTERNAL_SERVER_ERROR"
@@ -559,16 +605,17 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !h.validateNPCCity(w, r, current.ID, r.PathValue("npcID")) {
+	cityID := h.worldFor(r.Context(), current.ID).CityID
+	if !h.validateNPCInCity(w, r, cityID, r.PathValue("npcID")) {
 		return
 	}
 	locationID := strings.TrimSpace(r.URL.Query().Get("locationId"))
 	_, canValidateCity := h.worldReader.(cityNPCReader)
-	if (locationID == "" && canValidateCity) || (locationID != "" && locationID != expectedServiceLocationID(h.worldFor(r.Context(), current.ID).CityID, "police")) {
+	if (locationID == "" && canValidateCity) || (locationID != "" && locationID != expectedServiceLocationID(cityID, "police")) {
 		h.writeAPIError(w, r, http.StatusBadRequest, "CORRESPONDENCE_LOCATION_REQUIRED", "select the local police station to retrieve correspondence", nil)
 		return
 	}
-	if locationID != "" && !h.requireLocalAccessAttempt(w, r, current.ID, "police", locationID, "") {
+	if locationID != "" && !h.requireLocalAccessAttemptInCity(w, r, current.ID, cityID, "police", locationID, "") {
 		return
 	}
 	from, err := time.Parse("2006-01-02", r.URL.Query().Get("from"))
@@ -600,6 +647,14 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not retrieve correspondence", http.StatusInternalServerError)
 		return
 	}
+	now := h.now().UTC()
+	available := results[:0]
+	for _, result := range results {
+		if !result.SentAt.After(now) {
+			available = append(available, result)
+		}
+	}
+	results = available
 	items := make([]cases.DiscoveredItem, 0, len(results))
 	for _, result := range results {
 		metadata, _ := json.Marshal(result)
@@ -628,16 +683,60 @@ type caseProgressRequest struct {
 }
 
 func (h *Handler) listOpenCases(w http.ResponseWriter, r *http.Request) {
-	current, ok := h.caseAccount(w, r)
+	if reader, ok := h.caseReader.(sessionCaseListReader); ok {
+		token, err := r.Cookie(sessionCookie)
+		if err != nil || token.Value == "" {
+			http.Error(w, "authentication required", http.StatusUnauthorized)
+			return
+		}
+		results, err := reader.ListOpenPublicCasesForSession(r.Context(), h.worldServerID, token.Value, h.now())
+		if errors.Is(err, cases.ErrSessionNotFound) {
+			http.Error(w, "authentication required", http.StatusUnauthorized)
+			return
+		}
+		if err != nil {
+			http.Error(w, "could not retrieve open cases", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"results": results})
+		return
+	}
+	_, cityID, ok := h.caseAccountAndCity(w, r)
 	if !ok {
 		return
 	}
-	results, err := h.caseReader.ListOpenPublicCases(r.Context(), h.worldServerID, h.worldFor(r.Context(), current.ID).CityID)
+	results, err := h.caseReader.ListOpenPublicCases(r.Context(), h.worldServerID, cityID)
 	if err != nil {
 		http.Error(w, "could not retrieve open cases", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (h *Handler) caseAccountAndCity(w http.ResponseWriter, r *http.Request) (account, string, bool) {
+	reader, ok := h.store.(caseSessionLocationReader)
+	if !ok {
+		current, valid := h.caseAccount(w, r)
+		if !valid {
+			return account{}, "", false
+		}
+		return current, h.worldFor(r.Context(), current.ID).CityID, true
+	}
+	token, err := r.Cookie(sessionCookie)
+	if err != nil || token.Value == "" {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return account{}, "", false
+	}
+	current, _, locationID, err := reader.accountForSessionAndLocation(r.Context(), token.Value, h.now())
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return account{}, "", false
+	}
+	cityID := h.worldAt().CityID
+	if city, ok := world.CityForLocation(locationID); ok {
+		cityID = city.ID
+	}
+	return current, cityID, true
 }
 
 func (h *Handler) getCase(w http.ResponseWriter, r *http.Request) {
@@ -699,11 +798,15 @@ func (h *Handler) getInterrogationAnswers(w http.ResponseWriter, r *http.Request
 }
 
 func (h *Handler) validateNPCCity(w http.ResponseWriter, r *http.Request, accountID, npcID string) bool {
+	return h.validateNPCInCity(w, r, h.worldFor(r.Context(), accountID).CityID, npcID)
+}
+
+func (h *Handler) validateNPCInCity(w http.ResponseWriter, r *http.Request, cityID, npcID string) bool {
 	reader, ok := h.worldReader.(cityNPCReader)
 	if !ok {
 		return true
 	}
-	valid, err := reader.NPCBelongsToCity(r.Context(), h.worldServerID, h.worldFor(r.Context(), accountID).CityID, npcID)
+	valid, err := reader.NPCBelongsToCity(r.Context(), h.worldServerID, cityID, npcID)
 	if err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "NPC_CITY_VALIDATION_FAILED", "could not validate the selected person", err)
 		return false
@@ -728,6 +831,11 @@ func expectedServiceLocationID(cityID, facility string) string {
 }
 
 func (h *Handler) requireLocalAccessAttempt(w http.ResponseWriter, r *http.Request, accountID, facility, locationID, companyID string) bool {
+	cityID := h.worldFor(r.Context(), accountID).CityID
+	return h.requireLocalAccessAttemptInCity(w, r, accountID, cityID, facility, locationID, companyID)
+}
+
+func (h *Handler) requireLocalAccessAttemptInCity(w http.ResponseWriter, r *http.Request, accountID, cityID, facility, locationID, companyID string) bool {
 	attemptID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("accessAttemptId")), 10, 64)
 	if err != nil || attemptID < 1 {
 		h.writeAPIError(w, r, http.StatusForbidden, "LOCAL_ACCESS_REQUIRED", "authenticate with the local terminal before requesting these records", nil)
@@ -738,8 +846,7 @@ func (h *Handler) requireLocalAccessAttempt(w http.ResponseWriter, r *http.Reque
 		h.writeAPIError(w, r, http.StatusServiceUnavailable, "LOCAL_ACCESS_UNAVAILABLE", "local access validation is unavailable", nil)
 		return false
 	}
-	state := h.worldFor(r.Context(), accountID)
-	valid, err := reader.ValidateLocalAccessAttempt(r.Context(), h.worldServerID, accountID, attemptID, state.CityID, locationID, companyID, facility, h.now().UTC())
+	valid, err := reader.ValidateLocalAccessAttempt(r.Context(), h.worldServerID, accountID, attemptID, cityID, locationID, companyID, facility, h.now().UTC())
 	if err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "LOCAL_ACCESS_VALIDATION_FAILED", "could not validate local terminal access", err)
 		return false
@@ -1203,13 +1310,23 @@ func (h *Handler) newspaper(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 	var current account
+	var cityID string
+	var ok bool
 	if h.whiteboardReader != nil {
-		var ok bool
-		current, ok = h.caseAccount(w, r)
-		if !ok {
-			return
+		current, cityID, ok = h.caseAccountAndCity(w, r)
+	} else {
+		current, valid := h.worldAccount(w, r)
+		ok = valid
+		if valid {
+			cityID = h.worldFor(r.Context(), current.ID).CityID
 		}
-	} else if !h.authorizeWorldRequest(w, r) {
+	}
+	if !ok {
+		return
+	}
+	city, exists := world.CityByID(cityID)
+	if !exists {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "PERSON_SEARCH_FAILED", "could not resolve the current country", world.ErrEntityNotFound)
 		return
 	}
 	query, ok := directoryQuery(w, r)
@@ -1218,24 +1335,19 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 	}
 	var results []world.PersonSearchRecord
 	var err error
-	if h.whiteboardReader != nil {
-		cityID := h.worldFor(r.Context(), current.ID).CityID
-		if cityReader, ok := h.worldReader.(cityPersonSearchReader); ok {
-			results, err = cityReader.SearchNPCsInCity(r.Context(), h.worldServerID, cityID, query)
-		} else {
-			results, err = h.worldReader.SearchNPCs(r.Context(), h.worldServerID, query)
-			for index := 0; err == nil && index < len(results); {
-				npc := results[index].NPC
-				valid := strings.HasPrefix(npc.ID, "npc:"+cityID+"/") || (cityID == "fr/lyon" && strings.HasPrefix(npc.ID, "npc:lyon/"))
-				if !valid {
-					results = append(results[:index], results[index+1:]...)
-					continue
-				}
-				index++
-			}
-		}
+	if countryReader, ok := h.worldReader.(countryPersonSearchReader); ok {
+		results, err = countryReader.SearchNPCsInCountry(r.Context(), h.worldServerID, city.CountryID, query)
 	} else {
 		results, err = h.worldReader.SearchNPCs(r.Context(), h.worldServerID, query)
+		for index := 0; err == nil && index < len(results); {
+			npc := results[index].NPC
+			valid := strings.HasPrefix(npc.ID, "npc:"+city.CountryID+"/") || (city.CountryID == "fr" && strings.HasPrefix(npc.ID, "npc:lyon/"))
+			if !valid {
+				results = append(results[:index], results[index+1:]...)
+				continue
+			}
+			index++
+		}
 	}
 	if err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "PERSON_SEARCH_FAILED", "could not search people", err)
@@ -1250,7 +1362,7 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 			for _, result := range results {
 				npcIDs = append(npcIDs, result.NPC.ID)
 			}
-			scenes, err := reader.PersonSearchScenes(r.Context(), h.worldServerID, h.worldFor(r.Context(), current.ID).CityID, npcIDs)
+			scenes, err := reader.PersonSearchScenes(r.Context(), h.worldServerID, cityID, npcIDs)
 			if err != nil {
 				h.writeAPIError(w, r, http.StatusInternalServerError, "PERSON_SEARCH_FAILED", "could not retrieve case scene references", err)
 				return
@@ -1598,10 +1710,19 @@ func districtForLocation(destinations []world.DistrictDestination, locationID st
 }
 
 func (h *Handler) authorizedPlayer(w http.ResponseWriter, r *http.Request) (account, bool) {
-	if !h.authorizeWorldRequest(w, r) {
+	return h.worldAccount(w, r)
+}
+
+func (h *Handler) worldAccount(w http.ResponseWriter, r *http.Request) (account, bool) {
+	if h.worldReader == nil || h.worldServerID == "" {
+		http.Error(w, "world directory unavailable", http.StatusServiceUnavailable)
 		return account{}, false
 	}
-	token, _ := r.Cookie(sessionCookie)
+	token, err := r.Cookie(sessionCookie)
+	if err != nil || token.Value == "" {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return account{}, false
+	}
 	current, _, err := h.store.accountForSession(r.Context(), token.Value, h.now())
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
@@ -1611,20 +1732,8 @@ func (h *Handler) authorizedPlayer(w http.ResponseWriter, r *http.Request) (acco
 }
 
 func (h *Handler) authorizeWorldRequest(w http.ResponseWriter, r *http.Request) bool {
-	if h.worldReader == nil || h.worldServerID == "" {
-		http.Error(w, "world directory unavailable", http.StatusServiceUnavailable)
-		return false
-	}
-	token, err := r.Cookie(sessionCookie)
-	if err != nil || token.Value == "" {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return false
-	}
-	if _, _, err := h.store.accountForSession(r.Context(), token.Value, h.now()); err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return false
-	}
-	return true
+	_, ok := h.worldAccount(w, r)
+	return ok
 }
 
 func directoryQuery(w http.ResponseWriter, r *http.Request) (string, bool) {

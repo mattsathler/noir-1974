@@ -1,16 +1,9 @@
+import { apiRequest } from "../../shared/apiRequest.js";
+
 async function search(path, query, cityId = "") {
   const params = new URLSearchParams({ q: query });
   if (cityId) params.set("cityId", cityId);
-  const response = await fetch(`${path}?${params}`, { credentials: "same-origin" });
-  const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
-  if (!response.ok) {
-    const error = new Error(payload.message?.trim() || "The directory could not be reached.");
-    error.code = payload.code;
-    error.requestId = payload.requestId;
-    error.details = payload.details;
-    throw error;
-  }
+  const payload = await apiRequest(`${path}?${params}`);
   return payload.results ?? [];
 }
 
@@ -19,6 +12,8 @@ const worldCacheLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 const worldCachePrefix = `noir:world-data:v${worldCacheVersion}`;
 const newspaperCachePrefix = "noir:newspaper:v2";
 const newspaperRequests = new Map();
+const whiteboardCacheVersion = 1;
+const whiteboardCacheLifetimeMs = 24 * 60 * 60 * 1000;
 
 function readCachedWorldList(key) {
   try {
@@ -60,9 +55,7 @@ export async function getCompanyAtLocation(locationId, companyId = "", accessAtt
   const params = new URLSearchParams({ locationId });
   if (companyId) params.set("companyId", companyId);
   if (accessAttemptId) params.set("accessAttemptId", accessAttemptId);
-  const response = await fetch(`/api/world/companies?${params}`, { credentials: "same-origin" });
-  const payload = await responsePayload(response);
-  if (!response.ok) throw new Error(payload.message?.trim() || "The company directory could not be reached.");
+  const payload = await apiRequest(`/api/world/companies?${params}`);
   return payload.results ?? [];
 }
 
@@ -70,62 +63,35 @@ export async function getNeighborhoodDestinations(cityId = "unknown") {
   const key = `${worldCachePrefix}:neighborhoods:${encodeURIComponent(cityId)}`;
   return cachedWorldList(key, async () => {
     const params = new URLSearchParams({ cityId });
-    const response = await fetch(`/api/world/transit?${params}`, { credentials: "same-origin" });
-    const payload = await responsePayload(response);
-    if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve neighborhood destinations.");
+    const payload = await apiRequest(`/api/world/transit?${params}`);
     return payload.destinations ?? [];
   });
 }
 
 export async function getGateDestinations() {
   return cachedWorldList(`${worldCachePrefix}:gate-cities`, async () => {
-    const response = await fetch("/api/world/gate/destinations", { credentials: "same-origin" });
-    const payload = await responsePayload(response);
-    if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve GATE destinations.");
+    const payload = await apiRequest("/api/world/gate/destinations");
     return payload.destinations ?? [];
   });
 }
 
 export async function movePlayer(path, body) {
-  const response = await fetch(path, {
+  return apiRequest(path, {
     method: "POST",
-    credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const payload = await responsePayload(response);
-  if (!response.ok) {
-    const error = new Error(payload.message?.trim() || "Could not change location.");
-    error.code = payload.code;
-    error.requestId = payload.requestId;
-    error.details = payload.details;
-    throw error;
-  }
-  return payload;
 }
 
 export async function getCurrentWorld() {
-  const response = await fetch("/api/world", { credentials: "same-origin" });
-  const payload = await responsePayload(response);
-  if (!response.ok) throw new Error(payload.message?.trim() || "Could not retrieve current location.");
-  return payload;
-}
-
-async function responsePayload(response) {
-  const contentType = response.headers.get("content-type") ?? "";
-  return contentType.includes("application/json")
-    ? response.json()
-    : { message: await response.text() };
+  return apiRequest("/api/world");
 }
 
 export async function getNPCEmails(npcId, from, to, locationId = "", accessAttemptId = "") {
   const params = new URLSearchParams({ from, to });
   if (locationId) params.set("locationId", locationId);
   if (accessAttemptId) params.set("accessAttemptId", accessAttemptId);
-  const response = await fetch(`/api/world/npcs/${encodeURIComponent(npcId)}/emails?${params}`, { credentials: "same-origin" });
-  const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
-  if (!response.ok) throw new Error(payload.message?.trim() || "The correspondence office could not be reached.");
+  const payload = await apiRequest(`/api/world/npcs/${encodeURIComponent(npcId)}/emails?${params}`);
   return payload.results ?? [];
 }
 
@@ -134,19 +100,12 @@ export async function getNPCRecords(npcId, from, to, source, locationId = "", ac
   if (source) params.set("source", source);
   if (locationId) params.set("locationId", locationId);
   if (accessAttemptId) params.set("accessAttemptId", accessAttemptId);
-  const response = await fetch(`/api/world/npcs/${encodeURIComponent(npcId)}/records?${params}`, { credentials: "same-origin" });
-  const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
-  if (!response.ok) throw new Error(payload.message?.trim() || "The records office could not be reached.");
+  const payload = await apiRequest(`/api/world/npcs/${encodeURIComponent(npcId)}/records?${params}`);
   return payload.results ?? [];
 }
 
-async function requestNewspaperIssue() {
-  const response = await fetch("/api/world/newspaper", { credentials: "same-origin" });
-  const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
-  if (!response.ok) throw new Error(payload.message?.trim() || "The newspaper could not be retrieved.");
-  return payload;
+async function requestNewspaperIssue(contextKey = "") {
+  return apiRequest("/api/world/newspaper", { dedupeKey: contextKey });
 }
 
 export function getNewspaperIssue(cityId, issueDay) {
@@ -156,7 +115,7 @@ export function getNewspaperIssue(cityId, issueDay) {
   const cacheKey = `${newspaperCachePrefix}:${cityKey}:${issueDay}`;
   if (newspaperRequests.has(cacheKey)) return newspaperRequests.get(cacheKey);
 
-  const request = requestNewspaperIssue().then((issue) => {
+  const request = requestNewspaperIssue(cacheKey).then((issue) => {
     try {
       const cityPrefix = `${newspaperCachePrefix}:${cityKey}:`;
       for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
@@ -174,16 +133,7 @@ export function getNewspaperIssue(cityId, issueDay) {
 }
 
 async function requestCase(path, options) {
-  const response = await fetch(path, { credentials: "same-origin", ...options });
-  const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
-  if (!response.ok) {
-    const error = new Error(payload.message?.trim() || "The case service could not be reached.");
-    error.code = payload.code;
-    error.status = response.status;
-    throw error;
-  }
-  return payload;
+  return apiRequest(path, options);
 }
 
 export function lookupPhoneContact(number) {
@@ -248,27 +198,33 @@ export function submitCaseAccusation(boardId, stationLocationId) {
 }
 
 async function whiteboardRequest(path, options) {
-  const response = await fetch(path, { credentials: "same-origin", ...options });
-  const payload = await responsePayload(response);
-  if (!response.ok) throw new Error(payload.message?.trim() || "The whiteboard could not be reached.");
-  return payload;
+  return apiRequest(path, options);
 }
 
 const whiteboardCacheVersions = new Map();
 function readWhiteboardCache(key) {
   try {
-    const cached = JSON.parse(sessionStorage.getItem(`noir:whiteboards:${key}`) || "null");
-    return cached?.value ?? null;
+    const storageKey = `noir:whiteboards:v${whiteboardCacheVersion}:${key}`;
+    const cached = JSON.parse(sessionStorage.getItem(storageKey) || "null");
+    if (cached?.version === whiteboardCacheVersion && cached.expiresAt > Date.now()) return cached.value ?? null;
+    if (cached) sessionStorage.removeItem(storageKey);
   } catch { return null; }
+  return null;
 }
 function writeWhiteboardCache(key, value) {
   whiteboardCacheVersions.set(key, (whiteboardCacheVersions.get(key) ?? 0) + 1);
-  try { sessionStorage.setItem(`noir:whiteboards:${key}`, JSON.stringify({ savedAt: Date.now(), value })); } catch { /* Storage may be disabled. */ }
+  try {
+    sessionStorage.setItem(`noir:whiteboards:v${whiteboardCacheVersion}:${key}`, JSON.stringify({
+      version: whiteboardCacheVersion,
+      expiresAt: Date.now() + whiteboardCacheLifetimeMs,
+      value,
+    }));
+  } catch { /* Storage may be disabled. */ }
   return value;
 }
 function removeWhiteboardCache(key) {
   whiteboardCacheVersions.set(key, (whiteboardCacheVersions.get(key) ?? 0) + 1);
-  try { sessionStorage.removeItem(`noir:whiteboards:${key}`); } catch { /* Storage may be disabled. */ }
+  try { sessionStorage.removeItem(`noir:whiteboards:v${whiteboardCacheVersion}:${key}`); } catch { /* Storage may be disabled. */ }
 }
 const whiteboardSaveStates = new Map();
 function announceWhiteboardUpdate(boardId, status) {
@@ -324,7 +280,7 @@ export function cacheWhiteboardDraft(board) {
 export function discardWhiteboardDraft(boardId) {
   const boards = readWhiteboardCache("list");
   if (boards) writeWhiteboardCache("list", boards.filter((board) => board.id !== boardId));
-  try { sessionStorage.removeItem(`noir:whiteboards:${boardId}`); } catch { /* Storage may be disabled. */ }
+  removeWhiteboardCache(boardId);
   whiteboardSaveStates.delete(boardId);
 }
 

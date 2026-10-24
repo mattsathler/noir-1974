@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"noir-1974/apps/api/internal/world/names"
 )
@@ -18,16 +19,17 @@ var ErrInvalidGenerationKey = errors.New("invalid generated entity key")
 var personNameOrderCache sync.Map
 
 type NPC struct {
-	ID            string          `json:"id"`
-	GenerationKey string          `json:"generationKey"`
-	RegionID      string          `json:"regionId"`
-	Name          string          `json:"name"`
-	Age           int             `json:"age"`
-	Appearance    string          `json:"appearance"`
-	Visual        *VisualIdentity `json:"visual,omitempty"`
-	Personality   string          `json:"personality"`
-	Status        string          `json:"status"`
-	MaritalStatus string          `json:"-"`
+	ID              string          `json:"id"`
+	GenerationKey   string          `json:"generationKey"`
+	RegionID        string          `json:"regionId"`
+	Name            string          `json:"name"`
+	Age             int             `json:"age"`
+	Appearance      string          `json:"appearance"`
+	Visual          *VisualIdentity `json:"visual,omitempty"`
+	Personality     string          `json:"personality"`
+	Status          string          `json:"status"`
+	StatusChangedAt time.Time       `json:"-"`
+	MaritalStatus   string          `json:"-"`
 }
 
 type Company struct {

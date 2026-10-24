@@ -375,7 +375,7 @@ func TestGateTravelMaterializationFailureReturnsDiagnosticEnvelope(t *testing.T)
 	materializationErr := errors.New(`persist city employment: ERROR: insert or update on table "employment_relationships" violates foreign key constraint`)
 	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: session, locationID: "fr/lyon"}
 	reader := failingCityMaterializer{err: materializationErr}
-	handler := newHandler(repository, false, reader, "server-1", nil, nil, nil, nil, true)
+	handler := newHandler(repository, false, reader, "server-1", nil, nil, nil, nil, true, nil)
 	request := httptest.NewRequest(http.MethodPost, "/api/world/gate/travel", strings.NewReader(`{"cityId":"us/los-angeles","districtId":"us/los-angeles/district/central"}`))
 	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
 	response := httptest.NewRecorder()
@@ -403,7 +403,7 @@ func TestGateTravelMaterializationFailureHidesDiagnosticsWhenDisabled(t *testing
 	const session = "valid"
 	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: session}
 	reader := failingCityMaterializer{err: errors.New("database constraint details")}
-	handler := newHandler(repository, false, reader, "server-1", nil, nil, nil, nil, false)
+	handler := newHandler(repository, false, reader, "server-1", nil, nil, nil, nil, false, nil)
 	request := httptest.NewRequest(http.MethodPost, "/api/world/gate/travel", strings.NewReader(`{"cityId":"us/los-angeles","districtId":"us/los-angeles/district/central"}`))
 	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
 	response := httptest.NewRecorder()
@@ -434,6 +434,29 @@ func TestAPIErrorMiddlewareReturnsRequestReferenceForPanic(t *testing.T) {
 	}
 	if response.Header().Get("X-Request-ID") != payload.RequestID || strings.Contains(response.Body.String(), "simulated handler panic") {
 		t.Fatalf("panic response has no matching reference or leaked internals: headers=%v body=%s", response.Header(), response.Body.String())
+	}
+}
+
+func TestRequestTimeoutCancelsWorkAndReturnsStructuredGatewayTimeout(t *testing.T) {
+	handler := requestTimeoutMiddleware(10*time.Millisecond, apiErrorMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+		http.Error(w, "database query canceled", http.StatusInternalServerError)
+	})))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/slow", nil))
+
+	var payload apiErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("timeout response is not JSON: %v; body=%s", err, response.Body.String())
+	}
+	if response.Code != http.StatusGatewayTimeout || payload.Code != "REQUEST_TIMEOUT" {
+		t.Fatalf("unexpected timeout response: status=%d payload=%+v", response.Code, payload)
+	}
+	if payload.RequestID == "" || response.Header().Get("X-Request-ID") != payload.RequestID {
+		t.Fatalf("timeout request ID missing or inconsistent: payload=%q header=%q", payload.RequestID, response.Header().Get("X-Request-ID"))
+	}
+	if strings.Contains(response.Body.String(), "database query canceled") {
+		t.Fatalf("timeout leaked the handler error: %s", response.Body.String())
 	}
 }
 

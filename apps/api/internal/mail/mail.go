@@ -46,6 +46,7 @@ type Context struct {
 	NPCName        string
 	Employer       string
 	EmploymentRole string
+	DeathAt        time.Time
 	Personal       []Correspondent
 	Colleagues     []Correspondent
 }
@@ -53,6 +54,8 @@ type Context struct {
 type Correspondent struct {
 	ID               string
 	Name             string
+	Status           string
+	DeathAt          time.Time
 	Role             string
 	RelationshipType string
 	CompanyID        string
@@ -143,17 +146,34 @@ func Generate(seed string, worldVersion int, npcID string, context Context, from
 		}
 		for _, correspondent := range context.Personal {
 			if message, ok := correspondence(seed, worldVersion, npcID, context.NPCName, context.EmploymentRole, correspondent, date, "personal", templates); ok {
-				result = append(result, message)
+				if beforeDeathDeadline(message.SentAt, correspondent.DeathAt) {
+					result = append(result, message)
+				}
 			}
 		}
 		for _, colleague := range context.Colleagues {
 			if message, ok := correspondence(seed, worldVersion, npcID, context.NPCName, context.EmploymentRole, colleague, date, "colleague", templates); ok {
-				result = append(result, message)
+				if beforeDeathDeadline(message.SentAt, colleague.DeathAt) {
+					result = append(result, message)
+				}
 			}
 		}
 	}
+	if !context.DeathAt.IsZero() {
+		available := result[:0]
+		for _, message := range result {
+			if beforeDeathDeadline(message.SentAt, context.DeathAt) {
+				available = append(available, message)
+			}
+		}
+		result = available
+	}
 	SortMessages(result)
 	return result, nil
+}
+
+func beforeDeathDeadline(sentAt, deathAt time.Time) bool {
+	return deathAt.IsZero() || !sentAt.After(deathAt)
 }
 
 // correspondence generates a single shared message for both participants' mailboxes.

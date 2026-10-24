@@ -1,24 +1,15 @@
+import { apiRequest } from "../../shared/apiRequest.js";
+
 async function request(path, options = {}) {
   const { includeWorldFallback = false, ...requestOptions } = options;
-  const response = await fetch(path, {
-    credentials: "same-origin",
+  const payload = await apiRequest(path, {
     ...requestOptions,
     headers: {
       ...(requestOptions.body ? { "Content-Type": "application/json" } : {}),
       ...requestOptions.headers,
     },
   });
-
-  if (response.status === 204) return null;
-
-  const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json")
-    ? await response.json()
-    : { message: await response.text() };
-
-  if (!response.ok) {
-    throw new Error(payload.message?.trim() || "The request could not be completed.");
-  }
+  if (payload === null) return null;
 
   if (includeWorldFallback && !payload.world?.serverTime) {
     payload.world = {

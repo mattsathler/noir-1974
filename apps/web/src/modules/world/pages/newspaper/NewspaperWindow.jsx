@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getNewspaperIssue } from "../../api.js";
+import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
 
 export default function NewspaperWindow({ cityId, issueDay, onClose }) {
   const [issue, setIssue] = useState(null);
@@ -15,7 +16,7 @@ export default function NewspaperWindow({ cityId, issueDay, onClose }) {
     try {
       setIssue(await getNewspaperIssue(cityId, issueDay));
     } catch (requestError) {
-      setError(requestError.message || "The newspaper could not be retrieved.");
+      setError(requestError);
     } finally {
       setLoading(false);
     }
@@ -61,12 +62,7 @@ export default function NewspaperWindow({ cityId, issueDay, onClose }) {
         </header>
 
         {loading && <div className="newspaper-state" role="status" aria-live="polite">The presses are running…</div>}
-        {error && (
-          <div className="newspaper-state newspaper-state--error" role="alert">
-            <p>{error}</p>
-            <button type="button" onClick={loadIssue}>TRY AGAIN</button>
-          </div>
-        )}
+        {error && <APIErrorNotice error={error} fallback="The newspaper could not be retrieved." onRetry={loadIssue} retrying={loading} className="newspaper-state newspaper-state--error" />}
 
         {issue && !loading && (
           <>

@@ -17,6 +17,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"noir-1974/apps/api/internal/mail"
 	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
@@ -27,6 +28,7 @@ var caseSchema embed.FS
 
 var (
 	ErrCaseNotFound          = errors.New("case not found")
+	ErrSessionNotFound       = errors.New("player session not found")
 	ErrInvalidCaseState      = errors.New("invalid shared case state")
 	ErrInvalidProgress       = errors.New("invalid player case progress")
 	ErrInvalidLocalAccess    = errors.New("invalid local access result")
@@ -1131,6 +1133,76 @@ func (store *PostgresStore) ListOpenPublicCases(ctx context.Context, serverID, c
 		results = append(results, result)
 	}
 	return results, rows.Err()
+}
+
+// ListOpenPublicCasesForSession resolves the player's current city and lists its open cases in one database round-trip.
+func (store *PostgresStore) ListOpenPublicCasesForSession(ctx context.Context, serverID, token string, now time.Time) ([]PublicCase, error) {
+	tokenHash := sha256.Sum256([]byte(token))
+	cityIDs := make([]string, 0, len(world.Cities()))
+	for _, city := range world.Cities() {
+		cityIDs = append(cityIDs, city.ID)
+	}
+	rows, err := store.db.Query(ctx, `
+		SELECT resolved.city_id, open_cases.case_id, open_cases.city_id, open_cases.case_type,
+		       open_cases.victim_entity_id, open_cases.location_entity_id, open_cases.status, open_cases.created_at
+		FROM player_sessions s
+		JOIN player_accounts a ON a.id = s.account_id
+		LEFT JOIN player_locations pl ON pl.account_id = a.id
+		CROSS JOIN LATERAL (
+			SELECT COALESCE((
+				SELECT city_id FROM unnest($4::text[]) AS city_catalog(city_id)
+				WHERE COALESCE(pl.location_id, '') = city_id
+				   OR COALESCE(pl.location_id, '') LIKE city_id || '/%'
+				   OR COALESCE(pl.location_id, '') LIKE 'service:' || city_id || '/%'
+				   OR COALESCE(pl.location_id, '') LIKE 'location:' || city_id || '/%'
+				ORDER BY length(city_id) DESC LIMIT 1
+			), CASE
+				WHEN COALESCE(pl.location_id, '') IN ('lyon', 'service:lyon', 'location:lyon')
+				  OR COALESCE(pl.location_id, '') LIKE 'lyon/%'
+				  OR COALESCE(pl.location_id, '') LIKE 'service:lyon/%'
+				  OR COALESCE(pl.location_id, '') LIKE 'location:lyon/%'
+				THEN 'fr/lyon'
+				ELSE $5
+			END) AS city_id
+		) resolved
+		LEFT JOIN LATERAL (
+			SELECT c.case_id, c.city_id, c.case_type, c.victim_entity_id, c.location_entity_id, s2.status, c.created_at
+			FROM cases c JOIN case_states s2 USING (server_id, case_id)
+			WHERE c.server_id = $1::uuid AND c.city_id = resolved.city_id AND s2.status = 'open'
+			ORDER BY c.created_at DESC, c.case_id DESC
+		) open_cases ON TRUE
+		WHERE s.token_hash = $2 AND s.expires_at > $3
+		ORDER BY open_cases.created_at DESC NULLS LAST, open_cases.case_id DESC NULLS LAST`,
+		serverID, tokenHash[:], now, cityIDs, "fr/lyon")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([]PublicCase, 0)
+	sessionFound := false
+	for rows.Next() {
+		sessionFound = true
+		var resolvedCity string
+		var caseID, cityID, caseType, victimID, locationID, status pgtype.Text
+		var createdAt pgtype.Timestamptz
+		if err := rows.Scan(&resolvedCity, &caseID, &cityID, &caseType, &victimID, &locationID, &status, &createdAt); err != nil {
+			return nil, err
+		}
+		if !caseID.Valid {
+			continue
+		}
+		results = append(results, PublicCase{
+			ID: caseID.String, CityID: cityID.String, CaseType: caseType.String, VictimID: victimID.String,
+			LocationID: locationID.String, Status: status.String, CreatedAt: createdAt.Time,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if !sessionFound {
+		return nil, ErrSessionNotFound
+	}
+	return results, nil
 }
 
 // GetPublicCase returns narrative evidence without internal classifications or solution data.

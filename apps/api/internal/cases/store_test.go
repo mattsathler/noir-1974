@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"noir-1974/apps/api/internal/records"
 )
 
@@ -33,6 +34,14 @@ func (row testCaseRow) Scan(destinations ...any) error {
 			*target = row.values[index].(int)
 		case *[]byte:
 			*target = append([]byte(nil), row.values[index].([]byte)...)
+		case *pgtype.Text:
+			if row.values[index] != nil {
+				*target = pgtype.Text{String: row.values[index].(string), Valid: true}
+			}
+		case *pgtype.Timestamptz:
+			if row.values[index] != nil {
+				*target = pgtype.Timestamptz{Time: row.values[index].(time.Time), Valid: true}
+			}
 		default:
 			return errors.New("test row has unsupported destination")
 		}
@@ -47,6 +56,9 @@ type casePersistenceFixture struct {
 	activityRows  [][]any
 	activityQuery string
 	activityArgs  []any
+	sessionQuery  string
+	sessionArgs   []any
+	sessionRows   [][]any
 }
 
 func newCasePersistenceFixture() *casePersistenceFixture {
@@ -106,12 +118,46 @@ func (fixture *casePersistenceFixture) QueryRow(_ context.Context, query string,
 }
 
 func (fixture *casePersistenceFixture) Query(_ context.Context, query string, args ...any) (pgx.Rows, error) {
+	if strings.Contains(query, "FROM player_sessions s") {
+		fixture.sessionQuery = query
+		fixture.sessionArgs = args
+		return &caseFixtureRows{rows: fixture.sessionRows}, nil
+	}
 	if strings.Contains(query, "FROM case_activity_records") {
 		fixture.activityQuery = query
 		fixture.activityArgs = args
 		return &caseFixtureRows{rows: fixture.activityRows}, nil
 	}
 	return nil, errors.New("unexpected case row query")
+}
+
+func TestListOpenPublicCasesForSessionUsesOneScopedQuery(t *testing.T) {
+	createdAt := time.Date(2026, time.October, 24, 12, 0, 0, 0, time.UTC)
+	fixture := newCasePersistenceFixture()
+	fixture.sessionRows = [][]any{{"fr/lyon", "case-1", "fr/lyon", "homicide", "npc:victim", "location:fr/lyon/central", "open", createdAt}}
+	store := NewPostgresStore(fixture)
+
+	results, err := store.ListOpenPublicCasesForSession(context.Background(), "server-1", "session-token", createdAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].ID != "case-1" || results[0].CityID != "fr/lyon" || results[0].Status != "open" || !results[0].CreatedAt.Equal(createdAt) {
+		t.Fatalf("unexpected public cases: %+v", results)
+	}
+	if fixture.sessionQuery == "" || !strings.Contains(fixture.sessionQuery, "s2.status = 'open'") || !strings.Contains(fixture.sessionQuery, "c.city_id = resolved.city_id") {
+		t.Fatalf("combined query did not scope open cases to the resolved city: %s", fixture.sessionQuery)
+	}
+	if len(fixture.sessionArgs) != 5 || fixture.sessionArgs[1] == nil || fixture.sessionArgs[2] != createdAt || fixture.sessionArgs[4] != "fr/lyon" {
+		t.Fatalf("unexpected combined query arguments: %#v", fixture.sessionArgs)
+	}
+}
+
+func TestListOpenPublicCasesForSessionRejectsMissingSession(t *testing.T) {
+	store := NewPostgresStore(newCasePersistenceFixture())
+	_, err := store.ListOpenPublicCasesForSession(context.Background(), "server-1", "missing-token", time.Now())
+	if !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("missing session error = %v, want %v", err, ErrSessionNotFound)
+	}
 }
 
 func (fixture *casePersistenceFixture) Begin(context.Context) (pgx.Tx, error) {

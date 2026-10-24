@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getGateDestinations, getNeighborhoodDestinations, getNPCRecords, movePlayer } from "./api.js";
+import { cacheWhiteboardDraft, discardWhiteboardDraft, getCachedWhiteboard, getGateDestinations, getNeighborhoodDestinations, getNPCRecords, getWhiteboard, movePlayer } from "./api.js";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  localStorage.clear();
+  sessionStorage.clear();
+});
 
 describe("NPC activity records API", () => {
   it("requests one NPC for the selected date interval", async () => {
@@ -76,5 +81,39 @@ describe("world navigation APIs", () => {
 
     await expect(getNeighborhoodDestinations("fr/lyon")).resolves.toEqual(destinations);
     expect(fetch).toHaveBeenCalledWith("/api/world/transit?cityId=fr%2Flyon", { credentials: "same-origin" });
+  });
+});
+
+describe("whiteboard local cache", () => {
+  it("does not replace a newer local mutation with a stale in-flight response", async () => {
+    let finishRequest;
+    const fetch = vi.fn(() => new Promise((resolve) => { finishRequest = resolve; }));
+    vi.stubGlobal("fetch", fetch);
+    const oldBoard = { id: "board:race", title: "Old title", pins: [], connections: [] };
+    const updatedBoard = { ...oldBoard, title: "Updated title" };
+
+    const pending = getWhiteboard(oldBoard.id);
+    cacheWhiteboardDraft(updatedBoard);
+    finishRequest(new Response(JSON.stringify({ whiteboard: oldBoard }), {
+      headers: { "content-type": "application/json" },
+    }));
+
+    await expect(pending).resolves.toEqual(updatedBoard);
+    expect(getCachedWhiteboard(oldBoard.id)).toEqual(updatedBoard);
+  });
+
+  it("expires cached boards and removes drafts when discarded", () => {
+    let now = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const board = { id: "board:qa", title: "QA board", pins: [], connections: [] };
+
+    cacheWhiteboardDraft(board);
+    expect(getCachedWhiteboard(board.id)).toEqual(board);
+    discardWhiteboardDraft(board.id);
+    expect(getCachedWhiteboard(board.id)).toBeNull();
+
+    cacheWhiteboardDraft(board);
+    now += 24 * 60 * 60 * 1000 + 1;
+    expect(getCachedWhiteboard(board.id)).toBeNull();
   });
 });

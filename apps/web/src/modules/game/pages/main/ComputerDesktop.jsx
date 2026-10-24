@@ -82,7 +82,7 @@ function programsFor(facilityContext) {
   return PERSONAL_PROGRAMS;
 }
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, issueDay, facilityContext, onClose }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose }) {
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
   const bootLines = isCompanyComputer ? [`${facilityContext.label} WORKSTATION`, "MERIDIAN AUTHENTICATION SERVICE…", "LOCAL SESSION READY"] : BOOT_LINES;
@@ -460,7 +460,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} cityId={cityId} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} runHack={runHack} onPin={requestPin} />
                         : program.id === "personal-mail"
                           ? <PlayerMailbox key={id} timeZone={timeZone} onPin={requestPin} />
-                        : <WorldDirectory key={id} program={program.id} companyLocationId={program.id === "staff-directory" ? facilityContext?.locationId : undefined} companyId={program.id === "staff-directory" ? facilityContext?.companyId : undefined} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} cityId={cityId} serverTime={serverTime} timeZone={timeZone} runHack={runHack} onPin={requestPin} />}
+                        : <WorldDirectory key={id} program={program.id} companyLocationId={program.id === "staff-directory" ? facilityContext?.locationId : undefined} companyId={program.id === "staff-directory" ? facilityContext?.companyId : undefined} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} runHack={runHack} onPin={requestPin} />}
                 </div>
               </section>;
             })}

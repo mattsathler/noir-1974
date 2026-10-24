@@ -378,6 +378,48 @@ func TestCentralServicePointsAreStableAcrossWorldSeedsAndSearchIsDistrictScoped(
 	}
 }
 
+func TestCityExpansionCacheIsScopedAndInvalidatedByServerCountry(t *testing.T) {
+	store := &PostgresStore{}
+	keyA := countryExpansionScope("server-a", "br") + "city:rio"
+	keyOtherServer := countryExpansionScope("server-b", "br") + "city:rio"
+	keyOtherCountry := countryExpansionScope("server-a", "ar") + "city:rio"
+
+	store.cacheCityExpansions(keyA, "server-a", "br", 0,
+		[]NPC{{ID: "npc:private"}}, nil, nil)
+	if _, _, _, ok, _ := store.cachedCityExpansions("server-a", "br", keyA); !ok {
+		t.Fatal("expected cache hit in original server and country scope")
+	}
+	if _, _, _, ok, _ := store.cachedCityExpansions("server-b", "br", keyOtherServer); ok {
+		t.Fatal("city expansion leaked across servers")
+	}
+	if _, _, _, ok, _ := store.cachedCityExpansions("server-a", "ar", keyOtherCountry); ok {
+		t.Fatal("city expansion leaked across countries")
+	}
+
+	store.invalidateCountryExpansions("server-a", "br")
+	if _, _, _, ok, revision := store.cachedCityExpansions("server-a", "br", keyA); ok || revision != 1 {
+		t.Fatalf("expected invalidated cache and incremented revision; hit=%v revision=%d", ok, revision)
+	}
+}
+
+func TestWorldCasesExpansionCacheIsolatedByServerAndInvalidated(t *testing.T) {
+	store := &PostgresStore{}
+	keyA := worldCasesScope("server-a") + "seed:city-version"
+	keyB := worldCasesScope("server-b") + "seed:city-version"
+	store.cacheWorldCasesExpansions("server-a", keyA, 0, []NPC{{ID: "npc:one"}}, nil, nil)
+
+	if _, _, _, hit, _ := store.cachedWorldCasesExpansions("server-a", keyA); !hit {
+		t.Fatal("expected cache hit for original server")
+	}
+	if _, _, _, hit, _ := store.cachedWorldCasesExpansions("server-b", keyB); hit {
+		t.Fatal("world expansion leaked across servers")
+	}
+	store.invalidateWorldForCases("server-a")
+	if _, _, _, hit, revision := store.cachedWorldCasesExpansions("server-a", keyA); hit || revision != 1 {
+		t.Fatalf("expected invalidated cache and incremented revision; hit=%v revision=%d", hit, revision)
+	}
+}
+
 func TestPersonMaritalStatusUsesCurrentMarriageAndSupportsPriorStatus(t *testing.T) {
 	for _, test := range []struct {
 		name    string
