@@ -177,8 +177,18 @@ async function requestCase(path, options) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json") ? await response.json() : { message: await response.text() };
-  if (!response.ok) throw new Error(payload.message?.trim() || "The case service could not be reached.");
+  if (!response.ok) {
+    const error = new Error(payload.message?.trim() || "The case service could not be reached.");
+    error.code = payload.code;
+    error.status = response.status;
+    throw error;
+  }
   return payload;
+}
+
+export function lookupPhoneContact(number) {
+  const digits = String(number).replace(/\D/gu, "");
+  return requestCase(`/api/world/phone/${encodeURIComponent(digits)}`);
 }
 
 export async function getOpenCases() {

@@ -114,68 +114,68 @@
   "roles": {
     "colleague": {
       "routine": [
-        "My own schedule has not changed much. The office was busier than usual the week before {victim} died.",
-        "My days were ordinary, though several people started staying late at the office."
+        "The after-hours entry carried the initials for {victim} and {suspect}; someone corrected the time beside them.",
+        "Both {victim} and {suspect} were connected to the late entry, but the original time is still needed to check their movements."
       ],
       "associates": [
-        "I mostly spend time with people from the office. {victim} and I were colleagues, not close friends.",
-        "I keep to a small circle at work. I cannot say who {victim} trusted outside it."
+        "The disagreement over responsibilities involved {victim} and {suspect}; the minutes record only abbreviated names.",
+        "People in the office knew {victim} and {suspect} disagreed, but few heard the whole conversation."
       ],
       "unusual": [
-        "A time in the after-hours book looks different from the other entries. I only noticed when it was pointed out.",
-        "I heard raised voices once. It could have been about work; I did not catch the words."
+        "The meeting notes were copied twice. The version left in the registry did not match the one {suspect} had circulated.",
+        "After the argument, {victim} asked whether the original minutes were still in the registry."
       ],
       "work": [
-        "There had been disagreement over responsibilities. That sort of thing happens here more than people admit.",
-        "The meeting notes may help. I remember a page being replaced, but not by whom."
+        "The minutes place {victim} and {suspect} on opposite sides of the responsibility dispute; compare the initials with the personnel file.",
+        "The disagreement was about who could approve the revised duties, not simply a general quarrel between coworkers."
       ],
       "worries": [
-        "I do not want to be quoted. People here remember who cooperates with investigators.",
-        "I am afraid the office records will be tidied up before anyone asks for them."
+        "Do not treat the corrected hour as an alibi until the original entry and both signatures have been checked.",
+        "The person who changed the time may have had access to the registry; the handwriting alone does not prove who did it."
       ]
     },
     "acquaintance": {
       "routine": [
-        "My routine has been quiet. The last time I saw {victim}, they seemed preoccupied.",
-        "I have kept to my usual habits. {victim} stopped making plans after a difficult week at work."
+        "After a difficult meeting with {suspect}, {victim} stopped making plans and kept talking about the office records.",
+        "{victim} told me the argument with {suspect} had followed them home, though they would not explain the paperwork."
       ],
       "associates": [
         "I usually spend time with family and a few old friends. {victim} was one of them.",
         "I saw {victim} now and then, but we did not share the same circle at work."
       ],
       "unusual": [
-        "{victim} asked me to hold onto a note, then changed their mind. It may have been about a meeting.",
-        "They said a work record had been changed. I do not know which one."
+        "{victim} said someone had warned them to leave the meeting notes alone, but did not show me the message.",
+        "They believed a work record had been changed after the dispute with {suspect}; I never saw the original."
       ],
       "work": [
-        "They were frustrated about a decision at the office. I did not understand the details.",
-        "I only know they thought the minutes from a meeting were incomplete."
+        "{victim} described the dispute with {suspect} as a disagreement over responsibility for the revised duties.",
+        "They thought the meeting minutes had been altered, but could not tell me who changed the copy."
       ],
       "worries": [
-        "I am sorry, but I do not want to discuss their private life on a telephone line.",
-        "I worry that I will misremember something and make matters worse."
+        "I cannot identify who sent an unsigned warning; it should be matched with the records, not treated as proof by itself.",
+        "I worry people will blame {suspect} for the argument without checking who altered the register."
       ]
     },
     "perpetrator": {
       "routine": [
-        "My routine has not changed. I have already answered questions about my schedule that week.",
-        "I will not discuss my movements over the telephone. Speak to my representative."
+        "The corrected register is the official one. There is no reason to compare it with an earlier copy.",
+        "I kept to my usual hours. If the after-hours book says otherwise, someone must have copied it incorrectly."
       ],
       "associates": [
-        "I spend time with my own friends. I worked with {victim}; that is all I will say about them.",
-        "I do not want to discuss my personal circle or other employees. Stop pressing me."
+        "{victim} and I disagreed about responsibilities. It was an ordinary workplace dispute, nothing more.",
+        "I will not discuss whether {victim} trusted me with the meeting notes. That is an internal matter."
       ],
       "unusual": [
-        "I do not recall anything unusual. You should check the official records.",
-        "I have nothing to add, and I will not speculate about the office book."
+        "I did not ask anyone to keep the minutes from the registry. You should verify that claim with the original copy.",
+        "There was no unusual correction in the after-hours book, as far as I remember."
       ],
       "work": [
-        "Disagreements at work are routine. You are making too much of ordinary meetings.",
-        "I will not discuss internal business with an investigator over this line."
+        "The disagreement with {victim} concerned who could approve the revised duties; it did not concern the attendance register.",
+        "I never changed the meeting notes. The registry should have the first copy if it still exists."
       ],
       "worries": [
-        "I am worried about people drawing conclusions from incomplete records.",
-        "I have said all I intend to say. Please do not call again."
+        "I am concerned that people will treat two initials and a corrected time as proof of who made the change.",
+        "There is no need to compare the original minutes with the copy in the registry."
       ]
     }
   }

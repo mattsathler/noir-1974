@@ -1,0 +1,73 @@
+M13 PLAYTHROUGH — INVESTIGAÇÃO E ACUSAÇÃO
+Data: 2026-10-23
+Ambiente: branch Neon QA
+Objetivo: gerar um caso seedado, percorrer as ferramentas atuais e avaliar se as pistas sustentam uma acusação desafiadora, mas possível.
+Segurança: seed e credenciais foram omitidas. Nenhum mundo foi resetado. Todas as alterações remotas desta execução ocorreram na branch QA.
+
+RESUMO DAS ETAPAS
+
+1. Confirmar o ambiente
+   A configuração aponta para a branch QA. O mundo já tinha 800 NPCs e 27 casos abertos. Foi usada uma conta temporária de playthrough. A API local conectou-se à branch QA sem reinicializar o mundo.
+
+2. Gerar o novo caso
+   O próximo slot seedado era o 27, em Beijing; a cidade tinha 4 casos abertos, abaixo do limite 10. Para não esperar o horário normal, foi adiantado apenas next_run_at na branch QA. O scheduler criou o caso case:f14f6c5208b0b5612f9b75db às 23:05 UTC. Beijing passou a ter 5 casos abertos e o scheduler avançou ao slot 28.
+   Seed: corresponde à configuração persistida. Hash curto para identificação: 8064cd51f0da16fe. O valor da seed não é registrado.
+
+3. Abrir o dossiê público
+   A vítima é Jun Huang, funcionário da Dargent Shipping, encontrado em Bell & Finch Rooms, Beijing Li. O dossiê trouxe cinco itens:
+   - Ficha de pessoal: Jun e outra pessoa trabalhavam na mesma empresa.
+   - Ata de reunião: houve desacordo sobre responsabilidades; nomes abreviados.
+   - Registro após o expediente: duas assinaturas conhecidas em entrada tardia, com horário corrigido à mão.
+   - Aviso privado: “Leave the meeting notes as they are. If you take them to the registry, you will regret it.”
+   - Última mensagem: “This is your final chance to keep quiet. Do not make me come looking for you.”
+   As duas mensagens não mostram remetente nem destinatário.
+
+4. Consultar diretório, correspondência e depoimentos
+   A busca da empresa identificou oito funcionários. A caixa postal de Jun, no intervalo de 17 a 23 de outubro, trouxe mensagens de rotina de colegas e da empresa, mas não as duas ameaças do dossiê. Isso impede atribuí-las a uma pessoa usando a correspondência atual.
+   Foram consultados depoimentos disponíveis. O endpoint retorna bancos longos de respostas genéricas por tema, sem fala individualizada e atribuível ao NPC; portanto não ajudou a distinguir os colegas.
+   As consultas de registros bancários/GATE dos funcionários não produziram uma conferência de horário útil para a ocorrência. O registro de expediente do dossiê continuou sem identificação das assinaturas.
+
+5. Fazer buscas residenciais a partir das pistas profissionais
+   - Guo Hu, gerente: encontrou uma cópia de requisição de papel para livro razão, com duas iniciais e data de 14 de outubro. O nome não é legível e não há ligação direta com Jun.
+   - Fang Sun, contadora: itens majoritariamente domésticos; um recorte registra reunião no salão da empresa em 12 de outubro, às 20h, mas não identifica participantes.
+   - Xiu Guo, secretária: encontrou rascunho de reclamação não enviado sobre uma promoção prometida em particular e retirada diante do escritório. É um possível motivo de conflito profissional, mas não cita Jun nem informa quem retirou a promoção.
+   A pista da busca residencial tornou Xiu uma hipótese plausível, mas não conclusiva.
+
+6. Montar o whiteboard
+   Board: board_giKoAhv7nBhHnncxFsb3KSs9, “Beijing · Jun Huang”.
+   Acusada: Xiu Guo. Vítima: Jun Huang. Provas marcadas: os cinco itens públicos do dossiê (três registros e duas mensagens). Os anexos residenciais não foram marcados como prova porque não são evidências vinculadas ao caso pelo backend.
+   A hipótese foi escolhida antes de consultar a solução interna. O encadeamento foi: conflito sobre responsabilidades + ameaça para manter as atas em segredo + possível ressentimento profissional de Xiu. A falta de nomes nas atas e de autoria nas mensagens deixa uma lacuna importante.
+
+7. Entregar a acusação e verificar o resultado
+   A primeira submissão validou o board, mas falhou ao gravar a prisão: a constraint world_mutations_value_check aceitava apenas alive/dead, embora o código já aceitasse arrested. A transação foi revertida. Corrigi a constraint em apps/api/internal/world/schema.sql e reapliquei o schema na branch QA.
+   Na segunda submissão, a acusação foi aceita. O email de decisão informou que a prisão foi autorizada. O NPC Xiu Guo passou a status arrested; o caso passou a solved. O jornal THE Beijing GAZETTE publicou “Police announce arrest in the death of Jun Huang”.
+   Só depois desse resultado foi consultada a solução interna do caso. Ela confirmou Xiu Guo como assassina. A acusação estava correta.
+
+AVALIAÇÃO
+
+Resultado: o ciclo funciona e a solução foi alcançada sem consultar o segredo antes da acusação. A dificuldade foi moderada pelo número de funcionários, pela necessidade de cruzar fontes e por buscar evidência residencial. A acusação correta, porém, dependeu de uma hipótese com suporte incompleto: o motivo encontrado na casa de Xiu não cita a vítima, e as mensagens ameaçadoras e as assinaturas não identificam pessoas.
+
+As pistas dão uma direção possível, mas ainda não formam uma ligação verificável entre Xiu e o homicídio. O diretório demonstra oportunidade geral (mesma empresa); a reclamação sugere motivo; as ameaças sugerem encobrimento; nenhuma ferramenta atual conecta explicitamente Xiu aos três fatos. Assim, o caso foi solucionável neste playthrough, mas o resultado pareceu mais uma dedução plausível que uma conclusão sustentada. Recomenda-se melhorar a atribuição das mensagens ou das iniciais/assinaturas nas atas, sem revelar ao front informações internas do caso.
+
+FALHAS E AJUSTES OBSERVADOS
+
+- Bloqueio de submissão: schema de world_mutations não permitia arrested. Corrigido em apps/api/internal/world/schema.sql com atualização da constraint para permitir alive, dead e arrested.
+- Interrogatório: respostas são coleções genéricas não atribuídas ao NPC; pouca utilidade investigativa nesta rodada.
+- Correspondência: ameaças do dossiê não aparecem como mensagens atribuíveis na caixa postal consultada.
+- Evidência: atas e registro de horário não revelam nomes, deixando a pessoa acusada ligada apenas indiretamente ao caso.
+
+IMPACTO QA
+
+- Caso seedado criado pela rotina do scheduler no slot 27.
+- Uma conta/personagem e um whiteboard temporários foram criados na branch QA.
+- Foram registrados três pedidos de busca residencial, uma sessão de terminal policial, uma acusação aceita e a consequente mutação de status/publicação no jornal.
+- Nenhum dado fora da branch QA foi alterado e o banco não foi resetado.
+
+AJUSTES APÓS A PLAYTHROUGH
+
+- Cada interrogatório agora prioriza um único contexto: primeiro um NPC diretamente ligado ao caso, depois uma relação pessoal e, por fim, um colega. Isso evita misturar depoimentos de vários casos abertos.
+- Para cada pergunta, o backend mantém uma fala curta de contexto e duas falas do papel da pessoa no caso. O pool é selecionado de forma estável; a interface escolhe entre essas falas sem misturar casos. Quando não há caso relacionado, continuam disponíveis as respostas de personalidade e rotina.
+- Os diálogos de conflito profissional, extorsão e ciúmes foram revisados para apontar cruzamentos entre pistas existentes e advertir quando uma linha isolada é inconclusiva.
+- A acusação passou a ponderar a força das provas em vez de contar todo item do dossiê como prova plena: evidência direta vale 1, evidência de apoio vale 0,75, ameaça anônima vale 0,25 e material apenas contextual vale 0. Pins marcados como prova sem vínculo probatório reduzem a chance.
+- Estes ajustes de diálogo e pontuação foram feitos depois do resultado registrado acima; a playthrough descrita não foi repetida com as novas regras.
+- O build da API passou após as alterações. Testes automatizados não foram executados.

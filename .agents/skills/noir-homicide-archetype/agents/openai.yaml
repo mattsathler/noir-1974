@@ -1,0 +1,4 @@
+interface:
+  display_name: "Noir Homicide Archetype"
+  short_description: "Add deterministic homicide archetypes to Noir"
+  default_prompt: "Use $noir-homicide-archetype to add a new homicide archetype to Noir."

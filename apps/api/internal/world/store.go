@@ -113,6 +113,14 @@ type CompanyEmployee struct {
 	Visual *VisualIdentity `json:"visual,omitempty"`
 }
 
+type PhoneContact struct {
+	ID      string          `json:"id"`
+	Name    string          `json:"name"`
+	Company string          `json:"company"`
+	Status  string          `json:"status"`
+	Visual  *VisualIdentity `json:"visual,omitempty"`
+}
+
 type LocationRecord struct {
 	Address Address `json:"address"`
 }
@@ -1246,6 +1254,54 @@ func (store *PostgresStore) CityWorldForCases(ctx context.Context, serverID, cit
 	}
 	sort.Slice(base.NPCs, func(i, j int) bool { return base.NPCs[i].ID < base.NPCs[j].ID })
 	return base, nil
+}
+
+// PhoneContactByNumber resolves a generated employee telephone number within the caller's city.
+func (store *PostgresStore) PhoneContactByNumber(ctx context.Context, serverID, cityID, number string) (PhoneContact, error) {
+	digits := strings.Map(func(character rune) rune {
+		if character >= '0' && character <= '9' {
+			return character
+		}
+		return -1
+	}, number)
+	if len(digits) != 7 {
+		return PhoneContact{}, ErrEntityNotFound
+	}
+	city, err := store.CityWorldForCases(ctx, serverID, cityID)
+	if err != nil {
+		return PhoneContact{}, err
+	}
+	npcs := make(map[string]NPC, len(city.NPCs))
+	for _, npc := range city.NPCs {
+		npcs[npc.ID] = npc
+	}
+	companies := make(map[string]string, len(city.Companies))
+	for _, company := range city.Companies {
+		companies[company.ID] = company.Name
+	}
+	sort.Slice(city.EmploymentRelationships, func(i, j int) bool {
+		return city.EmploymentRelationships[i].ID < city.EmploymentRelationships[j].ID
+	})
+	for _, relationship := range city.EmploymentRelationships {
+		npc, exists := npcs[relationship.EmployeeNPCID]
+		if !exists || phoneNumberForNPC(npc.ID) != digits {
+			continue
+		}
+		return PhoneContact{
+			ID: npc.ID, Name: npc.Name, Company: companies[relationship.EmployerCompanyID],
+			Status: npc.Status, Visual: npc.Visual,
+		}, nil
+	}
+	return PhoneContact{}, ErrEntityNotFound
+}
+
+func phoneNumberForNPC(npcID string) string {
+	hash := uint32(2166136261)
+	for index := 0; index < len(npcID); index++ {
+		hash = (hash ^ uint32(npcID[index])) * 16777619
+	}
+	digits := fmt.Sprintf("%07d", 1000000+hash%9000000)
+	return digits
 }
 
 // ExpandDistrictSociety adds a deterministic pair to an existing district under a row lock.

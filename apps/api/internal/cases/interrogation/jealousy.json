@@ -114,20 +114,20 @@
   "roles": {
     "colleague": {
       "routine": [
-        "My routine was ordinary. {victim} seemed tired whenever I saw them at work.",
-        "I kept to my usual hours. {victim} had been leaving at different times for a while."
+        "{victim} had been leaving at different times; the work rota can check whether {suspect} was with them.",
+        "I kept regular hours. The late return people mention happened outside my shift."
       ],
       "associates": [
         "I mostly spend time with colleagues. I knew {victim} and their spouse only in passing.",
         "I was not part of their private circle, and I do not trust office gossip about them."
       ],
       "unusual": [
-        "A torn letter was mentioned after the death. I never saw the whole thing.",
-        "Someone said there had been a late return one evening. I could not confirm it."
+        "I heard the letter about a private meeting was torn, but never saw who handled it.",
+        "The late return was discussed only after the death; I cannot confirm that {suspect} was there."
       ],
       "work": [
-        "There was no office matter that I know of. Their private life was not discussed at work.",
-        "I remember a request for time off, but not the reason given."
+        "{victim} asked for time away after a private meeting with {suspect}; I do not know what happened between them.",
+        "Their work schedules might check the account of the late return, but they do not explain the letter."
       ],
       "worries": [
         "I do not want to repeat rumours about a marriage. Please ask someone who was there.",
@@ -136,46 +136,46 @@
     },
     "acquaintance": {
       "routine": [
-        "My routine has been quiet. {victim} had been keeping to themselves when we met.",
-        "I have not changed my habits. {victim} once mentioned an awkward evening, then changed the subject."
+        "{victim} stopped meeting friends after an argument with {suspect}, but never told me what started it.",
+        "They mentioned a late evening with {suspect} and changed the subject when I asked about the letter."
       ],
       "associates": [
-        "I usually spend time with a few friends. I knew both of them, but will not take sides.",
-        "I saw {victim} socially now and then. I did not know what happened between the spouses."
+        "I knew {victim} and {suspect} as a couple. Their friends saw them separately near the end.",
+        "{victim} trusted {suspect}, but had stopped inviting them to the same gatherings."
       ],
       "unusual": [
-        "There was a letter about a meeting. I only saw a few words before it was put away.",
-        "I heard someone came home late, though I do not know which night or who saw it."
+        "{victim} told me the meeting letter was incomplete and asked me not to repeat what it said about {suspect}.",
+        "A neighbour mentioned a late return by {suspect}; I did not see the person arrive myself."
       ],
       "work": [
-        "This was not something {victim} wanted to discuss at work or with friends.",
-        "I cannot tell you whether a private meeting had anything to do with the death."
+        "{victim} said the private meeting with {suspect} changed their relationship, but would not tell me why.",
+        "I cannot connect their work schedules to the letter or say whether the meeting was an alibi."
       ],
       "worries": [
-        "I am not comfortable discussing their marriage on a telephone line.",
-        "I worry that people will turn a rumour into a fact because it suits them."
+        "A troubled marriage does not prove who caused the death; the letter and the return time need independent checks.",
+        "I worry the missing part of the letter will be filled in with rumours about {suspect}."
       ]
     },
     "perpetrator": {
       "routine": [
-        "I am trying to get through each day. I will not discuss my schedule or my marriage with a stranger.",
-        "My routine is private. I have nothing to say about that week; please stop calling."
+        "I kept to my usual routine. The neighbours do not know what time I returned that night.",
+        "I will not discuss whether I met {victim} that evening. The letter does not establish that."
       ],
       "associates": [
-        "{victim} was my spouse. That is private, and I will not discuss my personal circle.",
-        "I do not want to discuss who I or {victim} spent time with."
+        "{victim} was my spouse. We had friends in common, but I will not name them over this line.",
+        "Our friends did not know what was written in the missing part of the letter."
       ],
       "unusual": [
-        "I have not seen that letter. I cannot help you with something I have not read.",
-        "People remember things differently after a death. I will not comment on hearsay."
+        "I did not arrange a private meeting with {victim}; you should check who wrote the appointment card.",
+        "I have not seen the complete letter. No one should treat the torn fragment as a full account."
       ],
       "work": [
-        "There is nothing about my work that relates to this. I will end the call if you continue.",
-        "I will not discuss private correspondence with you."
+        "{victim} and I argued about whether to attend a meeting, not about anything that happened at home.",
+        "My work schedule can be checked against the reported late return."
       ],
       "worries": [
-        "I am worried that grief is making people suspicious of everyone close to {victim}.",
-        "I have nothing further to say. Please respect my privacy."
+        "I am worried that people will treat the marriage as proof and ignore the missing letter and uncertain time.",
+        "There is no need to check the appointment card against my schedule."
       ]
     }
   }

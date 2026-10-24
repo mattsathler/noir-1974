@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"sort"
 	"strings"
@@ -305,10 +306,16 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 	}
 	profileAnswers := []InterrogationAnswers{profiles.Personalities[npc.Personality].answers(), profiles.Occupations[occupation].answers(), profiles.Routines[routine].answers()}
 	rows, err := store.db.Query(ctx, `
-		SELECT c.archetype_id,
+		SELECT c.case_id,c.archetype_id,
 		       victim.generation_key, killer.generation_key,
 	       CASE WHEN c.killer_entity_id = $3 THEN 'perpetrator'
 	            WHEN c.victim_entity_id = $3 THEN 'acquaintance'
+	            WHEN EXISTS (
+	              SELECT 1 FROM personal_relationships direct_relation
+	              WHERE direct_relation.server_id = c.server_id
+	                AND ((direct_relation.person_a_npc_id = $3 AND direct_relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
+	                  OR (direct_relation.person_b_npc_id = $3 AND direct_relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
+	            ) THEN 'acquaintance'
 	            WHEN EXISTS (
 	              SELECT 1 FROM employment_relationships principal_job
 	              JOIN employment_relationships caller_job
@@ -337,15 +344,27 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 	      AND ((relation.person_a_npc_id = $3 AND relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
 	        OR (relation.person_b_npc_id = $3 AND relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
 	  ))
-	ORDER BY c.created_at DESC, c.case_id`, serverID, cityID, npcID)
+	ORDER BY CASE
+	           WHEN c.killer_entity_id = $3 THEN 0
+	           WHEN c.victim_entity_id = $3 THEN 1
+	           WHEN EXISTS (
+	             SELECT 1 FROM personal_relationships relation
+	             WHERE relation.server_id = c.server_id
+	               AND ((relation.person_a_npc_id = $3 AND relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
+	                 OR (relation.person_b_npc_id = $3 AND relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
+	           ) THEN 2
+	           ELSE 3
+	         END,
+	         c.created_at DESC, c.case_id
+		LIMIT 1`, serverID, cityID, npcID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	contextFound := false
 	for rows.Next() {
-		var archetype, victimKey, killerKey, role string
-		if err := rows.Scan(&archetype, &victimKey, &killerKey, &role); err != nil {
+		var caseID, archetype, victimKey, killerKey, role string
+		if err := rows.Scan(&caseID, &archetype, &victimKey, &killerKey, &role); err != nil {
 			return nil, err
 		}
 		victim, err := world.GenerateNPC(seed, version, victimKey)
@@ -365,28 +384,53 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 			}
 			contextFound = true
 		}
-		mergeInterrogationAnswers(answers, caseFile.Shared.answers(), map[string]string{"victim": victim.Name})
-		mergeInterrogationAnswers(answers, branch.answers(), map[string]string{"victim": victim.Name, "suspect": killer.Name})
+		mergeInterrogationAnswers(answers, caseFile.Shared.answers(), map[string]string{"victim": victim.Name}, 1, caseID+"/shared/"+npcID)
+		mergeInterrogationAnswers(answers, branch.answers(), map[string]string{"victim": victim.Name, "suspect": killer.Name}, 2, caseID+"/role/"+npcID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	profileTokens := map[string]string{"npc": npc.Name, "occupation": occupation, "employer": employer, "personality": npc.Personality, "routine": routine}
-	for _, profile := range profileAnswers {
-		mergeInterrogationAnswers(answers, profile, profileTokens)
+	if !contextFound {
+		profileTokens := map[string]string{"npc": npc.Name, "occupation": occupation, "employer": employer, "personality": npc.Personality, "routine": routine}
+		for index, profile := range profileAnswers {
+			mergeInterrogationAnswers(answers, profile, profileTokens, 1, npcID+"/profile/"+fmt.Sprint(index))
+		}
 	}
 	return answers, nil
 }
 
-func mergeInterrogationAnswers(target, source InterrogationAnswers, names map[string]string) {
+func mergeInterrogationAnswers(target, source InterrogationAnswers, names map[string]string, limit int, selectionKey string) {
 	for question, lines := range source {
-		for _, line := range lines {
+		for _, line := range selectInterrogationLines(lines, limit, selectionKey+"/"+question) {
 			for token, name := range names {
 				line = strings.ReplaceAll(line, "{"+token+"}", name)
 			}
 			target[question] = append(target[question], line)
 		}
 	}
+}
+
+func selectInterrogationLines(lines []string, limit int, selectionKey string) []string {
+	if limit <= 0 || len(lines) <= limit {
+		return lines
+	}
+	hash := sha256.Sum256([]byte(selectionKey))
+	start := int(binary.BigEndian.Uint64(hash[:8]) % uint64(len(lines)))
+	selected := make([]string, 0, limit)
+	for offset := 0; offset < len(lines) && len(selected) < limit; offset++ {
+		line := lines[(start+offset)%len(lines)]
+		duplicate := false
+		for _, existing := range selected {
+			if line == existing {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			selected = append(selected, line)
+		}
+	}
+	return selected
 }
 
 func NewPostgresStore(db caseDatabase) *PostgresStore {
@@ -1498,20 +1542,44 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return AccusationResult{}, err
 	}
-	var totalProofs, validProofs int
+	var totalProofs int
+	var proofStrength float64
 	if err := tx.QueryRow(ctx, `SELECT count(*) FILTER(WHERE p.designation='proof'),
-		count(*) FILTER(WHERE p.designation='proof' AND (
-		EXISTS(SELECT 1 FROM case_evidence e WHERE e.server_id=$1::uuid AND e.case_id=$4 AND e.evidence_id=p.item_id)
-		OR EXISTS(SELECT 1 FROM case_activity_records a WHERE a.server_id=$1::uuid AND a.case_id=$4 AND a.record_id=p.item_id)
-		OR EXISTS(SELECT 1 FROM case_mail_messages m WHERE m.server_id=$1::uuid AND m.case_id=$4 AND m.message_id=p.item_id)))
-		FROM player_whiteboard_pins p WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3`, serverID, accountID, boardID, caseID).Scan(&totalProofs, &validProofs); err != nil {
+		COALESCE(sum(CASE WHEN p.designation='proof' THEN CASE
+			WHEN EXISTS (
+				SELECT 1 FROM case_activity_records a JOIN cases c USING(server_id,case_id)
+				WHERE a.server_id=$1::uuid AND a.case_id=$4 AND a.record_id=p.item_id
+				  AND c.archetype_id='financial_extortion'
+				  AND a.internal_relation IN ('extortion_payment','precrime_route')
+			) THEN 1.0
+			WHEN EXISTS (
+				SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
+				WHERE e.server_id=$1::uuid AND e.case_id=$4 AND e.evidence_id=p.item_id
+				  AND ((c.archetype_id='workplace_conflict' AND e.evidence_type='office_log')
+				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='travel_register'))
+			) THEN 1.0
+			WHEN EXISTS (
+				SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
+				WHERE e.server_id=$1::uuid AND e.case_id=$4 AND e.evidence_id=p.item_id
+				  AND ((c.archetype_id='workplace_conflict' AND e.evidence_type='meeting_minutes')
+				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='account_record')
+				    OR (c.archetype_id='jealousy' AND e.evidence_type IN ('letter_fragment','witness_statement')))
+			) THEN 0.75
+			WHEN EXISTS (
+				SELECT 1 FROM case_mail_messages m
+				WHERE m.server_id=$1::uuid AND m.case_id=$4 AND m.message_id=p.item_id
+				  AND m.internal_relation IN ('anonymous_warning','anonymous_followup')
+			) THEN 0.25
+			ELSE 0.0
+		END ELSE 0.0 END),0)::float8
+		FROM player_whiteboard_pins p WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3`, serverID, accountID, boardID, caseID).Scan(&totalProofs, &proofStrength); err != nil {
 		return AccusationResult{}, err
 	}
-	// The odds rule is tuned centrally; a true suspect with one authentic pin gains 65 points,
-	// while each unrelated pin marked as proof removes 40 points. Innocent suspects always score zero.
+	// Authenticated case evidence has different probative strength. Context-only pins
+	// do not raise arrest odds; unrelated pins marked as proof lower them.
 	chance := 0
 	if accusedID == killerID && markedVictimID == victimID {
-		chance = 10 + validProofs*65 - (totalProofs-validProofs)*40
+		chance = int(math.Round(10 + proofStrength*65 - (float64(totalProofs)-proofStrength)*40))
 	}
 	if chance < 0 {
 		chance = 0

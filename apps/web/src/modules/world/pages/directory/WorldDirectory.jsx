@@ -3,7 +3,7 @@ import { MapPin } from "pixelarticons/react/MapPin";
 import { getCompanyAtLocation, getNPCRecords, searchCompanies, searchLocations, searchPeople } from "../../api.js";
 import DatePicker from "../../components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
-import { phoneNumberForNPC, registerPhoneContacts } from "../../phoneDirectory.js";
+import { phoneNumberForNPC } from "../../phoneDirectory.js";
 
 const FALLBACK_NPC_VISUAL = {
   hairId: "hair_short_brown",
@@ -75,10 +75,6 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
   const isPeopleSearch = !isCityRecords && !isStaffDirectory;
   const isPrivilegedSystem = isBankRecords || isGateRecords;
   const staffCompanies = companyId ? companies.filter(({ company }) => company.id === companyId) : companies;
-
-  useEffect(() => {
-    if (isStaffDirectory && companies.length) registerPhoneContacts(companies);
-  }, [companies, isStaffDirectory]);
 
   useEffect(() => {
     if (!isStaffDirectory) return undefined;

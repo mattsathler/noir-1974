@@ -114,42 +114,42 @@
   "roles": {
     "colleague": {
       "routine": [
-        "My schedule has been steady. {victim} had been staying late with account papers.",
-        "My days were much the same, though {victim} seemed distracted when the weekly settlement came up."
+        "{victim} stayed late to compare the settlement statement with the ledger; {suspect} knew a duplicate was missing.",
+        "The payment dispute began before {victim} died. The account papers can establish when {suspect} was involved."
       ],
       "associates": [
-        "I mostly spend time with people from accounts. I cannot speak for what they knew about the ledger.",
-        "I worked alongside {victim}; we were not close outside the office."
+        "{victim} and {suspect} were both connected to the disputed remittance, though their roles were different.",
+        "The people handling the ledger were not necessarily the ones who approved the payment. Check the initials against the staff file."
       ],
       "unusual": [
-        "One ledger entry used a reference instead of a name. It might have been normal; I do not know.",
-        "There was talk of a GATE trip near that time. I cannot connect it to anything myself."
+        "The ledger used a reference instead of a name; {victim} asked whether it matched a GATE passage from the same week.",
+        "I heard {suspect} ask for the duplicate settlement statement after the account entry was queried."
       ],
       "work": [
-        "The settlement statements and the account ledger do not seem to tell quite the same story.",
-        "I noticed a payment entry that had been queried, then it disappeared from the desk."
+        "The settlement statement and ledger disagree about the remittance linked to {victim}; compare both copies before deciding who handled it.",
+        "{victim} said {suspect} knew where the missing duplicate had gone, but I did not see who removed it."
       ],
       "worries": [
-        "Please keep my name out of this. People who handle the accounts have long memories.",
-        "I am worried someone will alter the ledger again. I cannot prove that has happened."
+        "A payment record and a GATE passage are leads to compare, not proof of who ordered either one.",
+        "Keep the original ledger and the duplicate statement together; a reference number alone can point to the wrong clerk."
       ]
     },
     "acquaintance": {
       "routine": [
-        "My days have been ordinary. {victim} seemed under strain the last few times we met.",
-        "I have kept to my normal routine. {victim} once asked me how to trace a payment reference."
+        "{victim} seemed under strain after asking how to trace a payment reference connected to {suspect}.",
+        "They told me the remittance was not a routine bill, but would not explain why it had been sent."
       ],
       "associates": [
         "I usually spend time with family and a few neighbours. {victim} was an old acquaintance.",
         "I did not know {victim}'s work circle well enough to name anyone."
       ],
       "unusual": [
-        "{victim} said a message had arrived asking for money. They would not show it to me.",
-        "They mentioned a journey recorded by GATE, but did not explain why it mattered."
+        "{victim} said an anonymous message demanded another payment and mentioned a duplicate statement.",
+        "They asked whether a GATE record could confirm {suspect}'s account of that evening. I never saw the result."
       ],
       "work": [
-        "They thought an account entry had been hidden among routine payments. That is all I know.",
-        "They said a copy of a statement was important and needed to be kept somewhere safe."
+        "{victim} believed a private remittance had been hidden among routine account entries and linked it to {suspect}.",
+        "They were trying to preserve a copy of the settlement statement before the registry could replace it."
       ],
       "worries": [
         "I do not want to be drawn into a dispute about money. Please leave me out of it.",
@@ -158,24 +158,24 @@
     },
     "perpetrator": {
       "routine": [
-        "I have kept to my usual schedule. I will not answer questions about private accounts.",
-        "I cannot help you. The matter has already caused enough trouble."
+        "I was following my usual schedule. The ledger and GATE register will show the same thing if you read them correctly.",
+        "The payment was ordinary. I cannot explain why {victim} kept asking about its reference."
       ],
       "associates": [
         "I spend time with people outside the office. I will not name anyone on a call that may be recorded.",
         "I knew {victim} through work. I have nothing else to say about them."
       ],
       "unusual": [
-        "A payment reference proves nothing. I will not discuss it further.",
-        "I do not remember any message or unusual journey. Check the records yourself."
+        "I never received a duplicate statement. The registry should confirm that if you ask the right clerk.",
+        "An anonymous message and a GATE entry do not establish who arranged a payment."
       ],
       "work": [
-        "All payments went through the proper channels, as far as I know.",
-        "I will not discuss account procedures with you. Please use the official request."
+        "The remittance was processed through the proper channel; the account reference should match the settlement copy.",
+        "{victim} and I discussed the payment, but I did not ask them to keep a duplicate statement."
       ],
       "worries": [
-        "I am concerned you will accuse someone based on an incomplete ledger.",
-        "I have no comment. Do not telephone this office again."
+        "I am concerned you will treat a matching amount and travel record as proof of an agreement.",
+        "There is no reason to compare the duplicate statement with the ledger."
       ]
     }
   }

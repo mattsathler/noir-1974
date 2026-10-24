@@ -91,6 +91,10 @@ type cityPersonSearchReader interface {
 	SearchNPCsInCity(context.Context, string, string, string) ([]world.PersonSearchRecord, error)
 }
 
+type phoneDirectoryReader interface {
+	PhoneContactByNumber(context.Context, string, string, string) (world.PhoneContact, error)
+}
+
 type companyLocationReader interface {
 	CompanyAtLocation(context.Context, string, string) ([]world.CompanyRecord, error)
 }
@@ -208,6 +212,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/world/transit", handler.transitDistricts)
 		mux.HandleFunc("GET /api/world/gate/destinations", handler.gateDestinations)
 		mux.HandleFunc("POST /api/world/gate/travel", handler.gateTravel)
+		if _, ok := reader.(phoneDirectoryReader); ok && caseReader != nil {
+			mux.HandleFunc("GET /api/world/phone/{number}", handler.lookupPhoneContact)
+		}
 	}
 	if recordsReader != nil {
 		mux.HandleFunc("GET /api/world/npcs/{npcID}/records", handler.npcRecords)
@@ -1146,6 +1153,29 @@ func (h *Handler) caseAccount(w http.ResponseWriter, r *http.Request) (account, 
 		return account{}, false
 	}
 	return current, true
+}
+
+func (h *Handler) lookupPhoneContact(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.worldReader.(phoneDirectoryReader)
+	if !ok {
+		http.Error(w, "phone directory unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	cityID := h.worldFor(r.Context(), current.ID).CityID
+	contact, err := reader.PhoneContactByNumber(r.Context(), h.worldServerID, cityID, r.PathValue("number"))
+	if errors.Is(err, world.ErrEntityNotFound) {
+		h.writeAPIError(w, r, http.StatusNotFound, "PHONE_NUMBER_NOT_FOUND", "number not in directory", err)
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "PHONE_LOOKUP_FAILED", "could not search the phone directory", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"contact": contact})
 }
 
 func (h *Handler) newspaper(w http.ResponseWriter, r *http.Request) {

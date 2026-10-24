@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Phone } from "pixelarticons/react/Phone";
-import { findPhoneContact } from "../../../world/phoneDirectory.js";
-import { getInterrogationAnswers } from "../../../world/api.js";
+import { getInterrogationAnswers, lookupPhoneContact } from "../../../world/api.js";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
 
@@ -34,6 +33,7 @@ export default function Telephone({ onClose }) {
   const [interviewLoading, setInterviewLoading] = useState(false);
   const [interviewError, setInterviewError] = useState(false);
   const callTimer = useRef(null);
+  const callRequest = useRef(0);
 
   useEffect(() => () => window.clearTimeout(callTimer.current), []);
 
@@ -49,6 +49,7 @@ export default function Telephone({ onClose }) {
   }, [callState, contact]);
 
   function resetCall() {
+    callRequest.current += 1;
     window.clearTimeout(callTimer.current);
     setCallState("idle");
     setContact(null);
@@ -65,26 +66,31 @@ export default function Telephone({ onClose }) {
     setNumber((current) => current.length < PHONE_LENGTH ? `${current}${key}` : current);
   }
 
-  function handleCallButton() {
+  async function handleCallButton() {
     if (callState === "calling" || callState === "connected") {
       resetCall();
       return;
     }
-    const match = findPhoneContact(number);
-    if (!match) {
-      setContact(null);
-      setCallState("not-found");
-      return;
-    }
-    if (match.status !== "alive") {
-      setContact(null);
-      setCallState("dead");
-      return;
-    }
-    setContact(match);
+    const requestId = ++callRequest.current;
+    setContact(null);
+    setInterviewError(false);
     setCallState("calling");
-    const answerDelay = 900 + Math.floor(Math.random() * 2101);
-    callTimer.current = window.setTimeout(() => setCallState("connected"), answerDelay);
+    try {
+      const { contact: match } = await lookupPhoneContact(number);
+      if (requestId !== callRequest.current) return;
+      if (match.status !== "alive") {
+        setCallState("dead");
+        return;
+      }
+      setContact(match);
+      const answerDelay = 900 + Math.floor(Math.random() * 2101);
+      callTimer.current = window.setTimeout(() => {
+        if (requestId === callRequest.current) setCallState("connected");
+      }, answerDelay);
+    } catch (error) {
+      if (requestId !== callRequest.current) return;
+      setCallState(error.status === 404 ? "not-found" : "directory-error");
+    }
   }
 
   return (
@@ -137,7 +143,7 @@ export default function Telephone({ onClose }) {
                 />
               </div>
               <p className={`telephone-app__call-status telephone-app__call-status--${callState}`} role="status" aria-live="polite" aria-hidden={callState === "idle"}>
-                {callState === "not-found" ? "NUMBER NOT IN DIRECTORY" : callState === "dead" ? "LINE DISCONNECTED" : callState === "calling" ? `CALLING · ${contact?.name}` : ""}
+                {callState === "not-found" ? "NUMBER NOT IN DIRECTORY" : callState === "dead" ? "LINE DISCONNECTED" : callState === "directory-error" ? "DIRECTORY UNAVAILABLE" : callState === "calling" ? contact ? `CALLING · ${contact.name}` : "LOOKING UP DIRECTORY…" : ""}
               </p>
               <div className="telephone-app__decorative-actions" aria-hidden="true">
                 {["HELP", "HOLD", "CONF.", "OPTION", "DIRECTORY", "CALLERS", "SERVICES", "COPY", "PRINT", "REDIAL"].map((label) => (
