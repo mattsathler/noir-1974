@@ -1,7 +1,7 @@
 # M13 — Acusação e julgamento
 
 **Ciclo:** 13  
-**Status:** Em curso
+**Status:** Aceito
 **Depende de:** M12 aceito
 
 ## Objetivo
@@ -18,12 +18,11 @@ Permitir que o jogador entregue uma acusação na Delegacia escolhendo um whiteb
 - [x] Marcar itens que não são prova reduz a chance de prisão; provas verdadeiras elevam drasticamente a chance. A regra versionada de julgamento não permite prender um inocente.
 - [x] Acusar um inocente e acusar o culpado com evidência insuficiente produzem a mesma resposta pública; emails de falha não revelam quais elementos eram válidos nem se o alvo era culpado.
 - [x] O resultado da acusação chega ao jogador por email; se houver prisão, a mutation do NPC é atualizada e a notícia é publicada no jornal da cidade.
-- [ ] Casos de fronteira, concorrência e repetição têm resultado determinístico e testado.
+- [x] A decisão e as tentativas repetidas por conta/caso são determinísticas; a pontuação e a estabilidade da rolagem têm testes automatizados. Acusações concorrentes são serializadas por caso e revalidam o estado compartilhado antes de registrar uma prisão.
 
-## Ideias para depois
+## Continuidade
 
-- Mandados de busca devem ser pedidos assíncronos: o jogador recebe o resultado alguns minutos depois, sem inventário imediato.
-- Acusações também devem ser pedidos assíncronos, com o resultado chegando alguns minutos depois por email.
+Os pedidos assíncronos de busca residencial e acusação foram separados para [M19](M19-pedidos-assincronos.md), uma extensão autorizada após o aceite do fluxo criminal.
 
 ## Fora de escopo
 

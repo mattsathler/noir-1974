@@ -14,6 +14,7 @@ export default function ResidentialSearchWindow({ cityId, stationLocationId, onC
   const [selected, setSelected] = useState(null);
   const [message, setMessage] = useState("Search the personnel register for a subject.");
   const [busy, setBusy] = useState(false);
+  const [requestStatus, setRequestStatus] = useState("");
   const cityPeople = useMemo(() => people.filter(({ npc }) => npcBelongsToCity(npc, cityId)), [people, cityId]);
 
   async function findPeople(event) {
@@ -30,12 +31,14 @@ export default function ResidentialSearchWindow({ cityId, stationLocationId, onC
   }
 
   async function submitRequest() {
-    if (!selected) return;
+    if (!selected || requestStatus === "pending" || requestStatus === "processing") return;
     setBusy(true); setMessage("SUBMITTING RESIDENTIAL SEARCH REQUEST…");
     try {
-      await requestResidentialSearch(selected.npc.id, stationLocationId);
-      setMessage("AUTHORIZATION GRANTED. SEARCH COMPLETE. REPORT DELIVERED TO PERSONAL MAIL.");
-      setSelected(null);
+      const result = await requestResidentialSearch(selected.npc.id, stationLocationId);
+      setRequestStatus(result.status);
+      setMessage(result.status === "granted"
+        ? "SEARCH COMPLETE. THE REPORT IS AVAILABLE IN YOUR PERSONAL MAILBOX."
+        : "REQUEST RECEIVED. AUTHORIZATION REVIEW IS IN PROGRESS. THE REPORT WILL ARRIVE BY PERSONAL MAIL IN ABOUT 3 MINUTES.");
     } catch (error) { setMessage(error.message || "REQUEST COULD NOT BE COMPLETED"); }
     finally { setBusy(false); }
   }
@@ -67,7 +70,7 @@ export default function ResidentialSearchWindow({ cityId, stationLocationId, onC
           <div><dt>DESCRIPTION</dt><dd>{selected.npc.appearance || "NOT RECORDED"}</dd></div>
           <div><dt>RESIDENTIAL SEARCH</dt><dd>HOME ADDRESS WITHHELD FROM THIS FILE</dd></div>
         </dl>
-        <footer className="warrant-window__actions"><button type="button" disabled={busy} onClick={() => { setSelected(null); setMessage("PERSONNEL FILE LOCATED"); }}>BACK</button><button type="button" disabled={busy} onClick={submitRequest}>{busy ? "PROCESSING…" : "REQUEST SEARCH"}</button></footer>
+        <footer className="warrant-window__actions"><button type="button" disabled={busy || requestStatus === "pending" || requestStatus === "processing"} onClick={() => { setSelected(null); setRequestStatus(""); setMessage("PERSONNEL FILE LOCATED"); }}>BACK</button><button type="button" disabled={busy || requestStatus === "pending" || requestStatus === "processing"} onClick={submitRequest}>{busy ? "PROCESSING…" : requestStatus === "pending" || requestStatus === "processing" ? "REQUEST PENDING" : "REQUEST SEARCH"}</button></footer>
       </section>}
       {!selected && <footer className="warrant-window__actions"><button type="button" onClick={onClose}>CANCEL</button></footer>}
     </section>

@@ -43,7 +43,9 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
     try {
       const result = await submitCaseAccusation(selectedBoard.id, stationLocationId);
       setSubmitted(true);
-      setMessage(result.message || "SUBMITTED FOR REVIEW · CHECK PERSONAL MAIL FOR THE DECISION.");
+      setMessage(result.status === "completed"
+        ? "THIS BOARD HAS ALREADY BEEN REVIEWED. CHECK PERSONAL MAIL FOR THE DECISION."
+        : "ACCUSED BOARD RECEIVED. REVIEW IS IN PROGRESS. THE DECISION WILL ARRIVE BY PERSONAL MAIL IN ABOUT 3 MINUTES.");
     } catch (error) {
       setMessage(error.message || "THE ACCUSATION COULD NOT BE SUBMITTED.");
     } finally { setBusy(false); }

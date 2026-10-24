@@ -208,6 +208,53 @@ func TestCaseStoreRejectsInvalidSharedStateAndEvidence(t *testing.T) {
 	}
 }
 
+func TestAccusationChanceRequiresCorrectSuspectAndWeightsEvidence(t *testing.T) {
+	if got := accusationChance(false, 10, 10); got != 0 {
+		t.Fatalf("chance for an innocent suspect = %d, want 0", got)
+	}
+	if got := accusationChance(true, 1, 1); got != 75 {
+		t.Fatalf("chance for one direct proof = %d, want 75", got)
+	}
+	if got := accusationChance(true, 2, 1); got != 35 {
+		t.Fatalf("chance for one direct and one unsupported proof = %d, want 35", got)
+	}
+	if got := accusationChance(true, 4, 4); got != 99 {
+		t.Fatalf("chance for overwhelming evidence = %d, want cap 99", got)
+	}
+	if got := accusationChance(true, 1, 0); got != 0 {
+		t.Fatalf("chance for unsupported proof = %d, want 0", got)
+	}
+}
+
+func TestAccusationDecisionRollIsStableForRetries(t *testing.T) {
+	first := accusationAccepted("server", "account", "case", 75)
+	for attempt := 0; attempt < 20; attempt++ {
+		if got := accusationAccepted("server", "account", "case", 75); got != first {
+			t.Fatalf("retry %d verdict = %t, want stable verdict %t", attempt, got, first)
+		}
+	}
+	if accusationAccepted("server", "account", "case", 0) {
+		t.Fatal("zero chance should never accept an accusation")
+	}
+	if !accusationAccepted("server", "account", "case", 99) {
+		// Keep this fixture tied to the deterministic seed so the 99% ceiling stays testable.
+		t.Fatal("fixture's deterministic roll should fall below the 99% ceiling")
+	}
+}
+
+func TestAsyncRequestIDIsStableAndScoped(t *testing.T) {
+	want := asyncRequestID("server-a", "account-a", "accusation", "case-1")
+	if got := asyncRequestID("server-a", "account-a", "accusation", "case-1"); got != want {
+		t.Fatalf("repeated request ID = %q, want %q", got, want)
+	}
+	if got := asyncRequestID("server-a", "account-b", "accusation", "case-1"); got == want {
+		t.Fatal("different player received the same request ID")
+	}
+	if DefaultAsyncRequestDelay != 3*time.Minute {
+		t.Fatalf("default asynchronous delay = %s, want 3 minutes", DefaultAsyncRequestDelay)
+	}
+}
+
 func TestNPCRecordsQueryIsScopedAndOmitsBackendClassification(t *testing.T) {
 	fixture := newCasePersistenceFixture()
 	publicRecord := records.Record{

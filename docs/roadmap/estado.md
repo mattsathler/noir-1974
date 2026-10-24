@@ -12,12 +12,12 @@ Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadma
 | Campo | Valor |
 | --- | --- |
 | Data de referência | 2026-10-23 |
-| Milestone vigente | M13 — Acusação e julgamento |
-| Último aceito | M12 — Interações investigativas em locais |
-| Primeiro playtest | M06 aceito; recorte mínimo pronto para playtest interno. |
-| Fluxo do crime até a prisão | **93%** (13 de 14 milestones) |
+| Milestone vigente | nenhum (fluxo criminal completo aceito) |
+| Último aceito | M13 — Acusação e julgamento |
+| Primeiro playtest | M06 aceito; recorte mínimo pronto para playtest interno. Fluxo completo até a prisão também aceito. |
+| Fluxo do crime até a prisão | **100%** (14 de 14 milestones) |
 
-Interiores, buscas, apreensões e interações investigativas em locais estão aceitos. Acusação e julgamento ainda precisam fechar o fluxo criminal.
+O fluxo criminal completo está aceito: o caso pode ser investigado, acusado na Delegacia e terminar na prisão do culpado.
 
 ## Barra do fluxo criminal completo
 
@@ -37,8 +37,8 @@ M09 ████████████████████  aceito
 M10 ████████████████████  aceito
 M11 ████████████████████  aceito
 M12 ████████████████████  aceito
-M13 ░░░░░░░░░░░░░░░░░░░░  não iniciado   ← fluxo completo até a prisão
-     | 93%
+M13 ████████████████████  aceito   ← fluxo completo até a prisão
+     | 100%
 ```
 
 Cada milestone do fluxo pesa **1/14 ≈ 7,1%**. Só entra na conta com status **Aceito**. “Em curso” não soma porcentagem; a porcentagem mede ciclos aceitos do percurso completo.
@@ -58,7 +58,7 @@ Cada milestone do fluxo pesa **1/14 ≈ 7,1%**. Só entra na conta com status **
 | [M10](milestones/M10-mundo-compartilhado-e-investigacao.md) Mundo compartilhado e investigação | 7,1% | Aceito | 79% |
 | [M11](milestones/M11-geografia-internacional-e-viagem.md) Geografia, viagem e visita a locais | 7,1% | Aceito | 86% |
 | [M12](milestones/M12-busca-e-apreensao.md) Interações investigativas em locais | 7,1% | Aceito | 93% |
-| [M13](milestones/M13-acusacao-e-julgamento.md) Acusação e julgamento | 7,1% | Não iniciado | **100%** |
+| [M13](milestones/M13-acusacao-e-julgamento.md) Acusação e julgamento | 7,1% | Aceito | **100%** |
 
 Fórmula: `milestones_aceitos_M00_a_M13 / 14`, arredondado para inteiro. O primeiro playtest continua identificado pelo aceite do M06, em campo separado.
 

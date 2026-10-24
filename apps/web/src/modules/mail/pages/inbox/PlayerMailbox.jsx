@@ -19,12 +19,16 @@ export default function PlayerMailbox({ timeZone, onPin }) {
 
   useEffect(() => {
     let active = true;
-    getPlayerEmails().then((items) => {
+    let loaded = false;
+    const refresh = () => getPlayerEmails().then((items) => {
       if (!active) return;
+      loaded = true;
       setMessages(items);
       setStatus(items.length ? `${items.length} MESSAGE${items.length === 1 ? "" : "S"} ON FILE` : "NO PERSONAL MAIL ON FILE");
-    }).catch((error) => { if (active) setStatus(error.message || "MAILBOX UNAVAILABLE"); });
-    return () => { active = false; };
+    }).catch((error) => { if (active && !loaded) setStatus(error.message || "MAILBOX UNAVAILABLE"); });
+    refresh();
+    const interval = window.setInterval(refresh, 15000);
+    return () => { active = false; window.clearInterval(interval); };
   }, []);
 
   return <div className="email-inbox">

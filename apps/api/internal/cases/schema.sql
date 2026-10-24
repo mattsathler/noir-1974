@@ -155,12 +155,36 @@ CREATE TABLE IF NOT EXISTS player_search_warrants (
     city_id text NOT NULL CHECK (city_id <> ''),
     station_location_id text NOT NULL CHECK (station_location_id <> ''),
     target_npc_id text NOT NULL CHECK (target_npc_id <> ''),
-    status text NOT NULL CHECK (status IN ('granted', 'denied')),
+    status text NOT NULL CHECK (status IN ('pending', 'granted', 'denied')),
     catalog_version integer NOT NULL DEFAULT 2 CHECK (catalog_version > 0),
+    ready_at timestamptz NOT NULL DEFAULT now(),
     created_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (server_id, account_id, warrant_id)
 );
 ALTER TABLE player_search_warrants ADD COLUMN IF NOT EXISTS catalog_version integer NOT NULL DEFAULT 1;
+ALTER TABLE player_search_warrants ADD COLUMN IF NOT EXISTS ready_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE player_search_warrants DROP CONSTRAINT IF EXISTS player_search_warrants_status_check;
+ALTER TABLE player_search_warrants ADD CONSTRAINT player_search_warrants_status_check CHECK (status IN ('pending', 'granted', 'denied'));
+
+CREATE TABLE IF NOT EXISTS player_async_requests (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    request_id text NOT NULL CHECK (request_id <> ''),
+    request_type text NOT NULL CHECK (request_type IN ('residential_search', 'accusation')),
+    request_key text NOT NULL CHECK (request_key <> ''),
+    payload jsonb NOT NULL,
+    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed')),
+    available_at timestamptz NOT NULL,
+    lease_until timestamptz,
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    completed_at timestamptz,
+    PRIMARY KEY (server_id, request_id),
+    UNIQUE (server_id, account_id, request_type, request_key)
+);
+CREATE INDEX IF NOT EXISTS player_async_requests_due_idx
+    ON player_async_requests(server_id, available_at, created_at)
+    WHERE status IN ('pending', 'processing');
 
 CREATE TABLE IF NOT EXISTS player_inbox_messages (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,

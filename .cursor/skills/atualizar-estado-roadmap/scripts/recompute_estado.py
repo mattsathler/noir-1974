@@ -72,8 +72,8 @@ PRODUCT_BLURB = {
         "Acusação e julgamento ainda precisam fechar o fluxo criminal."
     ),
     13: (
-        "Busca e apreensão está aceita, com o mundo internacional e compartilhado disponível. "
-        "Acusação e julgamento ainda precisam fechar o fluxo criminal."
+        "O fluxo criminal completo está aceito: o caso pode ser investigado, "
+        "acusado na Delegacia e terminar na prisão do culpado."
     ),
     14: (
         "O fluxo criminal completo está aceito: o caso é gerado, investigado, "

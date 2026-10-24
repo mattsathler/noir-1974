@@ -159,6 +159,9 @@ func main() {
 	defer stop()
 	recurring := cases.NewRecurringGenerator(databaseURL, worldServerID, caseStore, worldStore, caseInterval, maxOpenCases)
 	go recurring.Run(serverCtx)
+	asyncRequests := cases.NewAsyncRequestProcessor(caseStore, worldServerID, 5*time.Second)
+	asyncRequests.SetAccusationAcceptedHandler(func(cityID string) { newsService.InvalidateCity(worldServerID, cityID) })
+	go asyncRequests.Run(serverCtx)
 
 	go func() {
 		<-serverCtx.Done()

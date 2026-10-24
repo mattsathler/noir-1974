@@ -78,8 +78,10 @@ type WhiteboardPin struct {
 }
 
 type AccusationResult struct {
-	Accepted bool   `json:"-"`
-	Message  string `json:"message"`
+	Accepted bool      `json:"-"`
+	Status   string    `json:"status"`
+	ReadyAt  time.Time `json:"readyAt,omitempty"`
+	Message  string    `json:"message"`
 }
 
 type Whiteboard struct {
@@ -106,7 +108,32 @@ type PlayerMailMessage struct {
 type WarrantRequest struct {
 	WarrantID string             `json:"warrantId"`
 	Status    string             `json:"status"`
+	ReadyAt   time.Time          `json:"readyAt,omitempty"`
 	Message   *PlayerMailMessage `json:"message,omitempty"`
+}
+
+type asyncRequest struct {
+	RequestID   string
+	AccountID   string
+	RequestType string
+	Payload     []byte
+	Status      string
+	AvailableAt time.Time
+}
+
+type residentialSearchPayload struct {
+	CityID            string `json:"cityId"`
+	StationLocationID string `json:"stationLocationId"`
+	TargetNPCID       string `json:"targetNpcId"`
+}
+
+type accusationPayload struct {
+	CityID    string   `json:"cityId"`
+	BoardID   string   `json:"boardId"`
+	CaseID    string   `json:"caseId,omitempty"`
+	AccusedID string   `json:"accusedId"`
+	VictimID  string   `json:"victimId"`
+	ProofIDs  []string `json:"proofIds"`
 }
 
 type LocalAccessAttempt struct {
@@ -517,9 +544,11 @@ func (store *PostgresStore) Migrate(ctx context.Context) error {
 	return nil
 }
 
-// RequestResidentialSearch records a police authorization and delivers the inventory to the player's mailbox.
+const DefaultAsyncRequestDelay = 3 * time.Minute
+
+// RequestResidentialSearch queues a police search. Its inventory is delivered after review.
 // NPC status is deliberately not checked here: a deceased person's residence remains searchable.
-func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, serverID, accountID, cityID, stationLocationID, npcID string, now time.Time) (WarrantRequest, error) {
+func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, serverID, accountID, cityID, stationLocationID, npcID string, _ time.Time) (WarrantRequest, error) {
 	cityKey := cityID
 	if cityID == "fr/lyon" {
 		cityKey = "lyon"
@@ -538,6 +567,68 @@ func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, server
 	if !targetExists {
 		return WarrantRequest{}, ErrCaseNotFound
 	}
+	identity := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s", accountID, cityID, npcID)))
+	warrantID := "warrant:" + hex.EncodeToString(identity[:12])
+	payload, err := json.Marshal(residentialSearchPayload{CityID: cityID, StationLocationID: stationLocationID, TargetNPCID: npcID})
+	if err != nil {
+		return WarrantRequest{}, err
+	}
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return WarrantRequest{}, fmt.Errorf("begin residential search request: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err := tx.Exec(ctx, `INSERT INTO player_search_warrants(server_id,account_id,warrant_id,city_id,station_location_id,target_npc_id,status,catalog_version,ready_at)
+		VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,'pending',3,now()+make_interval(secs=>$7::double precision))
+		ON CONFLICT(server_id,account_id,warrant_id) DO NOTHING`, serverID, accountID, warrantID, cityID, stationLocationID, npcID, DefaultAsyncRequestDelay.Seconds()); err != nil {
+		return WarrantRequest{}, fmt.Errorf("record residential search request: %w", err)
+	}
+	var status string
+	var readyAt time.Time
+	if err := tx.QueryRow(ctx, `SELECT status,ready_at FROM player_search_warrants WHERE server_id=$1::uuid AND account_id=$2::uuid AND warrant_id=$3`, serverID, accountID, warrantID).Scan(&status, &readyAt); err != nil {
+		return WarrantRequest{}, err
+	}
+	if status != "pending" {
+		if err := tx.Commit(ctx); err != nil {
+			return WarrantRequest{}, err
+		}
+		return WarrantRequest{WarrantID: warrantID, Status: status, ReadyAt: readyAt}, nil
+	}
+	job, err := enqueueAsyncRequest(ctx, tx, serverID, accountID, "residential_search", warrantID, payload, DefaultAsyncRequestDelay)
+	if err != nil {
+		return WarrantRequest{}, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE player_search_warrants SET ready_at=$4 WHERE server_id=$1::uuid AND account_id=$2::uuid AND warrant_id=$3`, serverID, accountID, warrantID, job.AvailableAt); err != nil {
+		return WarrantRequest{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return WarrantRequest{}, err
+	}
+	return WarrantRequest{WarrantID: warrantID, Status: job.Status, ReadyAt: job.AvailableAt}, nil
+}
+
+func enqueueAsyncRequest(ctx context.Context, tx pgx.Tx, serverID, accountID, requestType, requestKey string, payload []byte, delay time.Duration) (asyncRequest, error) {
+	requestID := asyncRequestID(serverID, accountID, requestType, requestKey)
+	_, err := tx.Exec(ctx, `INSERT INTO player_async_requests(server_id,account_id,request_id,request_type,request_key,payload,available_at)
+		VALUES($1::uuid,$2::uuid,$3,$4,$5,$6::jsonb,now()+make_interval(secs=>$7::double precision))
+		ON CONFLICT(server_id,account_id,request_type,request_key) DO NOTHING`, serverID, accountID, requestID, requestType, requestKey, string(payload), delay.Seconds())
+	if err != nil {
+		return asyncRequest{}, fmt.Errorf("queue asynchronous %s request: %w", requestType, err)
+	}
+	var request asyncRequest
+	err = tx.QueryRow(ctx, `SELECT request_id,request_type,payload,status,available_at FROM player_async_requests
+		WHERE server_id=$1::uuid AND account_id=$2::uuid AND request_type=$3 AND request_key=$4`, serverID, accountID, requestType, requestKey).
+		Scan(&request.RequestID, &request.RequestType, &request.Payload, &request.Status, &request.AvailableAt)
+	return request, err
+}
+
+func asyncRequestID(serverID, accountID, requestType, requestKey string) string {
+	identity := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s", serverID, accountID, requestType, requestKey)))
+	return "async:" + hex.EncodeToString(identity[:16])
+}
+
+// completeResidentialSearch generates and mails the deterministic inventory for a queued search.
+func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serverID, accountID, cityID, stationLocationID, npcID string, now time.Time) (WarrantRequest, error) {
 	var generationKey string
 	if err := store.db.QueryRow(ctx, `SELECT generation_key FROM world_entities WHERE server_id=$1::uuid AND entity_id=$2`, serverID, npcID).Scan(&generationKey); err != nil {
 		return WarrantRequest{}, fmt.Errorf("load residential subject: %w", err)
@@ -1482,8 +1573,7 @@ func (store *PostgresStore) SetWhiteboardPinDesignation(ctx context.Context, ser
 	return tx.Commit(ctx)
 }
 
-// SubmitAccusation derives the homicide from the marked victim and resolves one account's accusation exactly once.
-// Version 1 uses a deterministic roll so retries cannot change the verdict.
+// SubmitAccusation snapshots a prepared board and queues its review.
 func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, accountID, cityID, boardID string, now time.Time) (AccusationResult, error) {
 	tx, err := store.db.Begin(ctx)
 	if err != nil {
@@ -1491,49 +1581,84 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	}
 	defer tx.Rollback(ctx)
 	var accusedID, markedVictimID string
+	var proofIDs []string
 	if err := tx.QueryRow(ctx, `SELECT COALESCE(max(i.item_data #>> '{metadata,npc,id}') FILTER(WHERE p.designation='accused'),''),
-		COALESCE(max(i.item_data #>> '{metadata,npc,id}') FILTER(WHERE p.designation='victim'),'')
+		COALESCE(max(i.item_data #>> '{metadata,npc,id}') FILTER(WHERE p.designation='victim'),''),
+		COALESCE(array_agg(p.item_id ORDER BY p.item_id) FILTER(WHERE p.designation='proof'),'{}'::text[])
 		FROM player_whiteboard_pins p JOIN player_discovered_items i USING(server_id,account_id,item_id)
-		WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3 AND i.item_source='person'`, serverID, accountID, boardID).Scan(&accusedID, &markedVictimID); err != nil {
+		WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3 AND i.item_source='person'`, serverID, accountID, boardID).Scan(&accusedID, &markedVictimID, &proofIDs); err != nil {
 		return AccusationResult{}, err
 	}
-	if accusedID == "" || markedVictimID == "" {
+	if accusedID == "" || markedVictimID == "" || len(proofIDs) == 0 {
 		return AccusationResult{}, ErrInvalidProgress
 	}
-	var markedProofs int
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM player_whiteboard_pins WHERE server_id=$1::uuid AND account_id=$2::uuid AND whiteboard_id=$3 AND designation='proof'`, serverID, accountID, boardID).Scan(&markedProofs); err != nil {
-		return AccusationResult{}, err
-	}
-	if markedProofs < 1 {
-		return AccusationResult{}, ErrInvalidProgress
-	}
-	var caseID, killerID, victimID string
-	err = tx.QueryRow(ctx, `SELECT c.case_id,c.killer_entity_id,c.victim_entity_id FROM cases c JOIN case_states s USING(server_id,case_id)
+	var caseID string
+	err = tx.QueryRow(ctx, `SELECT c.case_id FROM cases c JOIN case_states s USING(server_id,case_id)
 		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND c.victim_entity_id=$3 AND s.status='open'
-		ORDER BY c.created_at DESC,c.case_id LIMIT 1`, serverID, cityID, markedVictimID).Scan(&caseID, &killerID, &victimID)
+		ORDER BY c.created_at DESC,c.case_id LIMIT 1`, serverID, cityID, markedVictimID).Scan(&caseID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return AccusationResult{}, err
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		identity := sha256.Sum256([]byte(fmt.Sprintf("unmatched-accusation|%s|%s|%s|%s", accountID, boardID, accusedID, markedVictimID)))
+		caseID = ""
+	}
+	if caseID != "" {
+		var prior bool
+		if err := tx.QueryRow(ctx, `SELECT accepted FROM player_case_accusations WHERE server_id=$1::uuid AND account_id=$2::uuid AND case_id=$3`, serverID, accountID, caseID).Scan(&prior); err == nil {
+			if err := tx.Commit(ctx); err != nil {
+				return AccusationResult{}, err
+			}
+			return AccusationResult{Accepted: prior, Status: "completed", Message: "This accusation has already been reviewed. Check the personal mailbox for the decision."}, nil
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return AccusationResult{}, err
+		}
+	}
+	requestKey := "case:" + caseID
+	if caseID == "" {
+		requestKey = "unmatched:" + boardID + ":" + accusedID + ":" + markedVictimID
+	}
+	payloadData, err := json.Marshal(accusationPayload{CityID: cityID, BoardID: boardID, CaseID: caseID, AccusedID: accusedID, VictimID: markedVictimID, ProofIDs: proofIDs})
+	if err != nil {
+		return AccusationResult{}, err
+	}
+	job, err := enqueueAsyncRequest(ctx, tx, serverID, accountID, "accusation", requestKey, payloadData, DefaultAsyncRequestDelay)
+	if err != nil {
+		return AccusationResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return AccusationResult{}, err
+	}
+	return AccusationResult{Status: job.Status, ReadyAt: job.AvailableAt, Message: "Your accusation has been received for review. Check the personal mailbox for the decision."}, nil
+}
+
+// resolveAccusation delivers the delayed review based on the immutable board snapshot.
+func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, accountID string, request accusationPayload, now time.Time) (AccusationResult, error) {
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return AccusationResult{}, err
+	}
+	defer tx.Rollback(ctx)
+	const genericFailure = "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant."
+	if request.CaseID == "" {
+		identity := sha256.Sum256([]byte(fmt.Sprintf("unmatched-accusation|%s|%s|%s|%s", accountID, request.BoardID, request.AccusedID, request.VictimID)))
 		messageID := "accusation:unmatched:" + hex.EncodeToString(identity[:12])
-		_, err = tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
-			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, messageID, now.UTC(), "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant.")
-		if err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
+			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, messageID, now.UTC(), genericFailure); err != nil {
 			return AccusationResult{}, err
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return AccusationResult{}, err
 		}
-		return AccusationResult{Message: "Your accusation has been submitted for corporate review. Check the personal mailbox for the decision."}, nil
+		return AccusationResult{Status: "completed"}, nil
 	}
-	if err != nil {
-		return AccusationResult{}, err
-	}
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))`, accountID, caseID); err != nil {
+	// Serialize verdicts for the shared case, including submissions from different players.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))`, serverID, request.CaseID); err != nil {
 		return AccusationResult{}, err
 	}
 	var prior bool
-	err = tx.QueryRow(ctx, `SELECT accepted FROM player_case_accusations WHERE server_id=$1::uuid AND account_id=$2::uuid AND case_id=$3`, serverID, accountID, caseID).Scan(&prior)
+	err = tx.QueryRow(ctx, `SELECT accepted FROM player_case_accusations WHERE server_id=$1::uuid AND account_id=$2::uuid AND case_id=$3`, serverID, accountID, request.CaseID).Scan(&prior)
 	if err == nil {
-		result := AccusationResult{Accepted: prior, Message: "Your accusation has been submitted for corporate review. Check the personal mailbox for the decision."}
+		result := AccusationResult{Accepted: prior, Status: "completed"}
 		if err := tx.Commit(ctx); err != nil {
 			return AccusationResult{}, err
 		}
@@ -1542,77 +1667,108 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return AccusationResult{}, err
 	}
+	var caseStatus string
+	if err := tx.QueryRow(ctx, `SELECT status FROM case_states WHERE server_id=$1::uuid AND case_id=$2 FOR UPDATE`, serverID, request.CaseID).Scan(&caseStatus); err != nil {
+		return AccusationResult{}, err
+	}
+	if caseStatus != "open" {
+		if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,board_id,accepted,outcome,created_at)
+			VALUES($1::uuid,$2::uuid,$3,$4,false,'insufficient',$5) ON CONFLICT DO NOTHING`, serverID, accountID, request.CaseID, request.BoardID, now.UTC()); err != nil {
+			return AccusationResult{}, err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
+			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, "accusation:"+request.CaseID, now.UTC(), genericFailure); err != nil {
+			return AccusationResult{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return AccusationResult{}, err
+		}
+		return AccusationResult{Status: "completed"}, nil
+	}
+	var killerID, victimID string
+	if err := tx.QueryRow(ctx, `SELECT killer_entity_id,victim_entity_id FROM cases WHERE server_id=$1::uuid AND case_id=$2`, serverID, request.CaseID).Scan(&killerID, &victimID); err != nil {
+		return AccusationResult{}, err
+	}
 	var totalProofs int
 	var proofStrength float64
-	if err := tx.QueryRow(ctx, `SELECT count(*) FILTER(WHERE p.designation='proof'),
-		COALESCE(sum(CASE WHEN p.designation='proof' THEN CASE
+	if err := tx.QueryRow(ctx, `SELECT count(*),
+		COALESCE(sum(CASE
 			WHEN EXISTS (
 				SELECT 1 FROM case_activity_records a JOIN cases c USING(server_id,case_id)
-				WHERE a.server_id=$1::uuid AND a.case_id=$4 AND a.record_id=p.item_id
+				WHERE a.server_id=$1::uuid AND a.case_id=$2 AND a.record_id=proof.item_id
 				  AND c.archetype_id='financial_extortion'
 				  AND a.internal_relation IN ('extortion_payment','precrime_route')
 			) THEN 1.0
 			WHEN EXISTS (
 				SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
-				WHERE e.server_id=$1::uuid AND e.case_id=$4 AND e.evidence_id=p.item_id
+				WHERE e.server_id=$1::uuid AND e.case_id=$2 AND e.evidence_id=proof.item_id
 				  AND ((c.archetype_id='workplace_conflict' AND e.evidence_type='office_log')
 				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='travel_register'))
 			) THEN 1.0
 			WHEN EXISTS (
 				SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
-				WHERE e.server_id=$1::uuid AND e.case_id=$4 AND e.evidence_id=p.item_id
+				WHERE e.server_id=$1::uuid AND e.case_id=$2 AND e.evidence_id=proof.item_id
 				  AND ((c.archetype_id='workplace_conflict' AND e.evidence_type='meeting_minutes')
 				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='account_record')
 				    OR (c.archetype_id='jealousy' AND e.evidence_type IN ('letter_fragment','witness_statement')))
 			) THEN 0.75
 			WHEN EXISTS (
 				SELECT 1 FROM case_mail_messages m
-				WHERE m.server_id=$1::uuid AND m.case_id=$4 AND m.message_id=p.item_id
+				WHERE m.server_id=$1::uuid AND m.case_id=$2 AND m.message_id=proof.item_id
 				  AND m.internal_relation IN ('anonymous_warning','anonymous_followup')
 			) THEN 0.25
 			ELSE 0.0
-		END ELSE 0.0 END),0)::float8
-		FROM player_whiteboard_pins p WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3`, serverID, accountID, boardID, caseID).Scan(&totalProofs, &proofStrength); err != nil {
+		END),0)::float8
+		FROM unnest($3::text[]) AS proof(item_id)`, serverID, request.CaseID, request.ProofIDs).Scan(&totalProofs, &proofStrength); err != nil {
 		return AccusationResult{}, err
 	}
 	// Authenticated case evidence has different probative strength. Context-only pins
 	// do not raise arrest odds; unrelated pins marked as proof lower them.
-	chance := 0
-	if accusedID == killerID && markedVictimID == victimID {
-		chance = int(math.Round(10 + proofStrength*65 - (float64(totalProofs)-proofStrength)*40))
-	}
-	if chance < 0 {
-		chance = 0
-	}
-	if chance > 99 {
-		chance = 99
-	}
-	roll := sha256.Sum256([]byte(fmt.Sprintf("judgment-v1|%s|%s|%s", serverID, accountID, caseID)))
-	accepted := int(binary.BigEndian.Uint64(roll[:8])%100) < chance
+	chance := accusationChance(request.AccusedID == killerID && request.VictimID == victimID, totalProofs, proofStrength)
+	accepted := accusationAccepted(serverID, accountID, request.CaseID, chance)
 	outcome, subject, body := "insufficient", "Accusation review · Case decision", "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant."
 	if accepted {
 		outcome = "arrested"
 		body = "The corporate review has authorized the arrest. The accused has been taken into custody, and the city police have been notified."
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,board_id,accepted,outcome,created_at) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7)`, serverID, accountID, caseID, boardID, accepted, outcome, now.UTC()); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,board_id,accepted,outcome,created_at) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7)`, serverID, accountID, request.CaseID, request.BoardID, accepted, outcome, now.UTC()); err != nil {
 		return AccusationResult{}, err
 	}
 	if accepted {
 		statusJSON, _ := json.Marshal("arrested")
-		if _, err := tx.Exec(ctx, `INSERT INTO world_mutations(server_id,entity_id,field_key,value) VALUES($1::uuid,$2,'status',$3::jsonb)`, serverID, accusedID, string(statusJSON)); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO world_mutations(server_id,entity_id,field_key,value) VALUES($1::uuid,$2,'status',$3::jsonb)`, serverID, request.AccusedID, string(statusJSON)); err != nil {
 			return AccusationResult{}, err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE case_states SET status='solved',updated_at=$3 WHERE server_id=$1::uuid AND case_id=$2`, serverID, caseID, now.UTC()); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE case_states SET status='solved',updated_at=$3 WHERE server_id=$1::uuid AND case_id=$2`, serverID, request.CaseID, now.UTC()); err != nil {
 			return AccusationResult{}, err
 		}
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments) VALUES($1::uuid,$2::uuid,$3,NULL,$4,$5,$6,'[]'::jsonb)`, serverID, accountID, "accusation:"+caseID, now.UTC(), subject, body); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments) VALUES($1::uuid,$2::uuid,$3,NULL,$4,$5,$6,'[]'::jsonb)`, serverID, accountID, "accusation:"+request.CaseID, now.UTC(), subject, body); err != nil {
 		return AccusationResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return AccusationResult{}, err
 	}
-	return AccusationResult{Accepted: accepted, Message: "Your accusation has been submitted for corporate review. Check the personal mailbox for the decision."}, nil
+	return AccusationResult{Accepted: accepted, Status: "completed"}, nil
+}
+
+func accusationChance(correctSuspect bool, totalProofs int, proofStrength float64) int {
+	if !correctSuspect {
+		return 0
+	}
+	chance := int(math.Round(10 + proofStrength*65 - (float64(totalProofs)-proofStrength)*40))
+	if chance < 0 {
+		return 0
+	}
+	if chance > 99 {
+		return 99
+	}
+	return chance
+}
+
+func accusationAccepted(serverID, accountID, caseID string, chance int) bool {
+	roll := sha256.Sum256([]byte(fmt.Sprintf("judgment-v1|%s|%s|%s", serverID, accountID, caseID)))
+	return int(binary.BigEndian.Uint64(roll[:8])%100) < chance
 }
 
 func (store *PostgresStore) PinDiscoveredItem(ctx context.Context, serverID, accountID, boardID, itemID string, x, y int) error {
