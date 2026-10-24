@@ -28,6 +28,23 @@ describe("AccusationWindow", () => {
     expect(submitCaseAccusation).not.toHaveBeenCalled();
   });
 
+  it("does not count a blank note marked as proof toward accusation readiness", async () => {
+    getWhiteboards.mockResolvedValue([{ id: "board-note", title: "Case notes" }]);
+    getWhiteboard.mockResolvedValue({
+      id: "board-note", title: "Case notes", pins: [
+        { id: "note-1", source: "note", designation: "proof" },
+        { id: "person-1", source: "person", designation: "accused" },
+        { id: "person-2", source: "person", designation: "victim" },
+      ],
+    });
+
+    render(<AccusationWindow stationLocationId="police-station" onClose={vi.fn()} />);
+
+    expect(await screen.findByText(/AT LEAST ONE PIN MARKED PROOF/)).toHaveClass("is-missing");
+    expect(screen.getByRole("button", { name: "SUBMIT ACCUSATION" })).toBeDisabled();
+    expect(submitCaseAccusation).not.toHaveBeenCalled();
+  });
+
   it("submits the selected complete board from the police station", async () => {
     getWhiteboards.mockResolvedValue([{ id: "board-2", title: "Case file" }]);
     getWhiteboard.mockResolvedValue({

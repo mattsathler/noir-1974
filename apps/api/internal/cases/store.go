@@ -1654,11 +1654,9 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	defer tx.Rollback(ctx)
 	var accusedID, markedVictimID string
 	var proofIDs []string
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(max(i.item_data #>> '{metadata,npc,id}') FILTER(WHERE p.designation='accused'),''),
-		COALESCE(max(i.item_data #>> '{metadata,npc,id}') FILTER(WHERE p.designation='victim'),''),
-		COALESCE(array_agg(p.item_id ORDER BY p.item_id) FILTER(WHERE p.designation='proof'),'{}'::text[])
-		FROM player_whiteboard_pins p JOIN player_discovered_items i USING(server_id,account_id,item_id)
-		WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3 AND i.item_source='person'`, serverID, accountID, boardID).Scan(&accusedID, &markedVictimID, &proofIDs); err != nil {
+	if err := tx.QueryRow(ctx, accusationBoardPinsQuery,
+		serverID, accountID, boardID,
+	).Scan(&accusedID, &markedVictimID, &proofIDs); err != nil {
 		return AccusationResult{}, err
 	}
 	if accusedID == "" || markedVictimID == "" || len(proofIDs) == 0 {
@@ -1702,6 +1700,12 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	}
 	return AccusationResult{Status: job.Status, ReadyAt: job.AvailableAt, Message: "Your accusation has been received for review. Check the personal mailbox for the decision."}, nil
 }
+
+const accusationBoardPinsQuery = `SELECT COALESCE(max(i.item_data #>> '{metadata,npc,id}') FILTER(WHERE p.designation='accused' AND i.item_source='person'),''),
+		COALESCE(max(i.item_data #>> '{metadata,npc,id}') FILTER(WHERE p.designation='victim' AND i.item_source='person'),''),
+		COALESCE(array_agg(p.item_id ORDER BY p.item_id) FILTER(WHERE p.designation='proof' AND i.item_source <> 'note'),'{}'::text[])
+		FROM player_whiteboard_pins p JOIN player_discovered_items i USING(server_id,account_id,item_id)
+WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3`
 
 // resolveAccusation delivers the delayed review based on the immutable board snapshot.
 func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, accountID string, request accusationPayload, now time.Time) (AccusationResult, error) {

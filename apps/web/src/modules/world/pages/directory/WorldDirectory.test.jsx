@@ -44,7 +44,8 @@ describe("WorldDirectory activity records", () => {
     expect(screen.queryByText(/\b\d{4}\b/)).not.toBeInTheDocument();
   });
 
-  it("requests only GATE records in the GATE app", async () => {
+  it("requests only GATE records in the GATE app and pins their occurrence date", async () => {
+    const onPin = vi.fn();
     searchPeople.mockResolvedValue([{
       npc: { id: "npc:ada", name: "Ada Morel", age: 41, appearance: "dark hair" },
       workplaces: [],
@@ -53,7 +54,7 @@ describe("WorldDirectory activity records", () => {
     getNPCRecords.mockResolvedValue([
       { id: "record:gate", source: "gate", occurredAt: "2026-11-10T13:00:00.000Z", operator: "Meridian Global · GATE Network", description: "A public terminal session ended.", origin: "Bellecour", destination: "Part-Dieu" },
     ]);
-    render(<div className="computer-window"><WorldDirectory program="gate-records" serverTime={new Date("2026-11-12T20:15:00Z")} runHack={(action) => action()} /></div>);
+    render(<div className="computer-window"><WorldDirectory program="gate-records" serverTime={new Date("2026-11-12T20:15:00Z")} runHack={(action) => action()} onPin={onPin} /></div>);
     await screen.findByLabelText("PERSON NAME");
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));
@@ -67,5 +68,10 @@ describe("WorldDirectory activity records", () => {
     expect(screen.getByText("Bellecour")).toBeInTheDocument();
     expect(screen.getByText("Part-Dieu")).toBeInTheDocument();
     expect(screen.queryByText("FINANCIAL LEDGER")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Pin GATE log" }));
+    expect(onPin).toHaveBeenCalledWith(expect.objectContaining({
+      id: "record:gate",
+      content: expect.stringContaining("OCCURRED · Tue, Nov 10, 2:00 PM"),
+    }));
   });
 });

@@ -47,6 +47,22 @@ async function cachedWorldList(key, load) {
   return items;
 }
 
+export function clearWorldLocationCache() {
+  try {
+    const locationCachePrefix = `${worldCachePrefix}:`;
+    const keys = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(`${locationCachePrefix}gate-cities`) || key?.startsWith(`${locationCachePrefix}neighborhoods:`)) {
+        keys.push(key);
+      }
+    }
+    keys.forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    // Location endpoints remain usable when browser storage is unavailable.
+  }
+}
+
 export const searchPeople = (query) => search("/api/world/npcs", query);
 export const searchCompanies = (query, cityId) => search("/api/world/companies", query, cityId);
 export const searchLocations = (query) => search("/api/world/locations", query);
@@ -227,8 +243,28 @@ function removeWhiteboardCache(key) {
   try { sessionStorage.removeItem(`noir:whiteboards:v${whiteboardCacheVersion}:${key}`); } catch { /* Storage may be disabled. */ }
 }
 const whiteboardSaveStates = new Map();
+let whiteboardSyncChannel;
+function getWhiteboardSyncChannel() {
+  if (typeof BroadcastChannel === "undefined") return null;
+  if (!whiteboardSyncChannel) {
+    try { whiteboardSyncChannel = new BroadcastChannel("noir:whiteboards"); } catch { return null; }
+  }
+  return whiteboardSyncChannel;
+}
 function announceWhiteboardUpdate(boardId, status) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("noir:whiteboard-updated", { detail: { boardId, status } }));
+  if (status === "saved" || status === "deleted") {
+    try { getWhiteboardSyncChannel()?.postMessage({ boardId, status }); } catch { /* Cross-tab sync is an enhancement; the API remains authoritative. */ }
+  }
+}
+export function subscribeWhiteboardUpdates(listener) {
+  const channel = getWhiteboardSyncChannel();
+  if (!channel) return () => {};
+  const handleMessage = (event) => {
+    if (event.data?.boardId && ["saved", "deleted"].includes(event.data.status)) listener(event.data);
+  };
+  channel.addEventListener("message", handleMessage);
+  return () => channel.removeEventListener("message", handleMessage);
 }
 function updateWhiteboardCache(boardId, update) {
   const board = readWhiteboardCache(boardId);
@@ -322,9 +358,10 @@ export async function deleteWhiteboard(boardId) {
   if (previousBoards) writeWhiteboardCache("list", previousBoards.filter((board) => board.id !== boardId));
   removeWhiteboardCache(boardId);
   whiteboardSaveStates.delete(boardId);
-  announceWhiteboardUpdate(boardId, "deleted");
   try {
-    return await whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`, { method: "DELETE" });
+    const result = await whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`, { method: "DELETE" });
+    announceWhiteboardUpdate(boardId, "deleted");
+    return result;
   } catch (error) {
     if (previousBoards) writeWhiteboardCache("list", previousBoards);
     if (previousBoard) writeWhiteboardCache(boardId, previousBoard);

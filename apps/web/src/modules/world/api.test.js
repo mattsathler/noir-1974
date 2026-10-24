@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cacheWhiteboardDraft, discardWhiteboardDraft, getCachedWhiteboard, getGateDestinations, getNeighborhoodDestinations, getNPCRecords, getWhiteboard, movePlayer } from "./api.js";
+import { cacheWhiteboardDraft, discardWhiteboardDraft, getCachedWhiteboard, getGateDestinations, getNeighborhoodDestinations, getNPCRecords, getWhiteboard, movePlayer, setWhiteboardSaveState, subscribeWhiteboardUpdates } from "./api.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -85,6 +85,35 @@ describe("world navigation APIs", () => {
 });
 
 describe("whiteboard local cache", () => {
+  it("notifies other same-origin tabs only after a board save succeeds", () => {
+    class TestBroadcastChannel {
+      static channels = [];
+      constructor(name) { this.name = name; this.listeners = new Set(); TestBroadcastChannel.channels.push(this); }
+      addEventListener(type, listener) { if (type === "message") this.listeners.add(listener); }
+      removeEventListener(type, listener) { if (type === "message") this.listeners.delete(listener); }
+      postMessage(data) {
+        for (const channel of TestBroadcastChannel.channels) {
+          if (channel === this || channel.name !== this.name) continue;
+          for (const listener of channel.listeners) listener({ data });
+        }
+      }
+    }
+    vi.stubGlobal("BroadcastChannel", TestBroadcastChannel);
+    const listener = vi.fn();
+    const unsubscribe = subscribeWhiteboardUpdates(listener);
+    const thisTabChannel = TestBroadcastChannel.channels[0];
+    const postMessage = vi.spyOn(thisTabChannel, "postMessage");
+
+    setWhiteboardSaveState("board:sync", "saving");
+    expect(postMessage).not.toHaveBeenCalled();
+    setWhiteboardSaveState("board:sync", "saved");
+    expect(postMessage).toHaveBeenCalledWith({ boardId: "board:sync", status: "saved" });
+    const otherTab = new TestBroadcastChannel("noir:whiteboards");
+    otherTab.postMessage({ boardId: "board:sync", status: "saved" });
+    expect(listener).toHaveBeenCalledWith({ boardId: "board:sync", status: "saved" });
+    unsubscribe();
+  });
+
   it("does not replace a newer local mutation with a stale in-flight response", async () => {
     let finishRequest;
     const fetch = vi.fn(() => new Promise((resolve) => { finishRequest = resolve; }));

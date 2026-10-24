@@ -36,6 +36,9 @@ vi.mock("../modules/identity/pages/character-creation/CharacterCreationPage.jsx"
 vi.mock("../modules/identity/pages/archive/ArchivePage.jsx", () => ({
   default: () => <main>Archive screen</main>,
 }));
+vi.mock("../modules/cases/pages/files/Whiteboard.jsx", () => ({
+  default: ({ initialBoardId, standalone }) => <main data-board-id={initialBoardId} data-standalone={standalone}>Standalone whiteboard</main>,
+}));
 
 describe("App routing", () => {
   beforeEach(() => {
@@ -59,6 +62,44 @@ describe("App routing", () => {
     window.history.replaceState({}, "", "/login");
     render(<App />);
     expect(await screen.findByText("Login screen")).toBeInTheDocument();
+  });
+
+  it("opens a board directly in the standalone route after checking the session", async () => {
+    window.history.replaceState({}, "", "/whiteboard/board_case-notes");
+    currentIdentity.mockResolvedValue({ character: { displayName: "Ada" }, world: { city: "Lyon" } });
+
+    render(<App />);
+
+    expect(await screen.findByText("Standalone whiteboard")).toBeInTheDocument();
+    expect(document.querySelector("[data-board-id]")).toHaveAttribute("data-board-id", "board_case-notes");
+    expect(document.querySelector("[data-standalone]")).toHaveAttribute("data-standalone", "true");
+    expect(window.location.pathname).toBe("/whiteboard/board_case-notes");
+  });
+
+  it("opens the board picker route without requiring an existing board id", async () => {
+    window.history.replaceState({}, "", "/whiteboard");
+    currentIdentity.mockResolvedValue({ character: { displayName: "Ada" } });
+    render(<App />);
+
+    expect(await screen.findByText("Standalone whiteboard")).toBeInTheDocument();
+    expect(document.querySelector("[data-standalone]")).toHaveAttribute("data-standalone", "true");
+    expect(window.location.pathname).toBe("/whiteboard");
+  });
+
+  it("returns an authenticated player to a requested board after login", async () => {
+    window.history.replaceState({}, "", "/whiteboard/board_case-notes");
+    localStorage.setItem("noir:world-data:v1:gate-cities", JSON.stringify({ items: [{ id: "stale" }] }));
+    localStorage.setItem("noir:world-data:v1:neighborhoods:fr%2Flyon", JSON.stringify({ items: [{ id: "stale" }] }));
+    localStorage.setItem("noir:whiteboard:v1:board_case-notes", JSON.stringify({ boardId: "board_case-notes" }));
+    render(<App />);
+    expect(await screen.findByText("Login screen")).toBeInTheDocument();
+    expect(window.location.search).toContain("returnTo=%2Fwhiteboard%2Fboard_case-notes");
+    fireEvent.click(screen.getByRole("button", { name: "Authenticate existing account" }));
+    expect(await screen.findByText("Standalone whiteboard")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/whiteboard/board_case-notes");
+    expect(localStorage.getItem("noir:world-data:v1:gate-cities")).toBeNull();
+    expect(localStorage.getItem("noir:world-data:v1:neighborhoods:fr%2Flyon")).toBeNull();
+    expect(localStorage.getItem("noir:whiteboard:v1:board_case-notes")).not.toBeNull();
   });
 
   it("starts on registration when its path is selected", () => {

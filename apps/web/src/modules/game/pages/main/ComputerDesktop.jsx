@@ -5,7 +5,6 @@ import { Mail } from "pixelarticons/react/Mail";
 import { Map as MapIcon } from "pixelarticons/react/Map";
 import { Message } from "pixelarticons/react/Message";
 import { Note } from "pixelarticons/react/Note";
-import { Notes } from "pixelarticons/react/Notes";
 import { Printer } from "pixelarticons/react/Printer";
 import { User } from "pixelarticons/react/User";
 import { Users } from "pixelarticons/react/Users";
@@ -13,7 +12,6 @@ import { Wifi } from "pixelarticons/react/Wifi";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
 import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, setWhiteboardSaveState } from "../../../world/api.js";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
-import Whiteboard from "../../../cases/pages/files/Whiteboard.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
 import PlayerMailbox from "../../../mail/pages/inbox/PlayerMailbox.jsx";
@@ -29,13 +27,11 @@ const BOOT_LINES = [
 const PERSONAL_PROGRAMS = [
   { id: "case-files", label: "CASE FILES", Icon: Files, state: "UNDER REVIEW", available: false },
   { id: "personal-mail", label: "PERSONAL MAIL", Icon: Mail, state: "ONLINE", available: true },
-  { id: "whiteboard", label: "WHITEBOARD", Icon: Notes, state: "ONLINE", available: true },
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
 ];
 
 const BYPASSED_PROGRAM_LABELS = {
   "case-files": "CA\uE000E FI\uE001ES",
-  whiteboard: "WHI\uE000\uE001BOAR\uE002",
   "city-records": "CI\uE003Y RECO\uE004DS",
   interpol: "PERSON\uE001EL SEARCH",
   emails: "E\uE002AIL ARCHIVE",
@@ -58,7 +54,6 @@ function visibleProgramLabel(program, bypassed) {
 
 function programsFor(facilityContext) {
   if (!facilityContext || facilityContext.kind === "personal") return PERSONAL_PROGRAMS;
-  const whiteboard = { id: "whiteboard", label: "WHITEBOARD", Icon: Notes, state: "ONLINE", available: true };
   const offlinePrograms = [
     { id: "internal-memos", label: "INTERNAL MEMOS", Icon: Note, state: "OFFLINE", available: false },
     { id: "print-queue", label: "PRINT QUEUE", Icon: Printer, state: "OFFLINE", available: false },
@@ -69,14 +64,12 @@ function programsFor(facilityContext) {
   if (facilityContext.kind === "police") return [
     { id: "interpol", label: "PERSONNEL SEARCH", Icon: User, state: "ONLINE", available: true },
     { id: "emails", label: "EMAIL ARCHIVE", Icon: Mail, state: "ONLINE", available: true },
-    whiteboard,
     ...offlinePrograms,
   ];
-  if (facilityContext.kind === "bank") activePrograms = [{ id: "bank-records", label: "FINANCIAL RECORDS", Icon: Dollar, state: "ONLINE", available: true }, whiteboard];
-  else if (facilityContext.kind === "gate") activePrograms = [{ id: "gate-records", label: "GATE ACCESS LOGS", Icon: MapIcon, state: "ONLINE", available: true }, whiteboard];
+  if (facilityContext.kind === "bank") activePrograms = [{ id: "bank-records", label: "FINANCIAL RECORDS", Icon: Dollar, state: "ONLINE", available: true }];
+  else if (facilityContext.kind === "gate") activePrograms = [{ id: "gate-records", label: "GATE ACCESS LOGS", Icon: MapIcon, state: "ONLINE", available: true }];
   else if (facilityContext.kind === "company") activePrograms = [
     { id: "staff-directory", label: "STAFF DIRECTORY", Icon: Users, state: "ONLINE", available: true },
-    whiteboard,
   ];
   if (activePrograms) return [...activePrograms, ...offlinePrograms];
   return PERSONAL_PROGRAMS;
@@ -103,7 +96,6 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   });
   const [booting, setBooting] = useState(true);
   const [pinDialog, setPinDialog] = useState(null);
-  const [preferredBoardId, setPreferredBoardId] = useState(null);
   const modalRef = useRef(null);
   const closeButtonRef = useRef(null);
   const windowRefs = useRef(new Map());
@@ -123,7 +115,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     try {
       sessionStorage.setItem("noir:computer:windows", JSON.stringify({
         savedAt: Date.now(),
-        windows: windows.map(({ id, program, boardId, zIndex, position }) => ({ id, programId: program.id, boardId, zIndex, position })),
+        windows: windows.map(({ id, program, zIndex, position }) => ({ id, programId: program.id, zIndex, position })),
       }));
     } catch { /* Storage may be disabled by the browser. */ }
   }, [windows]);
@@ -166,7 +158,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     try {
       sessionStorage.setItem("noir:computer:windows", JSON.stringify({
         savedAt: Date.now(),
-        windows: windowsStateRef.current.map(({ id, program, boardId, zIndex, position }) => ({ id, programId: program.id, boardId, zIndex, position })),
+        windows: windowsStateRef.current.map(({ id, program, zIndex, position }) => ({ id, programId: program.id, zIndex, position })),
       }));
     } catch { /* Storage may be disabled by the browser. */ }
   }
@@ -260,24 +252,19 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     setWindows((previous) => previous.map((item) => item.id === windowId ? { ...item, zIndex } : item));
   }
 
-  function launchProgram(program, boardId = null) {
+  function launchProgram(program) {
     if (!program.available) return;
-    if (boardId) setPreferredBoardId(boardId);
     const existing = windows.find((item) => item.program.id === program.id);
-    if (existing) {
-      if (boardId && existing.boardId !== boardId) setWindows((previous) => previous.map((item) => item.id === existing.id ? { ...item, boardId } : item));
-      focusWindow(existing.id);
-      return;
-    }
+    if (existing) { focusWindow(existing.id); return; }
     const zIndex = nextZIndexRef.current++;
     const id = `${program.id}:${zIndex}`;
     const offset = windows.length;
     const compact = window.matchMedia("(max-width: 42rem)").matches;
-    const position = program.id === "whiteboard" || offset === 0 ? null : {
+    const position = offset === 0 ? null : {
       left: Math.min(compact ? 8 + offset * 10 : 40 + offset * 28, compact ? 32 : 140),
       top: Math.min(compact ? 8 + offset * 10 : 32 + offset * 24, compact ? 32 : 120),
     };
-    setWindows((previous) => [...previous, { id, program, boardId, zIndex, position }]);
+    setWindows((previous) => [...previous, { id, program, zIndex, position }]);
   }
 
   function closeWindow(windowId) {
@@ -295,7 +282,6 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       .then(() => setWhiteboardSaveState(boardId, "saved"))
       .catch(() => setWhiteboardSaveState(boardId, "save"));
     setPinDialog(null);
-    launchProgram(programs.find((item) => item.id === "whiteboard"), boardId);
   }
 
   async function requestPin(item) {
@@ -307,7 +293,6 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
         cacheWhiteboardDraft(draft);
         setWhiteboardSaveState(draft.id, "saving");
         setPinDialog(null);
-        launchProgram(programs.find((program) => program.id === "whiteboard"), draft.id);
         createWhiteboard(draft.title, draft.id)
           .then((created) => finishPin(draft.id, item, created))
           .catch(() => setWhiteboardSaveState(draft.id, "save"));
@@ -337,7 +322,6 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     cacheWhiteboardDraft(draft);
     setWhiteboardSaveState(draft.id, "saving");
     setPinDialog(null);
-    launchProgram(programs.find((program) => program.id === "whiteboard"), draft.id);
     createWhiteboard(draft.title, draft.id)
       .then((created) => finishPin(draft.id, item, created))
       .catch(() => setWhiteboardSaveState(draft.id, "save"));
@@ -428,7 +412,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             </nav>
 
             {windows.map((desktopWindow) => {
-              const { id, program, position, zIndex, boardId } = desktopWindow;
+              const { id, program, position, zIndex } = desktopWindow;
               return <section
                 ref={(element) => { if (element) windowRefs.current.set(id, element); else windowRefs.current.delete(id); }}
                 className={`computer-window${position ? " computer-window--positioned" : ""}`}
@@ -438,24 +422,19 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 aria-label={`${program.label} application window`}
                 onMouseDown={() => focusWindow(id)}
               >
-                {isBypassed && program.id !== "whiteboard" && <div className="computer-window__corruption" aria-hidden="true">
+                {isBypassed && <div className="computer-window__corruption" aria-hidden="true">
                   <span>ERR://BYPASS_TOKEN_REJECTED</span>
                   <span>0x7F ▓▒░ �⿻� AUTH::FALSE</span>
                   <span>DATA STREAM DESYNC // RETRY</span>
                   <span>{"\uE000\uE001 // \uE017\uE018\uE019"}</span>
                 </div>}
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
-                  <span><span className="computer-status-light" /> {program.id === "whiteboard" ? "PERSONAL WHITEBOARD" : program.id === "personal-mail" ? "PERSONAL MAILBOX" : `${program.label} DATABASE`} {isBypassed && <i className="computer-bypass-window-tag">BYPASS LINK</i>}</span>
+                  <span><span className="computer-status-light" /> {program.id === "personal-mail" ? "PERSONAL MAILBOX" : `${program.label} DATABASE`} {isBypassed && <i className="computer-bypass-window-tag">BYPASS LINK</i>}</span>
                   <button type="button" className="computer-window__close" aria-label={`Close ${program.label}`} onClick={() => closeWindow(id)}>×</button>
                 </header>
                 <div className="computer-window__body">
                   {program.id === "case-files"
                     ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} onPin={requestPin} />
-                      : program.id === "whiteboard"
-                      ? <Whiteboard key={id} initialBoardId={boardId || preferredBoardId} focusBoard={(selectedBoardId) => {
-                        setPreferredBoardId(selectedBoardId);
-                        setWindows((previous) => previous.map((item) => item.id === id ? { ...item, boardId: selectedBoardId } : item));
-                      }} />
                       : program.id === "emails"
                         ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} cityId={cityId} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} runHack={runHack} onPin={requestPin} />
                         : program.id === "personal-mail"
@@ -470,7 +449,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 <p className="whiteboard-destination__item">{pinDialog.item.title}</p>
                 {pinDialog.error && <p className="whiteboard-destination__error" role="alert">{pinDialog.error}</p>}
                 <div className="whiteboard-destination__list">
-                  {pinDialog.boards.map((board) => <button key={board.id} type="button" disabled={pinDialog.busy} onClick={() => choosePinDestination(board.id)}><span>{board.title}</span><span>OPEN BOARD →</span></button>)}
+                  {pinDialog.boards.map((board) => <button key={board.id} type="button" disabled={pinDialog.busy} onClick={() => choosePinDestination(board.id)}><span>{board.title}</span><span>PIN TO BOARD →</span></button>)}
                 </div>
                 <button className="whiteboard-destination__create" type="button" disabled={pinDialog.busy} onClick={createAndChooseBoard}>{pinDialog.busy ? "SAVING RECORD…" : "+ CREATE NEW BOARD"}</button>
               </div>

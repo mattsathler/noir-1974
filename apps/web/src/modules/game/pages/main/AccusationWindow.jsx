@@ -3,7 +3,7 @@ import { getWhiteboard, getWhiteboards, submitCaseAccusation } from "../../../wo
 
 function boardReadiness(board) {
   const pins = board?.pins ?? [];
-  const hasProof = pins.some((pin) => pin.designation === "proof");
+  const hasProof = pins.some((pin) => pin.designation === "proof" && pin.source !== "note");
   const hasAccused = pins.some((pin) => pin.designation === "accused" && pin.source === "person");
   const hasVictim = pins.some((pin) => pin.designation === "victim" && pin.source === "person");
   return { hasProof, hasAccused, hasVictim, ready: hasProof && hasAccused && hasVictim };

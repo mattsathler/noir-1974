@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Cross } from "pixelarticons/react/Cross";
 import { MonitorSharp } from "pixelarticons/react/MonitorSharp";
+import { Notes } from "pixelarticons/react/Notes";
 import { Earth } from "pixelarticons/react/Earth";
 import { NotebookSharp } from "pixelarticons/react/NotebookSharp";
 import { Phone } from "pixelarticons/react/Phone";
@@ -227,6 +228,15 @@ export default function GamePage({ initialWorld = null, onLogout }) {
               onClick={() => { setNewspaperOpen(false); setComputerEntry(null); setComputerContext({ kind: "personal", label: "NOIR PERSONAL COMPUTER", city: world?.city }); setComputerOpen(true); }}
             >
               <MonitorSharp className="computer-launch__icon" aria-hidden="true" />
+            </button>
+            <button
+              className="whiteboard-launch"
+              type="button"
+              aria-label="Open investigation board in a new window"
+              title="Open investigation board"
+              onClick={() => window.open("/whiteboard", "_blank", "noopener,noreferrer")}
+            >
+              <Notes className="computer-launch__icon" aria-hidden="true" />
             </button>
             <button
               className="computer-launch"

@@ -527,7 +527,7 @@ func (store *PostgresStore) getNPCWithWorldConfig(ctx context.Context, serverID,
 			 ) status ON true
 			 WHERE e.server_id=$1::uuid AND e.entity_id=$2 AND e.entity_type='npc'
 			)
-			SELECT target.seed, target.world_version, target.city_version, target.generation_key, target.status,
+			SELECT target.seed, target.world_version, target.city_version, target.generation_key, target.status, target.created_at,
 		        COALESCE((SELECT jsonb_agg(jsonb_build_object(
 		          'relationshipId', r.relationship_id, 'role', COALESCE(r.role,''),
 		          'companyId', c.entity_id, 'companyKey', c.generation_key) ORDER BY r.relationship_id)

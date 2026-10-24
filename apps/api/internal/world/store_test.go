@@ -6,9 +6,11 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type fixtureRow struct {
@@ -29,6 +31,10 @@ func (row fixtureRow) Scan(destinations ...any) error {
 			*destination = value.(string)
 		case *int:
 			*destination = value.(int)
+		case *pgtype.Timestamptz:
+			*destination = value.(pgtype.Timestamptz)
+		case *[]byte:
+			*destination = append((*destination)[:0], value.([]byte)...)
 		default:
 			return errors.New("fixture row has an unsupported destination type")
 		}
@@ -171,6 +177,50 @@ func TestMutationSurvivesStoreRestartAndIsIsolatedByServer(t *testing.T) {
 	}
 	if err := restartedProcess.SetNPCStatus(context.Background(), "server-a", npc.ID, "missing"); !errors.Is(err, ErrInvalidMutation) {
 		t.Fatalf("invalid status error = %v, want ErrInvalidMutation", err)
+	}
+}
+
+func TestGetNPCWithWorldConfigScansStatusChangedAt(t *testing.T) {
+	const seed = "m14-npc-correspondence-scan-fixture"
+	generated, err := Generate(seed, GeneratorVersion2)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	npc := generated.NPCs[0]
+	changedAt := time.Date(2026, time.October, 24, 12, 30, 0, 0, time.UTC)
+	var query string
+	database := &fixtureDatabase{
+		queryRow: func(sql string, _ []any) pgx.Row {
+			query = sql
+			return fixtureRow{values: []any{
+				seed,
+				GeneratorVersion2,
+				GeneratorVersion2,
+				npc.GenerationKey,
+				"dead",
+				pgtype.Timestamptz{Time: changedAt, Valid: true},
+				[]byte("[]"),
+				[]byte("[]"),
+			}}
+		},
+		query: func(string, []any) pgx.Rows { return &fixtureRows{} },
+	}
+	store := NewPostgresStore(database)
+	profile, gotSeed, version, err := store.GetNPCWithWorldConfig(context.Background(), "server-id", npc.ID)
+	if err != nil {
+		t.Fatalf("GetNPCWithWorldConfig() error = %v", err)
+	}
+	if !strings.Contains(query, "target.status, target.created_at") {
+		t.Fatalf("combined query does not select status timestamp: %s", query)
+	}
+	if gotSeed != seed || version != GeneratorVersion2 {
+		t.Fatalf("world config = (%q, %d), want (%q, %d)", gotSeed, version, seed, GeneratorVersion2)
+	}
+	if profile.NPC.Status != "dead" {
+		t.Fatalf("NPC status = %q, want dead", profile.NPC.Status)
+	}
+	if !profile.NPC.StatusChangedAt.Equal(changedAt) {
+		t.Fatalf("status changed at = %v, want %v", profile.NPC.StatusChangedAt, changedAt)
 	}
 }
 

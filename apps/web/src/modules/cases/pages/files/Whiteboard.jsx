@@ -19,12 +19,13 @@ import {
   moveWhiteboardPin,
   renameWhiteboard,
   removeWhiteboardPin,
+  subscribeWhiteboardUpdates,
   updateWhiteboardNote,
 } from "../../../world/api.js";
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
 
-export default function Whiteboard({ initialBoardId, focusBoard }) {
+export default function Whiteboard({ initialBoardId, focusBoard, standalone = false }) {
   const [boards, setBoards] = useState([]);
   const [board, setBoard] = useState(null);
   const [selection, setSelection] = useState([]);
@@ -46,12 +47,14 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
   const noteTimersRef = useRef(new Map());
   const noteVersionsRef = useRef(new Map());
   const activeNoteSavesRef = useRef(0);
+  const lastSyncSnapshotRef = useRef("");
 
   useEffect(() => () => noteTimersRef.current.forEach((timer) => clearTimeout(timer)), []);
 
 
   async function loadBoard(id) {
     const result = await getWhiteboard(id);
+    lastSyncSnapshotRef.current = JSON.stringify(result);
     setBoard(result);
     setSelection([]);
     setSaveState(getWhiteboardSaveState(id));
@@ -72,6 +75,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
       if (preferred) {
         const result = await getWhiteboard(preferred);
         if (active) {
+          lastSyncSnapshotRef.current = JSON.stringify(result);
           setBoard(result);
           setSaveState(getWhiteboardSaveState(preferred));
           setMessage(`${result.pins.length} RECORD${result.pins.length === 1 ? "" : "S"} ON THIS BOARD`);
@@ -110,6 +114,47 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
     window.addEventListener("noir:whiteboard-updated", handleExternalBoardUpdate);
     return () => window.removeEventListener("noir:whiteboard-updated", handleExternalBoardUpdate);
   }, [board?.id]);
+
+  useEffect(() => {
+    if (board) lastSyncSnapshotRef.current = JSON.stringify(board);
+  }, [board]);
+
+  useEffect(() => {
+    if (!board?.id) return undefined;
+    const boardId = board.id;
+    let active = true;
+    const refreshFromServer = async () => {
+      if (document.visibilityState === "hidden" || busy || saveState === "saving" || activeNoteSavesRef.current > 0 || noteTimersRef.current.size > 0 || Object.keys(noteDraftsRef.current).length > 0 || dragRef.current) return;
+      try {
+        const latest = await getWhiteboard(boardId);
+        if (!active) return;
+        const snapshot = JSON.stringify(latest);
+        if (snapshot === lastSyncSnapshotRef.current) return;
+        lastSyncSnapshotRef.current = snapshot;
+        setBoard((current) => current?.id === boardId ? latest : current);
+        setBoards((previous) => previous.map((item) => item.id === boardId ? { ...item, title: latest.title } : item));
+        setMessage(`${latest.pins.length} RECORD${latest.pins.length === 1 ? "" : "S"} · UPDATED FROM ANOTHER WINDOW`);
+      } catch { /* Keep the current board visible during temporary network failures. */ }
+    };
+    const unsubscribe = subscribeWhiteboardUpdates((update) => {
+      if (update.boardId === boardId && update.status === "saved") refreshFromServer();
+    });
+    const onVisibilityChange = () => { if (document.visibilityState === "visible") refreshFromServer(); };
+    if (standalone) {
+      window.addEventListener("focus", refreshFromServer);
+      document.addEventListener("visibilitychange", onVisibilityChange);
+    }
+    const timer = standalone ? window.setInterval(refreshFromServer, 5000) : null;
+    return () => {
+      active = false;
+      unsubscribe();
+      if (standalone) {
+        window.removeEventListener("focus", refreshFromServer);
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      }
+      if (timer) window.clearInterval(timer);
+    };
+  }, [board?.id, busy, saveState, standalone]);
 
   useEffect(() => {
     if (renamingBoardId) renameInputRef.current?.focus();
@@ -433,7 +478,7 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
   }
 
   return (
-    <section className="personal-whiteboard" aria-label="Personal investigation whiteboard">
+    <section className={`personal-whiteboard${standalone ? " personal-whiteboard--standalone" : ""}`} aria-label="Personal investigation whiteboard">
       <header className="personal-whiteboard__header">
         <div><p className="computer-window__eyebrow">PRIVATE INVESTIGATION · PERSONAL RECORD</p>
           {renamingBoardId === board?.id
@@ -493,11 +538,6 @@ export default function Whiteboard({ initialBoardId, focusBoard }) {
                   disabled={pin.pending}
                   onChange={(event) => updateNoteDraft(pin, "content", event.target.value)}
                 />
-                <label className="personal-whiteboard__designation">MARK PIN
-                  <select aria-label="Mark note" value={pin.designation||""} disabled={busy} onChange={(event)=>changeDesignation(pin,event.target.value)}>
-                    <option value="">UNMARKED</option><option value="proof">PROOF</option>
-                  </select>
-                </label>
               </> : <>
                 <header><span>{pin.source.toUpperCase()} · PINNED</span><button className="personal-whiteboard__remove-pin" type="button" aria-label={`Remove ${pin.title} from board`} disabled={busy} onClick={() => removePin(pin.id)}><Trash aria-hidden="true" /></button></header>
                 {pin.source === "person" && pin.metadata?.npc?.visual && <div className="personal-whiteboard__person-portrait"><ModularFace visual={pin.metadata.npc.visual} name={pin.metadata.npc.name || pin.title} /></div>}

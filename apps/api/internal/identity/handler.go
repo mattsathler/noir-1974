@@ -643,7 +643,8 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		log.Printf("retrieve correspondence for NPC %q: %v", r.PathValue("npcID"), err)
+		requestID, _ := r.Context().Value(requestIDContextKey{}).(string)
+		log.Printf("api_error request_id=%s method=%s path=%s code=NPC_CORRESPONDENCE_FAILED error=%v", requestID, r.Method, r.URL.Path, err)
 		http.Error(w, "could not retrieve correspondence", http.StatusInternalServerError)
 		return
 	}

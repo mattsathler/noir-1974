@@ -272,6 +272,22 @@ func TestAccusationChanceRequiresCorrectSuspectAndWeightsEvidence(t *testing.T) 
 	}
 }
 
+func TestAccusationBoardPinsQueryAcceptsEvidencePinsAndExcludesNotesAsProof(t *testing.T) {
+	if !strings.Contains(accusationBoardPinsQuery, "p.designation='accused' AND i.item_source='person'") {
+		t.Fatal("accused pin query must require a person source")
+	}
+	if !strings.Contains(accusationBoardPinsQuery, "p.designation='victim' AND i.item_source='person'") {
+		t.Fatal("victim pin query must require a person source")
+	}
+	if !strings.Contains(accusationBoardPinsQuery, "p.designation='proof' AND i.item_source <> 'note'") {
+		t.Fatal("proof pin query must accept evidence sources while excluding blank notes")
+	}
+	whereClause := strings.SplitN(accusationBoardPinsQuery, "\nWHERE p.server_id", 2)
+	if len(whereClause) != 2 || strings.Contains(whereClause[1], "item_source") {
+		t.Fatal("proof selection must not be restricted to person pins")
+	}
+}
+
 func TestAccusationDecisionRollIsStableForRetries(t *testing.T) {
 	first := accusationAccepted("server", "account", "case", 75)
 	for attempt := 0; attempt < 20; attempt++ {
