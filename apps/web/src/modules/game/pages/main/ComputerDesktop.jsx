@@ -23,6 +23,17 @@ const BOOT_LINES = [
   "LYON NODE FOUND",
   "PRIVATE SYSTEM READY",
 ];
+const PERSONAL_BOOT_STORAGE_KEY = "noir:computer:personal-booted";
+
+function hasPersonalComputerBooted() {
+  try { return sessionStorage.getItem(PERSONAL_BOOT_STORAGE_KEY) === "true"; }
+  catch { return false; }
+}
+
+function markPersonalComputerBooted() {
+  try { sessionStorage.setItem(PERSONAL_BOOT_STORAGE_KEY, "true"); }
+  catch { /* Keep the boot sequence available when browser storage is disabled. */ }
+}
 
 const PERSONAL_PROGRAMS = [
   { id: "case-files", label: "CASE FILES", Icon: Files, state: "UNDER REVIEW", available: false },
@@ -94,7 +105,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       });
     } catch { return []; }
   });
-  const [booting, setBooting] = useState(true);
+  const [booting, setBooting] = useState(() => isCompanyComputer || !hasPersonalComputerBooted());
   const [pinDialog, setPinDialog] = useState(null);
   const modalRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -151,7 +162,10 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   }, [windows]);
 
   function finishBoot() {
-    bootTimerRef.current = window.setTimeout(() => setBooting(false), 650);
+    bootTimerRef.current = window.setTimeout(() => {
+      setBooting(false);
+      if (!isCompanyComputer) markPersonalComputerBooted();
+    }, 650);
   }
 
   function persistWindows() {
