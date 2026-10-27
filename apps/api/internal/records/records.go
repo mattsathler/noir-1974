@@ -52,7 +52,7 @@ type Context struct {
 var bankActivities = []string{
 	"A household account settled a routine service charge.",
 	"A standing order was processed by the account holder.",
-	"A cash withdrawal was entered at a company counter.",
+	"The account holder withdrew cash at the employer's cashier's desk.",
 	"A small payment for household goods was recorded.",
 	"A personal transfer was received and cleared.",
 	"A personal transfer was sent and cleared.",

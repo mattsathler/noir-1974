@@ -71,7 +71,7 @@ describe("WorldDirectory activity records", () => {
     fireEvent.click(screen.getByRole("button", { name: "Pin GATE log" }));
     expect(onPin).toHaveBeenCalledWith(expect.objectContaining({
       id: "record:gate",
-      content: expect.stringContaining("OCCURRED · Tue, Nov 10, 2:00 PM"),
+      content: expect.stringContaining("GATE USED · Tue, Nov 10, 2:00 PM"),
     }));
   });
 });

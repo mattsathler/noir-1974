@@ -90,6 +90,7 @@ type Whiteboard struct {
 	ID          string                 `json:"id"`
 	Title       string                 `json:"title"`
 	CreatedAt   time.Time              `json:"createdAt"`
+	LockedAt    *time.Time             `json:"lockedAt,omitempty"`
 	Pins        []WhiteboardPin        `json:"pins"`
 	Connections []WhiteboardConnection `json:"connections"`
 }
@@ -535,7 +536,7 @@ func (store *PostgresStore) Migrate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, statement := range strings.Split(string(contents), ";") {
+	for _, statement := range splitSQLStatements(string(contents)) {
 		if strings.TrimSpace(statement) == "" {
 			continue
 		}
@@ -544,6 +545,97 @@ func (store *PostgresStore) Migrate(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// splitSQLStatements keeps semicolons inside quoted strings, comments, and
+// PostgreSQL dollar-quoted function bodies intact while applying embedded schema.
+func splitSQLStatements(sql string) []string {
+	statements := make([]string, 0)
+	start := 0
+	var dollarTag string
+	singleQuoted, doubleQuoted, lineComment, blockComment := false, false, false, false
+	for i := 0; i < len(sql); i++ {
+		if lineComment {
+			if sql[i] == '\n' {
+				lineComment = false
+			}
+			continue
+		}
+		if blockComment {
+			if i+1 < len(sql) && sql[i] == '*' && sql[i+1] == '/' {
+				blockComment = false
+				i++
+			}
+			continue
+		}
+		if dollarTag != "" {
+			if strings.HasPrefix(sql[i:], dollarTag) {
+				i += len(dollarTag) - 1
+				dollarTag = ""
+			}
+			continue
+		}
+		if singleQuoted {
+			if sql[i] == '\'' {
+				if i+1 < len(sql) && sql[i+1] == '\'' {
+					i++
+					continue
+				}
+				singleQuoted = false
+			}
+			continue
+		}
+		if doubleQuoted {
+			if sql[i] == '"' {
+				if i+1 < len(sql) && sql[i+1] == '"' {
+					i++
+					continue
+				}
+				doubleQuoted = false
+			}
+			continue
+		}
+		if i+1 < len(sql) && sql[i] == '-' && sql[i+1] == '-' {
+			lineComment = true
+			i++
+			continue
+		}
+		if i+1 < len(sql) && sql[i] == '/' && sql[i+1] == '*' {
+			blockComment = true
+			i++
+			continue
+		}
+		switch sql[i] {
+		case '\'':
+			singleQuoted = true
+		case '"':
+			doubleQuoted = true
+		case '$':
+			if end := strings.IndexByte(sql[i+1:], '$'); end >= 0 {
+				tagBody := sql[i+1 : i+1+end]
+				valid := true
+				for j, char := range tagBody {
+					if !(char == '_' || char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || j > 0 && char >= '0' && char <= '9') {
+						valid = false
+						break
+					}
+				}
+				if valid {
+					dollarTag = sql[i : i+end+2]
+					i += end + 1
+				}
+			}
+		case ';':
+			if statement := strings.TrimSpace(sql[start:i]); statement != "" {
+				statements = append(statements, statement)
+			}
+			start = i + 1
+		}
+	}
+	if statement := strings.TrimSpace(sql[start:]); statement != "" {
+		statements = append(statements, statement)
+	}
+	return statements
 }
 
 const DefaultAsyncRequestDelay = 3 * time.Minute
@@ -1512,7 +1604,7 @@ func (store *PostgresStore) RecordDiscoveredItems(ctx context.Context, serverID,
 
 func (store *PostgresStore) ListWhiteboards(ctx context.Context, serverID, accountID string) ([]Whiteboard, error) {
 	rows, err := store.db.Query(ctx,
-		`SELECT whiteboard_id, title, created_at FROM player_whiteboards
+		`SELECT whiteboard_id, title, created_at, locked_at FROM player_whiteboards
 		 WHERE server_id = $1::uuid AND account_id = $2::uuid ORDER BY created_at, whiteboard_id`, serverID, accountID)
 	if err != nil {
 		return nil, err
@@ -1521,7 +1613,7 @@ func (store *PostgresStore) ListWhiteboards(ctx context.Context, serverID, accou
 	boards := make([]Whiteboard, 0)
 	for rows.Next() {
 		var board Whiteboard
-		if err := rows.Scan(&board.ID, &board.Title, &board.CreatedAt); err != nil {
+		if err := rows.Scan(&board.ID, &board.Title, &board.CreatedAt, &board.LockedAt); err != nil {
 			return nil, err
 		}
 		board.Pins = []WhiteboardPin{}
@@ -1578,7 +1670,7 @@ func (store *PostgresStore) GetWhiteboard(ctx context.Context, serverID, account
 	var board Whiteboard
 	var pinsJSON, connectionsJSON []byte
 	err := store.db.QueryRow(ctx,
-		`SELECT board.title, board.created_at,
+		`SELECT board.title, board.created_at, board.locked_at,
 		        COALESCE((
 			          SELECT jsonb_agg(item.item_data || jsonb_build_object('x', pin.position_x, 'y', pin.position_y, 'designation', pin.designation)
 		                           ORDER BY pin.pinned_at, pin.item_id)
@@ -1594,7 +1686,7 @@ func (store *PostgresStore) GetWhiteboard(ctx context.Context, serverID, account
 		        ), '[]'::jsonb)
 		 FROM player_whiteboards board
 		 WHERE board.server_id = $1::uuid AND board.account_id = $2::uuid AND board.whiteboard_id = $3`,
-		serverID, accountID, boardID).Scan(&board.Title, &board.CreatedAt, &pinsJSON, &connectionsJSON)
+		serverID, accountID, boardID).Scan(&board.Title, &board.CreatedAt, &board.LockedAt, &pinsJSON, &connectionsJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Whiteboard{}, ErrCaseNotFound
 	}
@@ -1652,6 +1744,14 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 		return AccusationResult{}, err
 	}
 	defer tx.Rollback(ctx)
+	var locked bool
+	if err := tx.QueryRow(ctx, `UPDATE player_whiteboards SET locked_at=COALESCE(locked_at,$4)
+		WHERE server_id=$1::uuid AND account_id=$2::uuid AND whiteboard_id=$3 RETURNING locked_at IS NOT NULL`, serverID, accountID, boardID, now.UTC()).Scan(&locked); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return AccusationResult{}, ErrCaseNotFound
+		}
+		return AccusationResult{}, err
+	}
 	var accusedID, markedVictimID string
 	var proofIDs []string
 	if err := tx.QueryRow(ctx, accusationBoardPinsQuery,
@@ -1674,16 +1774,16 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	}
 	if caseID != "" {
 		var prior bool
-		if err := tx.QueryRow(ctx, `SELECT accepted FROM player_case_accusations WHERE server_id=$1::uuid AND account_id=$2::uuid AND case_id=$3`, serverID, accountID, caseID).Scan(&prior); err == nil {
+		if err := tx.QueryRow(ctx, `SELECT accepted FROM player_case_accusations WHERE server_id=$1::uuid AND account_id=$2::uuid AND case_id=$3`, serverID, accountID, caseID).Scan(&prior); err == nil && prior {
 			if err := tx.Commit(ctx); err != nil {
 				return AccusationResult{}, err
 			}
 			return AccusationResult{Accepted: prior, Status: "completed", Message: "This accusation has already been reviewed. Check the personal mailbox for the decision."}, nil
-		} else if !errors.Is(err, pgx.ErrNoRows) {
+		} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return AccusationResult{}, err
 		}
 	}
-	requestKey := "case:" + caseID
+	requestKey := "case:" + caseID + ":board:" + boardID
 	if caseID == "" {
 		requestKey = "unmatched:" + boardID + ":" + accusedID + ":" + markedVictimID
 	}
@@ -1733,14 +1833,14 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 	}
 	var prior bool
 	err = tx.QueryRow(ctx, `SELECT accepted FROM player_case_accusations WHERE server_id=$1::uuid AND account_id=$2::uuid AND case_id=$3`, serverID, accountID, request.CaseID).Scan(&prior)
-	if err == nil {
+	if err == nil && prior {
 		result := AccusationResult{Accepted: prior, Status: "completed"}
 		if err := tx.Commit(ctx); err != nil {
 			return AccusationResult{}, err
 		}
 		return result, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return AccusationResult{}, err
 	}
 	var caseStatus string
@@ -1749,11 +1849,11 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 	}
 	if caseStatus != "open" {
 		if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,board_id,accepted,outcome,created_at)
-			VALUES($1::uuid,$2::uuid,$3,$4,false,'insufficient',$5) ON CONFLICT DO NOTHING`, serverID, accountID, request.CaseID, request.BoardID, now.UTC()); err != nil {
+			VALUES($1::uuid,$2::uuid,$3,$4,false,'insufficient',$5) ON CONFLICT(server_id,account_id,case_id) DO UPDATE SET board_id=EXCLUDED.board_id,accepted=false,outcome='insufficient',created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, request.BoardID, now.UTC()); err != nil {
 			return AccusationResult{}, err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
-			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, "accusation:"+request.CaseID, now.UTC(), genericFailure); err != nil {
+			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, "accusation:"+request.CaseID+":"+request.BoardID, now.UTC(), genericFailure); err != nil {
 			return AccusationResult{}, err
 		}
 		if err := tx.Commit(ctx); err != nil {
@@ -1807,7 +1907,8 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		outcome = "arrested"
 		body = "The corporate review has authorized the arrest. The accused has been taken into custody, and the city police have been notified."
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,board_id,accepted,outcome,created_at) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7)`, serverID, accountID, request.CaseID, request.BoardID, accepted, outcome, now.UTC()); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,board_id,accepted,outcome,created_at) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7)
+		ON CONFLICT(server_id,account_id,case_id) DO UPDATE SET board_id=EXCLUDED.board_id,accepted=EXCLUDED.accepted,outcome=EXCLUDED.outcome,created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, request.BoardID, accepted, outcome, now.UTC()); err != nil {
 		return AccusationResult{}, err
 	}
 	if accepted {
@@ -1819,7 +1920,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 			return AccusationResult{}, err
 		}
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments) VALUES($1::uuid,$2::uuid,$3,NULL,$4,$5,$6,'[]'::jsonb)`, serverID, accountID, "accusation:"+request.CaseID, now.UTC(), subject, body); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments) VALUES($1::uuid,$2::uuid,$3,NULL,$4,$5,$6,'[]'::jsonb)`, serverID, accountID, "accusation:"+request.CaseID+":"+request.BoardID, now.UTC(), subject, body); err != nil {
 		return AccusationResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {

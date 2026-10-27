@@ -6,6 +6,7 @@ import { getWhiteboard, getWhiteboards, submitCaseAccusation } from "../../../wo
 vi.mock("../../../world/api.js", () => ({
   getWhiteboard: vi.fn(),
   getWhiteboards: vi.fn(),
+  markWhiteboardSubmitted: vi.fn(),
   submitCaseAccusation: vi.fn(),
 }));
 
@@ -61,5 +62,31 @@ describe("AccusationWindow", () => {
 
     expect(submitCaseAccusation).toHaveBeenCalledWith("board-2", "police-station");
     expect(await screen.findByText(/REVIEW IS IN PROGRESS.*ABOUT 3 MINUTES/)).toBeInTheDocument();
+  });
+
+  it("keeps a submitted board locked and offers a fresh board for another review", async () => {
+    getWhiteboards.mockResolvedValue([
+      { id: "board-old", title: "First submission", lockedAt: "2026-10-27T10:00:00Z" },
+      { id: "board-new", title: "Revised evidence" },
+    ]);
+    getWhiteboard.mockImplementation(async (id) => ({
+      id,
+      title: id === "board-old" ? "First submission" : "Revised evidence",
+      lockedAt: id === "board-old" ? "2026-10-27T10:00:00Z" : undefined,
+      pins: [
+        { id: `${id}-proof`, source: "record", designation: "proof" },
+        { id: `${id}-accused`, source: "person", designation: "accused" },
+        { id: `${id}-victim`, source: "person", designation: "victim" },
+      ],
+    }));
+    submitCaseAccusation.mockResolvedValue({ status: "pending" });
+
+    render(<AccusationWindow stationLocationId="police-station" onClose={vi.fn()} />);
+    expect(await screen.findByRole("combobox", { name: "INVESTIGATION BOARD" })).toHaveValue("board-new");
+    expect(screen.getByRole("option", { name: /First submission.*SUBMITTED · LOCKED/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "SUBMIT ACCUSATION" }));
+
+    expect(submitCaseAccusation).toHaveBeenCalledWith("board-new", "police-station");
+    expect(await screen.findByText(/REVIEW IS IN PROGRESS/)).toBeInTheDocument();
   });
 });

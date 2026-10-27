@@ -1101,7 +1101,7 @@
 .personal-whiteboard__tools select { min-width: 9rem; padding: var(--noir-space-2); color: var(--noir-paper-200); background: var(--noir-ink-900); border: 1px solid var(--noir-ink-500); font: inherit; font-size: 0.72rem; }
 .personal-whiteboard__designation { display: grid; gap: 0.25rem; margin-top: var(--noir-space-2); color: var(--noir-ink-700); font-size: 0.62rem; letter-spacing: 0.08em; }
 .personal-whiteboard__designation select { width: 100%; padding: 0.3rem; color: var(--noir-ink-900); background: var(--noir-paper-100); border: 1px solid var(--noir-ink-500); font: inherit; font-size: 0.68rem; }
-.personal-whiteboard__save { margin-left: auto; color: var(--noir-success); font-size: 0.72rem; letter-spacing: 0.1em; }
+.personal-whiteboard__save { margin-left: auto; margin-right: var(--noir-space-3); color: var(--noir-success); font-size: 0.72rem; letter-spacing: 0.1em; }
 .personal-whiteboard__save--saving { color: var(--noir-brass-300); }
 .personal-whiteboard__save--save { color: var(--noir-danger); }
 .personal-whiteboard__viewport { width: 100%; height: clamp(28rem, 58vh, 52rem); overflow: auto; overscroll-behavior: contain; cursor: grab; border: 1px solid var(--noir-ink-500); background: var(--noir-ink-950); scrollbar-color: var(--noir-ink-500) var(--noir-ink-950); scrollbar-width: thin; }
@@ -1109,7 +1109,7 @@
 .personal-whiteboard--standalone { display: flex; min-height: calc(100vh - 5rem); min-height: calc(100svh - 5rem); flex-direction: column; }
 .personal-whiteboard--standalone .personal-whiteboard__viewport { flex: 1 1 auto; height: auto; min-height: 24rem; max-height: calc(100svh - 15rem); }
 .personal-whiteboard__viewport:active { cursor: grabbing; }
-.personal-whiteboard__stage { position: relative; width: 2200px; height: 1400px; overflow: hidden; background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--noir-ink-500) 55%, transparent) 1px, transparent 1px) 0 0 / 18px 18px, var(--noir-ink-900); box-shadow: inset 0 0 0 5px var(--noir-ink-950); cursor: grab; }
+.personal-whiteboard__stage { position: relative; width: 4400px; height: 2800px; overflow: hidden; background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--noir-ink-500) 55%, transparent) 1px, transparent 1px) 0 0 / 18px 18px, var(--noir-ink-900); box-shadow: inset 0 0 0 5px var(--noir-ink-950); cursor: grab; }
 .personal-whiteboard__pages,
 .personal-whiteboard__pin p,
 .computer-window__body,
@@ -1132,12 +1132,15 @@
 .personal-whiteboard__viewport::-webkit-scrollbar-thumb:hover { background: var(--noir-brass-500); }
 .personal-whiteboard__strings { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .personal-whiteboard__strings polyline { fill: none; stroke: var(--noir-danger); stroke-linecap: square; stroke-linejoin: miter; stroke-width: 2; shape-rendering: crispEdges; }
+.personal-whiteboard__strings .personal-whiteboard__string-preview { stroke-dasharray: 7 5; opacity: 0.8; pointer-events: none; }
 .personal-whiteboard__strings .personal-whiteboard__string-shadow { stroke: var(--noir-ink-950); stroke-width: 4; filter: url(#string-shadow); }
-.personal-whiteboard__pin { position: absolute; z-index: 2; width: min(17rem, 34%); min-height: 8rem; padding: var(--noir-space-3); color: var(--noir-ink-950); background: var(--noir-paper-200); border: 1px solid var(--noir-paper-100); box-shadow: 3px 3px 0 rgb(0 0 0 / 55%); cursor: grab; touch-action: none; }
-.personal-whiteboard__pin:active { cursor: grabbing; }
+.personal-whiteboard__pin { position: absolute; z-index: 2; width: min(17rem, 34%); min-height: 8rem; padding: var(--noir-space-3); color: var(--noir-ink-950); background: var(--noir-paper-200); border: 1px solid var(--noir-paper-100); box-shadow: 3px 3px 0 rgb(0 0 0 / 55%); cursor: default; }
 .personal-whiteboard__pin:focus-visible { outline: 2px solid var(--noir-brass-300); outline-offset: 3px; }
-.personal-whiteboard__tack { position: absolute; top: -0.45rem; left: calc(50% - 0.35rem); width: 0.7rem; height: 0.7rem; background: var(--noir-danger); border: 1px solid var(--noir-paper-100); box-shadow: 1px 1px 0 var(--noir-ink-950); }
+.personal-whiteboard__tack { position: absolute; z-index: 3; top: -0.45rem; left: calc(50% - 0.35rem); display: block; width: 0.7rem; height: 0.7rem; padding: 0; appearance: none; background: var(--noir-danger); border: 1px solid var(--noir-paper-100); border-radius: 0; box-shadow: 1px 1px 0 var(--noir-ink-950); cursor: crosshair; touch-action: none; }
+.personal-whiteboard__tack:disabled { opacity: 1; cursor: not-allowed; }
 .personal-whiteboard__pin header { display: flex; align-items: center; justify-content: space-between; gap: var(--noir-space-2); color: var(--noir-ink-700); font-size: 0.66rem; letter-spacing: 0.08em; }
+.personal-whiteboard__pin-drag-handle { cursor: grab; touch-action: none; user-select: none; }
+.personal-whiteboard__pin-drag-handle:active { cursor: grabbing; }
 .personal-whiteboard__pin header button.personal-whiteboard__remove-pin { display: grid; width: 1.65rem; height: 1.65rem; place-items: center; padding: 0; color: var(--noir-danger); background: transparent; border: 0; cursor: pointer; }
 .personal-whiteboard__remove-pin svg { width: 16px; height: 16px; fill: currentColor; shape-rendering: crispEdges; }
 .personal-whiteboard__remove-pin:hover { color: color-mix(in srgb, var(--noir-danger) 72%, var(--noir-ink-950)) !important; }
@@ -1149,12 +1152,11 @@
 .personal-whiteboard__pin--note .personal-whiteboard__note-content:focus { outline: 0; }
 .personal-whiteboard__save--save { padding: 0; background: transparent; border: 0; cursor: pointer; font: inherit; text-decoration: underline; }
 .personal-whiteboard__pin { text-align: left; }
-.personal-whiteboard__pin p { max-height: 7rem; margin: 0 0 var(--noir-space-2); overflow: auto; color: var(--noir-ink-800) !important; font-family: var(--noir-font-mono); font-size: 0.72rem !important; line-height: 1.55 !important; letter-spacing: 0.01em !important; white-space: pre-line; scrollbar-color: var(--noir-ink-700) var(--noir-paper-300); scrollbar-width: thin; }
+.personal-whiteboard__pin p { max-height: 7rem; margin: 0 0 var(--noir-space-2); overflow: auto; color: var(--noir-ink-800) !important; font-family: var(--noir-font-mono); font-size: 0.72rem !important; line-height: 1.55 !important; letter-spacing: 0.01em !important; white-space: pre-line; cursor: text; scrollbar-color: var(--noir-ink-700) var(--noir-paper-300); scrollbar-width: thin; }
 .personal-whiteboard__pin p::-webkit-scrollbar { width: 6px; }
 .personal-whiteboard__pin p::-webkit-scrollbar-track { background: var(--noir-paper-300); }
 .personal-whiteboard__pin p::-webkit-scrollbar-thumb { background: var(--noir-ink-700); border: 1px solid var(--noir-paper-400); }
 .personal-whiteboard__pin--selected { outline: 2px solid var(--noir-brass-400); outline-offset: 2px; }
-.personal-whiteboard__connect { padding: 0; color: var(--noir-ink-700); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 0.64rem; letter-spacing: 0.06em; }
 .personal-whiteboard__links { margin-top: var(--noir-space-4); padding-top: var(--noir-space-3); border-top: 1px solid var(--noir-ink-600); }
 .personal-whiteboard__links h2 { margin: 0 0 var(--noir-space-2); color: var(--noir-brass-300); font-size: 0.74rem; letter-spacing: 0.1em; }
 .personal-whiteboard__links > div { display: flex; align-items: center; justify-content: space-between; gap: var(--noir-space-3); padding: var(--noir-space-2) 0; color: var(--noir-paper-300); border-bottom: 1px solid var(--noir-ink-800); font-size: 0.72rem; }

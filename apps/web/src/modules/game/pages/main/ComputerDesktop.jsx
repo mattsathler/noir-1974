@@ -302,7 +302,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     let boards = [];
     try {
       boards = await getWhiteboards();
-      if (!boards.length) {
+      const editableBoards = boards.filter((board) => !board.lockedAt);
+      if (!editableBoards.length) {
         const draft = createWhiteboardDraft(0);
         cacheWhiteboardDraft(draft);
         setWhiteboardSaveState(draft.id, "saving");
@@ -312,10 +313,10 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
           .catch(() => setWhiteboardSaveState(draft.id, "save"));
         return;
       }
-      setPinDialog({ item, boards, busy: false, error: "" });
+      setPinDialog({ item, boards: editableBoards, busy: false, error: "" });
     } catch (error) {
       const availableBoards = await getWhiteboards().catch(() => boards);
-      setPinDialog({ item, boards: availableBoards, busy: false, error: error.message || "COULD NOT OPEN PERSONAL BOARDS" });
+      setPinDialog({ item, boards: availableBoards.filter((board) => !board.lockedAt), busy: false, error: error.message || "COULD NOT OPEN PERSONAL BOARDS" });
     }
   }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getWhiteboard, getWhiteboards, submitCaseAccusation } from "../../../world/api.js";
+import { getWhiteboard, getWhiteboards, markWhiteboardSubmitted, submitCaseAccusation } from "../../../world/api.js";
 
 function boardReadiness(board) {
   const pins = board?.pins ?? [];
@@ -28,7 +28,7 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
       }));
       if (!active) return;
       setBoards(loaded);
-      setSelectedId(loaded[0]?.id ?? "");
+      setSelectedId(loaded.find((board) => !board.lockedAt)?.id ?? loaded[0]?.id ?? "");
       setMessage(loaded.length ? "SELECT A BOARD FOR THE ACCUSATION REPORT." : "NO INVESTIGATION BOARDS ARE AVAILABLE.");
     }).catch((error) => { if (active) setMessage(error.message || "INVESTIGATION BOARDS COULD NOT BE LOADED."); })
       .finally(() => { if (active) setLoading(false); });
@@ -42,6 +42,8 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
     setMessage("FORWARDING ACCUSATION FOR REVIEW…");
     try {
       const result = await submitCaseAccusation(selectedBoard.id, stationLocationId);
+      markWhiteboardSubmitted(selectedBoard.id);
+      setBoards((previous) => previous.map((board) => board.id === selectedBoard.id ? { ...board, lockedAt: new Date().toISOString() } : board));
       setSubmitted(true);
       setMessage(result.status === "completed"
         ? "THIS BOARD HAS ALREADY BEEN REVIEWED. CHECK PERSONAL MAIL FOR THE DECISION."
@@ -60,7 +62,7 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
         <select id="accusation-board" value={selectedId} disabled={loading || busy || submitted || boards.length === 0} onChange={(event) => setSelectedId(event.target.value)}>
           {boards.length === 0 ? <option value="">NO BOARDS AVAILABLE</option> : boards.map((board) => {
             const status = boardReadiness(board);
-            return <option key={board.id} value={board.id}>{board.title} · {status.ready ? "READY" : "INCOMPLETE"}</option>;
+            return <option key={board.id} value={board.id} disabled={Boolean(board.lockedAt)}>{board.title} · {board.lockedAt ? "SUBMITTED · LOCKED" : status.ready ? "READY" : "INCOMPLETE"}</option>;
           })}
         </select>
         {selectedBoard && <ul className="accusation-window__checklist" aria-label="Required board contents">
@@ -69,8 +71,9 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
           <li className={readiness.hasVictim ? "is-ready" : "is-missing"}>{readiness.hasVictim ? "✓" : "!"} ONE PERSON MARKED VICTIM</li>
         </ul>}
         {selectedBoard && !readiness.ready && <p className="accusation-window__warning" role="alert">This board is missing required pins. Complete all three items above before submitting.</p>}
+        {selectedBoard?.lockedAt && <p className="accusation-window__warning" role="alert">This board has already been submitted and is locked. Create a new board to prepare another accusation.</p>}
         <p className="world-directory__message" role="status" aria-live="polite">{loading ? "LOADING INVESTIGATION BOARDS…" : message}</p>
-        <footer className="warrant-window__actions"><button type="button" disabled={busy} onClick={onClose}>CANCEL</button><button type="submit" disabled={loading || busy || submitted || !readiness.ready}>{busy ? "SUBMITTING…" : submitted ? "SUBMITTED" : "SUBMIT ACCUSATION"}</button></footer>
+        <footer className="warrant-window__actions"><button type="button" disabled={busy} onClick={onClose}>CANCEL</button><button type="submit" disabled={loading || busy || submitted || selectedBoard?.lockedAt || !readiness.ready}>{busy ? "SUBMITTING…" : submitted ? "SUBMITTED" : "SUBMIT ACCUSATION"}</button></footer>
       </form>
     </section>
   </div>;

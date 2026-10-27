@@ -19,6 +19,17 @@ type testCaseRow struct {
 	err    error
 }
 
+func TestSplitSQLStatementsKeepsDollarQuotedFunctionBodies(t *testing.T) {
+	sql := `CREATE FUNCTION guard() RETURNS trigger AS $$ BEGIN PERFORM 1; RETURN NEW; END; $$ LANGUAGE plpgsql; SELECT 1;`
+	statements := splitSQLStatements(sql)
+	if len(statements) != 2 {
+		t.Fatalf("splitSQLStatements returned %d statements, want 2: %#v", len(statements), statements)
+	}
+	if !strings.Contains(statements[0], "PERFORM 1; RETURN NEW;") {
+		t.Fatalf("function body was split at an internal semicolon: %q", statements[0])
+	}
+}
+
 func (row testCaseRow) Scan(destinations ...any) error {
 	if row.err != nil {
 		return row.err

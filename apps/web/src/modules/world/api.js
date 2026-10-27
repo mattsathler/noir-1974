@@ -253,7 +253,7 @@ function getWhiteboardSyncChannel() {
 }
 function announceWhiteboardUpdate(boardId, status) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("noir:whiteboard-updated", { detail: { boardId, status } }));
-  if (status === "saved" || status === "deleted") {
+  if (status === "saved" || status === "deleted" || status === "locked") {
     try { getWhiteboardSyncChannel()?.postMessage({ boardId, status }); } catch { /* Cross-tab sync is an enhancement; the API remains authoritative. */ }
   }
 }
@@ -261,7 +261,7 @@ export function subscribeWhiteboardUpdates(listener) {
   const channel = getWhiteboardSyncChannel();
   if (!channel) return () => {};
   const handleMessage = (event) => {
-    if (event.data?.boardId && ["saved", "deleted"].includes(event.data.status)) listener(event.data);
+    if (event.data?.boardId && ["saved", "deleted", "locked"].includes(event.data.status)) listener(event.data);
   };
   channel.addEventListener("message", handleMessage);
   return () => channel.removeEventListener("message", handleMessage);
@@ -276,6 +276,11 @@ function updateWhiteboardCache(boardId, update) {
 
 export function getCachedWhiteboard(boardId) {
   return readWhiteboardCache(boardId);
+}
+
+export function markWhiteboardSubmitted(boardId, lockedAt = new Date().toISOString()) {
+  updateWhiteboardCache(boardId, (board) => ({ ...board, lockedAt }));
+  announceWhiteboardUpdate(boardId, "locked");
 }
 
 export function cachePinnedWhiteboardItem(boardId, item, x, y, fallbackBoard = null) {

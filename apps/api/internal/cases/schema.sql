@@ -248,8 +248,10 @@ CREATE TABLE IF NOT EXISTS player_whiteboards (
     whiteboard_id text NOT NULL CHECK (whiteboard_id <> ''),
     title text NOT NULL CHECK (title <> ''),
     created_at timestamptz NOT NULL DEFAULT now(),
+    locked_at timestamptz,
     PRIMARY KEY (server_id, account_id, whiteboard_id)
 );
+ALTER TABLE player_whiteboards ADD COLUMN IF NOT EXISTS locked_at timestamptz;
 CREATE INDEX IF NOT EXISTS player_whiteboards_by_owner_idx
     ON player_whiteboards(server_id, account_id, created_at, whiteboard_id);
 
@@ -288,6 +290,69 @@ CREATE TABLE IF NOT EXISTS player_whiteboard_connections (
         REFERENCES player_whiteboard_pins(server_id, account_id, whiteboard_id, item_id) ON DELETE CASCADE,
     CHECK (from_item_id < to_item_id)
 );
+
+CREATE OR REPLACE FUNCTION reject_locked_whiteboard_changes() RETURNS trigger AS $$
+DECLARE
+    target_server uuid;
+    target_account uuid;
+    target_board text;
+    board_locked boolean;
+BEGIN
+    IF TG_TABLE_NAME = 'player_whiteboards' THEN
+        IF TG_OP = 'DELETE' AND OLD.locked_at IS NOT NULL THEN
+            RAISE EXCEPTION 'submitted whiteboard is locked' USING ERRCODE = '55000';
+        END IF;
+        IF TG_OP = 'UPDATE' AND OLD.locked_at IS NOT NULL AND NEW.title IS DISTINCT FROM OLD.title THEN
+            RAISE EXCEPTION 'submitted whiteboard is locked' USING ERRCODE = '55000';
+        END IF;
+        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+        RETURN NEW;
+    END IF;
+    IF TG_OP = 'DELETE' THEN
+        target_server := OLD.server_id;
+        target_account := OLD.account_id;
+        target_board := OLD.whiteboard_id;
+    ELSE
+        target_server := NEW.server_id;
+        target_account := NEW.account_id;
+        target_board := NEW.whiteboard_id;
+    END IF;
+    SELECT locked_at IS NOT NULL INTO board_locked FROM player_whiteboards
+      WHERE server_id = target_server AND account_id = target_account AND whiteboard_id = target_board;
+    IF board_locked THEN
+        RAISE EXCEPTION 'submitted whiteboard is locked' USING ERRCODE = '55000';
+    END IF;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS player_whiteboards_lock_guard ON player_whiteboards;
+CREATE TRIGGER player_whiteboards_lock_guard BEFORE UPDATE OR DELETE ON player_whiteboards
+    FOR EACH ROW EXECUTE FUNCTION reject_locked_whiteboard_changes();
+DROP TRIGGER IF EXISTS player_whiteboard_pins_lock_guard ON player_whiteboard_pins;
+CREATE TRIGGER player_whiteboard_pins_lock_guard BEFORE INSERT OR UPDATE OR DELETE ON player_whiteboard_pins
+    FOR EACH ROW EXECUTE FUNCTION reject_locked_whiteboard_changes();
+DROP TRIGGER IF EXISTS player_whiteboard_connections_lock_guard ON player_whiteboard_connections;
+CREATE TRIGGER player_whiteboard_connections_lock_guard BEFORE INSERT OR UPDATE OR DELETE ON player_whiteboard_connections
+    FOR EACH ROW EXECUTE FUNCTION reject_locked_whiteboard_changes();
+
+CREATE OR REPLACE FUNCTION reject_locked_whiteboard_note_changes() RETURNS trigger AS $$
+BEGIN
+    IF OLD.item_source = 'note' AND EXISTS (
+        SELECT 1 FROM player_whiteboard_pins pin JOIN player_whiteboards board
+          USING (server_id, account_id, whiteboard_id)
+        WHERE pin.server_id = OLD.server_id AND pin.account_id = OLD.account_id
+          AND pin.item_id = OLD.item_id AND board.locked_at IS NOT NULL
+    ) THEN
+        RAISE EXCEPTION 'submitted whiteboard is locked' USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS player_whiteboard_notes_lock_guard ON player_discovered_items;
+CREATE TRIGGER player_whiteboard_notes_lock_guard BEFORE UPDATE ON player_discovered_items
+    FOR EACH ROW EXECUTE FUNCTION reject_locked_whiteboard_note_changes();
 CREATE TABLE IF NOT EXISTS case_generation_schedule (
     server_id uuid PRIMARY KEY REFERENCES worlds(server_id) ON DELETE CASCADE,
     next_slot bigint NOT NULL DEFAULT 1,
