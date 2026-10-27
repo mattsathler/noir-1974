@@ -187,7 +187,7 @@ func TestGetNPCWithWorldConfigScansStatusChangedAt(t *testing.T) {
 		t.Fatalf("Generate() error = %v", err)
 	}
 	npc := generated.NPCs[0]
-	changedAt := time.Date(2026, time.October, 24, 12, 30, 0, 0, time.UTC)
+	changedAt := time.Date(1974, time.October, 24, 12, 30, 0, 0, time.UTC)
 	var query string
 	database := &fixtureDatabase{
 		queryRow: func(sql string, _ []any) pgx.Row {

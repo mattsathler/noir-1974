@@ -16,9 +16,9 @@ describe("NPC activity records API", () => {
     }));
     vi.stubGlobal("fetch", fetch);
 
-    await expect(getNPCRecords("npc:ada/01", "2026-11-01", "2026-11-12")).resolves.toEqual(results);
+    await expect(getNPCRecords("npc:ada/01", "1974-11-01", "1974-11-12")).resolves.toEqual(results);
     expect(fetch).toHaveBeenCalledWith(
-      "/api/world/npcs/npc%3Aada%2F01/records?from=2026-11-01&to=2026-11-12",
+      "/api/world/npcs/npc%3Aada%2F01/records?from=1974-11-01&to=1974-11-12",
       { credentials: "same-origin" },
     );
   });
@@ -29,9 +29,9 @@ describe("NPC activity records API", () => {
     }));
     vi.stubGlobal("fetch", fetch);
 
-    await getNPCRecords("npc:ada", "2026-11-01", "2026-11-12", "gate");
+    await getNPCRecords("npc:ada", "1974-11-01", "1974-11-12", "gate");
     expect(fetch).toHaveBeenCalledWith(
-      "/api/world/npcs/npc%3Aada/records?from=2026-11-01&to=2026-11-12&source=gate",
+      "/api/world/npcs/npc%3Aada/records?from=1974-11-01&to=1974-11-12&source=gate",
       { credentials: "same-origin" },
     );
   });
@@ -39,7 +39,7 @@ describe("NPC activity records API", () => {
   it("surfaces API errors", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response("date range must be valid\n", { status: 400 }));
     vi.stubGlobal("fetch", fetch);
-    await expect(getNPCRecords("npc:ada", "2026-12-01", "2026-11-01")).rejects.toThrow("date range must be valid");
+    await expect(getNPCRecords("npc:ada", "1974-12-01", "1974-11-01")).rejects.toThrow("date range must be valid");
   });
 });
 

@@ -8,7 +8,7 @@ Cada dia consulta duas fontes independentes: o Meridian Global Settlement Office
 
 ## Registros de caso
 
-O arquétipo `financial_extortion` do Crime Generator associa um pagamento da vítima ao culpado e uma passagem GATE do culpado ao distrito da cena. `case_activity_records` persiste esses eventos com a relação interna ao caso e ao papel que exercem na trama. O corpo JSON persistido e a resposta pública omitem esses campos internos.
+Em casos gerados na versão 4, `case_activity_records` coloca vítima e culpado no distrito da cena antes do horário do homicídio. Em `financial_extortion`, o mesmo débito anônimo da vítima aparece como crédito na conta do culpado, usando valor e referência iguais; outras transferências entre NPCs aparecem como comparações. Em `jealousy`, passagens sincronizadas da vítima e de um possível amante apoiam a hipótese do caso. As relações internas ao caso e o papel narrativo nunca aparecem no JSON público.
 
 O endpoint de NPC combina a rotina determinística com os eventos persistidos para aquele NPC e intervalo, aplica o filtro de fonte e ordena por data e ID. No desktop, o jogador acessa os registros por dois apps: Meridian Bank para o ledger financeiro e GATE Network para os deslocamentos. Cada app apresenta o uso das credenciais do protagonista como uma etapa narrativa de acesso privilegiado; a autorização real da API continua baseada na sessão autenticada.
 

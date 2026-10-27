@@ -8,7 +8,7 @@ Mensagens cotidianas são geradas sob demanda para uma única caixa de NPC e um 
 
 Os padrões editáveis ficam em [`apps/api/internal/mail/templates.json`](../../apps/api/internal/mail/templates.json), separados nas listas `personal`, `workplace` e `colleague`. Cada item tem `subject` e `body`; para acrescentar variações basta incluir novos objetos na lista correspondente. O arquivo é embutido no binário da API.
 
-O Crime Generator também cria mensagens de caso — por exemplo, conversa conjugal marcada por ciúme ou cobrança de extorsão. Elas são persistidas em `case_mail_messages`, relacionadas ao caso, ao destinatário e ao remetente. A consulta inclui a mesma mensagem na caixa de quem a recebeu e na caixa de quem a enviou. Mensagens comuns são geradas na leitura e misturadas cronologicamente às mensagens persistidas.
+O Crime Generator também cria mensagens de caso — por exemplo, conversa conjugal marcada por ciúme, cobrança de extorsão ou uma fala de arrependimento enviada a um colega. Elas são persistidas em `case_mail_messages`, relacionadas ao caso, ao destinatário e ao remetente. A consulta inclui a mesma mensagem na caixa de quem a recebeu e na caixa de quem a enviou. Mensagens anônimas são raras: o remetente real aparece na caixa de enviados e é ocultado somente na caixa do destinatário. Mensagens comuns são geradas na leitura e misturadas cronologicamente às mensagens persistidas.
 
 ## Separação da classificação interna
 

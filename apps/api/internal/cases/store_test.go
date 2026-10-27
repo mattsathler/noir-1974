@@ -65,6 +65,7 @@ type casePersistenceFixture struct {
 	progress      map[string][]byte
 	evidence      map[string]map[string]bool
 	activityRows  [][]any
+	emailRows     [][]any
 	activityQuery string
 	activityArgs  []any
 	sessionQuery  string
@@ -139,11 +140,40 @@ func (fixture *casePersistenceFixture) Query(_ context.Context, query string, ar
 		fixture.activityArgs = args
 		return &caseFixtureRows{rows: fixture.activityRows}, nil
 	}
+	if strings.Contains(query, "FROM case_mail_messages") {
+		return &caseFixtureRows{rows: fixture.emailRows}, nil
+	}
 	return nil, errors.New("unexpected case row query")
 }
 
+func TestAnonymousCaseEmailHidesSenderOnlyInRecipientMailbox(t *testing.T) {
+	data, err := json.Marshal(map[string]string{"sender": "Ada Morel", "recipient": "Mara Vale", "subject": "A private warning", "body": "Keep the register closed."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture := newCasePersistenceFixture()
+	fixture.emailRows = [][]any{{"case:one", "npc:victim", "npc:killer", "anonymous_warning", data}}
+	store := NewPostgresStore(fixture)
+
+	received, err := store.NPCEmails(context.Background(), "server-1", "npc:victim", time.Time{}, time.Time{})
+	if err != nil {
+		t.Fatalf("recipient NPCEmails() error = %v", err)
+	}
+	if len(received) != 1 || received[0].Sender != "Unknown sender" {
+		t.Fatalf("recipient view should hide sender: %+v", received)
+	}
+
+	sent, err := store.NPCEmails(context.Background(), "server-1", "npc:killer", time.Time{}, time.Time{})
+	if err != nil {
+		t.Fatalf("sender NPCEmails() error = %v", err)
+	}
+	if len(sent) != 1 || sent[0].Sender != "Ada Morel" {
+		t.Fatalf("sender view should retain the sender identity: %+v", sent)
+	}
+}
+
 func TestListOpenPublicCasesForSessionUsesOneScopedQuery(t *testing.T) {
-	createdAt := time.Date(2026, time.October, 24, 12, 0, 0, 0, time.UTC)
+	createdAt := time.Date(1974, time.October, 24, 12, 0, 0, 0, time.UTC)
 	fixture := newCasePersistenceFixture()
 	fixture.sessionRows = [][]any{{"fr/lyon", "case-1", "fr/lyon", "homicide", "npc:victim", "location:fr/lyon/central", "open", createdAt}}
 	store := NewPostgresStore(fixture)
@@ -332,7 +362,7 @@ func TestNPCRecordsQueryIsScopedAndOmitsBackendClassification(t *testing.T) {
 	fixture := newCasePersistenceFixture()
 	publicRecord := records.Record{
 		ID: "record:extortion", NPCID: "npc:victim", Source: "bank",
-		OccurredAt: time.Date(2026, 11, 10, 16, 42, 0, 0, time.UTC),
+		OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
 		Operator:   "Meridian Global Settlement Office", Description: "A private remittance cleared.",
 	}
 	data, err := json.Marshal(publicRecord)
@@ -341,8 +371,8 @@ func TestNPCRecordsQueryIsScopedAndOmitsBackendClassification(t *testing.T) {
 	}
 	fixture.activityRows = [][]any{{data}}
 	store := NewPostgresStore(fixture)
-	from := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
-	through := time.Date(2026, 11, 12, 23, 59, 0, 0, time.UTC)
+	from := time.Date(1974, 11, 1, 0, 0, 0, 0, time.UTC)
+	through := time.Date(1974, 11, 12, 23, 59, 0, 0, time.UTC)
 	result, err := store.NPCRecords(context.Background(), "server-1", "npc:victim", from, through, "")
 	if err != nil {
 		t.Fatalf("NPCRecords() error = %v", err)

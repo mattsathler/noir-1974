@@ -15,7 +15,7 @@ describe("ResidentialSearchWindow", () => {
     searchPeople.mockResolvedValue([{
       npc: { id: "npc:br/rio-de-janeiro/people/ana", name: "Ana Costa", status: "alive" },
     }]);
-    requestResidentialSearch.mockResolvedValue({ status: "pending", readyAt: "2026-10-23T23:03:00Z" });
+    requestResidentialSearch.mockResolvedValue({ status: "pending", readyAt: "1974-10-23T23:03:00Z" });
 
     render(<ResidentialSearchWindow cityId="br/rio-de-janeiro" stationLocationId="service:br/rio-de-janeiro/police-station" onClose={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ana" } });

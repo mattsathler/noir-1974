@@ -57,8 +57,8 @@ func (reader legacyWorldReader) EmployeesOfCompanies(ctx context.Context, server
 func main() {
 	serverID := flag.String("server", "", "world server ID; defaults to NOIR_WORLD_SERVER_ID")
 	npcID := flag.String("npc", "", "NPC ID; defaults to first employed Lyon NPC")
-	fromValue := flag.String("from", "2026-10-17", "first mailbox date, YYYY-MM-DD")
-	throughValue := flag.String("to", "2026-10-23", "last mailbox date, YYYY-MM-DD")
+	fromValue := flag.String("from", "", "first mailbox date, YYYY-MM-DD; defaults to six days before --to")
+	throughValue := flag.String("to", "", "last mailbox date, YYYY-MM-DD; defaults to today")
 	samples := flag.Int("samples", 100, "measured requests after warmups")
 	warmups := flag.Int("warmups", 5, "warmup requests")
 	csvPath := flag.String("csv", "", "optional path for raw sample CSV")
@@ -79,15 +79,26 @@ func main() {
 	if *samples < 1 || *warmups < 0 || *concurrency < 1 {
 		log.Fatal("samples and concurrency must be positive; warmups cannot be negative")
 	}
-	from, err := time.Parse("2006-01-02", *fromValue)
-	if err != nil {
-		log.Fatal("parse --from: ", err)
+	var err error
+	throughDate := time.Now().UTC().Truncate(24 * time.Hour)
+	if *throughValue != "" {
+		throughDate, err = time.Parse("2006-01-02", *throughValue)
+		if err != nil {
+			log.Fatal("parse --to: ", err)
+		}
 	}
-	to, err := time.Parse("2006-01-02", *throughValue)
-	if err != nil || to.Before(from) || to.Sub(from) > 6*24*time.Hour {
+	fromDate := throughDate.AddDate(0, 0, -6)
+	if *fromValue != "" {
+		fromDate, err = time.Parse("2006-01-02", *fromValue)
+		if err != nil {
+			log.Fatal("parse --from: ", err)
+		}
+	}
+	from := fromDate
+	if throughDate.Before(from) || throughDate.Sub(from) > 6*24*time.Hour {
 		log.Fatal("--to must be within a valid seven-day interval")
 	}
-	through := to.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	through := throughDate.AddDate(0, 0, 1).Add(-time.Nanosecond)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	poolConfig, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))

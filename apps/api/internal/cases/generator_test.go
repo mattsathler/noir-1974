@@ -73,21 +73,130 @@ func TestFinancialExtortionIncludesMixedBankAndGATECaseRecords(t *testing.T) {
 	if err := Validate(definition, base); err != nil {
 		t.Fatalf("Validate() error = %v", err)
 	}
-	if len(definition.Records) != 2 {
-		t.Fatalf("case has %d linked activity records, want transfer and GATE movement", len(definition.Records))
-	}
-	bySource := map[string]records.Record{}
+	var victimPayment, killerReceipt records.Record
+	var sceneVictim, sceneKiller records.Record
 	for _, item := range definition.Records {
-		bySource[item.Source] = item
+		switch item.InternalRelation {
+		case "extortion_payment":
+			if item.NPCID == definition.VictimID {
+				victimPayment = item
+			}
+			if item.NPCID == definition.KillerID {
+				killerReceipt = item
+			}
+		case "scene-victim":
+			sceneVictim = item
+		case "scene-killer":
+			sceneKiller = item
+		}
 	}
-	if bySource["bank"].InternalRelation != "extortion_payment" || bySource["bank"].NPCID != definition.VictimID {
-		t.Fatalf("extortion transfer is not linked to the victim: %+v", bySource["bank"])
+	if victimPayment.Source != "bank" || victimPayment.Direction != "outgoing" || victimPayment.NPCID != definition.VictimID {
+		t.Fatalf("extortion debit is not linked to the victim: %+v", victimPayment)
 	}
-	if bySource["gate"].InternalRelation != "precrime_route" || bySource["gate"].NPCID != definition.KillerID {
-		t.Fatalf("GATE movement is not linked to the killer: %+v", bySource["gate"])
+	if killerReceipt.Source != "bank" || killerReceipt.Direction != "incoming" || killerReceipt.NPCID != definition.KillerID {
+		t.Fatalf("matching extortion credit is not linked to the killer: %+v", killerReceipt)
 	}
-	if !bySource["bank"].OccurredAt.Before(bySource["gate"].OccurredAt) {
-		t.Fatal("extortion transfer should precede the investigated GATE movement")
+	if victimPayment.Amount != killerReceipt.Amount || victimPayment.Reference == "" || victimPayment.Reference != killerReceipt.Reference || !victimPayment.OccurredAt.Equal(killerReceipt.OccurredAt) {
+		t.Fatalf("sender and recipient transaction entries do not match: debit=%+v credit=%+v", victimPayment, killerReceipt)
+	}
+	if sceneVictim.Destination == "" || sceneVictim.Destination != sceneKiller.Destination || !sceneVictim.OccurredAt.Before(definition.CrimeAt) || !sceneKiller.OccurredAt.Before(definition.CrimeAt) {
+		t.Fatalf("victim and killer GATE movements do not converge at the scene before the crime: victim=%+v killer=%+v crime=%s", sceneVictim, sceneKiller, definition.CrimeAt)
+	}
+	if !victimPayment.OccurredAt.Before(sceneKiller.OccurredAt) {
+		t.Fatal("extortion transfer should precede the investigated GATE movements")
+	}
+}
+
+func TestJealousyCaseConnectsSpousesParamourAndInvestigationChannels(t *testing.T) {
+	base, err := world.Generate("m13-jealousy-v4", world.GeneratorVersion2)
+	if err != nil {
+		t.Fatalf("world.Generate() error = %v", err)
+	}
+	var definition Definition
+	for index := 0; index < 300; index++ {
+		definition, err = Generate(base, fmt.Sprintf("jealousy-v4-%d", index), GeneratorVersion)
+		if err != nil {
+			t.Fatalf("Generate() error = %v", err)
+		}
+		if definition.ArchetypeID == "jealousy" {
+			break
+		}
+	}
+	if definition.ArchetypeID != "jealousy" {
+		t.Fatal("no seed selected the jealousy archetype")
+	}
+	if definition.ParamourID == "" || definition.ParamourID == definition.KillerID || definition.ParamourID == definition.VictimID {
+		t.Fatalf("jealousy case has no distinct paramour: %+v", definition)
+	}
+	if err := Validate(definition, base); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+	var affairVictim, affairParamour bool
+	for _, record := range definition.Records {
+		if record.InternalRelation == "affair-victim" && record.NPCID == definition.VictimID {
+			affairVictim = true
+		}
+		if record.InternalRelation == "affair-paramour" && record.NPCID == definition.ParamourID {
+			affairParamour = true
+		}
+	}
+	if !affairVictim || !affairParamour {
+		t.Fatal("jealousy case omitted synchronized GATE passages for the affair pair")
+	}
+	var affairMail, remorseMail bool
+	for _, message := range definition.Emails {
+		if message.InternalRelation == "jealousy_exchange" && message.MailboxNPCID == definition.VictimID && message.RelatedNPCID == definition.ParamourID {
+			affairMail = true
+		}
+		if message.InternalRelation == "killer_remorse" && message.MailboxNPCID == definition.KillerID {
+			remorseMail = true
+		}
+	}
+	if !affairMail || !remorseMail {
+		t.Fatalf("jealousy case omitted affair or killer correspondence: %+v", definition.Emails)
+	}
+}
+
+func TestLegacyCaseGeneratorVersionRemainsAvailable(t *testing.T) {
+	base, err := world.Generate("legacy-case-v3", world.GeneratorVersion2)
+	if err != nil {
+		t.Fatalf("world.Generate() error = %v", err)
+	}
+	definition, err := Generate(base, "legacy-case-seed", legacyGeneratorVersion)
+	if err != nil {
+		t.Fatalf("legacy Generate() error = %v", err)
+	}
+	if definition.GeneratorVersion != legacyGeneratorVersion || !definition.CrimeAt.IsZero() || definition.ParamourID != "" {
+		t.Fatalf("legacy case changed its v3 shape: %+v", definition)
+	}
+	if err := Validate(definition, base); err != nil {
+		t.Fatalf("legacy Validate() error = %v", err)
+	}
+}
+
+func TestAnonymousCaseMessagesAreRareAndRetainSenderIdentityInSourceData(t *testing.T) {
+	base, err := world.Generate("m13-anonymous-mail-v4", world.GeneratorVersion2)
+	if err != nil {
+		t.Fatalf("world.Generate() error = %v", err)
+	}
+	anonymousCount := 0
+	for index := 0; index < 100; index++ {
+		definition, err := Generate(base, fmt.Sprintf("anonymous-mail-case-%d", index), GeneratorVersion)
+		if err != nil {
+			t.Fatalf("Generate() error = %v", err)
+		}
+		for _, message := range definition.Emails {
+			if message.InternalRelation != "anonymous_warning" {
+				continue
+			}
+			anonymousCount++
+			if message.Sender != npcByID(base.NPCs, definition.KillerID).Name || message.MailboxNPCID != definition.VictimID || message.RelatedNPCID != definition.KillerID {
+				t.Fatalf("anonymous message did not retain its true sender and participants: %+v", message)
+			}
+		}
+	}
+	if anonymousCount == 0 || anonymousCount == 100 {
+		t.Fatalf("anonymous messages appeared %d/100 times; expected a rare, recurring subset", anonymousCount)
 	}
 }
 

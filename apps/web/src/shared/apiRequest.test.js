@@ -35,8 +35,8 @@ describe("apiRequest", () => {
       apiRequest("/api/profile", { headers: { "X-Context": "two" } }),
     ]);
     await Promise.all([
-      apiRequest("/api/world/newspaper", { dedupeKey: "fr/lyon:2026-10-24" }),
-      apiRequest("/api/world/newspaper", { dedupeKey: "us/austin:2026-10-24" }),
+      apiRequest("/api/world/newspaper", { dedupeKey: "fr/lyon:1974-10-24" }),
+      apiRequest("/api/world/newspaper", { dedupeKey: "us/austin:1974-10-24" }),
     ]);
     await Promise.all([
       apiRequest("/api/cancellable", { signal: new AbortController().signal }),

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS cases (
     victim_entity_id text NOT NULL,
     killer_entity_id text NOT NULL,
     location_entity_id text NOT NULL,
+    crime_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (server_id, case_id),
     FOREIGN KEY (server_id, victim_entity_id)
@@ -26,6 +27,7 @@ CREATE INDEX IF NOT EXISTS cases_by_server_created_idx
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS archetype_id text NOT NULL DEFAULT 'workplace_conflict';
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS motive text NOT NULL DEFAULT 'Legacy workplace homicide.';
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS city_id text NOT NULL DEFAULT 'fr/lyon';
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS crime_at timestamptz;
 UPDATE cases c
 SET city_id = substring(r.region_id from '^([^/]+/[^/]+)')
 FROM world_entities e

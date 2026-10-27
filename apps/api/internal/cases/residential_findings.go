@@ -20,6 +20,7 @@ type residentialCaseFindings struct {
 	Victim    []residentialFinding `json:"victim"`
 	Colleague []residentialFinding `json:"colleague"`
 	Associate []residentialFinding `json:"associate"`
+	Paramour  []residentialFinding `json:"paramour"`
 }
 
 func readResidentialFindingList(path string) ([]residentialFinding, error) {

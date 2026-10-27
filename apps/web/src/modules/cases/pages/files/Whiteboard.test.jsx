@@ -23,7 +23,7 @@ describe("Whiteboard pin designations", () => {
     const board = {
       id: "board-locked",
       title: "Submitted case",
-      lockedAt: "2026-10-27T10:00:00Z",
+      lockedAt: "1974-10-27T10:00:00Z",
       pins: [
         { id: "note-1", source: "note", title: "UNTITLED NOTE", content: "Evidence note", x: 2000, y: 2000 },
         { id: "person-1", source: "person", title: "Ada Morel", content: "PERSON FILE", x: 4000, y: 2000 },
@@ -134,7 +134,7 @@ describe("Whiteboard pin designations", () => {
     const board = {
       id: "board-2",
       title: "Case notes",
-      pins: [{ id: "gate-1", source: "gate", title: "GATE ACCESS LOG", content: "GATE passage at 2:00 PM", metadata: { occurredAt: "2026-11-10T13:00:00.000Z" }, x: 2000, y: 2000 }],
+      pins: [{ id: "gate-1", source: "gate", title: "GATE ACCESS LOG", content: "GATE passage at 2:00 PM", metadata: { occurredAt: "1974-11-10T13:00:00.000Z" }, x: 2000, y: 2000 }],
       connections: [],
     };
     const setPointerCapture = vi.fn();

@@ -194,21 +194,21 @@ func TestRegisterCreatesAccountAndHttpOnlySession(t *testing.T) {
 func TestNPCRecordsRequiresSessionAndReturnsSelectedIntervalWithoutClassification(t *testing.T) {
 	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid", locationID: "service:lyon/meridian-bank"}
 	reader := &fakeRecordReader{items: []records.Record{{
-		ID: "record:1", NPCID: "npc:one", Source: "bank", OccurredAt: time.Date(2026, 11, 10, 16, 42, 0, 0, time.UTC),
+		ID: "record:1", NPCID: "npc:one", Source: "bank", OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
 		Operator: "Meridian Global Settlement Office", Description: "A private remittance cleared.", CaseID: "case:hidden", InternalRelation: "extortion_payment",
 	}, {
-		ID: "record:2", NPCID: "npc:one", Source: "gate", OccurredAt: time.Date(2026, 11, 10, 16, 42, 0, 0, time.UTC),
+		ID: "record:2", NPCID: "npc:one", Source: "gate", OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
 		Operator: "Meridian Global · GATE Network", Description: "A passenger entry was recorded.",
 	}}}
 	handler := NewHandlerWithGame(repository, false, fakeDirectory{}, fakeNews{}, nil, reader, "server-1")
-	request := httptest.NewRequest(http.MethodGet, "/api/world/npcs/npc:one/records?from=2026-11-06&to=2026-11-12&source=bank", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12&source=bank", nil)
 	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
-	if reader.npcID != "npc:one" || reader.from.Format("2006-01-02") != "2026-11-06" || reader.to.Format("2006-01-02") != "2026-11-12" {
+	if reader.npcID != "npc:one" || reader.from.Format("2006-01-02") != "1974-11-06" || reader.to.Format("2006-01-02") != "1974-11-12" {
 		t.Fatalf("query forwarded wrong target or interval: %+v", reader)
 	}
 	if strings.Contains(recorder.Body.String(), "case:hidden") || strings.Contains(recorder.Body.String(), "extortion_payment") {
@@ -234,11 +234,11 @@ func TestBankRecordsAreAvailableBeforePhysicalVisitsAreEnabled(t *testing.T) {
 		return recorder
 	}
 
-	bank := request("/api/world/npcs/npc:one/records?from=2026-11-06&to=2026-11-12&source=bank")
+	bank := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12&source=bank")
 	if bank.Code != http.StatusOK || !strings.Contains(bank.Body.String(), "A remittance") {
 		t.Fatalf("bank query without a physical visit: status=%d body=%s", bank.Code, bank.Body.String())
 	}
-	mixed := request("/api/world/npcs/npc:one/records?from=2026-11-06&to=2026-11-12")
+	mixed := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12")
 	if mixed.Code != http.StatusOK || !strings.Contains(mixed.Body.String(), "bank:1") || !strings.Contains(mixed.Body.String(), "gate:1") {
 		t.Fatalf("unfiltered records should include both sources: status=%d body=%s", mixed.Code, mixed.Body.String())
 	}
@@ -487,9 +487,9 @@ func TestNPCRecordsRejectsMissingOrOversizedDateRange(t *testing.T) {
 	handler := NewHandlerWithGame(repository, false, fakeDirectory{}, fakeNews{}, nil, reader, "server-1")
 	for _, path := range []string{
 		"/api/world/npcs/npc:one/records",
-		"/api/world/npcs/npc:one/records?from=2026-01-01&to=2028-01-01",
-		"/api/world/npcs/npc:one/records?from=2026-01-01&to=2026-01-08",
-		"/api/world/npcs/npc:one/records?from=2026-01-01&to=2026-01-02&source=unknown",
+		"/api/world/npcs/npc:one/records?from=1974-01-01&to=2028-01-01",
+		"/api/world/npcs/npc:one/records?from=1974-01-01&to=1974-01-08",
+		"/api/world/npcs/npc:one/records?from=1974-01-01&to=1974-01-02&source=unknown",
 	} {
 		request := httptest.NewRequest(http.MethodGet, path, nil)
 		request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})

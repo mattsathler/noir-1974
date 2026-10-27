@@ -14,7 +14,7 @@ afterEach(() => {
 describe("PlayerMailbox", () => {
   it("refreshes while open so delayed reports arrive without reopening the mailbox", async () => {
     getPlayerEmails.mockResolvedValueOnce([]).mockResolvedValueOnce([{
-      id: "warrant:1:mail", sentAt: "2026-10-23T23:03:00Z", subject: "Residential search report · Ana Costa",
+      id: "warrant:1:mail", sentAt: "1974-10-23T23:03:00Z", subject: "Residential search report · Ana Costa",
       body: "The authorized search is complete.", attachments: [],
     }]);
     const setInterval = vi.spyOn(window, "setInterval");

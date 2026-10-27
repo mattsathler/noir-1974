@@ -760,10 +760,14 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 	var caseID string
 	err = store.db.QueryRow(ctx, `SELECT c.case_id,c.archetype_id, c.killer_entity_id=$3, c.victim_entity_id=$3,
 		CASE WHEN c.killer_entity_id=$3 THEN 'killer' WHEN c.victim_entity_id=$3 THEN 'victim'
+		WHEN EXISTS (SELECT 1 FROM case_relationships cr JOIN employment_relationships er USING(server_id,relationship_id)
+			WHERE cr.server_id=c.server_id AND cr.case_id=c.case_id AND cr.relationship_role='paramour_employment' AND er.employee_npc_id=$3) THEN 'paramour'
 		WHEN EXISTS (SELECT 1 FROM employment_relationships a JOIN employment_relationships b ON b.server_id=a.server_id AND b.employer_company_id=a.employer_company_id WHERE a.server_id=c.server_id AND a.employee_npc_id=$3 AND b.employee_npc_id IN (c.killer_entity_id,c.victim_entity_id)) THEN 'colleague'
 		ELSE 'associate' END
 		FROM cases c JOIN case_states s USING (server_id, case_id)
 		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND (c.killer_entity_id=$3 OR c.victim_entity_id=$3
+		OR EXISTS (SELECT 1 FROM case_relationships cr JOIN employment_relationships er USING(server_id,relationship_id)
+			WHERE cr.server_id=c.server_id AND cr.case_id=c.case_id AND cr.relationship_role='paramour_employment' AND er.employee_npc_id=$3)
 		OR EXISTS (SELECT 1 FROM employment_relationships a JOIN employment_relationships b ON b.server_id=a.server_id AND b.employer_company_id=a.employer_company_id WHERE a.server_id=c.server_id AND a.employee_npc_id=$3 AND b.employee_npc_id IN (c.killer_entity_id,c.victim_entity_id))
 		OR EXISTS (SELECT 1 FROM personal_relationships r WHERE r.server_id=c.server_id AND ((r.person_a_npc_id=$3 AND r.person_b_npc_id IN (c.killer_entity_id,c.victim_entity_id)) OR (r.person_b_npc_id=$3 AND r.person_a_npc_id IN (c.killer_entity_id,c.victim_entity_id)))) )
 		AND s.status='open' ORDER BY c.created_at DESC LIMIT 1`, serverID, cityID, npcID).Scan(&caseID, &archetype, &isKiller, &isVictim, &caseRole)
@@ -808,13 +812,15 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 			contextualFindings = caseFindings.Colleague
 		case "associate":
 			contextualFindings = caseFindings.Associate
+		case "paramour":
+			contextualFindings = caseFindings.Paramour
 		}
 	}
 	lastFinding := commonFindings[order[7]]
 	if len(contextualFindings) > 0 {
 		lastFinding = contextualFindings[random.Intn(len(contextualFindings))]
 	}
-	if caseID != "" {
+	if caseID != "" && archetype == "financial_extortion" {
 		var recordData []byte
 		err := store.db.QueryRow(ctx, `SELECT record_data FROM case_activity_records
 			WHERE server_id=$1::uuid AND case_id=$2 AND (npc_entity_id=$3 OR related_npc_entity_id=$3)
@@ -868,7 +874,7 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 }
 
 func residentialFindingFromRecord(record records.Record) residentialFinding {
-	date := record.OccurredAt.UTC().Format("2 January 2006")
+	date := record.OccurredAt.UTC().Format("2 January")
 	content := fmt.Sprintf("A folded %s copy is dated %s. %s", record.Source, date, strings.TrimSpace(record.Description))
 	if record.Reference != "" {
 		content += " The reference is " + record.Reference + "."
@@ -966,12 +972,18 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 
 	var existingSeed, existingCityID, existingType, existingArchetype, existingMotive, existingVictim, existingKiller, existingLocation string
 	var existingVersion int
+	var crimeAtMatches bool
+	var crimeAt any
+	if !definition.CrimeAt.IsZero() {
+		crimeAt = definition.CrimeAt
+	}
 	err = tx.QueryRow(ctx,
-		`SELECT case_seed, city_id, generator_version, case_type, archetype_id, motive, victim_entity_id, killer_entity_id, location_entity_id
-		 FROM cases WHERE server_id = $1::uuid AND case_id = $2 FOR UPDATE`, serverID, definition.ID,
-	).Scan(&existingSeed, &existingCityID, &existingVersion, &existingType, &existingArchetype, &existingMotive, &existingVictim, &existingKiller, &existingLocation)
+		`SELECT case_seed, city_id, generator_version, case_type, archetype_id, motive, victim_entity_id, killer_entity_id, location_entity_id,
+		 crime_at IS NOT DISTINCT FROM $3::timestamptz
+		 FROM cases WHERE server_id = $1::uuid AND case_id = $2 FOR UPDATE`, serverID, definition.ID, crimeAt,
+	).Scan(&existingSeed, &existingCityID, &existingVersion, &existingType, &existingArchetype, &existingMotive, &existingVictim, &existingKiller, &existingLocation, &crimeAtMatches)
 	if err == nil {
-		if existingSeed != definition.Seed || existingCityID != definition.CityID || existingVersion != definition.GeneratorVersion || existingType != definition.CaseType || existingArchetype != definition.ArchetypeID || existingMotive != definition.Motive || existingVictim != definition.VictimID || existingKiller != definition.KillerID || existingLocation != definition.LocationID {
+		if existingSeed != definition.Seed || existingCityID != definition.CityID || existingVersion != definition.GeneratorVersion || existingType != definition.CaseType || existingArchetype != definition.ArchetypeID || existingMotive != definition.Motive || existingVictim != definition.VictimID || existingKiller != definition.KillerID || existingLocation != definition.LocationID || !crimeAtMatches {
 			return ErrPersistedConflict
 		}
 		if err := persistCaseEmails(ctx, tx, serverID, definition); err != nil {
@@ -1026,10 +1038,10 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO cases (server_id, case_id, case_seed, city_id, generator_version, case_type, archetype_id, motive,
-		 victim_entity_id, killer_entity_id, location_entity_id)
-		 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		 victim_entity_id, killer_entity_id, location_entity_id, crime_at)
+		 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 		serverID, definition.ID, definition.Seed, definition.CityID, definition.GeneratorVersion, definition.CaseType, definition.ArchetypeID, definition.Motive,
-		definition.VictimID, definition.KillerID, definition.LocationID,
+		definition.VictimID, definition.KillerID, definition.LocationID, crimeAt,
 	); err != nil {
 		return fmt.Errorf("persist case definition: %w", err)
 	}
@@ -1152,7 +1164,7 @@ func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID stri
 // while retaining case classification as backend-only metadata.
 func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID string, from, through time.Time) ([]mail.Message, error) {
 	rows, err := store.db.Query(ctx,
-		`SELECT case_id, related_npc_entity_id, internal_relation, message_data
+		`SELECT case_id, mailbox_npc_entity_id, related_npc_entity_id, internal_relation, message_data
 		 FROM case_mail_messages
 		 WHERE server_id = $1::uuid AND (mailbox_npc_entity_id = $2 OR related_npc_entity_id = $2)
 		   AND sent_at >= $3 AND sent_at <= $4
@@ -1166,13 +1178,17 @@ func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID strin
 	for rows.Next() {
 		var item mail.Message
 		var data []byte
-		if err := rows.Scan(&item.CaseID, &item.RelatedNPCID, &item.InternalRelation, &data); err != nil {
+		var recipientMailboxID string
+		if err := rows.Scan(&item.CaseID, &recipientMailboxID, &item.RelatedNPCID, &item.InternalRelation, &data); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(data, &item); err != nil {
 			return nil, fmt.Errorf("decode case email: %w", err)
 		}
 		item.MailboxNPCID = npcID
+		if (item.InternalRelation == "anonymous_warning" || item.InternalRelation == "anonymous_followup") && recipientMailboxID == npcID {
+			item.Sender = "Unknown sender"
+		}
 		result = append(result, item)
 	}
 	return result, rows.Err()
@@ -1300,11 +1316,12 @@ func (store *PostgresStore) ListOpenPublicCasesForSession(ctx context.Context, s
 // GetPublicCase returns narrative evidence without internal classifications or solution data.
 func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID string) (PublicCase, []PublicEvidence, error) {
 	var result PublicCase
+	var generatorVersion int
 	err := store.db.QueryRow(ctx,
-		`SELECT c.case_id, c.city_id, c.case_type, c.victim_entity_id, c.location_entity_id, s.status, c.created_at
+		`SELECT c.case_id, c.city_id, c.case_type, c.victim_entity_id, c.location_entity_id, s.status, c.created_at, c.generator_version
 		 FROM cases c JOIN case_states s USING (server_id, case_id)
 		 WHERE c.server_id = $1::uuid AND c.case_id = $2`, serverID, caseID,
-	).Scan(&result.ID, &result.CityID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt)
+	).Scan(&result.ID, &result.CityID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt, &generatorVersion)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return PublicCase{}, nil, ErrCaseNotFound
 	}
@@ -1346,6 +1363,12 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 	if err := rows.Err(); err != nil {
 		return PublicCase{}, nil, err
 	}
+	// V4 records and correspondence are discovered through NPC Bank, GATE, and
+	// Mail apps. Keep their associations out of the dossier so it cannot bypass
+	// the investigation flow. Legacy v3 cases retain their existing presentation.
+	if generatorVersion >= 4 {
+		return result, evidence, nil
+	}
 	activityRows, err := store.db.Query(ctx,
 		`SELECT record_id, record_data FROM case_activity_records
 		 WHERE server_id = $1::uuid AND case_id = $2 ORDER BY occurred_at, record_id`, serverID, caseID,
@@ -1369,6 +1392,12 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 		content := record.Description
 		if record.Source == "bank" {
 			kind, presentation = "bank", "FINANCIAL RECORD"
+			if record.Direction != "" {
+				content += " Direction: " + record.Direction + "."
+			}
+			if record.Reference != "" {
+				content += " Account reference: " + record.Reference + "."
+			}
 			if record.Amount > 0 {
 				content += fmt.Sprintf(" Amount: %d Credits.", record.Amount)
 			}
@@ -1872,9 +1901,15 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 			WHEN EXISTS (
 				SELECT 1 FROM case_activity_records a JOIN cases c USING(server_id,case_id)
 				WHERE a.server_id=$1::uuid AND a.case_id=$2 AND a.record_id=proof.item_id
-				  AND c.archetype_id='financial_extortion'
-				  AND a.internal_relation IN ('extortion_payment','precrime_route')
+				  AND ((a.source='bank' AND a.internal_relation='extortion_payment')
+				    OR (a.source='gate' AND a.internal_relation IN ('scene-victim','scene-killer'))
+				    OR (c.generator_version<4 AND c.archetype_id='financial_extortion' AND a.internal_relation IN ('extortion_payment','precrime_route')))
 			) THEN 1.0
+			WHEN EXISTS (
+				SELECT 1 FROM case_activity_records a
+				WHERE a.server_id=$1::uuid AND a.case_id=$2 AND a.record_id=proof.item_id
+				  AND a.source='gate' AND a.internal_relation IN ('affair-victim','affair-paramour')
+			) THEN 0.75
 			WHEN EXISTS (
 				SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
 				WHERE e.server_id=$1::uuid AND e.case_id=$2 AND e.evidence_id=proof.item_id
@@ -1889,10 +1924,10 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 				    OR (c.archetype_id='jealousy' AND e.evidence_type IN ('letter_fragment','witness_statement')))
 			) THEN 0.75
 			WHEN EXISTS (
-				SELECT 1 FROM case_mail_messages m
+				SELECT 1 FROM case_mail_messages m JOIN cases c USING(server_id,case_id)
 				WHERE m.server_id=$1::uuid AND m.case_id=$2 AND m.message_id=proof.item_id
-				  AND m.internal_relation IN ('anonymous_warning','anonymous_followup')
-			) THEN 0.25
+				  AND m.internal_relation IN ('anonymous_warning','anonymous_followup','killer_remorse','jealousy_exchange')
+			) THEN CASE WHEN EXISTS (SELECT 1 FROM cases WHERE server_id=$1::uuid AND case_id=$2 AND generator_version>=4) THEN 0.75 ELSE 0.25 END
 			ELSE 0.0
 		END),0)::float8
 		FROM unnest($3::text[]) AS proof(item_id)`, serverID, request.CaseID, request.ProofIDs).Scan(&totalProofs, &proofStrength); err != nil {

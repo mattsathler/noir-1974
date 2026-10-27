@@ -32,7 +32,7 @@
     },
     {
       "title": "Photostat of a letter",
-      "content": "A copied letter asks the victim to stop seeing someone. The signature is cut off in the copy.",
+      "content": "A copied letter asks the victim to stop seeing a colleague. It refers to the writer's spouse and warns that the affair must end. The signature is cut off in the copy.",
       "kind": "document"
     },
     {
@@ -44,7 +44,7 @@
   "victim": [
     {
       "title": "Private appointment note",
-      "content": "A note records an appointment the victim had tried to keep private. The other person's name has been torn away.",
+      "content": "A note records repeated private meetings with a colleague. The victim writes that their spouse has begun asking questions; the colleague's name has been torn away.",
       "kind": "paper"
     },
     {
@@ -124,6 +124,18 @@
     {
       "title": "Pressed flower envelope",
       "content": "A pressed violet is kept in an envelope marked 'Station garden, 6 October' in faded ink.",
+      "kind": "object"
+    }
+  ],
+  "paramour": [
+    {
+      "title": "Letters kept behind a drawer",
+      "content": "Two letters between this resident and a married colleague describe repeated private meetings and anxiety about the colleague's spouse discovering them.",
+      "kind": "paper"
+    },
+    {
+      "title": "Photograph with a pencilled date",
+      "content": "A photograph of this resident with a married colleague is dated the same evening as their GATE passages. A second copy has been hidden inside a book cover.",
       "kind": "object"
     }
   ]
