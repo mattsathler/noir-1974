@@ -23,7 +23,7 @@ O catálogo inicial cobre pelo menos:
 - **Usar o GATE:** ativação e confirmação da viagem, com assinatura sonora curta de transporte; a chegada só é sinalizada quando a transição for confirmada. Erros de destino e cancelamentos não usam o som de chegada.
 - **Hackear um computador:** início do acesso, atividade curta enquanto a ação aguarda ou processa e sinais distintos para acesso concedido, negado, interrompido ou falho. O áudio não pode indicar se um dado é pista, crime ou informação oculta.
 - **Dar BOOT em aplicativos:** ligar/inicializar o terminal e abrir ou fechar aplicativos com sons próprios, curtos e consistentes. Aplicativos diferentes podem compartilhar uma família de sons; não é necessário criar um efeito único para cada tela.
-- **Ações animadas do M15:** viagem, entrada/saída de locais, busca e apreensão e mandado de prisão recebem efeitos sincronizados com os estados visuais já existentes, sem antecipar destinos ou resultados.
+- **Transições visuais do M15:** a chegada pelo GATE e a cena de viagem entre bairros recebem efeitos sincronizados com os estados confirmados, sem antecipar destinos ou resultados. Ações policiais só entram no escopo de áudio quando suas animações forem especificadas.
 
 Outras interações podem reutilizar efeitos dessa biblioteca quando fizer sentido, mas não ampliam o escopo obrigatório sem revisão do milestone.
 
@@ -32,7 +32,7 @@ Outras interações podem reutilizar efeitos dessa biblioteca quando fizer senti
 - [ ] Existe uma biblioteca organizada de efeitos sonoros originais ou devidamente licenciados para as interações do escopo, com nomes, finalidade, estado correspondente e formato documentados.
 - [ ] A identidade sonora é coerente com o período, a ambientação investigativa e a direção de Noir 1974; não imita trilhas, efeitos ou marcas reconhecíveis de outra obra.
 - [ ] Telefonar, usar o GATE, hackear computador e dar BOOT/abrir aplicativos têm feedback sonoro identificável nos estados aplicáveis, incluindo falha e cancelamento quando relevantes.
-- [ ] Busca e apreensão, mandado de prisão e demais transições animadas do M15 têm áudio sincronizado com a confirmação e a progressão visual, sem anunciar sucesso antes da resposta autoritativa.
+- [ ] As transições do GATE e a cena de viagem entre bairros do M15 têm áudio sincronizado com a confirmação e a progressão visual, sem anunciar sucesso antes da resposta autoritativa.
 - [ ] Nenhum efeito sonoro revela classificação interna de pista, relação com crime, identidade do culpado, destino não confirmado ou qualquer dado oculto ao jogador.
 - [ ] A camada de áudio é acionada por eventos e estados explícitos da interface; re-renderizações, reabertura de componentes e respostas duplicadas não repetem efeitos acidentalmente.
 - [ ] Interações repetidas não acumulam sons, cortam sons críticos de confirmação ou geram reprodução contínua. Cada efeito tem duração limitada e comportamento definido para sobreposição e interrupção.

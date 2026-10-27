@@ -1,8 +1,8 @@
-# M16 — Auditoria integral de estabilidade e consistência pré-beta
+# M20 — Auditoria integral de estabilidade e consistência pré-beta
 
-**Ciclo:** 16
+**Ciclo:** 20
 **Status:** Não iniciado
-**Depende de:** M14 aceito e M15 aceito
+**Depende de:** M14, M15, M16, M17, M18 e M19 aceitos
 
 ## Objetivo
 
