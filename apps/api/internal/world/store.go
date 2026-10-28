@@ -404,8 +404,8 @@ func (store *PostgresStore) MaterializeCity(ctx context.Context, serverID, cityI
 		return nil
 	}
 	version := worldVersion
-	if version < GeneratorVersion5 {
-		version = GeneratorVersion5
+	if version < LatestGeneratorVersion {
+		version = LatestGeneratorVersion
 	}
 	tx, err := store.db.Begin(ctx)
 	if err != nil {
@@ -442,8 +442,8 @@ func (store *PostgresStore) cityGeneratorVersion(ctx context.Context, serverID, 
 	var version int
 	err := store.db.QueryRow(ctx, `SELECT generator_version FROM world_city_generators WHERE server_id=$1::uuid AND city_id=$2`, serverID, cityID).Scan(&version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		if fallback < GeneratorVersion5 {
-			return GeneratorVersion5, nil
+		if fallback < LatestGeneratorVersion {
+			return LatestGeneratorVersion, nil
 		}
 		return fallback, nil
 	}
@@ -451,6 +451,13 @@ func (store *PostgresStore) cityGeneratorVersion(ctx context.Context, serverID, 
 }
 
 func persistGeneratedCity(ctx context.Context, tx pgx.Tx, serverID string, generated World) error {
+	for _, npc := range generated.NPCs {
+		if generated.GeneratorVersion >= GeneratorVersion6 {
+			if npc.Visual == nil || ValidateVisualIdentityForPresentation(*npc.Visual, npc.Presentation) != nil {
+				return fmt.Errorf("persist NPC %q: %w", npc.ID, ErrInvalidVisualIdentity)
+			}
+		}
+	}
 	regionArgs := make([][]any, 0, len(generated.Regions))
 	for _, region := range generated.Regions {
 		regionArgs = append(regionArgs, []any{serverID, region.ID, optionalString(region.ParentID), region.Kind, region.Name})
@@ -931,8 +938,8 @@ func countryCityGeneratorVersion(city WorldCity, worldVersion int, cityVersions 
 	if version, ok := cityVersions[city.ID]; ok {
 		return version
 	}
-	if worldVersion < GeneratorVersion5 {
-		return GeneratorVersion5
+	if worldVersion < LatestGeneratorVersion {
+		return LatestGeneratorVersion
 	}
 	return worldVersion
 }

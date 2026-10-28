@@ -256,3 +256,81 @@ func TestGeneratorVersion4VisualSnapshotRemainsReconstructible(t *testing.T) {
 		t.Fatal("version 4 NPC changed when reconstructed from its generation key")
 	}
 }
+
+func TestGeneratorVersion6VisualCompatibilityAndDeterminism(t *testing.T) {
+	const seed = "i01-visual-compatibility"
+	first, err := Generate(seed, GeneratorVersion6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Generate(seed, GeneratorVersion6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.NPCs) != len(second.NPCs) {
+		t.Fatalf("NPC count differs: %d != %d", len(first.NPCs), len(second.NPCs))
+	}
+	for i, npc := range first.NPCs {
+		other := second.NPCs[i]
+		if npc.Presentation != PresentationMasculine && npc.Presentation != PresentationFeminine {
+			t.Fatalf("NPC %q has invalid presentation %q", npc.ID, npc.Presentation)
+		}
+		if npc.Visual == nil || ValidateVisualIdentityForPresentation(*npc.Visual, npc.Presentation) != nil {
+			t.Fatalf("NPC %q has incompatible visual identity: %+v", npc.ID, npc.Visual)
+		}
+		if npc.Presentation != other.Presentation || !reflect.DeepEqual(npc.Visual, other.Visual) || npc.Appearance != other.Appearance {
+			t.Fatalf("NPC %q changed appearance for the same seed and version", npc.ID)
+		}
+		if npc.Appearance != generatedAppearanceDescription(*npc.Visual) {
+			t.Fatalf("NPC %q description does not match its visual identity", npc.ID)
+		}
+		rebuilt, err := GenerateNPC(seed, GeneratorVersion6, npc.GenerationKey)
+		if err != nil {
+			t.Fatalf("rebuild NPC %q: %v", npc.ID, err)
+		}
+		if rebuilt.Presentation != npc.Presentation || !reflect.DeepEqual(rebuilt.Visual, npc.Visual) || rebuilt.Appearance != npc.Appearance {
+			t.Fatalf("NPC %q changed appearance during reconstruction", npc.ID)
+		}
+	}
+}
+
+func TestVisualCatalogDeclaresCompatibilityAndRejectsIncompatibleBeard(t *testing.T) {
+	catalog := VisualIdentityCatalog()
+	for layer, ids := range map[string][]string{
+		"accessories": catalog.Accessories, "beard": catalog.Beard, "eyes": catalog.Eyes,
+		"face": catalog.Face, "hair": catalog.Hair, "skin": catalog.Skin,
+	} {
+		var declared map[string][]VisualPresentation
+		switch layer {
+		case "accessories":
+			declared = catalog.Compatibility.Accessories
+		case "beard":
+			declared = catalog.Compatibility.Beard
+		case "eyes":
+			declared = catalog.Compatibility.Eyes
+		case "face":
+			declared = catalog.Compatibility.Face
+		case "hair":
+			declared = catalog.Compatibility.Hair
+		case "skin":
+			declared = catalog.Compatibility.Skin
+		}
+		for _, id := range ids {
+			if len(declared[id]) == 0 {
+				t.Fatalf("%s piece %q has no compatibility metadata", layer, id)
+			}
+		}
+	}
+	identity := DefaultVisualIdentity()
+	identity.BeardID = "beard_moustache_black"
+	if ValidateVisualIdentityForPresentation(identity, PresentationMasculine) != nil {
+		t.Fatal("masculine presentation should allow a catalogued beard")
+	}
+	if ValidateVisualIdentityForPresentation(identity, PresentationFeminine) == nil {
+		t.Fatal("feminine presentation should reject a masculine-only beard")
+	}
+	identity.BeardID = ""
+	if ValidateVisualIdentityForPresentation(identity, PresentationFeminine) != nil {
+		t.Fatal("feminine presentation should accept a composition without a beard")
+	}
+}

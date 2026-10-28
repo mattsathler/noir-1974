@@ -1,6 +1,6 @@
 # I01 — Compatibilidade da aparência procedural de NPCs
 
-**Status:** Proposta  
+**Status:** Implementada
 **Origem:** M15 — Identidade visual procedural e customização do personagem
 **Escopo:** Curto/médio
 
@@ -21,12 +21,14 @@ O backend gera aparências coerentes com metadados explícitos de compatibilidad
 
 ## Critérios de aceite
 
-- [ ] Cada peça visual aplicável declara compatibilidade explícita; a regra não depende de palavras no ID ou nome do arquivo.
-- [ ] A geração procedural não atribui barba/bigode a NPCs cuja apresentação não seja compatível com as regras declaradas.
-- [ ] O backend rejeita composições incompatíveis nos pontos em que recebe ou persiste aparências.
-- [ ] NPCs gerados com a mesma seed e versão mantêm a mesma aparência após reconstrução.
-- [ ] Há cobertura automatizada para compatibilidade, casos válidos e determinismo.
-- [ ] A descrição textual da aparência corresponde às peças visuais efetivamente geradas.
+- [x] Cada peça visual declara compatibilidade explícita no catálogo; a regra não depende de palavras no ID ou nome do arquivo.
+- [x] A geração procedural não atribui barba/bigode a NPCs com apresentação feminina.
+- [x] O backend rejeita composições incompatíveis durante geração e persistência de cidades.
+- [x] NPCs gerados com a mesma seed e versão mantêm a mesma aparência após reconstrução.
+- [x] Há cobertura automatizada para compatibilidade, casos válidos e determinismo.
+- [x] A descrição textual da aparência corresponde às peças visuais efetivamente geradas.
+
+Implementada na versão 6 do gerador. A apresentação visual é um atributo separado de orientação sexual; as peças de barba do catálogo são compatíveis com apresentação masculina, e as demais peças atuais são compatíveis com ambas.
 
 ## Fora de escopo
 

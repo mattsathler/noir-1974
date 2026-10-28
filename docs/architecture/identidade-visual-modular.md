@@ -4,7 +4,7 @@ Personagens são representados somente pelo rosto, em sprites pixel art transpar
 
 ## Identidade e catálogo
 
-`GET /api/character-visuals` retorna listas `accessories`, `beard`, `eyes`, `face`, `hair` e `skin`. A identidade usa este formato:
+`GET /api/character-visuals` retorna listas `accessories`, `beard`, `eyes`, `face`, `hair` e `skin`, além do mapa `compatibility` que declara as apresentações aceitas para cada ID. A identidade usa este formato:
 
 ```json
 {
@@ -27,4 +27,4 @@ O gerador `scripts/generate_character_color_variants.mjs` lê a luminosidade da 
 
 ## NPCs
 
-NPCs das versões 4 e 5 recebem aparência determinística e enviam as seis categorias em `npc.visual`; a descrição textual é derivada dos mesmos IDs. A versão 4 conserva sua seleção histórica para reconstrução. A versão 5 usa um fluxo visual próprio e calibra cor e estilo do cabelo por idade: não gera grisalho abaixo dos 40 anos e só seleciona calvície ou laterais ralas a partir dos 45. Cortes fora do catálogo de NPCs não são sorteados. Todos no mesmo servidor veem a mesma identidade e o backend não envia arquivos de arte.
+NPCs das versões 4, 5 e 6 recebem aparência determinística e enviam as seis categorias em `npc.visual`; a descrição textual é derivada dos mesmos IDs. A versão 4 conserva sua seleção histórica para reconstrução. A versão 5 usa um fluxo visual próprio e calibra cor e estilo do cabelo por idade. A versão 6 acrescenta `npc.presentation` (`masculine` ou `feminine`), validada separadamente de qualquer orientação sexual; hoje, cada peça de barba declara compatibilidade masculina, enquanto as demais peças aceitam ambas as apresentações. NPCs da versão 6 não recebem barba com apresentação feminina. Versões antigas conservam suas aparências históricas. Todos no mesmo servidor veem a mesma identidade e o backend não envia arquivos de arte.

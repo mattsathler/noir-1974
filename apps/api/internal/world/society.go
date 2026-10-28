@@ -19,17 +19,18 @@ var ErrInvalidGenerationKey = errors.New("invalid generated entity key")
 var personNameOrderCache sync.Map
 
 type NPC struct {
-	ID              string          `json:"id"`
-	GenerationKey   string          `json:"generationKey"`
-	RegionID        string          `json:"regionId"`
-	Name            string          `json:"name"`
-	Age             int             `json:"age"`
-	Appearance      string          `json:"appearance"`
-	Visual          *VisualIdentity `json:"visual,omitempty"`
-	Personality     string          `json:"personality"`
-	Status          string          `json:"status"`
-	StatusChangedAt time.Time       `json:"-"`
-	MaritalStatus   string          `json:"-"`
+	ID              string             `json:"id"`
+	GenerationKey   string             `json:"generationKey"`
+	RegionID        string             `json:"regionId"`
+	Name            string             `json:"name"`
+	Age             int                `json:"age"`
+	Appearance      string             `json:"appearance"`
+	Visual          *VisualIdentity    `json:"visual,omitempty"`
+	Presentation    VisualPresentation `json:"presentation,omitempty"`
+	Personality     string             `json:"personality"`
+	Status          string             `json:"status"`
+	StatusChangedAt time.Time          `json:"-"`
+	MaritalStatus   string             `json:"-"`
 }
 
 type Company struct {
@@ -132,7 +133,7 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 			return NPC{}, ErrInvalidGenerationKey
 		}
 		districtSlug, slotPart = parts[4], parts[6]
-	case GeneratorVersion3, GeneratorVersion4, GeneratorVersion5:
+	case GeneratorVersion3, GeneratorVersion4, GeneratorVersion5, GeneratorVersion6:
 		if len(parts) != 8 || parts[2] != "people" || parts[4] != "district" || parts[6] != "person" {
 			return NPC{}, ErrInvalidGenerationKey
 		}
@@ -195,7 +196,11 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 		name.first += " " + middle
 	}
 	regionID := cityID + "/district/" + districtSlug
-	return npcFor(citySeed, version, regionID, generationKey, name), nil
+	npc := npcFor(citySeed, version, regionID, generationKey, name)
+	if version >= GeneratorVersion6 && (npc.Visual == nil || ValidateVisualIdentityForPresentation(*npc.Visual, npc.Presentation) != nil) {
+		return NPC{}, ErrInvalidVisualIdentity
+	}
+	return npc, nil
 }
 
 // GenerateNPCFromKey chooses the city generator version embedded in a modern
@@ -206,7 +211,7 @@ func GenerateNPCFromKey(seed string, fallbackVersion int, generationKey string) 
 		cityID := parts[0] + "/" + parts[1]
 		if city, ok := CityByID(cityID); ok && city.ID != "fr/lyon" {
 			citySeed := CitySeed(seed, city.ID)
-			for version := GeneratorVersion5; version >= GeneratorVersion3; version-- {
+			for version := LatestGeneratorVersion; version >= GeneratorVersion3; version-- {
 				if parts[3] == seedFingerprint(citySeed, version) {
 					return GenerateNPC(seed, version, generationKey)
 				}
@@ -310,7 +315,7 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 			return Company{}, ErrInvalidGenerationKey
 		}
 		districtSlug = parts[4]
-	case GeneratorVersion3, GeneratorVersion4, GeneratorVersion5:
+	case GeneratorVersion3, GeneratorVersion4, GeneratorVersion5, GeneratorVersion6:
 		if len(parts) != 7 || parts[2] != "companies" || parts[4] != "district" || parts[6] != "company" {
 			return Company{}, ErrInvalidGenerationKey
 		}
@@ -362,7 +367,7 @@ func GenerateCompanyFromKey(seed string, fallbackVersion int, generationKey stri
 		cityID := parts[0] + "/" + parts[1]
 		if city, ok := CityByID(cityID); ok && city.ID != "fr/lyon" {
 			citySeed := CitySeed(seed, city.ID)
-			for version := GeneratorVersion5; version >= GeneratorVersion3; version-- {
+			for version := LatestGeneratorVersion; version >= GeneratorVersion3; version-- {
 				if parts[3] == seedFingerprint(citySeed, version) {
 					return GenerateCompany(seed, version, generationKey)
 				}
@@ -496,14 +501,22 @@ func npcFor(seed string, version int, regionID, generationKey string, name perso
 		MaritalStatus: maritalStatus,
 	}
 	if version >= GeneratorVersion4 {
-		visual := visualIdentityForNPC(seed, version, generationKey, npc.Age)
+		if version >= GeneratorVersion6 {
+			presentationStream := newStream(seed, version, "npc/presentation/"+generationKey)
+			if presentationStream.intn(2) == 0 {
+				npc.Presentation = PresentationMasculine
+			} else {
+				npc.Presentation = PresentationFeminine
+			}
+		}
+		visual := visualIdentityForNPC(seed, version, generationKey, npc.Age, npc.Presentation)
 		npc.Visual = &visual
 		npc.Appearance = generatedAppearanceDescription(visual)
 	}
 	return npc
 }
 
-func visualIdentityForNPC(seed string, version int, generationKey string, age int) VisualIdentity {
+func visualIdentityForNPC(seed string, version int, generationKey string, age int, presentation VisualPresentation) VisualIdentity {
 	if version == GeneratorVersion4 {
 		return legacyVisualIdentityForNPC(seed, generationKey)
 	}
@@ -515,7 +528,12 @@ func visualIdentityForNPC(seed string, version int, generationKey string, age in
 		EyesID:       eyeLayerIDs[stream.intn(len(eyeLayerIDs))],
 		AccessoryIDs: []string{},
 	}
-	if stream.intn(4) == 0 {
+	if version < GeneratorVersion6 {
+		if stream.intn(4) == 0 {
+			styles := []string{"moustache", "mutton", "soul_patch", "goatee", "full"}
+			identity.BeardID = "beard_" + styles[stream.intn(len(styles))] + "_" + hairTone(identity.HairID)
+		}
+	} else if presentation == PresentationMasculine && stream.intn(4) == 0 {
 		styles := []string{"moustache", "mutton", "soul_patch", "goatee", "full"}
 		identity.BeardID = "beard_" + styles[stream.intn(len(styles))] + "_" + hairTone(identity.HairID)
 	}
@@ -713,7 +731,7 @@ func personNamesForVersion(version int, countrySlug, citySlug string) ([]personN
 	if version == GeneratorVersion2 {
 		return allPersonNames(), nil
 	}
-	if version != GeneratorVersion3 && version != GeneratorVersion4 && version != GeneratorVersion5 {
+	if version != GeneratorVersion3 && version != GeneratorVersion4 && version != GeneratorVersion5 && version != GeneratorVersion6 {
 		return nil, ErrUnsupportedGeneratorVersion
 	}
 	catalog, ok := names.ForCity(countrySlug, citySlug)
@@ -737,7 +755,7 @@ func personNameScope(version int, countrySlug, citySlug string) string {
 }
 
 func selectedDistricts(seed string, version int) []namedPlace {
-	if version == GeneratorVersion5 {
+	if version >= GeneratorVersion5 {
 		catalog, ok := names.ForCity("fr", "lyon")
 		if !ok || len(catalog.DistrictPrefixes)*len(catalog.DistrictSuffixes) < 20 {
 			return nil

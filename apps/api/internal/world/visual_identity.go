@@ -4,6 +4,22 @@ import "errors"
 
 var ErrInvalidVisualIdentity = errors.New("invalid modular visual identity")
 
+type VisualPresentation string
+
+const (
+	PresentationMasculine VisualPresentation = "masculine"
+	PresentationFeminine  VisualPresentation = "feminine"
+)
+
+type VisualLayerCompatibility struct {
+	Accessories map[string][]VisualPresentation `json:"accessories"`
+	Beard       map[string][]VisualPresentation `json:"beard"`
+	Eyes        map[string][]VisualPresentation `json:"eyes"`
+	Face        map[string][]VisualPresentation `json:"face"`
+	Hair        map[string][]VisualPresentation `json:"hair"`
+	Skin        map[string][]VisualPresentation `json:"skin"`
+}
+
 // VisualIdentity stores the six sprite-layer categories selected for a character.
 type VisualIdentity struct {
 	HairID       string   `json:"hairId"`
@@ -15,12 +31,13 @@ type VisualIdentity struct {
 }
 
 type VisualIdentityOptions struct {
-	Accessories []string `json:"accessories"`
-	Beard       []string `json:"beard"`
-	Eyes        []string `json:"eyes"`
-	Face        []string `json:"face"`
-	Hair        []string `json:"hair"`
-	Skin        []string `json:"skin"`
+	Compatibility VisualLayerCompatibility `json:"compatibility"`
+	Accessories   []string                 `json:"accessories"`
+	Beard         []string                 `json:"beard"`
+	Eyes          []string                 `json:"eyes"`
+	Face          []string                 `json:"face"`
+	Hair          []string                 `json:"hair"`
+	Skin          []string                 `json:"skin"`
 }
 
 func DefaultVisualIdentity() VisualIdentity {
@@ -57,7 +74,23 @@ var accessoryLayerIDs = []string{
 }
 
 func VisualIdentityCatalog() VisualIdentityOptions {
+	compatible := func(ids []string) map[string][]VisualPresentation {
+		result := make(map[string][]VisualPresentation, len(ids))
+		for _, id := range ids {
+			result[id] = []VisualPresentation{PresentationMasculine, PresentationFeminine}
+		}
+		return result
+	}
+	beardCompatibility := make(map[string][]VisualPresentation, len(beardLayerIDs))
+	for _, id := range beardLayerIDs {
+		beardCompatibility[id] = []VisualPresentation{PresentationMasculine}
+	}
 	return VisualIdentityOptions{
+		Compatibility: VisualLayerCompatibility{
+			Accessories: compatible(accessoryLayerIDs), Beard: beardCompatibility,
+			Eyes: compatible(eyeLayerIDs), Face: compatible(faceLayerIDs),
+			Hair: compatible(hairLayerIDs), Skin: compatible(skinLayerIDs),
+		},
 		Accessories: append([]string(nil), accessoryLayerIDs...),
 		Beard:       append([]string(nil), beardLayerIDs...),
 		Eyes:        append([]string(nil), eyeLayerIDs...),
@@ -77,6 +110,51 @@ func ValidateVisualIdentity(identity VisualIdentity) error {
 		return ErrInvalidVisualIdentity
 	}
 	return nil
+}
+
+// ValidateVisualIdentityForPresentation checks catalog membership and the
+// compatibility declared for the selected presentation.
+func ValidateVisualIdentityForPresentation(identity VisualIdentity, presentation VisualPresentation) error {
+	if presentation != PresentationMasculine && presentation != PresentationFeminine {
+		return ErrInvalidVisualIdentity
+	}
+	if err := ValidateVisualIdentity(identity); err != nil {
+		return err
+	}
+	compatibility := VisualIdentityCatalog().Compatibility
+	for _, layer := range []struct {
+		id       string
+		declared map[string][]VisualPresentation
+		optional bool
+	}{
+		{identity.HairID, compatibility.Hair, false},
+		{identity.SkinID, compatibility.Skin, false},
+		{identity.EyesID, compatibility.Eyes, false},
+		{identity.FaceID, compatibility.Face, true},
+		{identity.BeardID, compatibility.Beard, true},
+	} {
+		if layer.optional && layer.id == "" {
+			continue
+		}
+		if !allowsPresentation(layer.declared[layer.id], presentation) {
+			return ErrInvalidVisualIdentity
+		}
+	}
+	for _, id := range identity.AccessoryIDs {
+		if !allowsPresentation(compatibility.Accessories[id], presentation) {
+			return ErrInvalidVisualIdentity
+		}
+	}
+	return nil
+}
+
+func allowsPresentation(allowed []VisualPresentation, presentation VisualPresentation) bool {
+	for _, candidate := range allowed {
+		if candidate == presentation {
+			return true
+		}
+	}
+	return false
 }
 
 func validateLayerList(selected, allowed []string, limit int) bool {

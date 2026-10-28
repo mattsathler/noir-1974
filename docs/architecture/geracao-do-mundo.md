@@ -74,6 +74,10 @@ A versão `5` preserva a identidade modular da versão 4, cria 20 bairros e ampl
 
 A geração visual da versão 5 também calibra cabelos por idade: NPCs abaixo de 40 anos não recebem cabelo grisalho; a chance aumenta gradualmente nas faixas seguintes. Calvície e cabelos ralos nas laterais só são selecionados a partir dos 45 anos. Cortes ausentes do catálogo de NPCs, como maria-chiquinha, não podem ser gerados. A versão 4 mantém sua saída histórica; novos mundos usam a versão 5.
 
+## Versão 6 — compatibilidade da aparência de NPCs
+
+A versão `6` preserva o mundo e as regras visuais da versão 5 e declara a apresentação visual de cada NPC (`masculine` ou `feminine`) em um fluxo determinístico próprio. Essa apresentação descreve a compatibilidade convencional das peças, não a orientação sexual do personagem. O catálogo declara compatibilidade por ID: barba é compatível com apresentação masculina; as demais peças atuais são compatíveis com ambas. A geração e a persistência rejeitam composições incompatíveis, e a descrição textual continua sendo derivada das peças selecionadas. Versões `1` a `5` permanecem reconstruíveis sem alteração.
+
 ## M11 — catálogo e viagem para bairros
 
 O catálogo geográfico fixo e versionado associa cada cidade canônica a um país e fuso horário. O GATE apresenta países, cidades e bairros em sequência, e valida o bairro escolhido dentro da cidade selecionada. A viagem persiste apenas a cidade; o bairro de chegada fica como contexto transitório da sessão.
