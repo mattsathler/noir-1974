@@ -164,23 +164,41 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 	for _, npc := range local.NPCs {
 		npcNames[npc.ID] = npc.Name
 	}
-	lead := Article{ID: "city-desk-" + cityID + "-" + dateKey, Section: "CITY DESK", Headline: "A quiet day for the city police", Summary: fmt.Sprintf("No newly discovered bodies have been reported in %s. Local authorities remain on duty.", city)}
+	lead := Article{ID: "city-desk-" + cityID + "-" + dateKey, Section: "CITY DESK", Headline: "A quiet day for the city police", Summary: fmt.Sprintf("There are no current homicide inquiries or new arrests in %s. Local authorities remain on duty.", city)}
 	articles := makeLightStories(local, serverID+"/"+cityID, dateKey)
-	foundCaseIDs := make(map[string]bool)
+	var discoveries []cases.PublicBodyDiscovery
 	if reader, ok := service.cases.(bodyDiscoveryReader); ok {
-		discoveries, err := reader.ListPublicBodyDiscoveries(ctx, serverID, cityID, serverTime)
+		discoveries, err = reader.ListPublicBodyDiscoveries(ctx, serverID, cityID, serverTime)
 		if err != nil {
 			return Issue{}, fmt.Errorf("query discovered bodies for city %s: %w", cityID, err)
 		}
-		if len(discoveries) > 0 {
-			lead = bodyDiscoveryArticle(discoveries[0], location)
-			foundCaseIDs[discoveries[0].CaseID] = true
-			bodyArticles := make([]Article, 0, len(discoveries)-1)
-			for _, discovery := range discoveries[1:] {
-				bodyArticles = append(bodyArticles, bodyDiscoveryArticle(discovery, location))
-				foundCaseIDs[discovery.CaseID] = true
+		bodyArticles := make([]Article, 0, len(discoveries))
+		openDiscoveries := make([]cases.PublicBodyDiscovery, 0, len(discoveries))
+		for _, discovery := range discoveries {
+			if discovery.Status != "open" {
+				continue
 			}
-			articles = append(bodyArticles, articles...)
+			openDiscoveries = append(openDiscoveries, discovery)
+			bodyArticles = append(bodyArticles, bodyDiscoveryArticle(discovery))
+		}
+		discoveries = openDiscoveries
+		articles = append(bodyArticles, articles...)
+	}
+	activeCase, activeErr := service.cases.LatestPublicCase(ctx, serverID, cityID)
+	if activeErr != nil && !errors.Is(activeErr, cases.ErrCaseNotFound) {
+		return Issue{}, fmt.Errorf("query current city case: %w", activeErr)
+	}
+	hasCurrentCaseLead := false
+	if activeErr == nil && activeCase.Status == "open" {
+		if name, found := npcNames[activeCase.VictimID]; found {
+			lead = Article{ID: activeCase.ID + "-current", Section: "CITY POLICE", Headline: fmt.Sprintf("Police continue inquiry into the death of %s", name), Summary: fmt.Sprintf("The homicide inquiry concerning %s remains open. Authorities continue to investigate.", name), CaseID: activeCase.ID}
+			hasCurrentCaseLead = true
+			for _, discovery := range discoveries {
+				if discovery.CaseID == activeCase.ID {
+					lead = bodyDiscoveryArticle(discovery)
+					break
+				}
+			}
 		}
 	}
 	if reader, ok := service.cases.(arrestReader); ok {
@@ -188,11 +206,26 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 		if err != nil && !errors.Is(err, cases.ErrCaseNotFound) {
 			return Issue{}, fmt.Errorf("query city arrest notice: %w", err)
 		}
-		if err == nil && foundCaseIDs[arrest.ID] {
+		if err == nil {
 			if name, found := npcNames[arrest.VictimID]; found {
-				articles = append([]Article{{ID: arrest.ID + "-arrest", Section: "CITY POLICE", Headline: fmt.Sprintf("Police announce arrest in the death of %s", name), Summary: fmt.Sprintf("A suspect has been taken into custody in the homicide inquiry concerning %s. The corporate review has concluded.", name), CaseID: arrest.ID}}, articles...)
+				arrestArticle := Article{ID: arrest.ID + "-arrest", Section: "CITY POLICE", Headline: fmt.Sprintf("Police announce arrest in the death of %s", name), Summary: fmt.Sprintf("A suspect has been taken into custody in the homicide inquiry concerning %s. The corporate review has concluded.", name), CaseID: arrest.ID}
+				if hasCurrentCaseLead {
+					articles = append([]Article{arrestArticle}, articles...)
+				} else {
+					lead = arrestArticle
+				}
 			}
 		}
+	}
+	filteredArticles := articles[:0]
+	for _, article := range articles {
+		if article.ID != lead.ID {
+			filteredArticles = append(filteredArticles, article)
+		}
+	}
+	articles = filteredArticles
+	if len(articles) > 6 {
+		articles = articles[:6]
 	}
 	return Issue{
 		Publication: fmt.Sprintf("THE %s GAZETTE", city),
@@ -204,17 +237,17 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 	}, nil
 }
 
-func bodyDiscoveryArticle(discovery cases.PublicBodyDiscovery, location *time.Location) Article {
+func bodyDiscoveryArticle(discovery cases.PublicBodyDiscovery) Article {
 	place := discovery.LocationName
 	if discovery.DistrictName != "" {
 		place += ", " + discovery.DistrictName
 	}
-	localTime := discovery.FoundAt.In(location).Format("Monday, January 2 at 3:04 PM")
 	return Article{
 		ID:       "body-found-" + discovery.CaseID,
 		Section:  "BODY FOUND",
 		Headline: fmt.Sprintf("Body of %s discovered in %s", discovery.VictimName, place),
-		Summary:  fmt.Sprintf("Authorities reported finding %s at %s. The discovery was recorded %s; the circumstances remain under investigation.", discovery.VictimName, place, localTime),
+		Summary:  fmt.Sprintf("Authorities reported finding %s at %s. The circumstances remain under investigation.", discovery.VictimName, place),
+		CaseID:   discovery.CaseID,
 	}
 }
 

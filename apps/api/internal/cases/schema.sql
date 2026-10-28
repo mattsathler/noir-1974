@@ -210,15 +210,23 @@ CREATE TABLE IF NOT EXISTS player_inbox_messages (
     message_id text NOT NULL CHECK (message_id <> ''),
     warrant_id text,
     sent_at timestamptz NOT NULL DEFAULT now(),
+    sender text NOT NULL DEFAULT 'BILL BOUER',
+    message_category text NOT NULL DEFAULT 'official' CHECK (message_category IN ('official','spam')),
     subject text NOT NULL CHECK (subject <> ''),
     body text NOT NULL,
     attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
+    deleted_at timestamptz,
     PRIMARY KEY (server_id, account_id, message_id),
     FOREIGN KEY (server_id, account_id, warrant_id)
         REFERENCES player_search_warrants(server_id, account_id, warrant_id) ON DELETE CASCADE
 );
+ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS sender text NOT NULL DEFAULT 'BILL BOUER';
+ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS message_category text NOT NULL DEFAULT 'official';
+ALTER TABLE player_inbox_messages DROP CONSTRAINT IF EXISTS player_inbox_messages_message_category_check;
+ALTER TABLE player_inbox_messages ADD CONSTRAINT player_inbox_messages_message_category_check CHECK (message_category IN ('official','spam'));
+ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 CREATE INDEX IF NOT EXISTS player_inbox_messages_by_date_idx
-    ON player_inbox_messages(server_id, account_id, sent_at DESC);
+    ON player_inbox_messages(server_id, account_id, sent_at DESC) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS player_case_accusations (
     server_id uuid NOT NULL,

@@ -155,6 +155,10 @@ type ResidentialSearchReader interface {
 	ListPlayerMail(context.Context, string, string) ([]cases.PlayerMailMessage, error)
 }
 
+type PlayerMailDeleteReader interface {
+	DeletePlayerMail(context.Context, string, string, string) error
+}
+
 type HospitalRecordsReader interface {
 	SearchHospitalPatients(context.Context, string, string, string) ([]cases.HospitalPatient, []cases.DiscoveredItem, error)
 }
@@ -268,6 +272,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		if _, ok := caseReader.(ResidentialSearchReader); ok {
 			mux.HandleFunc("POST /api/police/warrants", handler.requestResidentialSearch)
 			mux.HandleFunc("GET /api/player/emails", handler.playerEmails)
+		}
+		if _, ok := caseReader.(PlayerMailDeleteReader); ok {
+			mux.HandleFunc("DELETE /api/player/emails/{messageID}", handler.deletePlayerEmail)
 		}
 		if _, ok := caseReader.(LocalAccessAttemptReader); ok {
 			mux.HandleFunc("POST /api/facilities/access", handler.requestLocalAccess)
@@ -459,6 +466,27 @@ func (h *Handler) playerEmails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": messages})
+}
+
+func (h *Handler) deletePlayerEmail(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.caseReader.(PlayerMailDeleteReader)
+	if !ok {
+		http.Error(w, "personal mailbox unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if err := reader.DeletePlayerMail(r.Context(), h.worldServerID, current.ID, r.PathValue("messageID")); err != nil {
+		if errors.Is(err, cases.ErrPlayerMailNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		h.writeAPIError(w, r, http.StatusInternalServerError, "PLAYER_EMAIL_DELETE_FAILED", "could not delete personal mail", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func apiErrorMiddleware(next http.Handler) http.Handler {

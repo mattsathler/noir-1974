@@ -35,6 +35,7 @@ var (
 	ErrInvalidLocalAccess    = errors.New("invalid local access result")
 	ErrInvalidWhiteboardNote = errors.New("invalid whiteboard note")
 	ErrEvidenceNotFound      = errors.New("case evidence not found")
+	ErrPlayerMailNotFound    = errors.New("personal email not found")
 	ErrPersistedConflict     = errors.New("persisted case does not match generated definition")
 )
 
@@ -106,6 +107,8 @@ type PlayerMailAttachment struct {
 type PlayerMailMessage struct {
 	ID          string                 `json:"id"`
 	SentAt      time.Time              `json:"sentAt"`
+	Sender      string                 `json:"sender"`
+	Category    string                 `json:"category"`
 	Subject     string                 `json:"subject"`
 	Body        string                 `json:"body"`
 	Attachments []PlayerMailAttachment `json:"attachments"`
@@ -193,6 +196,7 @@ type CrimeReportDigest struct {
 
 type PublicBodyDiscovery struct {
 	CaseID       string    `json:"caseId"`
+	Status       string    `json:"status"`
 	VictimName   string    `json:"victimName"`
 	LocationName string    `json:"locationName"`
 	DistrictName string    `json:"districtName"`
@@ -1039,8 +1043,11 @@ func makeResidentialAttachment(warrantID string, index int, finding residentialF
 }
 
 func (store *PostgresStore) ListPlayerMail(ctx context.Context, serverID, accountID string) ([]PlayerMailMessage, error) {
-	rows, err := store.db.Query(ctx, `SELECT message_id,sent_at,subject,body,attachments FROM player_inbox_messages
-		WHERE server_id=$1::uuid AND account_id=$2::uuid ORDER BY sent_at DESC,message_id DESC`, serverID, accountID)
+	if err := store.ensureSampleSpam(ctx, serverID, accountID); err != nil {
+		return nil, fmt.Errorf("prepare junk mail: %w", err)
+	}
+	rows, err := store.db.Query(ctx, `SELECT message_id,sent_at,sender,message_category,subject,body,attachments FROM player_inbox_messages
+		WHERE server_id=$1::uuid AND account_id=$2::uuid AND deleted_at IS NULL ORDER BY sent_at DESC,message_id DESC`, serverID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -1049,7 +1056,7 @@ func (store *PostgresStore) ListPlayerMail(ctx context.Context, serverID, accoun
 	for rows.Next() {
 		var message PlayerMailMessage
 		var attachments []byte
-		if err := rows.Scan(&message.ID, &message.SentAt, &message.Subject, &message.Body, &attachments); err != nil {
+		if err := rows.Scan(&message.ID, &message.SentAt, &message.Sender, &message.Category, &message.Subject, &message.Body, &attachments); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(attachments, &message.Attachments); err != nil {
@@ -1058,6 +1065,40 @@ func (store *PostgresStore) ListPlayerMail(ctx context.Context, serverID, accoun
 		messages = append(messages, message)
 	}
 	return messages, rows.Err()
+}
+
+func (store *PostgresStore) ensureSampleSpam(ctx context.Context, serverID, accountID string) error {
+	stamp := time.Now().UTC()
+	spam := []struct {
+		sender, subject, body string
+	}{
+		{"Royal Pigeon Mutual", "Your complimentary pigeon is waiting", "Dear resident, your complimentary pigeon has been reserved. Please send three crumbs to confirm delivery. The bird has already declined to carry this notice, so we are sending it by post."},
+		{"The Clock Recovery Bureau", "The town clock owes you eleven minutes", "Our patented clock audit found that the town clock may owe you eleven minutes, subject to the railway's objection. Reply with your preferred minute. We cannot guarantee it will be the correct one."},
+		{"Café des Écoles Spoon Committee", "A teaspoon has selected you for a survey", "One teaspoon would like to ask whether the drawer is too small. A second teaspoon denies any complaint. A third has gone missing and is therefore unavailable for comment. A modest fee secures the full report."},
+	}
+	values := make([]string, 0, len(spam))
+	args := []any{serverID, accountID}
+	for index, message := range spam {
+		first := len(args) + 1
+		values = append(values, fmt.Sprintf("($1::uuid,$2::uuid,$%d,$%d,$%d,'spam',$%d,$%d,'[]'::jsonb)", first, first+1, first+2, first+3, first+4))
+		args = append(args, fmt.Sprintf("spam:circular:%02d", index+1), stamp.Add(-time.Duration(index)*24*time.Hour), message.sender, message.subject, message.body)
+	}
+	_, err := store.db.Exec(ctx, `INSERT INTO player_inbox_messages
+		(server_id,account_id,message_id,sent_at,sender,message_category,subject,body,attachments) VALUES `+strings.Join(values, ",")+
+		` ON CONFLICT(server_id,account_id,message_id) DO NOTHING`, args...)
+	return err
+}
+
+func (store *PostgresStore) DeletePlayerMail(ctx context.Context, serverID, accountID, messageID string) error {
+	result, err := store.db.Exec(ctx, `UPDATE player_inbox_messages SET deleted_at=now()
+		WHERE server_id=$1::uuid AND account_id=$2::uuid AND message_id=$3 AND deleted_at IS NULL`, serverID, accountID, messageID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrPlayerMailNotFound
+	}
+	return nil
 }
 
 // Create persists a compact case definition and its relationships and evidence references.
@@ -1314,13 +1355,13 @@ func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID strin
 	return result, rows.Err()
 }
 
-// LatestPublicCase returns the newest case without disclosing its killer.
+// LatestPublicCase returns the newest active case without disclosing its killer.
 func (store *PostgresStore) LatestPublicCase(ctx context.Context, serverID, cityID string) (PublicCase, error) {
 	var result PublicCase
 	err := store.db.QueryRow(ctx,
 		`SELECT c.case_id, c.city_id, c.case_type, c.victim_entity_id, c.location_entity_id, s.status, c.created_at
 		 FROM cases c JOIN case_states s USING (server_id, case_id)
-		 WHERE c.server_id = $1::uuid AND c.city_id = $2 ORDER BY c.created_at DESC, c.case_id DESC LIMIT 1`, serverID, cityID,
+		 WHERE c.server_id = $1::uuid AND c.city_id = $2 AND s.status='open' ORDER BY c.created_at DESC, c.case_id DESC LIMIT 1`, serverID, cityID,
 	).Scan(&result.ID, &result.CityID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return PublicCase{}, ErrCaseNotFound
@@ -1330,7 +1371,7 @@ func (store *PostgresStore) LatestPublicCase(ctx context.Context, serverID, city
 
 func (store *PostgresStore) LatestPublicArrest(ctx context.Context, serverID, cityID string) (PublicCase, error) {
 	var result PublicCase
-	err := store.db.QueryRow(ctx, `SELECT c.case_id,c.city_id,c.case_type,c.victim_entity_id,c.location_entity_id,s.status,c.created_at
+	err := store.db.QueryRow(ctx, `SELECT c.case_id,c.city_id,c.case_type,c.victim_entity_id,c.location_entity_id,s.status,a.created_at
 		FROM player_case_accusations a JOIN cases c USING(server_id,case_id) JOIN case_states s USING(server_id,case_id)
 		WHERE a.server_id=$1::uuid AND c.city_id=$2 AND a.accepted=true ORDER BY a.created_at DESC,a.case_id DESC LIMIT 1`, serverID, cityID).
 		Scan(&result.ID, &result.CityID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt)
@@ -1460,7 +1501,7 @@ func (store *PostgresStore) RevealDueBodies(ctx context.Context, serverID string
 }
 
 func (store *PostgresStore) ListPublicBodyDiscoveries(ctx context.Context, serverID, cityID string, now time.Time) ([]PublicBodyDiscovery, error) {
-	rows, err := store.db.Query(ctx, `SELECT c.case_id,v.generation_key,scene.generation_key,COALESCE(district.display_name,''),s.body_found_at,w.world_seed,
+	rows, err := store.db.Query(ctx, `SELECT c.case_id,s.status,v.generation_key,scene.generation_key,COALESCE(district.display_name,''),s.body_found_at,w.world_seed,
 		COALESCE(city_generator.generator_version,w.generator_version)
 		FROM cases c JOIN case_states s USING(server_id,case_id)
 		JOIN world_entities v ON v.server_id=c.server_id AND v.entity_id=c.victim_entity_id
@@ -1468,7 +1509,7 @@ func (store *PostgresStore) ListPublicBodyDiscoveries(ctx context.Context, serve
 		JOIN world_regions district ON district.server_id=scene.server_id AND district.region_id=scene.region_id
 		JOIN worlds w ON w.server_id=c.server_id
 		LEFT JOIN world_city_generators city_generator ON city_generator.server_id=c.server_id AND city_generator.city_id=c.city_id
-		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND s.body_found_at<=$3
+		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND s.status='open' AND s.body_found_at<=$3
 		ORDER BY s.body_found_at DESC,c.case_id DESC`, serverID, cityID, now.UTC())
 	if err != nil {
 		return nil, err
@@ -1481,7 +1522,7 @@ func (store *PostgresStore) ListPublicBodyDiscoveries(ctx context.Context, serve
 		var item PublicBodyDiscovery
 		var victimKey, locationKey, seed string
 		var worldVersion int
-		if err := rows.Scan(&item.CaseID, &victimKey, &locationKey, &item.DistrictName, &item.FoundAt, &seed, &worldVersion); err != nil {
+		if err := rows.Scan(&item.CaseID, &item.Status, &victimKey, &locationKey, &item.DistrictName, &item.FoundAt, &seed, &worldVersion); err != nil {
 			return nil, err
 		}
 		victim, err := world.GenerateNPCFromKey(seed, worldVersion, victimKey)

@@ -211,6 +211,10 @@ export async function getPlayerEmails() {
   return payload.results ?? [];
 }
 
+export function deletePlayerEmail(messageId) {
+  return requestCase(`/api/player/emails/${encodeURIComponent(messageId)}`, { method: "DELETE" });
+}
+
 export function saveCaseProgress(caseId, progress) {
   return requestCase(`/api/cases/${encodeURIComponent(caseId)}/progress`, {
     method: "POST",
