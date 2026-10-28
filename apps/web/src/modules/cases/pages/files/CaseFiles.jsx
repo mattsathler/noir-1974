@@ -1,117 +1,162 @@
-import { useEffect, useState } from "react";
-import { MapPin } from "pixelarticons/react/MapPin";
-import { getCaseFile, getNewspaperIssue, getOpenCases, saveCaseProgress } from "../../../world/api.js";
+import { useEffect, useMemo, useState } from "react";
+import { getCrimeReports } from "../../../world/api.js";
+import DatePicker from "../../../world/components/DatePicker.jsx";
+import ModularFace from "../../../identity/components/ModularFace.jsx";
 
-export default function CaseFiles({ cityId, issueDay, onPin }) {
+const FALLBACK_VISUAL = { hairId: "hair_short_brown", skinId: "skin_white", eyesId: "eyes_brown", faceId: "", beardId: "", accessoryIds: [] };
+
+function dateDaysBefore(dateKey, days) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatReportDate(value, timeZone) {
+  if (!value) return "DATE NOT RECORDED";
+  return new Intl.DateTimeFormat(undefined, {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
+  }).format(new Date(value)).toUpperCase();
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export default function CaseFiles({ cityId, issueDay, timeZone }) {
+  const initialTo = issueDay || todayKey();
   const [cases, setCases] = useState([]);
-  const [issue, setIssue] = useState(null);
-  const [activeCase, setActiveCase] = useState(null);
-  const [detail, setDetail] = useState(null);
-  const [message, setMessage] = useState("CONNECTING TO CASE ARCHIVE…");
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [savingEvidence, setSavingEvidence] = useState("");
+  const [missing, setMissing] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState(dateDaysBefore(initialTo, 30));
+  const [toDate, setToDate] = useState(initialTo);
+  const [appliedRange, setAppliedRange] = useState({ from: dateDaysBefore(initialTo, 30), to: initialTo });
+  const [message, setMessage] = useState("CONNECTING TO CITY REPORTS…");
+  const [reportError, setReportError] = useState(false);
+  const [rangeError, setRangeError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    let active = true;
-    Promise.all([getOpenCases(), getNewspaperIssue(cityId, issueDay)])
-      .then(([openCases, newspaper]) => {
-        if (!active) return;
-        setCases(openCases);
-        setIssue(newspaper);
-        setMessage(openCases.length ? "OPEN CASES RETRIEVED" : "NO OPEN CASES ON FILE");
-        if (openCases.length) setActiveCase(openCases[0]);
-      })
-      .catch((error) => { if (active) setMessage(error.message || "THE CASE ARCHIVE IS UNAVAILABLE"); });
-    return () => { active = false; };
+    const latestDay = issueDay || todayKey();
+    const previousMonth = dateDaysBefore(latestDay, 30);
+    setFromDate(previousMonth);
+    setToDate(latestDay);
+    setAppliedRange({ from: previousMonth, to: latestDay });
+    setSelected(null);
   }, [cityId, issueDay]);
 
   useEffect(() => {
-    if (!activeCase) { setDetail(null); return undefined; }
     let active = true;
-    setLoadingDetail(true);
-    getCaseFile(activeCase.id)
-      .then((record) => { if (active) setDetail(record); })
-      .catch((error) => { if (active) setMessage(error.message || "THE CASE FILE COULD NOT BE READ"); })
-      .finally(() => { if (active) setLoadingDetail(false); });
+    setCases([]);
+    setMissing([]);
+    setSelected(null);
+    setReportError(false);
+    setMessage("SEARCHING CITY RECORDS…");
+    getCrimeReports(appliedRange)
+      .then((reports) => {
+        if (!active) return;
+        setCases(reports.cases ?? []);
+        setMissing(reports.missing ?? []);
+        setMessage("CITY RECORDS SEARCH COMPLETE");
+      })
+      .catch((error) => { if (active) { setMessage(error.message || "CITY REPORTS ARE UNAVAILABLE"); setReportError(true); } });
     return () => { active = false; };
-  }, [activeCase]);
+  }, [cityId, appliedRange, retryCount]);
 
-  async function toggleEvidence(evidenceID) {
-    if (!detail || savingEvidence) return;
-    const current = detail.progress.discoveredEvidenceIds ?? [];
-    const removing = current.includes(evidenceID);
-    const next = removing ? current.filter((id) => id !== evidenceID) : [...current, evidenceID];
-    const whiteboardPins = removing
-      ? (detail.progress.whiteboardPins ?? []).filter((id) => id !== evidenceID)
-      : (detail.progress.whiteboardPins ?? []);
-    const whiteboardConnections = removing
-      ? (detail.progress.whiteboardConnections ?? []).filter((edge) => edge.fromId !== evidenceID && edge.toId !== evidenceID)
-      : (detail.progress.whiteboardConnections ?? []);
-    setSavingEvidence(evidenceID);
-    try {
-      const saved = await saveCaseProgress(detail.case.id, { discoveredEvidenceIds: next, whiteboardPins, whiteboardConnections });
-      setDetail((previous) => previous ? { ...previous, progress: saved.progress } : previous);
-    } catch (error) {
-      setMessage(error.message || "CASE NOTES COULD NOT BE SAVED");
-    } finally {
-      setSavingEvidence("");
-    }
+  const needle = search.trim().toLocaleLowerCase();
+  const visibleCases = useMemo(() => cases.filter((record) => !needle || (record.victimName ?? "").toLocaleLowerCase().includes(needle)), [cases, needle]);
+  const visibleMissing = useMemo(() => missing.filter((person) => !needle || person.name.toLocaleLowerCase().includes(needle)), [missing, needle]);
+  const missingIds = useMemo(() => new Set(missing.map((person) => person.npcId)), [missing]);
+  const openCaseVictims = useMemo(() => new Set(visibleCases.map((record) => record.victimId)), [visibleCases]);
+  const additionalMissing = visibleMissing.filter((person) => !openCaseVictims.has(person.npcId));
+
+  function searchDateRange(event) {
+    event.preventDefault();
+    if (!fromDate || !toDate) { setRangeError("SELECT BOTH DATES TO SEARCH THE CITY REGISTER."); return; }
+    if (fromDate > toDate) { setRangeError("THE START DATE MUST COME BEFORE THE END DATE."); return; }
+    setRangeError("");
+    setAppliedRange({ from: fromDate, to: toDate });
   }
 
-  const lead = issue?.lead;
-  const matchingLead = Boolean(lead && lead.caseId === activeCase?.id);
-  const selectedHeadline = matchingLead ? lead.headline || "OPEN HOMICIDE INQUIRY" : "OPEN HOMICIDE INQUIRY";
-  const selectedSummary = matchingLead ? lead.summary || "The investigation remains open." : "The investigation remains open.";
-  const filedIDs = detail?.progress?.discoveredEvidenceIds ?? [];
+  function openRecord(kind, record) {
+    setSelected({ kind, record });
+  }
+
+  if (selected) {
+    const { kind, record } = selected;
+    const name = kind === "case" ? record.victimName : record.name;
+    const visual = kind === "case" ? record.victimVisual : record.visual;
+    return (
+      <section className="case-files case-files--detail" aria-label="Public case file">
+        <button className="case-files__back" type="button" onClick={() => setSelected(null)}>← BACK TO CITY REPORTS</button>
+        <p className="computer-window__eyebrow">CITY POLICE · PUBLIC CASE FILE</p>
+        <div className="case-files__identity">
+          <figure className="case-files__portrait"><ModularFace visual={visual ?? FALLBACK_VISUAL} name={name || "Unidentified victim"} /></figure>
+          <div>
+            <p className="case-files__record-type">{kind === "case" ? "OPEN HOMICIDE INQUIRY" : "MISSING PERSON"}</p>
+            <h1>{name || "UNIDENTIFIED VICTIM"}</h1>
+          </div>
+        </div>
+        <p className="case-files__detail-note">The public file contains no further investigative findings.</p>
+      </section>
+    );
+  }
 
   return (
-    <section className="case-files" aria-label="Open case files">
-      <p className="computer-window__eyebrow">PRIVATE INVESTIGATION · SERVER RECORDS</p>
-      <h1>OPEN CASE FILES</h1>
+    <section className="case-files" aria-label="City crime reports">
+      <p className="computer-window__eyebrow">CITY POLICE · PUBLIC REPORTS</p>
+      <h1>CRIME REPORTS</h1>
+
+      <form className="case-files__filters" onSubmit={searchDateRange}>
+        <label className="case-files__name-search">
+          <span>SEARCH VICTIM OR MISSING PERSON</span>
+          <input type="search" maxLength="80" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="TYPE A NAME" />
+        </label>
+        <div className="world-record__activity-filter">
+          <DatePicker label="FROM" value={fromDate} maxDate={toDate} onChange={setFromDate} />
+          <DatePicker label="TO" value={toDate} minDate={fromDate} maxDate={issueDay || todayKey()} onChange={setToDate} />
+          <button type="submit">SEARCH OPEN CASES</button>
+        </div>
+      </form>
+      {rangeError && <p className="case-files__range-error" role="alert">{rangeError}</p>}
       <p className="case-files__message" role="status" aria-live="polite">{message}</p>
+      {reportError && <button className="case-files__retry" type="button" onClick={() => setRetryCount((count) => count + 1)}>RETRY CITY REPORTS</button>}
 
-      {cases.length > 0 && (
-        <nav className="case-files__list" aria-label="Open investigations">
-          {cases.map((record) => (
-            <button
-              className={`case-files__select${activeCase?.id === record.id ? " case-files__select--active" : ""}`}
-              key={record.id}
-              type="button"
-              aria-pressed={activeCase?.id === record.id}
-              onClick={() => setActiveCase(record)}
-            >
-              <span>HOMICIDE · {record.status.toUpperCase()}</span>
-              <span>{record.id}</span>
-            </button>
-          ))}
-        </nav>
-      )}
+      <section className="case-files__section" aria-labelledby="open-cases-title">
+        <h2 id="open-cases-title">OPEN INQUIRIES <span>{visibleCases.length}</span></h2>
+        {visibleCases.length ? (
+          <div className="case-files__list">
+            {visibleCases.map((record) => (
+              <button className="case-files__select" key={record.id} type="button" onClick={() => openRecord("case", record)}>
+                <span className="case-files__select-status">{missingIds.has(record.victimId) ? "MISSING PERSON · OPEN INQUIRY" : "OPEN HOMICIDE INQUIRY"}</span>
+                <strong>{record.victimName || "UNIDENTIFIED VICTIM"}</strong>
+                <time dateTime={record.crimeAt}>REPORTED · {formatReportDate(record.crimeAt, timeZone)}</time>
+                <span className="case-files__open-link">OPEN FILE →</span>
+              </button>
+            ))}
+          </div>
+        ) : <p className="case-files__empty">{needle ? "NO MATCHING OPEN INQUIRIES." : "NO OPEN INQUIRIES IN THIS DATE RANGE."}</p>}
+      </section>
 
-      {loadingDetail && <p className="case-files__message">READING CASE FILE…</p>}
-      {detail && !loadingDetail && (
-        <article className="case-files__detail">
-          <header className="world-record__header">
-            <h2>{selectedHeadline}</h2>
-            <span>{detail.case.status.toUpperCase()}</span>
-          </header>
-          <p>{selectedSummary}</p>
-          <p className="case-files__reference">VICTIM RECORD · {detail.case.victimId}</p>
-          <h2 className="case-files__section-heading">RECORDS FILED</h2>
-          {detail.evidence.map((item) => {
-            const filed = filedIDs.includes(item.id);
-            return (
-              <article className="case-files__evidence" key={item.id}>
-                <p className="case-files__evidence-title">{item.presentation}</p>
-                <p>{item.content}</p>
-                <button type="button" disabled={Boolean(savingEvidence)} onClick={() => toggleEvidence(item.id)}>
-                  {savingEvidence === item.id ? "SAVING…" : filed ? "REMOVE FROM NOTES" : "FILE IN PERSONAL NOTES"}
-                </button>
-                <button className="whiteboard-pin-button" type="button" aria-label={`Pin ${item.presentation}`} onClick={() => onPin?.({ id: item.id, source: ["email", "bank", "gate"].includes(item.type) ? item.type : "case", title: item.presentation, content: item.content, metadata: item })}><MapPin aria-hidden="true" /></button>
-              </article>
-            );
-          })}
-        </article>
-      )}
+      <section className="case-files__section case-files__missing" aria-labelledby="missing-persons-title">
+        <h2 id="missing-persons-title">MISSING PERSONS <span>{additionalMissing.length}</span></h2>
+        {additionalMissing.length ? (
+          <div className="case-files__list">
+            {additionalMissing.map((person) => (
+              <button className="case-files__select case-files__select--missing" key={person.npcId} type="button" onClick={() => openRecord("missing", person)}>
+                <span className="case-files__select-status">MISSING PERSON</span>
+                <strong>{person.name}</strong>
+                <time dateTime={person.missingAt}>MISSING SINCE · {formatReportDate(person.missingAt, timeZone)}</time>
+                <span className="case-files__open-link">OPEN FILE →</span>
+              </button>
+            ))}
+          </div>
+        ) : <p className="case-files__empty">{visibleMissing.length ? "ALL MISSING PERSONS ARE LISTED WITH THEIR OPEN INQUIRY ABOVE." : needle ? "NO MATCHING MISSING PERSONS." : "NO MISSING PERSONS REPORTED IN THIS CITY."}</p>}
+      </section>
     </section>
   );
 }

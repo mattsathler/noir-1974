@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +20,67 @@ import (
 type testCaseRow struct {
 	values []any
 	err    error
+}
+
+type emptyCaseRows struct{ pgx.Rows }
+
+func (*emptyCaseRows) Close()                                       {}
+func (*emptyCaseRows) Err() error                                   { return nil }
+func (*emptyCaseRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
+func (*emptyCaseRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
+func (*emptyCaseRows) Next() bool                                   { return false }
+func (*emptyCaseRows) Scan(...any) error                            { return nil }
+func (*emptyCaseRows) Values() ([]any, error)                       { return nil, nil }
+func (*emptyCaseRows) RawValues() [][]byte                          { return nil }
+
+type crimeReportQueryFixture struct{ queries int }
+
+func (fixture *crimeReportQueryFixture) Query(_ context.Context, query string, args ...any) (pgx.Rows, error) {
+	maxPlaceholder := 0
+	for _, match := range regexp.MustCompile(`\$(\d+)`).FindAllStringSubmatch(query, -1) {
+		index, err := strconv.Atoi(match[1])
+		if err != nil {
+			return nil, err
+		}
+		if index > maxPlaceholder {
+			maxPlaceholder = index
+		}
+	}
+	if maxPlaceholder != len(args) {
+		return nil, fmt.Errorf("query uses $%d but received %d arguments", maxPlaceholder, len(args))
+	}
+	if strings.Contains(query, "v.display_name") || strings.Contains(query, "scene.display_name") {
+		return nil, errors.New("world_entities does not contain display_name")
+	}
+	fixture.queries++
+	return &emptyCaseRows{}, nil
+}
+
+func (*crimeReportQueryFixture) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
+	return pgconn.CommandTag{}, errors.New("unexpected crime report exec")
+}
+
+func (*crimeReportQueryFixture) QueryRow(context.Context, string, ...any) pgx.Row {
+	return testCaseRow{err: errors.New("unexpected crime report query row")}
+}
+
+func (*crimeReportQueryFixture) Begin(context.Context) (pgx.Tx, error) {
+	return nil, errors.New("unexpected crime report transaction")
+}
+
+func TestCityCrimeReportsBindsEverySQLParameter(t *testing.T) {
+	database := &crimeReportQueryFixture{}
+	store := NewPostgresStore(database)
+	now := time.Date(1974, time.October, 27, 12, 0, 0, 0, time.UTC)
+	if _, err := store.CityCrimeReports(context.Background(), "server-1", "fr/lyon", now.AddDate(0, 0, -30), now.Add(time.Nanosecond), now); err != nil {
+		t.Fatalf("CityCrimeReports() error = %v", err)
+	}
+	if _, err := store.ListPublicBodyDiscoveries(context.Background(), "server-1", "fr/lyon", time.Now().UTC()); err != nil {
+		t.Fatalf("ListPublicBodyDiscoveries() error = %v", err)
+	}
+	if database.queries != 3 {
+		t.Fatalf("crime report methods executed %d queries, want 3", database.queries)
+	}
 }
 
 func TestSplitSQLStatementsKeepsDollarQuotedFunctionBodies(t *testing.T) {

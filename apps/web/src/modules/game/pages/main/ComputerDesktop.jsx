@@ -38,13 +38,13 @@ function markPersonalComputerBooted() {
 }
 
 const PERSONAL_PROGRAMS = [
-  { id: "case-files", label: "CASE FILES", Icon: Files, state: "UNDER REVIEW", available: false },
+  { id: "case-files", label: "CRIME REPORTS", Icon: Files, state: "ONLINE", available: true },
   { id: "personal-mail", label: "PERSONAL MAIL", Icon: Mail, state: "ONLINE", available: true },
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
 ];
 
 const BYPASSED_PROGRAM_LABELS = {
-  "case-files": "CA\uE000E FI\uE001ES",
+  "case-files": "CRI\uE000E REPO\uE001TS",
   "city-records": "CI\uE003Y RECO\uE004DS",
   interpol: "PERSON\uE001EL SEARCH",
   emails: "E\uE002AIL ARCHIVE",
@@ -455,7 +455,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 </header>
                 <div className="computer-window__body">
                   {program.id === "case-files"
-                    ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} onPin={requestPin} />
+                    ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} timeZone={timeZone} />
                     : program.id === "patient-search"
                       ? <HospitalPatientSearch key={id} accessAttemptId={accessAttemptId} timeZone={timeZone} onPin={requestPin} />
                       : program.id === "emails"

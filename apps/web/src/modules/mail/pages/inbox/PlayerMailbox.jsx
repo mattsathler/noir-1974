@@ -49,9 +49,10 @@ export default function PlayerMailbox({ timeZone, onPin }) {
           <h3 className="case-files__section-heading">RECOVERED AND SECURED · {message.attachments.length} ITEMS</h3>
           <div className="player-mail__attachment-grid">{message.attachments.map((item) => {
             const AttachmentIcon = ATTACHMENT_ICONS[item.kind] ?? Box;
-            return <article className="search-attachment" key={item.id}>
+            const bodyFound = item.kind === "body_found";
+            return <article className={`search-attachment${bodyFound ? " search-attachment--body-found" : ""}`} key={item.id}>
               <span className="search-attachment__tack" aria-hidden="true" />
-              <header><span>CASE · ATTACHMENT</span></header>
+              <header><span>{bodyFound ? "BODY DISCOVERY · CONFIRMED" : "CASE · ATTACHMENT"}</span></header>
               <span className={`search-attachment__icon search-attachment__icon--${item.kind}`} aria-hidden="true"><AttachmentIcon /></span>
               <h4>{item.title}</h4><p>{item.content}</p>
               <footer><button className="whiteboard-pin-button" type="button" aria-label={`Pin ${item.title} to a whiteboard`} onClick={() => onPin?.({ id: item.id, source: item.source, title: item.title, content: item.content, metadata: item.metadata })}><MapPin aria-hidden="true" /></button></footer>

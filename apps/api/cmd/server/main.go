@@ -124,26 +124,11 @@ func main() {
 	if err := caseStore.Create(ctx, worldServerID, generatedWorld, openingCase); err != nil {
 		log.Fatalf("persist opening case: %v", err)
 	}
-	openingCases := []cases.Definition{openingCase}
 	if openingCase.ArchetypeID != "financial_extortion" {
-		extortionCase, err := ensureExtortionCase(ctx, caseStore, worldServerID, worldSeed, generatedWorld)
-		if err != nil {
+		if _, err := ensureExtortionCase(ctx, caseStore, worldServerID, worldSeed, generatedWorld); err != nil {
 			log.Fatalf("persist opening extortion case: %v", err)
 		}
-		openingCases = append(openingCases, extortionCase)
 	}
-	for _, definition := range openingCases {
-		victim, err := worldStore.GetNPC(ctx, worldServerID, definition.VictimID)
-		if err != nil {
-			log.Fatalf("load opening case victim: %v", err)
-		}
-		if victim.NPC.Status != "dead" {
-			if err := worldStore.SetNPCStatus(ctx, worldServerID, definition.VictimID, "dead"); err != nil {
-				log.Fatalf("record opening case victim status: %v", err)
-			}
-		}
-	}
-
 	mux := http.NewServeMux()
 	newsService := newspaper.NewService(worldStore, caseStore)
 	recordsService := records.NewService(worldStore, caseStore)
@@ -165,6 +150,7 @@ func main() {
 	go recurring.Run(serverCtx)
 	asyncRequests := cases.NewAsyncRequestProcessor(caseStore, worldServerID, 5*time.Second)
 	asyncRequests.SetAccusationAcceptedHandler(func(cityID string) { newsService.InvalidateCity(worldServerID, cityID) })
+	asyncRequests.SetRequestCompletedHandler(newsService.InvalidateAll)
 	go asyncRequests.Run(serverCtx)
 
 	go func() {

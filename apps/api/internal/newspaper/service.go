@@ -24,13 +24,21 @@ type caseReader interface {
 type arrestReader interface {
 	LatestPublicArrest(context.Context, string, string) (cases.PublicCase, error)
 }
+type bodyDiscoveryReader interface {
+	ListPublicBodyDiscoveries(context.Context, string, string, time.Time) ([]cases.PublicBodyDiscovery, error)
+}
 
 type Service struct {
 	worlds worldReader
 	cases  caseReader
 	mu     sync.Mutex
-	issues map[string]Issue
+	issues map[string]cachedIssue
 	flight map[string]*issueFlight
+}
+
+type cachedIssue struct {
+	issue     Issue
+	updatedAt time.Time
 }
 
 type issueFlight struct {
@@ -63,7 +71,7 @@ type newsTemplate struct {
 }
 
 func NewService(worlds worldReader, cases caseReader) *Service {
-	return &Service{worlds: worlds, cases: cases, issues: make(map[string]Issue), flight: make(map[string]*issueFlight)}
+	return &Service{worlds: worlds, cases: cases, issues: make(map[string]cachedIssue), flight: make(map[string]*issueFlight)}
 }
 
 func (service *Service) InvalidateCity(serverID, cityID string) {
@@ -75,6 +83,12 @@ func (service *Service) InvalidateCity(serverID, cityID string) {
 			delete(service.issues, key)
 		}
 	}
+}
+
+func (service *Service) InvalidateAll() {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	clear(service.issues)
 }
 
 // Issue caches one generated edition per server, city, and in-game calendar day.
@@ -91,9 +105,9 @@ func (service *Service) Issue(ctx context.Context, serverID, cityID, city, count
 	dateKey := serverTime.In(zone).Format("2006-01-02")
 	cacheKey := serverID + "/" + cityID + "/" + dateKey
 	service.mu.Lock()
-	if issue, ok := service.issues[cacheKey]; ok {
+	if cached, ok := service.issues[cacheKey]; ok && time.Since(cached.updatedAt) < time.Minute {
 		service.mu.Unlock()
-		return issue, nil
+		return cached.issue, nil
 	}
 	if flight := service.flight[cacheKey]; flight != nil {
 		service.mu.Unlock()
@@ -111,7 +125,7 @@ func (service *Service) Issue(ctx context.Context, serverID, cityID, city, count
 	issue, err := service.buildIssue(ctx, serverID, cityID, city, country, serverTime)
 	service.mu.Lock()
 	if err == nil {
-		service.issues[cacheKey] = issue
+		service.issues[cacheKey] = cachedIssue{issue: issue, updatedAt: time.Now()}
 		cityPrefix := serverID + "/" + cityID + "/"
 		for key := range service.issues {
 			if key != cacheKey && len(key) >= len(cityPrefix) && key[:len(cityPrefix)] == cityPrefix {
@@ -126,15 +140,11 @@ func (service *Service) Issue(ctx context.Context, serverID, cityID, city, count
 	return issue, err
 }
 
-// buildIssue creates a deterministic city edition with its newest local case as lead.
+// buildIssue creates a city edition whose crime reporting is limited to confirmed body discoveries.
 func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, country string, serverTime time.Time) (Issue, error) {
 	base, err := service.worlds.CityWorldForCases(ctx, serverID, cityID)
 	if err != nil {
 		return Issue{}, fmt.Errorf("reconstruct city newspaper data: %w", err)
-	}
-	latest, caseErr := service.cases.LatestPublicCase(ctx, serverID, cityID)
-	if caseErr != nil && !errors.Is(caseErr, cases.ErrCaseNotFound) {
-		return Issue{}, fmt.Errorf("query latest case for city %s: %w", cityID, caseErr)
 	}
 	if serverTime.IsZero() {
 		return Issue{}, fmt.Errorf("invalid newspaper date")
@@ -154,32 +164,31 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 	for _, npc := range local.NPCs {
 		npcNames[npc.ID] = npc.Name
 	}
-	lead := Article{ID: "city-desk-" + cityID + "-" + dateKey, Section: "CITY DESK", Headline: "A quiet day for the city police", Summary: fmt.Sprintf("No new homicide inquiry has been reported in %s. Local authorities remain on duty.", city)}
-	if caseErr == nil {
-		victimName, exists := npcNames[latest.VictimID]
-		if !exists {
-			return Issue{}, fmt.Errorf("latest case victim is missing from generated city")
+	lead := Article{ID: "city-desk-" + cityID + "-" + dateKey, Section: "CITY DESK", Headline: "A quiet day for the city police", Summary: fmt.Sprintf("No newly discovered bodies have been reported in %s. Local authorities remain on duty.", city)}
+	articles := makeLightStories(local, serverID+"/"+cityID, dateKey)
+	foundCaseIDs := make(map[string]bool)
+	if reader, ok := service.cases.(bodyDiscoveryReader); ok {
+		discoveries, err := reader.ListPublicBodyDiscoveries(ctx, serverID, cityID, serverTime)
+		if err != nil {
+			return Issue{}, fmt.Errorf("query discovered bodies for city %s: %w", cityID, err)
 		}
-		headline := fmt.Sprintf("Police open homicide inquiry into death of %s", victimName)
-		summary := fmt.Sprintf("Authorities confirmed the death of %s. Detectives are asking anyone with information to come forward. The circumstances remain under investigation.", victimName)
-		if latest.Status == "solved" {
-			headline = fmt.Sprintf("Police announce arrest in the death of %s", victimName)
-			summary = fmt.Sprintf("City authorities confirmed that a suspect has been taken into custody in the case concerning %s. The corporate review is complete.", victimName)
-		}
-		lead = Article{
-			ID: latest.ID, Section: "SPECIAL REPORT",
-			Headline: headline,
-			Summary:  summary,
-			CaseID:   latest.ID,
+		if len(discoveries) > 0 {
+			lead = bodyDiscoveryArticle(discoveries[0], location)
+			foundCaseIDs[discoveries[0].CaseID] = true
+			bodyArticles := make([]Article, 0, len(discoveries)-1)
+			for _, discovery := range discoveries[1:] {
+				bodyArticles = append(bodyArticles, bodyDiscoveryArticle(discovery, location))
+				foundCaseIDs[discovery.CaseID] = true
+			}
+			articles = append(bodyArticles, articles...)
 		}
 	}
-	articles := makeLightStories(local, serverID+"/"+cityID, dateKey)
 	if reader, ok := service.cases.(arrestReader); ok {
 		arrest, err := reader.LatestPublicArrest(ctx, serverID, cityID)
 		if err != nil && !errors.Is(err, cases.ErrCaseNotFound) {
 			return Issue{}, fmt.Errorf("query city arrest notice: %w", err)
 		}
-		if err == nil && arrest.ID != latest.ID {
+		if err == nil && foundCaseIDs[arrest.ID] {
 			if name, found := npcNames[arrest.VictimID]; found {
 				articles = append([]Article{{ID: arrest.ID + "-arrest", Section: "CITY POLICE", Headline: fmt.Sprintf("Police announce arrest in the death of %s", name), Summary: fmt.Sprintf("A suspect has been taken into custody in the homicide inquiry concerning %s. The corporate review has concluded.", name), CaseID: arrest.ID}}, articles...)
 			}
@@ -193,6 +202,20 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 		Lead:        lead,
 		Articles:    articles,
 	}, nil
+}
+
+func bodyDiscoveryArticle(discovery cases.PublicBodyDiscovery, location *time.Location) Article {
+	place := discovery.LocationName
+	if discovery.DistrictName != "" {
+		place += ", " + discovery.DistrictName
+	}
+	localTime := discovery.FoundAt.In(location).Format("Monday, January 2 at 3:04 PM")
+	return Article{
+		ID:       "body-found-" + discovery.CaseID,
+		Section:  "BODY FOUND",
+		Headline: fmt.Sprintf("Body of %s discovered in %s", discovery.VictimName, place),
+		Summary:  fmt.Sprintf("Authorities reported finding %s at %s. The discovery was recorded %s; the circumstances remain under investigation.", discovery.VictimName, place, localTime),
+	}
 }
 
 func makeLightStories(base world.World, serverID, dateKey string) []Article {

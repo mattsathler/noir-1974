@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS world_mutations (
     entity_id text NOT NULL,
     field_key text NOT NULL CHECK (field_key = 'status'),
     value jsonb NOT NULL CHECK (
-        jsonb_typeof(value) = 'string' AND value #>> '{}' IN ('alive', 'dead', 'arrested')
+        jsonb_typeof(value) = 'string' AND value #>> '{}' IN ('alive', 'missing', 'dead', 'arrested')
     ),
     created_at timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (server_id, entity_id)
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS world_mutations (
 -- sync with the status values already accepted by the world store.
 ALTER TABLE world_mutations DROP CONSTRAINT IF EXISTS world_mutations_value_check;
 ALTER TABLE world_mutations ADD CONSTRAINT world_mutations_value_check CHECK (
-    jsonb_typeof(value) = 'string' AND value #>> '{}' IN ('alive', 'dead', 'arrested')
+    jsonb_typeof(value) = 'string' AND value #>> '{}' IN ('alive', 'missing', 'dead', 'arrested')
 );
 CREATE INDEX IF NOT EXISTS world_mutations_by_entity_order_idx
     ON world_mutations(server_id, entity_id, mutation_order DESC);

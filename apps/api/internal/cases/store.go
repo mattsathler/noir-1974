@@ -38,7 +38,7 @@ var (
 	ErrPersistedConflict     = errors.New("persisted case does not match generated definition")
 )
 
-const residentialSearchCatalogVersion = 5
+const residentialSearchCatalogVersion = 6
 
 type caseDatabase interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
@@ -116,6 +116,7 @@ type WarrantRequest struct {
 	Status    string             `json:"status"`
 	ReadyAt   time.Time          `json:"readyAt,omitempty"`
 	Message   *PlayerMailMessage `json:"message,omitempty"`
+	BodyFound bool               `json:"bodyFound,omitempty"`
 }
 
 type persistedCaseIdentity struct {
@@ -166,13 +167,36 @@ type LocalAccessAttempt struct {
 
 // PublicCase contains only facts safe for the newspaper headline.
 type PublicCase struct {
-	ID         string    `json:"id"`
-	CityID     string    `json:"cityId"`
-	CaseType   string    `json:"caseType"`
-	VictimID   string    `json:"victimId"`
-	LocationID string    `json:"-"`
-	Status     string    `json:"status"`
-	CreatedAt  time.Time `json:"createdAt"`
+	ID           string                `json:"id"`
+	CityID       string                `json:"cityId"`
+	CaseType     string                `json:"caseType"`
+	VictimID     string                `json:"victimId"`
+	VictimName   string                `json:"victimName,omitempty"`
+	VictimVisual *world.VisualIdentity `json:"victimVisual,omitempty"`
+	CrimeAt      time.Time             `json:"crimeAt,omitempty"`
+	LocationID   string                `json:"-"`
+	Status       string                `json:"status"`
+	CreatedAt    time.Time             `json:"createdAt"`
+}
+
+type MissingPerson struct {
+	NPCID     string                `json:"npcId"`
+	Name      string                `json:"name"`
+	Visual    *world.VisualIdentity `json:"visual,omitempty"`
+	MissingAt time.Time             `json:"missingAt"`
+}
+
+type CrimeReportDigest struct {
+	Cases   []PublicCase    `json:"cases"`
+	Missing []MissingPerson `json:"missing"`
+}
+
+type PublicBodyDiscovery struct {
+	CaseID       string    `json:"caseId"`
+	VictimName   string    `json:"victimName"`
+	LocationName string    `json:"locationName"`
+	DistrictName string    `json:"districtName"`
+	FoundAt      time.Time `json:"foundAt"`
 }
 
 // PersonSearchScenes returns scene addresses only for case victims in the requested city.
@@ -789,7 +813,7 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 			WHERE cr.server_id=c.server_id AND cr.case_id=c.case_id AND cr.relationship_role='paramour_employment' AND er.employee_npc_id=$3)
 		OR EXISTS (SELECT 1 FROM employment_relationships a JOIN employment_relationships b ON b.server_id=a.server_id AND b.employer_company_id=a.employer_company_id WHERE a.server_id=c.server_id AND a.employee_npc_id=$3 AND b.employee_npc_id IN (c.killer_entity_id,c.victim_entity_id))
 		OR EXISTS (SELECT 1 FROM personal_relationships r WHERE r.server_id=c.server_id AND ((r.person_a_npc_id=$3 AND r.person_b_npc_id IN (c.killer_entity_id,c.victim_entity_id)) OR (r.person_b_npc_id=$3 AND r.person_a_npc_id IN (c.killer_entity_id,c.victim_entity_id)))) )
-		AND s.status='open' ORDER BY c.created_at DESC LIMIT 1`, serverID, cityID, npcID).Scan(&caseID, &archetype, &isKiller, &isVictim, &caseRole, &caseSceneID)
+		AND s.status='open' AND COALESCE(c.crime_at,c.created_at)<=$4 ORDER BY c.created_at DESC LIMIT 1`, serverID, cityID, npcID, now.UTC()).Scan(&caseID, &archetype, &isKiller, &isVictim, &caseRole, &caseSceneID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		archetype = ""
 	} else if err != nil {
@@ -854,6 +878,21 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 		}
 	}
 	items = append(items, makeResidentialAttachment(warrantID, 7, lastFinding))
+	bodyFound := false
+	if isVictim && caseID != "" {
+		residential, err := store.isResidentialCaseScene(ctx, serverID, caseSceneID)
+		if err != nil {
+			return WarrantRequest{}, fmt.Errorf("check residential body discovery: %w", err)
+		}
+		if residential {
+			bodyFound = true
+			items = append(items, makeResidentialAttachment(warrantID, len(items), residentialFinding{
+				Title:   "Body located",
+				Content: fmt.Sprintf("The search team located %s at the reported address. The body was secured and transferred for examination; this report does not identify a suspect.", person.Name),
+				Kind:    "body_found",
+			}))
+		}
+	}
 	if isKiller && caseID != "" {
 		residential, err := store.isResidentialCaseScene(ctx, serverID, caseSceneID)
 		if err != nil {
@@ -901,7 +940,13 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 		station_location_id=EXCLUDED.station_location_id,status='granted',catalog_version=EXCLUDED.catalog_version,created_at=EXCLUDED.created_at`, serverID, accountID, warrantID, cityID, stationLocationID, npcID, stamp, residentialSearchCatalogVersion); err != nil {
 		return WarrantRequest{}, fmt.Errorf("record residential search authorization: %w", err)
 	}
-	message := PlayerMailMessage{ID: warrantID + ":mail", SentAt: stamp, Subject: "Residential search report · " + person.Name, Body: "The authorized residential search concerning " + person.Name + " is complete. The enclosed inventory lists all items recovered and secured. Review each item in context; routine household effects were included in the same report.", Attachments: items}
+	subject := "Residential search report · " + person.Name
+	bodyText := "The authorized residential search concerning " + person.Name + " is complete. The enclosed inventory lists all items recovered and secured. Review each item in context; routine household effects were included in the same report."
+	if bodyFound {
+		subject = "Body found · " + person.Name
+		bodyText = "The search team located the missing resident at the reported address. The body was secured and transferred for examination. The city newspaper will report the discovery."
+	}
+	message := PlayerMailMessage{ID: warrantID + ":mail", SentAt: stamp, Subject: subject, Body: bodyText, Attachments: items}
 	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages (server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
 		VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8::jsonb)
 		ON CONFLICT (server_id,account_id,message_id) DO UPDATE SET sent_at=EXCLUDED.sent_at,subject=EXCLUDED.subject,body=EXCLUDED.body,attachments=EXCLUDED.attachments`, serverID, accountID, message.ID, warrantID, stamp, message.Subject, message.Body, string(attachmentsJSON)); err != nil {
@@ -912,10 +957,21 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 		ON CONFLICT (server_id,account_id,item_id) DO UPDATE SET item_source=EXCLUDED.item_source,item_data=EXCLUDED.item_data`, serverID, accountID, string(attachmentsJSON)); err != nil {
 		return WarrantRequest{}, fmt.Errorf("save search attachments: %w", err)
 	}
+	if bodyFound {
+		if _, err := tx.Exec(ctx, `UPDATE case_states SET body_found_at=LEAST(COALESCE(body_found_at,$3),$3),body_found_method='residential_search',updated_at=$3
+			WHERE server_id=$1::uuid AND case_id=$2`, serverID, caseID, stamp); err != nil {
+			return WarrantRequest{}, fmt.Errorf("record residential body discovery: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO world_mutations(server_id,entity_id,field_key,value)
+			SELECT $1::uuid,$2,'status','"dead"'::jsonb WHERE EXISTS (
+				SELECT 1 FROM world_entities WHERE server_id=$1::uuid AND entity_id=$2 AND entity_type='npc')`, serverID, npcID); err != nil {
+			return WarrantRequest{}, fmt.Errorf("update discovered resident status: %w", err)
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return WarrantRequest{}, fmt.Errorf("commit residential search: %w", err)
 	}
-	return WarrantRequest{WarrantID: warrantID, Status: "granted", Message: &message}, nil
+	return WarrantRequest{WarrantID: warrantID, Status: "granted", Message: &message, BodyFound: bodyFound}, nil
 }
 
 func residentialFindingFromRecord(record records.Record) residentialFinding {
@@ -1017,8 +1073,19 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 
 	var existing persistedCaseIdentity
 	var crimeAt any
+	var bodyFoundAt any
+	var bodyFoundMethod any
 	if !definition.CrimeAt.IsZero() {
 		crimeAt = definition.CrimeAt
+	}
+	if !caseSceneIsResidential(base, definition.LocationID) {
+		foundAfter := definition.CrimeAt
+		if foundAfter.IsZero() {
+			foundAfter = time.Now().UTC()
+		}
+		digest := sha256.Sum256([]byte(definition.ID + "/automatic-body-discovery"))
+		delay := 30 + int(binary.BigEndian.Uint32(digest[:4])%180)
+		bodyFoundAt, bodyFoundMethod = foundAfter.Add(time.Duration(delay)*time.Minute), "automatic"
 	}
 	err = tx.QueryRow(ctx,
 		`SELECT case_seed, city_id, generator_version, case_type, archetype_id, motive, victim_entity_id, killer_entity_id, location_entity_id
@@ -1141,8 +1208,9 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 		return err
 	}
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO case_states (server_id, case_id, status) VALUES ($1::uuid, $2, 'open')`,
-		serverID, definition.ID,
+		`INSERT INTO case_states (server_id, case_id, status, body_found_at, body_found_method)
+		 VALUES ($1::uuid, $2, 'open', $3, $4)`,
+		serverID, definition.ID, bodyFoundAt, bodyFoundMethod,
 	); err != nil {
 		return fmt.Errorf("persist initial shared case state: %w", err)
 	}
@@ -1150,6 +1218,15 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 		return fmt.Errorf("commit case creation: %w", err)
 	}
 	return nil
+}
+
+func caseSceneIsResidential(base world.World, locationID string) bool {
+	for _, entity := range base.Entities {
+		if entity.ID == locationID {
+			return isResidentialGenerationKey(entity.GenerationKey)
+		}
+	}
+	return false
 }
 
 func persistCaseEmails(ctx context.Context, tx pgx.Tx, serverID string, definition Definition) error {
@@ -1284,6 +1361,162 @@ func (store *PostgresStore) ListOpenPublicCases(ctx context.Context, serverID, c
 		results = append(results, result)
 	}
 	return results, rows.Err()
+}
+
+// CityCrimeReports provides the city overview without exposing case solutions.
+func (store *PostgresStore) CityCrimeReports(ctx context.Context, serverID, cityID string, from, until, now time.Time) (CrimeReportDigest, error) {
+	result := CrimeReportDigest{Cases: []PublicCase{}, Missing: []MissingPerson{}}
+	rows, err := store.db.Query(ctx, `SELECT c.case_id,c.city_id,c.case_type,c.victim_entity_id,s.status,
+		COALESCE(c.crime_at,c.created_at),c.created_at,v.generation_key,w.world_seed,
+		COALESCE(city_generator.generator_version,w.generator_version)
+		FROM cases c JOIN case_states s USING(server_id,case_id)
+		JOIN world_entities v ON v.server_id=c.server_id AND v.entity_id=c.victim_entity_id
+		JOIN worlds w ON w.server_id=c.server_id
+		LEFT JOIN world_city_generators city_generator ON city_generator.server_id=c.server_id AND city_generator.city_id=c.city_id
+		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND s.status='open'
+		AND COALESCE(c.crime_at,c.created_at)>=$3 AND COALESCE(c.crime_at,c.created_at)<$4 AND COALESCE(c.crime_at,c.created_at)<=$5
+		ORDER BY c.crime_at DESC,c.case_id DESC`, serverID, cityID, from.UTC(), until.UTC(), now.UTC())
+	if err != nil {
+		return CrimeReportDigest{}, err
+	}
+	for rows.Next() {
+		var item PublicCase
+		var generationKey, seed string
+		var worldVersion int
+		if err := rows.Scan(&item.ID, &item.CityID, &item.CaseType, &item.VictimID, &item.Status, &item.CrimeAt, &item.CreatedAt, &generationKey, &seed, &worldVersion); err != nil {
+			rows.Close()
+			return CrimeReportDigest{}, err
+		}
+		victim, err := world.GenerateNPCFromKey(seed, worldVersion, generationKey)
+		if err != nil {
+			rows.Close()
+			return CrimeReportDigest{}, fmt.Errorf("reconstruct crime report victim: %w", err)
+		}
+		item.VictimName = victim.Name
+		item.VictimVisual = victim.Visual
+		result.Cases = append(result.Cases, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return CrimeReportDigest{}, err
+	}
+	rows.Close()
+	rows, err = store.db.Query(ctx, `SELECT DISTINCT ON (c.victim_entity_id) c.victim_entity_id,
+		COALESCE(c.crime_at,c.created_at),v.generation_key,w.world_seed,
+		COALESCE(city_generator.generator_version,w.generator_version)
+		FROM cases c JOIN case_states s USING(server_id,case_id)
+		JOIN world_entities v ON v.server_id=c.server_id AND v.entity_id=c.victim_entity_id
+		JOIN worlds w ON w.server_id=c.server_id
+		LEFT JOIN world_city_generators city_generator ON city_generator.server_id=c.server_id AND city_generator.city_id=c.city_id
+		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND s.status IN ('open','solved')
+		AND COALESCE(c.crime_at,c.created_at)<=$3 AND (s.body_found_at IS NULL OR s.body_found_at>$3)
+		ORDER BY c.victim_entity_id,c.created_at DESC,c.case_id DESC`, serverID, cityID, now.UTC())
+	if err != nil {
+		return CrimeReportDigest{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var person MissingPerson
+		var generationKey, seed string
+		var worldVersion int
+		if err := rows.Scan(&person.NPCID, &person.MissingAt, &generationKey, &seed, &worldVersion); err != nil {
+			return CrimeReportDigest{}, err
+		}
+		victim, err := world.GenerateNPCFromKey(seed, worldVersion, generationKey)
+		if err != nil {
+			return CrimeReportDigest{}, fmt.Errorf("reconstruct missing person: %w", err)
+		}
+		person.Name = victim.Name
+		person.Visual = victim.Visual
+		result.Missing = append(result.Missing, person)
+	}
+	return result, rows.Err()
+}
+
+// RevealDueBodies persists automatic public-scene discoveries once their scheduled time arrives.
+func (store *PostgresStore) RevealDueBodies(ctx context.Context, serverID string, now time.Time) error {
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err := tx.Exec(ctx, `INSERT INTO world_mutations(server_id,entity_id,field_key,value)
+		SELECT c.server_id,c.victim_entity_id,'status','"missing"'::jsonb
+		FROM cases c JOIN case_states s USING(server_id,case_id)
+		WHERE c.server_id=$1::uuid AND s.status IN ('open','solved') AND COALESCE(c.crime_at,c.created_at)<=$2
+		AND (s.body_found_at IS NULL OR s.body_found_at>$2)
+		AND COALESCE((SELECT m.value #>> '{}' FROM world_mutations m WHERE m.server_id=c.server_id AND m.entity_id=c.victim_entity_id AND m.field_key='status' ORDER BY m.mutation_order DESC LIMIT 1),'')<>'missing'`, serverID, now.UTC()); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO world_mutations(server_id,entity_id,field_key,value)
+		SELECT c.server_id,c.victim_entity_id,'status','"dead"'::jsonb
+		FROM cases c JOIN case_states s USING(server_id,case_id)
+		WHERE c.server_id=$1::uuid AND s.status IN ('open','solved') AND COALESCE(c.crime_at,c.created_at)<=$2
+		AND s.body_found_at IS NOT NULL AND s.body_found_at<=$2
+		AND COALESCE((SELECT m.value #>> '{}' FROM world_mutations m WHERE m.server_id=c.server_id AND m.entity_id=c.victim_entity_id AND m.field_key='status' ORDER BY m.mutation_order DESC LIMIT 1),'')<>'dead'`, serverID, now.UTC()); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (store *PostgresStore) ListPublicBodyDiscoveries(ctx context.Context, serverID, cityID string, now time.Time) ([]PublicBodyDiscovery, error) {
+	rows, err := store.db.Query(ctx, `SELECT c.case_id,v.generation_key,scene.generation_key,COALESCE(district.display_name,''),s.body_found_at,w.world_seed,
+		COALESCE(city_generator.generator_version,w.generator_version)
+		FROM cases c JOIN case_states s USING(server_id,case_id)
+		JOIN world_entities v ON v.server_id=c.server_id AND v.entity_id=c.victim_entity_id
+		JOIN world_entities scene ON scene.server_id=c.server_id AND scene.entity_id=c.location_entity_id
+		JOIN world_regions district ON district.server_id=scene.server_id AND district.region_id=scene.region_id
+		JOIN worlds w ON w.server_id=c.server_id
+		LEFT JOIN world_city_generators city_generator ON city_generator.server_id=c.server_id AND city_generator.city_id=c.city_id
+		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND s.body_found_at<=$3
+		ORDER BY s.body_found_at DESC,c.case_id DESC`, serverID, cityID, now.UTC())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]PublicBodyDiscovery, 0)
+	var cityWorld world.World
+	cityWorldLoaded := false
+	for rows.Next() {
+		var item PublicBodyDiscovery
+		var victimKey, locationKey, seed string
+		var worldVersion int
+		if err := rows.Scan(&item.CaseID, &victimKey, &locationKey, &item.DistrictName, &item.FoundAt, &seed, &worldVersion); err != nil {
+			return nil, err
+		}
+		victim, err := world.GenerateNPCFromKey(seed, worldVersion, victimKey)
+		if err != nil {
+			return nil, fmt.Errorf("reconstruct discovered victim: %w", err)
+		}
+		item.VictimName = victim.Name
+		if !cityWorldLoaded {
+			cityWorld, err = world.GenerateCity(seed, worldVersion, cityID)
+			if err != nil {
+				return nil, fmt.Errorf("reconstruct body discovery location: %w", err)
+			}
+			cityWorldLoaded = true
+		}
+		for _, entity := range cityWorld.Entities {
+			if entity.GenerationKey == locationKey {
+				item.LocationName = entity.Name
+				break
+			}
+		}
+		if item.LocationName == "" {
+			item.LocationName = generatedNameFromKey(locationKey)
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
+
+func generatedNameFromKey(key string) string {
+	parts := strings.Split(key, "/")
+	name := strings.ReplaceAll(parts[len(parts)-1], "-", " ")
+	if name == "" {
+		return key
+	}
+	return strings.ToUpper(name[:1]) + name[1:]
 }
 
 // ListOpenPublicCasesForSession resolves the player's current city and lists its open cases in one database round-trip.
@@ -2016,7 +2249,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 			) THEN CASE WHEN EXISTS (SELECT 1 FROM cases WHERE server_id=$1::uuid AND case_id=$2 AND generator_version>=4) THEN 0.75 ELSE 0.25 END
 			ELSE 0.0
 		END),0)::float8
-		FROM unnest($3::text[]) AS proof(item_id)`, serverID, request.CaseID, request.ProofIDs).Scan(&totalProofs, &proofStrength); err != nil {
+		FROM unnest($4::text[]) AS proof(item_id)`, serverID, request.CaseID, accountID, request.ProofIDs).Scan(&totalProofs, &proofStrength); err != nil {
 		return AccusationResult{}, err
 	}
 	// Authenticated case evidence has different probative strength. Context-only pins

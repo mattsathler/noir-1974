@@ -19,6 +19,7 @@ GET /api/world/transit
 GET /api/world/gate/destinations
 POST /api/world/gate/travel
 GET /api/world/newspaper
+GET /api/crime-reports
 GET /api/cases
 GET /api/cases/:caseID
 POST /api/cases/:caseID/progress
@@ -42,7 +43,7 @@ O frontend pede “NPC #23”. O servidor verifica o servidor do jogador, recupe
 
 As rotas de busca exigem uma sessão autenticada e consultam o servidor compartilhado configurado pela API. `q` é obrigatório e aceita até 80 caracteres. A busca de pessoas retorna nome, idade, aparência, IDs visuais determinísticos, local de trabalho e estado civil; não retorna cargo nem identidade do parceiro. A busca de empresas retorna sede e funcionários com seus cargos, oferecendo uma fonte separada para descobrir funções dentro da empresa. A busca de locais retorna apenas endereços do bairro atual, incluindo os pontos fixos de serviço quando o jogador está em Central. A API recompõe atributos gerados usando a seed do mundo e lê relações e mutations persistidas.
 
-`GET /api/world/newspaper` retorna a edição local da cidade atual do jogador, no dia fictício atual. A manchete usa o caso mais recente daquela cidade e omite o culpado; as notas locais são escolhidas deterministicamente por servidor, cidade e data. Cidades sem casos recebem uma chamada local de abertura. A API cria o caso inicial de Lyon uma única vez no bootstrap e registra a vítima como morta no estado compartilhado.
+`GET /api/world/newspaper` retorna a edição da cidade atual e publica apenas corpos já encontrados. Notícias de descoberta usam o horário e local da descoberta, separados do horário do crime. A edição atualiza o cache quando há mudanças de estado; notas locais continuam determinísticas por servidor, cidade e data. `GET /api/crime-reports?from=YYYY-MM-DD&to=YYYY-MM-DD` resolve a cidade pela localização persistida da conta e retorna inquéritos ainda abertos no período e pessoas atualmente desaparecidas, sem expor culpado ou classificações internas. O intervalo usa dias locais da cidade e, se omitido, cobre os últimos 30 dias. Nomes e retratos são reconstruídos do mundo determinístico. O backend agenda a descoberta automática em cenas públicas e registra buscas residenciais que localizam corpos; vítimas ainda não encontradas aparecem internamente como desaparecidas.
 
 As buscas textuais de pessoas, empresas e locais retornam no máximo cinco resultados, em ordem alfabética. A busca de pessoas monta os perfis completos somente para os cinco primeiros resultados; a busca de empresas consulta os funcionários somente para as cinco empresas retornadas. `GET /api/world/companies?locationId=...` lista todas as empresas relacionadas ao endereço exato por `company_locations`, sem incluir os funcionários nem procurar empresas apenas pelo bairro; a interface usa essas relações para listar empresas diretamente no Neighborhood. O computador da empresa recebe seu `companyId` como contexto; o staff directory consulta `GET /api/world/companies?locationId=...&companyId=...` depois do acesso e retorna somente os funcionários daquela empresa. A consulta de registros bancários/GATE também retorna no máximo cinco registros por chamada.
 

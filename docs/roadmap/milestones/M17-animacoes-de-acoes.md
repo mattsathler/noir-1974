@@ -1,16 +1,17 @@
-# M15 — Animações das ações do jogo
+# M17 — Animações das ações do jogo
 
-**Ciclo:** 15  
+**Ciclo:** 17  
 **Status:** Em andamento
 **Depende de:** M14 aceito
 
+> A introdução do destino após confirmação da viagem foi separada para [I02](../melhorias/I02-introducao-destino-gate.md), originada nesta milestone antes da troca de numeração.
+
 ## Objetivo
 
-Dar mais presença visual às mudanças de localização confirmadas pelo GATE, estabelecer os personagens centrais da narrativa policial e criar um sistema de conversa direta entre NPCs e jogador. A direção visual permanece coerente com a identidade de Noir 1974, em pixel art.
+Dar mais presença visual às viagens entre bairros, estabelecer os personagens centrais da narrativa policial e criar um sistema de conversa direta entre NPCs e jogador. A direção visual permanece coerente com a identidade de Noir 1974, em pixel art.
 
 ## Critérios de aceite
 
-- [ ] Depois que uma viagem pelo GATE for confirmada, o destino recém-alcançado aparece em uma introdução com efeito typewriter. A sequência não apresenta botão de skip e só exibe o destino como localização atual após a confirmação da API.
 - [ ] Viagens entre bairros apresentam uma cena de deslocamento com um carro em pixel art sobre um fundo de rua. A cena identifica o bairro de destino e termina na chegada confirmada.
 - [ ] Enquanto os PNGs finais do carro e do cenário não estiverem prontos, a cena usa substitutos visuais temporários. A estrutura permite trocar esses substitutos pelos assets finais sem alterar as regras da viagem.
 - [ ] Bill Bouer é estabelecido como o personagem policial protagonista, e The Crow como seu antagonista. Os dois devem manter identidade visual própria e coerente com a direção em pixel art de Noir 1974.

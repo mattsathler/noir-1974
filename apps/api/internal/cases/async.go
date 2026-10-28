@@ -15,6 +15,7 @@ type AsyncRequestProcessor struct {
 	serverID             string
 	interval             time.Duration
 	onAccusationAccepted func(string)
+	onRequestCompleted   func()
 }
 
 func NewAsyncRequestProcessor(store *PostgresStore, serverID string, interval time.Duration) *AsyncRequestProcessor {
@@ -28,11 +29,18 @@ func (processor *AsyncRequestProcessor) SetAccusationAcceptedHandler(handler fun
 	processor.onAccusationAccepted = handler
 }
 
+func (processor *AsyncRequestProcessor) SetRequestCompletedHandler(handler func()) {
+	processor.onRequestCompleted = handler
+}
+
 func (processor *AsyncRequestProcessor) Run(ctx context.Context) {
 	ticker := time.NewTicker(processor.interval)
 	defer ticker.Stop()
 	for {
 		worked, err := processor.store.ProcessNextAsyncRequest(ctx, processor.serverID, processor.onAccusationAccepted)
+		if worked && err == nil && processor.onRequestCompleted != nil {
+			processor.onRequestCompleted()
+		}
 		if err != nil && !errors.Is(err, context.Canceled) {
 			log.Printf("process asynchronous player request: %v", err)
 		}

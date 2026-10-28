@@ -16,7 +16,6 @@ import (
 type recurringWorld interface {
 	WorldForCases(context.Context, string) (world.World, error)
 	ExpandDistrictSociety(context.Context, string, string) error
-	SetNPCStatus(context.Context, string, string, string) error
 }
 
 type recurringStore interface {
@@ -30,6 +29,10 @@ type recurringStore interface {
 }
 
 type generationLock func(context.Context, func() error) error
+
+type dueBodyDiscoveryRunner interface {
+	RevealDueBodies(context.Context, string, time.Time) error
+}
 
 type RecurringGenerator struct {
 	databaseURL, serverID string
@@ -56,6 +59,9 @@ func (g *RecurringGenerator) Run(ctx context.Context) {
 	}
 	ticker := time.NewTicker(poll)
 	defer ticker.Stop()
+	if err := g.runOne(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		log.Printf("recurring case generation: %v", err)
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -69,7 +75,23 @@ func (g *RecurringGenerator) Run(ctx context.Context) {
 }
 
 func (g *RecurringGenerator) runOne(ctx context.Context) error {
-	return g.withGenerationLock(ctx, func() error { return g.generateOne(ctx) })
+	return g.withGenerationLock(ctx, func() error {
+		discoveries, tracksBodies := g.store.(dueBodyDiscoveryRunner)
+		if tracksBodies {
+			if err := discoveries.RevealDueBodies(ctx, g.serverID, time.Now().UTC()); err != nil {
+				return fmt.Errorf("publish body discoveries: %w", err)
+			}
+		}
+		if err := g.generateOne(ctx); err != nil {
+			return err
+		}
+		if tracksBodies {
+			if err := discoveries.RevealDueBodies(ctx, g.serverID, time.Now().UTC()); err != nil {
+				return fmt.Errorf("publish body discoveries: %w", err)
+			}
+		}
+		return nil
+	})
 }
 
 func (g *RecurringGenerator) withAdvisoryLock(ctx context.Context, generate func() error) error {
@@ -146,9 +168,6 @@ func (g *RecurringGenerator) generateOne(ctx context.Context) error {
 		return fmt.Errorf("could not find unused case candidates: %w", err)
 	}
 	if err := g.store.Create(ctx, g.serverID, base, definition); err != nil {
-		return err
-	}
-	if err := g.world.SetNPCStatus(ctx, g.serverID, definition.VictimID, "dead"); err != nil {
 		return err
 	}
 	return g.store.AdvanceGeneration(ctx, g.serverID, slot, g.interval)

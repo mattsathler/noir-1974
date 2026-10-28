@@ -132,10 +132,26 @@ CREATE TABLE IF NOT EXISTS case_states (
     case_id text NOT NULL,
     status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'solved', 'archived')),
     updated_at timestamptz NOT NULL DEFAULT now(),
+    body_found_at timestamptz,
+    body_found_method text CHECK (body_found_method IN ('automatic', 'residential_search')),
     PRIMARY KEY (server_id, case_id),
     FOREIGN KEY (server_id, case_id)
         REFERENCES cases(server_id, case_id) ON DELETE CASCADE
 );
+ALTER TABLE case_states ADD COLUMN IF NOT EXISTS body_found_at timestamptz;
+ALTER TABLE case_states ADD COLUMN IF NOT EXISTS body_found_method text;
+ALTER TABLE case_states DROP CONSTRAINT IF EXISTS case_states_body_found_method_check;
+ALTER TABLE case_states ADD CONSTRAINT case_states_body_found_method_check CHECK (body_found_method IS NULL OR body_found_method IN ('automatic', 'residential_search'));
+CREATE INDEX IF NOT EXISTS case_states_body_discovery_idx ON case_states(server_id, body_found_at) WHERE body_found_at IS NOT NULL;
+UPDATE case_states s SET body_found_at=COALESCE(c.crime_at,c.created_at)+interval '90 minutes',body_found_method='automatic'
+FROM cases c JOIN world_entities scene ON scene.server_id=c.server_id AND scene.entity_id=c.location_entity_id
+WHERE s.server_id=c.server_id AND s.case_id=c.case_id AND s.body_found_at IS NULL
+  AND scene.generation_key !~* '(^|/)(residence|residential|apartment|house|home|immeuble|flat)(/|[-_]|$)|/building/(residence|residential|apartment|house|home|immeuble|flat)([-_/]|$)';
+INSERT INTO world_mutations(server_id,entity_id,field_key,value)
+SELECT c.server_id,c.victim_entity_id,'status','"missing"'::jsonb
+FROM cases c JOIN case_states s USING(server_id,case_id)
+WHERE s.status IN ('open','solved') AND COALESCE(c.crime_at,c.created_at)<=now() AND (s.body_found_at IS NULL OR s.body_found_at>now())
+  AND (SELECT value #>> '{}' FROM world_mutations m WHERE m.server_id=c.server_id AND m.entity_id=c.victim_entity_id AND m.field_key='status' ORDER BY mutation_order DESC LIMIT 1)='dead';
 
 CREATE TABLE IF NOT EXISTS player_case_progress (
     server_id uuid NOT NULL,

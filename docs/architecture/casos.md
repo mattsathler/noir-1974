@@ -4,7 +4,7 @@ Um caso não armazena uma cópia do mundo. Ele pertence ao servidor e referencia
 
 ## Gerador modular de homicídios
 
-Todo caso gerado continua sendo um homicídio (`case_type`). O `archetype_id` descreve a trama e a motivação, sem restringir todos os casos a conflitos de trabalho. A versão 5 mantém a hora interna do crime e os canais investigativos da v4, e garante que o registro GATE do culpado mostre sua chegada ao bairro da cena antes do crime; em parte dos casos também registra a saída depois. A versão 4 permanece reconstruível sem a saída opcional e a versão 3 mantém sua seleção e pistas anteriores.
+Todo caso gerado continua sendo um homicídio (`case_type`). O `archetype_id` descreve a trama e a motivação, sem restringir todos os casos a conflitos de trabalho. A versão 6 mantém a hora interna do crime e os canais investigativos da v5, escolhe para ciúmes um edifício não corporativo no distrito do casal e dá a cada arquétipo uma janela noturna coerente com seu contexto, calculada no fuso da cidade. Conflitos de trabalho e extorsão continuam na sede da empresa. A chegada GATE do culpado ao bairro da cena antes do crime é garantida; em parte dos casos também há saída posterior. As versões 5 e 4 permanecem reconstruíveis, assim como a versão 3 com sua seleção e pistas anteriores.
 
 Os arquétipos atuais são `workplace_conflict`, `jealousy` e `financial_extortion`. O primeiro usa vínculos de emprego e a sede da empresa; o segundo parte de um casamento, um colega que serve de possível amante e correspondência e passagens GATE que conectam os três; o terceiro usa uma relação profissional para estruturar uma extorsão. Em casos v5, os registros GATE do culpado provam presença no bairro da cena no horário do crime: chegada anterior é garantida e a saída posterior pode aparecer também. Extorsões geram o mesmo valor e referência de conta anônima como débito da vítima e crédito do culpado, além de transferências alheias para criar comparações. Mensagens de arrependimento ou sobre o relacionamento também conectam os NPCs; apenas uma fração pequena das mensagens oculta o remetente de quem as recebe, enquanto a caixa de enviados mantém sua identidade. A seleção escolhe um arquétipo disponível e depois um cenário dentro dele, de forma determinística por `case_seed` e versão, para que um arquétipo com mais combinações não domine os demais. Registros e mensagens de caso guardam a classificação interna separada da apresentação ao jogador.
 
@@ -17,12 +17,14 @@ O validador comum verifica seed/versão/ID, vítimas e culpados existentes e dis
 - `case_evidence` guarda a classificação interna, apresentação, vínculos e regras de acesso em JSONB.
 - `case_activity_records` relaciona registros bancários e GATE ao caso, NPC, horário e classificação interna; o JSON público do registro não inclui essa classificação.
 - `case_mail_messages` relaciona mensagens ao caso, caixa do NPC, outro participante, horário e classificação interna; o JSON público contém apenas os campos de correspondência.
-- `case_states` guarda o estado compartilhado do caso (`open`, `solved`, `archived`).
+- `case_states` guarda o estado compartilhado do caso (`open`, `solved`, `archived`) e o evento persistido de descoberta do corpo, com horário e origem.
 - `player_case_progress` guarda IDs de evidências descobertas por conta, independentemente do estado compartilhado.
 
 A geração com a mesma seed, versão e mundo reproduz a mesma definição. Progresso do jogador nunca é derivado da seed. `PostgresStore.Create` verifica referências de entidades e relações persistidas e grava a definição e o estado inicial em uma transação. O schema é migrado na inicialização da API depois de identidade e mundo.
 
 A classificação das pistas e suas relações com a solução são internas ao backend, não expostas como tal ao jogador. A apresentação deve misturar pistas com acontecimentos cotidianos e deixar sua relevância como parte da dedução. Ver [Regra 0002](../rules/0002-pistas-sem-sinalizacao.md). A geração parte das relações sociais das empresas, conforme a [Regra 0003](../rules/0003-universo-corporativo.md).
+
+Crime Reports combina inquéritos abertos com vítimas cujo corpo ainda não foi encontrado. Esse estado é derivado no backend a partir do caso e do evento de descoberta; o perfil público comunica “missing” até o evento. Casos em cenas públicas recebem horário determinístico de descoberta automática; uma busca na residência da vítima pode registrar uma descoberta anterior. A atualização do estado e da notícia é idempotente.
 
 Nos geradores v4 e v5, o arquivo inicial contém o briefing e os registros formais do caso; as mensagens e atividades ligadas ficam nas caixas de email, no Meridian Bank e no GATE dos NPCs. Assim, ler o arquivo não substitui comparar as fontes investigativas. Casos v3 preservam a apresentação anterior.
 

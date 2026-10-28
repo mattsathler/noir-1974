@@ -162,6 +162,15 @@ export async function getOpenCases() {
   return payload.results ?? [];
 }
 
+export async function getCrimeReports({ from, to } = {}) {
+  const query = new URLSearchParams();
+  if (from) query.set("from", from);
+  if (to) query.set("to", to);
+  const encoded = query.toString();
+  const suffix = encoded ? `?${encoded}` : "";
+  return requestCase(`/api/crime-reports${suffix}`);
+}
+
 export function getCaseFile(caseId) {
   return requestCase(`/api/cases/${encodeURIComponent(caseId)}`);
 }

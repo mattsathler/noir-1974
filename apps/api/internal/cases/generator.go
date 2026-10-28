@@ -15,8 +15,10 @@ import (
 	"noir-1974/apps/api/internal/world"
 )
 
-const GeneratorVersion = 5
+const GeneratorVersion = 6
 const connectedGeneratorVersion = 4
+const contextualGeneratorVersion = 6
+const previousGeneratorVersion = 5
 const legacyGeneratorVersion = 3
 
 var (
@@ -107,7 +109,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	if strings.TrimSpace(seed) == "" {
 		return Definition{}, ErrInvalidCaseSeed
 	}
-	if version != GeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
+	if version != GeneratorVersion && version != previousGeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
 		return Definition{}, fmt.Errorf("%w: %d", ErrUnsupportedGenerator, version)
 	}
 	candidateWorld := base
@@ -141,8 +143,23 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	candidates := archetypeCandidates(archetype, candidateWorld, version)
 	selected := candidates[caseIndex(seed+"/"+archetype.id, version, len(candidates))]
 	caseID := makeCaseID(seed, version)
-	caseDate := time.Now().UTC().Truncate(24 * time.Hour)
-	crimeAt := caseDate.Add(time.Duration(18*60+caseIndex(seed+"/crime-time", version, 4*60)) * time.Minute)
+	generatedAt := time.Now()
+	caseDate := generatedAt.UTC().Truncate(24 * time.Hour)
+	caseDay := caseDate
+	var cityLocation *time.Location
+	if version >= contextualGeneratorVersion {
+		caseDay = cityLocalDay(selected.locationID, base, generatedAt)
+		if city, ok := world.CityByID(cityForLocation(base, selected.locationID)); ok {
+			if location, err := time.LoadLocation(city.TimeZone); err == nil {
+				cityLocation = location
+			}
+		}
+	}
+	crimeAt := caseDay.Add(caseTimeOffset(seed, selected.archetypeID, version))
+	if cityLocation != nil && crimeAt.After(generatedAt.UTC()) {
+		// Cases are generated before their evening crime time; keep generated records historical.
+		crimeAt = crimeAt.In(cityLocation).AddDate(0, 0, -1).UTC()
+	}
 	definition := Definition{
 		ID:               caseID,
 		CityID:           cityForLocation(base, selected.locationID),
@@ -177,6 +194,32 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	return definition, nil
 }
 
+func cityLocalDay(locationID string, base world.World, now time.Time) time.Time {
+	city, ok := world.CityByID(cityForLocation(base, locationID))
+	if !ok {
+		return now.UTC().Truncate(24 * time.Hour)
+	}
+	zone, err := time.LoadLocation(city.TimeZone)
+	if err != nil {
+		return now.UTC().Truncate(24 * time.Hour)
+	}
+	localNow := now.In(zone)
+	return time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, zone).UTC()
+}
+
+func caseTimeOffset(seed, archetypeID string, version int) time.Duration {
+	startMinute := 18 * 60
+	if version >= contextualGeneratorVersion {
+		switch archetypeID {
+		case "workplace_conflict":
+			startMinute = 19 * 60
+		case "financial_extortion":
+			startMinute = 20 * 60
+		}
+	}
+	return time.Duration(startMinute+caseIndex(seed+"/crime-time", version, 4*60)) * time.Minute
+}
+
 func availableArchetypesForVersion(base world.World, version int) []archetypeGenerator {
 	available := make([]archetypeGenerator, 0, len(archetypeGenerators))
 	for _, archetype := range archetypeGenerators {
@@ -188,6 +231,9 @@ func availableArchetypesForVersion(base world.World, version int) []archetypeGen
 }
 
 func archetypeCandidates(archetype archetypeGenerator, base world.World, version int) []candidate {
+	if version >= contextualGeneratorVersion && archetype.id == "jealousy" {
+		return jealousyCandidatesV6(base)
+	}
 	if version >= connectedGeneratorVersion && archetype.id == "jealousy" {
 		return jealousyCandidatesV4(base)
 	}
@@ -234,7 +280,7 @@ func buildCaseEmails(seed string, worldVersion int, caseID string, selected cand
 
 func buildConnectedCaseRecords(seed string, worldVersion int, caseID string, selected candidate, base world.World, crimeAt time.Time, caseVersion int) []records.Record {
 	keyVersion := connectedGeneratorVersion
-	if caseVersion >= GeneratorVersion {
+	if caseVersion >= previousGeneratorVersion {
 		keyVersion = caseVersion
 	}
 	key := fmt.Sprintf("noir-case-records/v%d/%s/%d/%s", keyVersion, seed, worldVersion, caseID)
@@ -251,7 +297,7 @@ func buildConnectedCaseRecords(seed string, worldVersion int, caseID string, sel
 		caseGateRecord(key, caseID, "scene-victim", selected.victimID, selected.killerID, crimeAt.Add(-38*time.Minute), victimOrigin, scene, "A passenger entry was recorded at the local relay."),
 		caseGateRecord(key, caseID, "scene-killer", selected.killerID, selected.victimID, crimeAt.Add(-19*time.Minute), killerOrigin, scene, "A passenger entry was recorded at the local relay."),
 	}
-	if caseVersion >= GeneratorVersion && keyIndex(key, "killer-scene-exit", 2) == 0 {
+	if caseVersion >= previousGeneratorVersion && keyIndex(key, "killer-scene-exit", 2) == 0 {
 		result = append(result, caseGateRecord(key, caseID, "scene-killer-exit", selected.killerID, selected.victimID, crimeAt.Add(14*time.Minute), scene, killerOrigin, "A passenger exit was recorded at the local relay."))
 	}
 	if selected.archetypeID == "financial_extortion" {
@@ -467,6 +513,9 @@ func Validate(definition Definition, base world.World) error {
 			validArchetype = validateExtortionV4(definition, base)
 		}
 	}
+	if !validateContextualScene(definition, base) || !validateContextualTiming(definition) {
+		return ErrInvalidDefinition
+	}
 	if !validArchetype {
 		return ErrInvalidDefinition
 	}
@@ -477,7 +526,7 @@ func Validate(definition Definition, base world.World) error {
 }
 
 func supportedCaseGeneratorVersion(version int) bool {
-	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == GeneratorVersion
+	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == previousGeneratorVersion || version == GeneratorVersion
 }
 
 func availableArchetypes(base world.World) []archetypeGenerator {
@@ -615,10 +664,26 @@ func jealousyCandidates(base world.World) []candidate {
 // jealousyCandidatesV4 requires a real spouse pair and a workplace acquaintance
 // who can serve as the suspected lover in the generated paper and travel trails.
 func jealousyCandidatesV4(base world.World) []candidate {
+	return jealousyCandidatesForVersion(base, false)
+}
+
+func jealousyCandidatesV6(base world.World) []candidate {
+	return jealousyCandidatesForVersion(base, true)
+}
+
+func jealousyCandidatesForVersion(base world.World, privateScene bool) []candidate {
 	var result []candidate
 	locationsByRegion := make(map[string][]string)
+	companyScenes := make(map[string]bool)
+	if privateScene {
+		for _, relation := range base.CompanyLocations {
+			if relation.LocationRole == "headquarters" {
+				companyScenes[relation.LocationID] = true
+			}
+		}
+	}
 	for _, entity := range base.Entities {
-		if entity.EntityType == "location" {
+		if entity.EntityType == "location" && (!privateScene || entity.LocationKind == "building" && !companyScenes[entity.ID]) {
 			locationsByRegion[entity.RegionID] = append(locationsByRegion[entity.RegionID], entity.ID)
 		}
 	}
@@ -668,6 +733,49 @@ func jealousyCandidatesV4(base world.World) []candidate {
 		}
 	}
 	return result
+}
+
+func validateContextualScene(definition Definition, base world.World) bool {
+	if definition.GeneratorVersion < contextualGeneratorVersion || definition.ArchetypeID != "jealousy" {
+		return true
+	}
+	for _, entity := range base.Entities {
+		if entity.ID != definition.LocationID || entity.EntityType != "location" || entity.LocationKind != "building" {
+			continue
+		}
+		for _, relation := range base.CompanyLocations {
+			if relation.LocationID == entity.ID && relation.LocationRole == "headquarters" {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func validateContextualTiming(definition Definition) bool {
+	if definition.GeneratorVersion < contextualGeneratorVersion {
+		return true
+	}
+	if definition.CrimeAt.IsZero() {
+		return false
+	}
+	zone := time.UTC
+	if city, ok := world.CityByID(definition.CityID); ok {
+		if loaded, err := time.LoadLocation(city.TimeZone); err == nil {
+			zone = loaded
+		}
+	}
+	localTime := definition.CrimeAt.In(zone)
+	minute := localTime.Hour()*60 + localTime.Minute()
+	startMinute := 18 * 60
+	switch definition.ArchetypeID {
+	case "workplace_conflict":
+		startMinute = 19 * 60
+	case "financial_extortion":
+		startMinute = 20 * 60
+	}
+	return minute >= startMinute && minute < startMinute+4*60
 }
 
 func buildEvidence(caseID string, selected candidate) []EvidenceDefinition {
@@ -848,7 +956,7 @@ func validateConnectedCaseRecords(definition Definition, base world.World) bool 
 			}
 			killerGate, scene, killerScene = item, item.Destination, true
 		case "scene-killer-exit":
-			if definition.GeneratorVersion < GeneratorVersion || item.Source != "gate" || item.NPCID != definition.KillerID || item.RelatedNPCID != definition.VictimID || !item.OccurredAt.After(definition.CrimeAt) || item.Origin != regionName(base, locationRegion(base, definition.LocationID)) {
+			if definition.GeneratorVersion < previousGeneratorVersion || item.Source != "gate" || item.NPCID != definition.KillerID || item.RelatedNPCID != definition.VictimID || !item.OccurredAt.After(definition.CrimeAt) || item.Origin != regionName(base, locationRegion(base, definition.LocationID)) {
 				return false
 			}
 		case "affair-victim":

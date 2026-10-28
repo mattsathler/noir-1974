@@ -6,6 +6,8 @@ O desenvolvimento avança em **ciclos**. Cada ciclo tem um **milestone de sucess
 
 Milestones concluídas ficam em [`achieved/`](achieved/); milestones em andamento ou futuras ficam em [`milestones/`](milestones/).
 
+Melhorias independentes, de escopo curto ou médio, ficam em [`melhorias/`](melhorias/). Uma melhoria não depende da conclusão de outra melhoria. Se o trabalho exigir várias etapas coordenadas ou ultrapassar escopo médio, deve ser descrito como milestone.
+
 Prova técnica que sustenta o restante (meta do ciclo 4):
 
 ```text
@@ -34,15 +36,15 @@ Ordem e regras de entrada/saída: [`ciclos.md`](ciclos.md).
 | 12 | Interações investigativas em locais | [M12](achieved/M12-busca-e-apreensao.md) |
 | 13 | Acusação e julgamento | [M13](achieved/M13-acusacao-e-julgamento.md) |
 | 14 | Otimização, cache e estabilidade | [M14](achieved/M14-otimizacao-cache-e-estabilidade.md) |
-| 15 | Animações das ações do jogo | [M15](milestones/M15-animacoes-de-acoes.md) |
-| 16 | Crime Reports | [M16](milestones/M16-crime-reports.md) |
-| 17 | Identidade visual procedural e customização do personagem | [M17](milestones/M17-identidade-visual-e-customizacao.md) |
+| 15 | Identidade visual procedural e customização do personagem | [M15](milestones/M15-identidade-visual-e-customizacao.md) |
+| 16 | Crime Reports | [M16](achieved/M16-crime-reports.md) |
+| 17 | Animações das ações do jogo | [M17](milestones/M17-animacoes-de-acoes.md) |
 | 18 | Áudio e efeitos sonoros | [M18](milestones/M18-audio-e-efeitos-sonoros.md) |
 | 19 | Pedidos policiais assíncronos | [M19](achieved/M19-pedidos-assincronos.md) |
 | 20 | Auditoria integral de estabilidade e consistência pré-beta | [M20](milestones/M20-auditoria-integral-pre-beta.md) |
 | 21 | Hospital e identificação forense | [M21](achieved/M21-hospital-e-identificacao-forense.md) |
 
-Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável para playtest, não a conclusão do jogo. M07–M13 constroem o fluxo investigativo completo: registros, correio, deslocamento, organização de elementos, expansão geográfica, visita e investigação de locais, acusação e prisão do culpado. O M10 também entrega identidades visuais modulares para personagens e geração recorrente de casos compartilhados. M14 vem depois do fluxo criminal completo e consolida desempenho, cache e estabilidade da plataforma; ele não altera a porcentagem de conclusão desse fluxo. M15 apresenta o destino confirmado do GATE em typewriter, usa uma cena temporária de carro em pixel art para viagens entre bairros e cria uma overlay de conversa direta com opções de resposta; também estabelece Bill Bouer e The Crow. Animações de deslocamento policial e roteiros tutoriais específicos ficam para especificações posteriores. M16 adiciona Crime Reports ao computador pessoal como início investigativo, lista desaparecidos e publica corpos encontrados no jornal. M17 amplia a geração visual de NPCs e permite editar a aparência do personagem do jogador após a criação. M18 adiciona áudio às interações. M19 implementa a análise assíncrona de mandados e acusações, como extensão do fluxo de M13. M20 realiza a auditoria integral de estabilidade e consistência pré-beta. M21 abre o Hospital e acrescenta prontuários, códigos estáveis de impressão digital e vestígios forenses comparáveis no fluxo de investigação. Tutorial (Vesper), auth completa, simulação temporal geral e outros sistemas continuam exigindo milestones próprios.
+Ciclos 1–5 são **fundação**. O ciclo 6 é o primeiro recorte jogável para playtest, não a conclusão do jogo. M07–M13 constroem o fluxo investigativo completo: registros, correio, deslocamento, organização de elementos, expansão geográfica, visita e investigação de locais, acusação e prisão do culpado. O M10 também entrega identidades visuais modulares para personagens e geração recorrente de casos compartilhados. M14 vem depois do fluxo criminal completo e consolida desempenho, cache e estabilidade da plataforma; ele não altera a porcentagem de conclusão desse fluxo. M15 amplia o catálogo de aparência procedural e permite editar a aparência do personagem do jogador. M16 adiciona Crime Reports ao computador pessoal como início investigativo, lista desaparecidos e publica corpos encontrados no jornal. M17 usa uma cena temporária de carro em pixel art para viagens entre bairros e cria uma overlay de conversa direta com opções de resposta; também estabelece Bill Bouer e The Crow. Animações de deslocamento policial e roteiros tutoriais específicos ficam para especificações posteriores. M18 adiciona áudio às interações. M19 implementa a análise assíncrona de mandados e acusações, como extensão do fluxo de M13. M20 realiza a auditoria integral de estabilidade e consistência pré-beta. M21 abre o Hospital e acrescenta prontuários, códigos estáveis de impressão digital e vestígios forenses comparáveis no fluxo de investigação. Tutorial (Vesper), auth completa, simulação temporal geral e outros sistemas continuam exigindo milestones próprios.
 
 ## Status
 

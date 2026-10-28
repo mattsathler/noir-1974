@@ -1,17 +1,17 @@
-# M17 — Identidade visual procedural e customização do personagem
+# M15 — Identidade visual procedural e customização do personagem
 
-**Ciclo:** 17
+**Ciclo:** 15
 **Status:** Não iniciado
-**Depende de:** M16 aceito
+**Depende de:** M14 aceito
+
+> A compatibilidade da aparência procedural dos NPCs foi separada para [I01](../melhorias/I01-compatibilidade-visual-npcs.md), originada nesta milestone antes da troca de numeração.
 
 ## Objetivo
 
-Ampliar e revisar o sistema de aparência modular para que NPCs tenham identidades visuais diversas, coerentes com seus atributos e estáveis no mundo compartilhado. Expandir o catálogo de faces, cabelos e cosméticos e permitir que o jogador volte a editar a aparência do próprio personagem depois da criação inicial.
+Ampliar o catálogo de faces, cabelos e cosméticos e permitir que o jogador volte a editar a aparência do próprio personagem depois da criação inicial.
 
 ## Critérios de aceite
 
-- [ ] O catálogo visual classifica cada peça com metadados explícitos de compatibilidade: apresentação masculina, feminina, unissex ou combinações permitidas, faixas etárias quando pertinentes, camadas incompatíveis e tags descritivas. A compatibilidade é validada no servidor e aplicada pelo gerador e pela interface.
-- [ ] A geração procedural considera idade e apresentação/gênero do personagem ao escolher peças, evitando combinações incompatíveis segundo os metadados (por exemplo, barba em personagem sem compatibilidade com barba), sem depender de filtros frágeis pelo nome do arquivo.
 - [ ] A seleção de tons de pele e traços visuais parte de dados explícitos de identidade/ancestralidade ou de distribuição regional documentada, sem inferir raça por nome, nacionalidade ou orientação sexual; os resultados permanecem variados e não estereotipados.
 - [ ] Orientação sexual não determina cabelo, barba, maquiagem ou outros traços como atalho visual. Quando houver preferência estética expressa pelo personagem/jogador, ela pode orientar a composição sem reduzir identidades a estereótipos.
 - [ ] O gerador leva idade em conta de forma consistente para cabelos, grisalhos, calvície e cosméticos relacionados, com regras explícitas, documentadas e cobertas por validação.

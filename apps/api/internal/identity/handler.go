@@ -130,6 +130,10 @@ type CaseAPIReader interface {
 	SavePlayerProgress(context.Context, string, string, string, cases.PlayerProgress) error
 }
 
+type crimeReportsReader interface {
+	CityCrimeReports(context.Context, string, string, time.Time, time.Time, time.Time) (cases.CrimeReportDigest, error)
+}
+
 type caseSessionLocationReader interface {
 	accountForSessionAndLocation(context.Context, string, time.Time) (account, *character, string, error)
 }
@@ -250,6 +254,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 	}
 	if caseReader != nil {
 		mux.HandleFunc("GET /api/cases", handler.listOpenCases)
+		if _, ok := caseReader.(crimeReportsReader); ok {
+			mux.HandleFunc("GET /api/crime-reports", handler.crimeReports)
+		}
 		mux.HandleFunc("GET /api/cases/{caseID}", handler.getCase)
 		mux.HandleFunc("POST /api/cases/{caseID}/progress", handler.saveCaseProgress)
 		if _, ok := caseReader.(CaseAccusationReader); ok {
@@ -755,6 +762,60 @@ func (h *Handler) listOpenCases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (h *Handler) crimeReports(w http.ResponseWriter, r *http.Request) {
+	reader, ok := h.caseReader.(crimeReportsReader)
+	if !ok {
+		http.Error(w, "crime reports unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	_, cityID, ok := h.caseAccountAndCity(w, r)
+	if !ok {
+		return
+	}
+	now := h.now()
+	from, until, err := crimeReportDateRange(cityID, r.URL.Query().Get("from"), r.URL.Query().Get("to"), now)
+	if err != nil {
+		http.Error(w, "invalid crime report date range", http.StatusBadRequest)
+		return
+	}
+	result, err := reader.CityCrimeReports(r.Context(), h.worldServerID, cityID, from, until, now)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "CRIME_REPORTS_UNAVAILABLE", "could not retrieve city crime reports", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func crimeReportDateRange(cityID, fromText, toText string, now time.Time) (time.Time, time.Time, error) {
+	zone := time.UTC
+	if city, ok := world.CityByID(cityID); ok {
+		if location, err := time.LoadLocation(city.TimeZone); err == nil {
+			zone = location
+		}
+	}
+	today := now.In(zone)
+	if fromText == "" && toText == "" {
+		fromText = today.AddDate(0, 0, -30).Format("2006-01-02")
+		toText = today.Format("2006-01-02")
+	} else if fromText == "" {
+		fromText = toText
+	} else if toText == "" {
+		toText = fromText
+	}
+	from, err := time.ParseInLocation("2006-01-02", fromText, zone)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	to, err := time.ParseInLocation("2006-01-02", toText, zone)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	if from.After(to) {
+		return time.Time{}, time.Time{}, errors.New("date range starts after it ends")
+	}
+	return from.UTC(), to.AddDate(0, 0, 1).UTC(), nil
 }
 
 func (h *Handler) caseAccountAndCity(w http.ResponseWriter, r *http.Request) (account, string, bool) {

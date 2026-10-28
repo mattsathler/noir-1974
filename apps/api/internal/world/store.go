@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -576,7 +577,7 @@ func (store *PostgresStore) getNPCWithWorldConfig(ctx context.Context, serverID,
 		return NPCProfile{}, "", 0, ErrGeneratedConflict
 	}
 	if combineWorldAndStatus {
-		if status != "alive" && status != "dead" && status != "arrested" {
+		if status != "alive" && status != "missing" && status != "dead" && status != "arrested" {
 			return NPCProfile{}, "", 0, ErrInvalidMutation
 		}
 		npc.Status = status
@@ -629,7 +630,7 @@ func (store *PostgresStore) getNPCWithWorldConfig(ctx context.Context, serverID,
 		if other.ID != relation.NPCID {
 			return NPCProfile{}, "", 0, ErrGeneratedConflict
 		}
-		if relation.Status != "alive" && relation.Status != "dead" && relation.Status != "arrested" {
+		if relation.Status != "alive" && relation.Status != "missing" && relation.Status != "dead" && relation.Status != "arrested" {
 			return NPCProfile{}, "", 0, ErrInvalidMutation
 		}
 		other.Status = relation.Status
@@ -2068,7 +2069,7 @@ func (store *PostgresStore) CityWorldForCases(ctx context.Context, serverID, cit
 	}
 	for index := range base.NPCs {
 		if status, ok := statuses[base.NPCs[index].ID]; ok {
-			if status != "alive" && status != "dead" && status != "arrested" {
+			if status != "alive" && status != "missing" && status != "dead" && status != "arrested" {
 				return World{}, ErrInvalidMutation
 			}
 			base.NPCs[index].Status = status
@@ -2211,8 +2212,8 @@ func (store *PostgresStore) PhoneContactByNumber(ctx context.Context, serverID, 
 
 func phoneNumberForNPC(npcID string) string {
 	hash := uint32(2166136261)
-	for index := 0; index < len(npcID); index++ {
-		hash = (hash ^ uint32(npcID[index])) * 16777619
+	for _, codeUnit := range utf16.Encode([]rune(npcID)) {
+		hash = (hash ^ uint32(codeUnit)) * 16777619
 	}
 	digits := fmt.Sprintf("%07d", 1000000+hash%9000000)
 	return digits
@@ -2341,7 +2342,7 @@ func (store *PostgresStore) applyNPCStatus(ctx context.Context, serverID, npcID 
 	if err != nil {
 		return err
 	}
-	if status != "alive" && status != "dead" && status != "arrested" {
+	if status != "alive" && status != "missing" && status != "dead" && status != "arrested" {
 		return ErrInvalidMutation
 	}
 	npc.Status = status
@@ -2354,7 +2355,7 @@ func applyNPCStatusMap(npcs []NPC, statuses map[string]string) error {
 		if !exists {
 			continue
 		}
-		if status != "alive" && status != "dead" && status != "arrested" {
+		if status != "alive" && status != "missing" && status != "dead" && status != "arrested" {
 			return ErrInvalidMutation
 		}
 		npcs[index].Status = status
@@ -2386,7 +2387,7 @@ func (store *PostgresStore) applyNPCStatuses(ctx context.Context, serverID strin
 		if err := rows.Scan(&id, &status); err != nil {
 			return err
 		}
-		if status != "alive" && status != "dead" && status != "arrested" {
+		if status != "alive" && status != "missing" && status != "dead" && status != "arrested" {
 			return ErrInvalidMutation
 		}
 		byID[id].Status = status
