@@ -15,7 +15,8 @@ import (
 	"noir-1974/apps/api/internal/world"
 )
 
-const GeneratorVersion = 4
+const GeneratorVersion = 5
+const connectedGeneratorVersion = 4
 const legacyGeneratorVersion = 3
 
 var (
@@ -106,7 +107,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	if strings.TrimSpace(seed) == "" {
 		return Definition{}, ErrInvalidCaseSeed
 	}
-	if version != GeneratorVersion && version != legacyGeneratorVersion {
+	if version != GeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
 		return Definition{}, fmt.Errorf("%w: %d", ErrUnsupportedGenerator, version)
 	}
 	candidateWorld := base
@@ -156,7 +157,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 		Relationships:    selected.relationships,
 		Evidence:         buildEvidence(caseID, selected),
 	}
-	if version == GeneratorVersion {
+	if version >= connectedGeneratorVersion {
 		definition.CrimeAt = crimeAt
 		definition.ParamourID = selected.paramourID
 	}
@@ -164,8 +165,8 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 		region := regionName(base, npcByID(base.NPCs, selected.killerID).RegionID)
 		definition.Records = records.ExtortionEvents(seed, base.GeneratorVersion, caseID, selected.killerID, selected.victimID, region, caseDate)
 	}
-	if version == GeneratorVersion {
-		definition.Records = buildConnectedCaseRecords(seed, base.GeneratorVersion, caseID, selected, base, crimeAt)
+	if version >= connectedGeneratorVersion {
+		definition.Records = buildConnectedCaseRecords(seed, base.GeneratorVersion, caseID, selected, base, crimeAt, version)
 		definition.Emails = buildConnectedCaseEmails(seed, base.GeneratorVersion, caseID, selected, base, crimeAt)
 	} else {
 		definition.Emails = buildCaseEmails(seed, base.GeneratorVersion, caseID, selected, base, caseDate)
@@ -187,7 +188,7 @@ func availableArchetypesForVersion(base world.World, version int) []archetypeGen
 }
 
 func archetypeCandidates(archetype archetypeGenerator, base world.World, version int) []candidate {
-	if version == GeneratorVersion && archetype.id == "jealousy" {
+	if version >= connectedGeneratorVersion && archetype.id == "jealousy" {
 		return jealousyCandidatesV4(base)
 	}
 	return archetype.candidates(base)
@@ -231,8 +232,12 @@ func buildCaseEmails(seed string, worldVersion int, caseID string, selected cand
 	}
 }
 
-func buildConnectedCaseRecords(seed string, worldVersion int, caseID string, selected candidate, base world.World, crimeAt time.Time) []records.Record {
-	key := fmt.Sprintf("noir-case-records/v4/%s/%d/%s", seed, worldVersion, caseID)
+func buildConnectedCaseRecords(seed string, worldVersion int, caseID string, selected candidate, base world.World, crimeAt time.Time, caseVersion int) []records.Record {
+	keyVersion := connectedGeneratorVersion
+	if caseVersion >= GeneratorVersion {
+		keyVersion = caseVersion
+	}
+	key := fmt.Sprintf("noir-case-records/v%d/%s/%d/%s", keyVersion, seed, worldVersion, caseID)
 	scene := regionName(base, locationRegion(base, selected.locationID))
 	killerOrigin := regionName(base, npcByID(base.NPCs, selected.killerID).RegionID)
 	victimOrigin := regionName(base, npcByID(base.NPCs, selected.victimID).RegionID)
@@ -245,6 +250,9 @@ func buildConnectedCaseRecords(seed string, worldVersion int, caseID string, sel
 	result := []records.Record{
 		caseGateRecord(key, caseID, "scene-victim", selected.victimID, selected.killerID, crimeAt.Add(-38*time.Minute), victimOrigin, scene, "A passenger entry was recorded at the local relay."),
 		caseGateRecord(key, caseID, "scene-killer", selected.killerID, selected.victimID, crimeAt.Add(-19*time.Minute), killerOrigin, scene, "A passenger entry was recorded at the local relay."),
+	}
+	if caseVersion >= GeneratorVersion && keyIndex(key, "killer-scene-exit", 2) == 0 {
+		result = append(result, caseGateRecord(key, caseID, "scene-killer-exit", selected.killerID, selected.victimID, crimeAt.Add(14*time.Minute), scene, killerOrigin, "A passenger exit was recorded at the local relay."))
 	}
 	if selected.archetypeID == "financial_extortion" {
 		amount := 45 + keyIndex(key, "payment-amount", 46)
@@ -416,10 +424,10 @@ func Validate(definition Definition, base world.World) error {
 	if !world.SupportsSocietyVersion(base.GeneratorVersion) {
 		return ErrInvalidDefinition
 	}
-	if strings.TrimSpace(definition.Seed) == "" || definition.GeneratorVersion != GeneratorVersion && definition.GeneratorVersion != legacyGeneratorVersion || definition.ID != makeCaseID(definition.Seed, definition.GeneratorVersion) || definition.CaseType != "homicide" || definition.ArchetypeID == "" || definition.Motive == "" {
+	if strings.TrimSpace(definition.Seed) == "" || !supportedCaseGeneratorVersion(definition.GeneratorVersion) || definition.ID != makeCaseID(definition.Seed, definition.GeneratorVersion) || definition.CaseType != "homicide" || definition.ArchetypeID == "" || definition.Motive == "" {
 		return ErrInvalidDefinition
 	}
-	if definition.GeneratorVersion == GeneratorVersion && definition.CrimeAt.IsZero() {
+	if definition.GeneratorVersion >= connectedGeneratorVersion && definition.CrimeAt.IsZero() {
 		return ErrInvalidDefinition
 	}
 	if definition.KillerID == definition.VictimID {
@@ -451,7 +459,7 @@ func Validate(definition Definition, base world.World) error {
 	}
 	archetype, exists := archetypeByID(definition.ArchetypeID)
 	validArchetype := exists && archetype.validate(definition, base)
-	if definition.GeneratorVersion == GeneratorVersion {
+	if definition.GeneratorVersion >= connectedGeneratorVersion {
 		switch definition.ArchetypeID {
 		case "jealousy":
 			validArchetype = validateJealousyV4(definition, base)
@@ -462,10 +470,14 @@ func Validate(definition Definition, base world.World) error {
 	if !validArchetype {
 		return ErrInvalidDefinition
 	}
-	if !hasReachableEvidence(definition.Evidence, definition, links, entities) || !hasEvidenceTypes(definition.Evidence, archetype.evidenceTypes...) || !validateCaseRecords(definition, base) || definition.GeneratorVersion == GeneratorVersion && !validateConnectedCaseEmails(definition, base) {
+	if !hasReachableEvidence(definition.Evidence, definition, links, entities) || !hasEvidenceTypes(definition.Evidence, archetype.evidenceTypes...) || !validateCaseRecords(definition, base) || definition.GeneratorVersion >= connectedGeneratorVersion && !validateConnectedCaseEmails(definition, base) {
 		return ErrUnsolvableCase
 	}
 	return nil
+}
+
+func supportedCaseGeneratorVersion(version int) bool {
+	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == GeneratorVersion
 }
 
 func availableArchetypes(base world.World) []archetypeGenerator {
@@ -792,7 +804,7 @@ func validateExtortionV4(definition Definition, base world.World) bool {
 }
 
 func validateCaseRecords(definition Definition, base world.World) bool {
-	if definition.GeneratorVersion == GeneratorVersion {
+	if definition.GeneratorVersion >= connectedGeneratorVersion {
 		return validateConnectedCaseRecords(definition, base)
 	}
 	if definition.ArchetypeID != "financial_extortion" {
@@ -835,6 +847,10 @@ func validateConnectedCaseRecords(definition Definition, base world.World) bool 
 				return false
 			}
 			killerGate, scene, killerScene = item, item.Destination, true
+		case "scene-killer-exit":
+			if definition.GeneratorVersion < GeneratorVersion || item.Source != "gate" || item.NPCID != definition.KillerID || item.RelatedNPCID != definition.VictimID || !item.OccurredAt.After(definition.CrimeAt) || item.Origin != regionName(base, locationRegion(base, definition.LocationID)) {
+				return false
+			}
 		case "affair-victim":
 			affairVictim = item
 		case "affair-paramour":

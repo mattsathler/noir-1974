@@ -38,7 +38,7 @@ var (
 	ErrPersistedConflict     = errors.New("persisted case does not match generated definition")
 )
 
-const residentialSearchCatalogVersion = 4
+const residentialSearchCatalogVersion = 5
 
 type caseDatabase interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
@@ -870,6 +870,16 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 			}
 		}
 	}
+	if isKiller && caseID != "" && binary.BigEndian.Uint64(identity[8:16])%4 == 0 {
+		weapons := []residentialFinding{
+			{Title: "Unregistered revolver", Content: "A small-calibre revolver was recovered wrapped in oilcloth. Its serial plate is filed smooth; the report records no ballistic comparison.", Kind: "weapon"},
+			{Title: "Heavy iron baton", Content: "A short iron baton was found beneath stored linens. One end carries a dark, unidentified stain; no laboratory comparison is included.", Kind: "weapon"},
+			{Title: "Carpenter's mallet", Content: "A wooden mallet with a dense iron head was recovered from a locked cupboard. The handle has been recently scrubbed.", Kind: "weapon"},
+			{Title: "Hunting knife", Content: "A broad-bladed hunting knife was found inside a tool roll. The blade has been cleaned and the report makes no forensic attribution.", Kind: "weapon"},
+		}
+		weaponIndex := int(identity[16]) % len(weapons)
+		items = append(items, makeResidentialAttachment(warrantID, len(items), weapons[weaponIndex]))
+	}
 	attachmentsJSON, err := json.Marshal(items)
 	if err != nil {
 		return WarrantRequest{}, err
@@ -1018,13 +1028,13 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 		if !existing.matches(definition) {
 			return ErrPersistedConflict
 		}
-		if definition.GeneratorVersion >= GeneratorVersion && crimeAt != nil {
+		if definition.GeneratorVersion >= connectedGeneratorVersion && crimeAt != nil {
 			if _, err := tx.Exec(ctx, `UPDATE cases c SET crime_at=COALESCE(c.crime_at,
 				(SELECT activity.occurred_at + interval '19 minutes' FROM case_activity_records activity
 				 WHERE activity.server_id=c.server_id AND activity.case_id=c.case_id AND activity.internal_relation='scene-killer'
 				 ORDER BY activity.occurred_at DESC LIMIT 1), $3)
 				WHERE c.server_id=$1::uuid AND c.case_id=$2 AND c.generator_version >= $4 AND c.crime_at IS NULL`,
-				serverID, definition.ID, crimeAt, GeneratorVersion); err != nil {
+				serverID, definition.ID, crimeAt, connectedGeneratorVersion); err != nil {
 				return fmt.Errorf("backfill persisted case crime time: %w", err)
 			}
 		}
@@ -1971,9 +1981,16 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 				SELECT 1 FROM case_activity_records a JOIN cases c USING(server_id,case_id)
 				WHERE a.server_id=$1::uuid AND a.case_id=$2 AND a.record_id=proof.item_id
 				  AND ((a.source='bank' AND a.internal_relation='extortion_payment')
-				    OR (a.source='gate' AND a.internal_relation IN ('scene-victim','scene-killer'))
+				    OR (a.source='gate' AND a.internal_relation IN ('scene-victim','scene-killer','scene-killer-exit'))
 				    OR (c.generator_version<4 AND c.archetype_id='financial_extortion' AND a.internal_relation IN ('extortion_payment','precrime_route')))
 			) THEN 1.0
+			WHEN EXISTS (
+				SELECT 1 FROM cases c JOIN player_search_warrants w ON w.server_id=c.server_id AND w.city_id=c.city_id AND w.target_npc_id=c.killer_entity_id
+				JOIN player_inbox_messages m ON m.server_id=w.server_id AND m.account_id=w.account_id AND m.warrant_id=w.warrant_id
+				CROSS JOIN LATERAL jsonb_array_elements(m.attachments) AS attachment(item)
+				WHERE c.server_id=$1::uuid AND c.case_id=$2 AND m.account_id=$3::uuid AND attachment.item->>'id'=proof.item_id
+				  AND attachment.item->>'kind'='weapon'
+			) THEN 0.75
 			WHEN EXISTS (
 				SELECT 1 FROM case_activity_records a
 				WHERE a.server_id=$1::uuid AND a.case_id=$2 AND a.record_id=proof.item_id

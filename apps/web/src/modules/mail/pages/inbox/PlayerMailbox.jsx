@@ -38,7 +38,7 @@ export default function PlayerMailbox({ timeZone, onPin }) {
     {!messages.length && status === "NO PERSONAL MAIL ON FILE" && <p className="email-inbox__empty">Case notices and official reports will be delivered here.</p>}
     {messages.map((message) => <details className="email-message" key={message.id}>
       <summary className="email-message__summary">
-        <span>NOIR CASE SERVICE → PERSONAL ACCOUNT</span>
+        <span>BILL BOUER → PERSONAL ACCOUNT</span>
         <span>{message.subject}</span>
         <time dateTime={message.sentAt}>{displayDate(message.sentAt, timeZone)}</time>
       </summary>
