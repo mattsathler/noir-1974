@@ -145,7 +145,7 @@ describe("Whiteboard pin designations", () => {
 
     try {
       render(<Whiteboard />);
-      expect(await screen.findByText(/GATE USED · Tue, Nov 10, 1:00 PM UTC/)).toBeInTheDocument();
+      expect(await screen.findByText(/GATE USED · Sun, Nov 10, 1:00 PM UTC/)).toBeInTheDocument();
       const description = screen.getByText(/GATE passage at 2:00 PM/);
 
       fireEvent.pointerDown(description, { pointerId: 1, button: 0, clientX: 20, clientY: 20 });

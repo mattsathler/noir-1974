@@ -35,6 +35,31 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (!submitted || !selectedId) return undefined;
+    let active = true;
+    const refreshBoardStatus = async () => {
+      try {
+        const latest = await getWhiteboards();
+        if (!active) return;
+        setBoards((previous) => latest.map((board) => ({
+          ...board,
+          pins: previous.find((item) => item.id === board.id)?.pins ?? [],
+        })));
+        const selected = latest.find((board) => board.id === selectedId);
+        if (selected && !selected.lockedAt) {
+          setSubmitted(false);
+          setMessage("REVIEW COMPLETE. THIS BOARD IS UNLOCKED AND READY FOR ANOTHER REVIEW.");
+        }
+      } catch { /* Keep the submitted state while the API is temporarily unavailable. */ }
+    };
+    const interval = window.setInterval(refreshBoardStatus, 5000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [submitted, selectedId]);
+
   async function submit(event) {
     event.preventDefault();
     if (!selectedBoard || !readiness.ready || busy || submitted) return;
@@ -46,7 +71,7 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
       setBoards((previous) => previous.map((board) => board.id === selectedBoard.id ? { ...board, lockedAt: new Date().toISOString() } : board));
       setSubmitted(true);
       setMessage(result.status === "completed"
-        ? "THIS BOARD HAS ALREADY BEEN REVIEWED. CHECK PERSONAL MAIL FOR THE DECISION."
+        ? "THIS BOARD WAS ALREADY REVIEWED. NO NEW REVIEW OR EMAIL WAS CREATED. CHECK PERSONAL MAIL FOR THE SAVED DECISION; USE A NEW BOARD FOR ANOTHER REVIEW."
         : "ACCUSED BOARD RECEIVED. REVIEW IS IN PROGRESS. THE DECISION WILL ARRIVE BY PERSONAL MAIL IN ABOUT 3 MINUTES.");
     } catch (error) {
       setMessage(error.message || "THE ACCUSATION COULD NOT BE SUBMITTED.");
@@ -71,7 +96,7 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
           <li className={readiness.hasVictim ? "is-ready" : "is-missing"}>{readiness.hasVictim ? "✓" : "!"} ONE PERSON MARKED VICTIM</li>
         </ul>}
         {selectedBoard && !readiness.ready && <p className="accusation-window__warning" role="alert">This board is missing required pins. Complete all three items above before submitting.</p>}
-        {selectedBoard?.lockedAt && <p className="accusation-window__warning" role="alert">This board has already been submitted and is locked. Create a new board to prepare another accusation.</p>}
+        {selectedBoard?.lockedAt && <p className="accusation-window__warning" role="alert">This board is locked while its review is in progress. It will unlock when the decision is delivered.</p>}
         <p className="world-directory__message" role="status" aria-live="polite">{loading ? "LOADING INVESTIGATION BOARDS…" : message}</p>
         <footer className="warrant-window__actions"><button type="button" disabled={busy} onClick={onClose}>CANCEL</button><button type="submit" disabled={loading || busy || submitted || selectedBoard?.lockedAt || !readiness.ready}>{busy ? "SUBMITTING…" : submitted ? "SUBMITTED" : "SUBMIT ACCUSATION"}</button></footer>
       </form>

@@ -7,7 +7,7 @@ async function search(path, query, cityId = "") {
   return payload.results ?? [];
 }
 
-const worldCacheVersion = 1;
+const worldCacheVersion = 2;
 const worldCacheLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 const worldCachePrefix = `noir:world-data:v${worldCacheVersion}`;
 const newspaperCachePrefix = "noir:newspaper:v2";
@@ -189,6 +189,12 @@ export function requestLocalSystemAccess(facility, command) {
       command,
     }),
   });
+}
+
+export async function searchHospitalPatients(query, accessAttemptId) {
+  const params = new URLSearchParams({ q: query, accessAttemptId: String(accessAttemptId) });
+  const payload = await apiRequest(`/api/hospital/patients?${params}`);
+  return payload.results ?? [];
 }
 
 export async function getPlayerEmails() {

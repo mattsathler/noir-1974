@@ -654,7 +654,7 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
                 />
               </> : <>
                 <header className="personal-whiteboard__pin-drag-handle" onPointerDown={(event) => beginDrag(event, pin)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}><span>{pin.source.toUpperCase()} · PINNED</span><button className="personal-whiteboard__remove-pin" type="button" aria-label={`Remove ${pin.title} from board`} disabled={boardLocked || busy} onClick={() => removePin(pin.id)}><Trash aria-hidden="true" /></button></header>
-                {pin.source === "person" && pin.metadata?.npc?.visual && <div className="personal-whiteboard__person-portrait"><ModularFace visual={pin.metadata.npc.visual} name={pin.metadata.npc.name || pin.title} /></div>}
+                {pin.metadata?.npc?.visual && <div className="personal-whiteboard__person-portrait"><ModularFace visual={pin.metadata.npc.visual} name={pin.metadata.npc.name || pin.title} /></div>}
                 <h2>{pin.title}</h2><p>{displayPinContent(pin)}</p>
                 <label className="personal-whiteboard__designation">MARK PIN
                   <select aria-label={`Mark ${pin.title}`} value={pin.designation||""} disabled={boardLocked || busy} onChange={(event)=>changeDesignation(pin,event.target.value)}>

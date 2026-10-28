@@ -172,6 +172,29 @@ func TestAnonymousCaseEmailHidesSenderOnlyInRecipientMailbox(t *testing.T) {
 	}
 }
 
+func TestPersistedCaseIdentityAllowsRegeneratedCrimeTime(t *testing.T) {
+	identity := persistedCaseIdentity{
+		Seed: "seed", CityID: "fr/lyon", GeneratorVersion: GeneratorVersion, CaseType: "homicide",
+		ArchetypeID: "jealousy", Motive: "motive", VictimID: "npc:victim", KillerID: "npc:killer", LocationID: "location:scene",
+	}
+	definition := Definition{
+		Seed: "seed", CityID: "fr/lyon", GeneratorVersion: GeneratorVersion, CaseType: "homicide",
+		ArchetypeID: "jealousy", Motive: "motive", VictimID: "npc:victim", KillerID: "npc:killer", LocationID: "location:scene",
+		CrimeAt: time.Date(1974, time.October, 27, 19, 30, 0, 0, time.UTC),
+	}
+	if !identity.matches(definition) {
+		t.Fatal("same persisted case identity should remain idempotent when crime time is regenerated")
+	}
+	definition.CrimeAt = definition.CrimeAt.AddDate(0, 0, 1)
+	if !identity.matches(definition) {
+		t.Fatal("crime time should not change the persisted case identity")
+	}
+	definition.LocationID = "location:other-scene"
+	if identity.matches(definition) {
+		t.Fatal("changing the persisted scene should still produce a case conflict")
+	}
+}
+
 func TestListOpenPublicCasesForSessionUsesOneScopedQuery(t *testing.T) {
 	createdAt := time.Date(1974, time.October, 24, 12, 0, 0, 0, time.UTC)
 	fixture := newCasePersistenceFixture()

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Files } from "pixelarticons/react/Files";
+import { Cross } from "pixelarticons/react/Cross";
 import { Dollar } from "pixelarticons/react/Dollar";
 import { Mail } from "pixelarticons/react/Mail";
 import { Map as MapIcon } from "pixelarticons/react/Map";
@@ -16,6 +17,7 @@ import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
 import PlayerMailbox from "../../../mail/pages/inbox/PlayerMailbox.jsx";
 import LocalTerminal from "./LocalTerminal.jsx";
+import HospitalPatientSearch from "./HospitalPatientSearch.jsx";
 
 const BOOT_LINES = [
   "NOIR PERSONAL TERMINAL · PRIVATE SESSION",
@@ -75,6 +77,10 @@ function programsFor(facilityContext) {
   if (facilityContext.kind === "police") return [
     { id: "interpol", label: "PERSONNEL SEARCH", Icon: User, state: "ONLINE", available: true },
     { id: "emails", label: "EMAIL ARCHIVE", Icon: Mail, state: "ONLINE", available: true },
+    ...offlinePrograms,
+  ];
+  if (facilityContext.kind === "hospital") return [
+    { id: "patient-search", label: "PATIENT SEARCH", Icon: Cross, state: "ONLINE", available: true },
     ...offlinePrograms,
   ];
   if (facilityContext.kind === "bank") activePrograms = [{ id: "bank-records", label: "FINANCIAL RECORDS", Icon: Dollar, state: "ONLINE", available: true }];
@@ -450,6 +456,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 <div className="computer-window__body">
                   {program.id === "case-files"
                     ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} onPin={requestPin} />
+                    : program.id === "patient-search"
+                      ? <HospitalPatientSearch key={id} accessAttemptId={accessAttemptId} timeZone={timeZone} onPin={requestPin} />
                       : program.id === "emails"
                         ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} cityId={cityId} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} runHack={runHack} onPin={requestPin} />
                         : program.id === "personal-mail"

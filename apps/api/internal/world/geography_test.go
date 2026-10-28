@@ -138,7 +138,7 @@ func TestEveryCityHasTheSameFourCentralBuildingCategories(t *testing.T) {
 			}
 			wantStatus := ""
 			if category == "hospital" {
-				wantStatus = "closed"
+				wantStatus = "open"
 			}
 			if firstAddress.Status != wantStatus {
 				t.Errorf("city %s %s status = %q, want %q", city.ID, category, firstAddress.Status, wantStatus)

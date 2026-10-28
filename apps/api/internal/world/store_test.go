@@ -411,7 +411,7 @@ func TestCentralServicePointsAreStableAcrossWorldSeedsAndSearchIsDistrictScoped(
 		}
 		wantStatus := ""
 		if strings.HasSuffix(id, "/hospital") {
-			wantStatus = "closed"
+			wantStatus = "open"
 		}
 		if firstCentral.Locations[i].Address.Status != wantStatus || secondCentral.Locations[i].Address.Status != wantStatus {
 			t.Fatalf("service %q status = %q/%q, want %q", id, firstCentral.Locations[i].Address.Status, secondCentral.Locations[i].Address.Status, wantStatus)

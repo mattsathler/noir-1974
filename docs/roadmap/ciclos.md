@@ -43,6 +43,7 @@ M00 docs + monorepo
                                           → M18 áudio e efeitos sonoros
                                             → M19 pedidos policiais assíncronos
                                               → M20 auditoria integral de estabilidade e consistência pré-beta
+                                                → M21 Hospital e identificação forense
 ```
 
 M06 é o primeiro recorte atravessável para playtest. A porcentagem geral acompanha o fluxo criminal completo até o aceite do M13, quando uma acusação válida pode levar à prisão do culpado. M14 é uma etapa posterior de qualidade técnica e não entra nesse cálculo. M10 reúne whiteboards, identidade visual modular e geração recorrente de casos compartilhados. M11 expande o catálogo fixo para 25 países e 100 cidades e oferece a viagem do GATE por país, cidade e bairro, seguida por cards de construções. M12 implementa as telas de interior e as ações dentro desses locais: interrogatórios, buscas e apreensões e acesso a sistemas restritos. M13 depende do M12 para garantir que whiteboard e busca estejam disponíveis para acusação.
@@ -51,6 +52,8 @@ M15 é uma etapa posterior ao fluxo criminal completo e à consolidação de est
 
 M19 é uma extensão do M13 solicitada após o aceite do fluxo criminal: mandados e acusações aguardam análise por alguns minutos, com resultados entregues pela caixa postal. Seu escopo não altera a porcentagem do fluxo criminal completo.
 
-M20 realiza a auditoria integral de estabilidade e consistência visual/funcional pré-beta após a entrega das milestones M14–M19.
+M20 realiza a auditoria integral de estabilidade e consistência visual/funcional pré-beta após a entrega das milestones M14–M19. M21 normalmente depende do aceite do M20; nesta execução, foi iniciada e aceita por instrução explícita antes da conclusão do M20. A exceção não altera nem aceita o M20, que continua pendente.
+
+M21 abre o serviço Hospital já presente no catálogo geográfico, implementa Patient Search e prontuários pós-morte, e acrescenta códigos estáveis de impressão digital e vestígios de cabelo ou digitais parciais para comparação investigativa. Não muda a fórmula de acusação do M13.
 
 Pular um ciclo só com ADR explicando por que o critério deixou de ser necessário.

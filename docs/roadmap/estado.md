@@ -45,20 +45,20 @@ Cada milestone do fluxo pesa **1/14 ≈ 7,1%**. Só entra na conta com status **
 
 | Milestone | Peso | Status | Soma acumulada se aceito |
 | --- | ---: | --- | ---: |
-| [M00](milestones/M00-repositorio-e-docs.md) Repositório e docs | 7,1% | Aceito | 7% |
-| [M01](milestones/M01-modelo-de-entidades-e-schema.md) Entidades e schema | 7,1% | Aceito | 14% |
-| [M02](milestones/M02-gerador-deterministico.md) Gerador determinístico | 7,1% | Aceito | 21% |
-| [M03](milestones/M03-sociedade-e-relacoes.md) Sociedade e relações | 7,1% | Aceito | 29% |
-| [M04](milestones/M04-mutations-e-reconstrucao.md) Mutations e reconstrução | 7,1% | Aceito | 36% |
-| [M05](milestones/M05-gerador-de-casos.md) Casos e validação | 7,1% | Aceito | 43% |
-| [M06](milestones/M06-api-e-cliente.md) API e cliente web | 7,1% | Aceito | 50% |
-| [M07](milestones/M07-registros-investigativos.md) Registros bancários e GATE | 7,1% | Aceito | 57% |
-| [M08](milestones/M08-sistema-de-emails.md) Correio eletrônico | 7,1% | Aceito | 64% |
-| [M09](milestones/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,1% | Aceito | 71% |
-| [M10](milestones/M10-mundo-compartilhado-e-investigacao.md) Mundo compartilhado e investigação | 7,1% | Aceito | 79% |
-| [M11](milestones/M11-geografia-internacional-e-viagem.md) Geografia, viagem e visita a locais | 7,1% | Aceito | 86% |
-| [M12](milestones/M12-busca-e-apreensao.md) Interações investigativas em locais | 7,1% | Aceito | 93% |
-| [M13](milestones/M13-acusacao-e-julgamento.md) Acusação e julgamento | 7,1% | Aceito | **100%** |
+| [M00](achieved/M00-repositorio-e-docs.md) Repositório e docs | 7,1% | Aceito | 7% |
+| [M01](achieved/M01-modelo-de-entidades-e-schema.md) Entidades e schema | 7,1% | Aceito | 14% |
+| [M02](achieved/M02-gerador-deterministico.md) Gerador determinístico | 7,1% | Aceito | 21% |
+| [M03](achieved/M03-sociedade-e-relacoes.md) Sociedade e relações | 7,1% | Aceito | 29% |
+| [M04](achieved/M04-mutations-e-reconstrucao.md) Mutations e reconstrução | 7,1% | Aceito | 36% |
+| [M05](achieved/M05-gerador-de-casos.md) Casos e validação | 7,1% | Aceito | 43% |
+| [M06](achieved/M06-api-e-cliente.md) API e cliente web | 7,1% | Aceito | 50% |
+| [M07](achieved/M07-registros-investigativos.md) Registros bancários e GATE | 7,1% | Aceito | 57% |
+| [M08](achieved/M08-sistema-de-emails.md) Correio eletrônico | 7,1% | Aceito | 64% |
+| [M09](achieved/M09-deslocamento-e-pontos-de-servico.md) Deslocamento e pontos de serviço | 7,1% | Aceito | 71% |
+| [M10](achieved/M10-mundo-compartilhado-e-investigacao.md) Mundo compartilhado e investigação | 7,1% | Aceito | 79% |
+| [M11](achieved/M11-geografia-internacional-e-viagem.md) Geografia, viagem e visita a locais | 7,1% | Aceito | 86% |
+| [M12](achieved/M12-busca-e-apreensao.md) Interações investigativas em locais | 7,1% | Aceito | 93% |
+| [M13](achieved/M13-acusacao-e-julgamento.md) Acusação e julgamento | 7,1% | Aceito | **100%** |
 
 Fórmula: `milestones_aceitos_M00_a_M13 / 14`, arredondado para inteiro. O primeiro playtest continua identificado pelo aceite do M06, em campo separado.
 

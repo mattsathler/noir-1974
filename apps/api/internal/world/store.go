@@ -1732,7 +1732,7 @@ func centralServiceLocations(city Region) []LocationRecord {
 		{"police-station", city.Name + " Police Station", ""},
 		{"meridian-bank", "Meridian Bank", ""},
 		{"gate-station", "Central GATE Station", ""},
-		{"hospital", city.Name + " Hospital", "closed"},
+		{"hospital", city.Name + " Hospital", "open"},
 	}
 	locations := make([]LocationRecord, 0, len(services))
 	for _, service := range services {

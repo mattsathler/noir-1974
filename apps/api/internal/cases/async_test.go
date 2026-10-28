@@ -65,6 +65,8 @@ func (tx *asyncRequestTx) Exec(_ context.Context, query string, _ ...any) (pgcon
 		tx.fixture.claimed = true
 	case !tx.claimTx && strings.Contains(query, "INSERT INTO player_inbox_messages"):
 		tx.fixture.emails++
+	case !tx.claimTx && strings.Contains(query, "UPDATE player_whiteboards SET locked_at=NULL"):
+		// Completed reviews release the board for another submission.
 	default:
 		return pgconn.CommandTag{}, errors.New("unexpected async transaction exec")
 	}

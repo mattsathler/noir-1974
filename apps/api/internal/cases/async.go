@@ -90,7 +90,7 @@ func (store *PostgresStore) ProcessNextAsyncRequest(ctx context.Context, serverI
 			processingErr = err
 		} else {
 			var result AccusationResult
-			result, processingErr = store.resolveAccusation(ctx, serverID, request.AccountID, payload, time.Now().UTC())
+			result, processingErr = store.resolveAccusation(ctx, serverID, request.AccountID, request.RequestID, payload, time.Now().UTC())
 			if processingErr == nil && result.Accepted && onAccusationAccepted != nil {
 				onAccusationAccepted(payload.CityID)
 			}

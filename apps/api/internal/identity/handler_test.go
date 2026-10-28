@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"noir-1974/apps/api/internal/cases"
 	"noir-1974/apps/api/internal/newspaper"
 	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
@@ -88,7 +89,7 @@ func (fakeDirectory) TransitDistrictsForCity(_ context.Context, _, cityID string
 			{Address: address("police-station", city.Name+" Police Station", "")},
 			{Address: address("meridian-bank", "Meridian Bank", "")},
 			{Address: address("gate-station", "Central GATE Station", "")},
-			{Address: address("hospital", city.Name+" Hospital", "closed")},
+			{Address: address("hospital", city.Name+" Hospital", "open")},
 		}},
 		{ID: city.ID + "/district/bellecour", Name: "Bellecour", Locations: []world.LocationRecord{
 			{Address: world.Address{LocationID: "location:bellecour-office", Name: "Bellecour Office", Kind: "building"}},
@@ -109,6 +110,39 @@ func (reader *fakeRecordReader) NPCRecords(_ context.Context, _, npcID string, f
 }
 
 type fakeNews struct{}
+
+type hospitalEndpointReader struct {
+	CaseAPIReader
+	WhiteboardAPIReader
+	allowedAccount string
+	allowedCity    string
+	allowedAttempt int64
+	validated      bool
+	searched       bool
+	searchCity     string
+	discovered     []cases.DiscoveredItem
+}
+
+func (reader *hospitalEndpointReader) SearchHospitalPatients(_ context.Context, _, cityID, query string) ([]cases.HospitalPatient, []cases.DiscoveredItem, error) {
+	reader.searched = true
+	reader.searchCity = cityID
+	item := cases.DiscoveredItem{ID: "hospital:report-1", Source: "case", Title: "Post-mortem report", Content: "case evidence"}
+	return []cases.HospitalPatient{{ID: "npc:victim", Name: query, Status: "dead", FingerprintCode: "AB12345"}}, []cases.DiscoveredItem{item}, nil
+}
+
+func (reader *hospitalEndpointReader) RecordLocalAccessAttempt(context.Context, string, string, string, string, string, string, string, time.Time) (cases.LocalAccessAttempt, error) {
+	return cases.LocalAccessAttempt{AttemptID: 1, Status: "granted"}, nil
+}
+
+func (reader *hospitalEndpointReader) ValidateLocalAccessAttempt(_ context.Context, _, accountID string, attemptID int64, cityID, locationID, companyID, facility string, _ time.Time) (bool, error) {
+	reader.validated = true
+	return accountID == reader.allowedAccount && attemptID == reader.allowedAttempt && cityID == reader.allowedCity && locationID == expectedServiceLocationID(reader.allowedCity, "hospital") && companyID == "" && facility == "hospital", nil
+}
+
+func (reader *hospitalEndpointReader) RecordDiscoveredItems(_ context.Context, _, _ string, items []cases.DiscoveredItem) error {
+	reader.discovered = append(reader.discovered, items...)
+	return nil
+}
 
 func (fakeNews) Issue(context.Context, string, string, string, string, time.Time) (newspaper.Issue, error) {
 	return newspaper.Issue{}, nil
@@ -216,6 +250,60 @@ func TestNPCRecordsRequiresSessionAndReturnsSelectedIntervalWithoutClassificatio
 	}
 	if strings.Contains(recorder.Body.String(), "record:2") || strings.Contains(recorder.Body.String(), "passenger entry") {
 		t.Fatalf("bank app returned a GATE record: %s", recorder.Body.String())
+	}
+}
+
+func TestHospitalPatientSearchRequiresScopedLocalAuthorizationAndPersistsFindings(t *testing.T) {
+	reader := &hospitalEndpointReader{allowedAccount: "account-1", allowedCity: "fr/lyon", allowedAttempt: 17}
+	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid", locationID: "service:lyon/hospital"}
+	handler := newHandler(repository, false, fakeDirectory{}, "server-1", fakeNews{}, reader, nil, nil, false, nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/hospital/patients?q=Pascal&accessAttemptId=17", nil)
+	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("authorized hospital search status = %d, body=%s", recorder.Code, recorder.Body.String())
+	}
+	if !reader.validated || !reader.searched || reader.searchCity != "fr/lyon" {
+		t.Fatalf("hospital search did not validate and scope the local session: %+v", reader)
+	}
+	if len(reader.discovered) != 1 || reader.discovered[0].ID != "hospital:report-1" {
+		t.Fatalf("hospital discoveries were not recorded for whiteboard use: %+v", reader.discovered)
+	}
+	if strings.Contains(recorder.Body.String(), "killer") || !strings.Contains(recorder.Body.String(), "AB12345") {
+		t.Fatalf("hospital response should expose the record code without internal culpability: %s", recorder.Body.String())
+	}
+}
+
+func TestHospitalPatientSearchDeniesMissingOrMismatchedLocalAccess(t *testing.T) {
+	tests := []struct {
+		name       string
+		accountID  string
+		locationID string
+		accessID   string
+		cookie     bool
+	}{
+		{name: "no session", accountID: "account-1", locationID: "service:lyon/hospital", accessID: "17"},
+		{name: "no access attempt", accountID: "account-1", locationID: "service:lyon/hospital", cookie: true},
+		{name: "wrong attempt", accountID: "account-1", locationID: "service:lyon/hospital", accessID: "18", cookie: true},
+		{name: "wrong account", accountID: "account-other", locationID: "service:lyon/hospital", accessID: "17", cookie: true},
+		{name: "wrong city", accountID: "account-1", locationID: "service:jp/tokyo/hospital", accessID: "17", cookie: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reader := &hospitalEndpointReader{allowedAccount: "account-1", allowedCity: "fr/lyon", allowedAttempt: 17}
+			repository := &fakeStore{account: account{ID: test.accountID}, sessionToken: "valid", locationID: test.locationID}
+			handler := newHandler(repository, false, fakeDirectory{}, "server-1", fakeNews{}, reader, nil, nil, false, nil)
+			request := httptest.NewRequest(http.MethodGet, "/api/hospital/patients?q=Pascal&accessAttemptId="+test.accessID, nil)
+			if test.cookie {
+				request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
+			}
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, request)
+			if recorder.Code < http.StatusBadRequest || reader.searched || len(reader.discovered) != 0 {
+				t.Fatalf("unauthorized hospital search status=%d searched=%t discoveries=%+v", recorder.Code, reader.searched, reader.discovered)
+			}
+		})
 	}
 }
 

@@ -151,6 +151,10 @@ type ResidentialSearchReader interface {
 	ListPlayerMail(context.Context, string, string) ([]cases.PlayerMailMessage, error)
 }
 
+type HospitalRecordsReader interface {
+	SearchHospitalPatients(context.Context, string, string, string) ([]cases.HospitalPatient, []cases.DiscoveredItem, error)
+}
+
 type LocalAccessAttemptReader interface {
 	RecordLocalAccessAttempt(context.Context, string, string, string, string, string, string, string, time.Time) (cases.LocalAccessAttempt, error)
 	ValidateLocalAccessAttempt(context.Context, string, string, int64, string, string, string, string, time.Time) (bool, error)
@@ -261,6 +265,11 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		if _, ok := caseReader.(LocalAccessAttemptReader); ok {
 			mux.HandleFunc("POST /api/facilities/access", handler.requestLocalAccess)
 		}
+		if _, ok := caseReader.(HospitalRecordsReader); ok {
+			if _, secured := caseReader.(LocalAccessAttemptReader); secured && handler.whiteboardReader != nil {
+				mux.HandleFunc("GET /api/hospital/patients", handler.searchHospitalPatients)
+			}
+		}
 	}
 	if handler.whiteboardReader != nil {
 		mux.HandleFunc("GET /api/whiteboards", handler.listWhiteboards)
@@ -292,6 +301,38 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		}, measured)
 	}
 	return measured
+}
+
+func (h *Handler) searchHospitalPatients(w http.ResponseWriter, r *http.Request) {
+	current, cityID, ok := h.caseAccountAndCity(w, r)
+	if !ok {
+		return
+	}
+	locationID := expectedServiceLocationID(cityID, "hospital")
+	if locationID == "" || !h.requireLocalAccessAttemptInCity(w, r, current.ID, cityID, "hospital", locationID, "") {
+		return
+	}
+	query, ok := directoryQuery(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.caseReader.(HospitalRecordsReader)
+	if !ok {
+		http.Error(w, "hospital records unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	patients, discovered, err := reader.SearchHospitalPatients(r.Context(), h.worldServerID, cityID, query)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "HOSPITAL_SEARCH_FAILED", "could not search local patient records", err)
+		return
+	}
+	if h.whiteboardReader != nil && len(discovered) > 0 {
+		if err := h.whiteboardReader.RecordDiscoveredItems(r.Context(), h.worldServerID, current.ID, discovered); err != nil {
+			h.writeAPIError(w, r, http.StatusInternalServerError, "HOSPITAL_RECORD_FAILED", "could not save forensic records", err)
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": patients})
 }
 
 func requestTimeoutMiddleware(timeout time.Duration, next http.Handler) http.Handler {
@@ -350,6 +391,8 @@ func (h *Handler) requestLocalAccess(w http.ResponseWriter, r *http.Request) {
 		city, exists := world.CityByID(state.CityID)
 		valid = valid && exists && len(records) == 1 && records[0].Address.City == city.Name
 	case "police", "bank", "gate":
+		valid = valid && input.CompanyID == "" && input.LocationID == expectedServiceLocationID(state.CityID, input.Facility)
+	case "hospital":
 		valid = valid && input.CompanyID == "" && input.LocationID == expectedServiceLocationID(state.CityID, input.Facility)
 	default:
 		valid = false
@@ -824,7 +867,7 @@ func expectedServiceLocationID(cityID, facility string) string {
 	if cityID == "fr/lyon" {
 		cityKey = "lyon"
 	}
-	suffix := map[string]string{"police": "police-station", "bank": "meridian-bank", "gate": "gate-station"}[facility]
+	suffix := map[string]string{"police": "police-station", "bank": "meridian-bank", "gate": "gate-station", "hospital": "hospital"}[facility]
 	if suffix == "" || cityKey == "" {
 		return ""
 	}

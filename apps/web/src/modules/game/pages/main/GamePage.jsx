@@ -33,7 +33,7 @@ function interiorProfile(place) {
   const identity = `${place.locationId} ${place.name}`.toLowerCase();
   if (identity.includes("police")) return { type: "police", label: "CORPORATE SECURITY OFFICE", room: "SECURITY DESK", detail: "A contracted security office serving this city.", facility: "police" };
   if (identity.includes("bank")) return { type: "bank", label: "MERIDIAN FINANCIAL SERVICES", room: "CUSTOMER HALL", detail: "Accounts and transactions are handled under corporate service terms.", facility: "bank" };
-  if (identity.includes("hospital")) return { type: "hospital", label: "CITY HOSPITAL", room: "EMERGENCY WARD", detail: "A public medical facility serving the surrounding neighborhood." };
+  if (identity.includes("hospital")) return { type: "hospital", label: "CITY HOSPITAL", room: "MEDICAL RECORDS", detail: "Patient records and post-mortem reports are maintained by the city hospital.", facility: "hospital" };
   if (identity.includes("gate")) return { type: "gate", label: "MERIDIAN GLOBAL · GATE NETWORK", room: "TRANSIT CONCOURSE", detail: "Passenger access is monitored by the local GATE relay.", facility: "gate" };
   if (identity.includes("home") || identity.includes("residence") || identity.includes("apartment")) return { label: "PRIVATE RESIDENCE", room: "ENTRY ROOM", detail: "A private interior at the selected address." };
   return { type: "building", label: "LOCAL COMMERCIAL PREMISES", room: "RECEPTION AREA", detail: "A privately operated business at the selected address.", facility: "company" };
