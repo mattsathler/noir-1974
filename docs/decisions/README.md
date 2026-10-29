@@ -21,7 +21,8 @@ Status: `Proposta` | `Aceita` | `Supersedida` | `Rejeitada`.
 | [0007](0007-monorepo.md) | Monorepo frontend + backend | Aceita |
 | [0008](0008-relacoes-tipadas.md) | Relações tipadas por domínio | Aceita |
 | [0009](0009-stack-concreto-da-api.md) | Stack concreta da API | Aceita |
-| [0010](0010-geografia-fixa-e-bairros-procedurais.md) | Geografia fixa e bairros procedurais | Aceita |
-| [0011](0011-predios-e-empresas.md) | Prédios e empresas como entidades distintas | Aceita |
+| [0010](0010-geografia-fixa-e-bairros-procedurais.md) | Geografia fixa e bairros procedurais | Supersedida |
+| [0011](0011-predios-e-empresas.md) | Prédios e empresas como entidades distintas | Supersedida |
+| [0012](0012-computador-proxy-e-sites-investigativos.md) | Computador pessoal, proxy e investigação por sites | Aceita |
 
 Quando uma decisão nova **substitui** outra, marcar a antiga como `Supersedida` e apontar o ADR sucessor.

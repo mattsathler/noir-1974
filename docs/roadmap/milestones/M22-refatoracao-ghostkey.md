@@ -1,8 +1,10 @@
 # M22 — Ghostkey: invasão e exploração de arquivos locais
 
 **Trilha:** Independente do fluxo criminal  
-**Status:** Não iniciado  
+**Status:** Substituída pela M23
 **Depende de:** M07, M08 e M12 aceitos (fontes de dados e acesso a sistemas locais existentes)
+
+> Esta proposta de navegação isolada em computadores locais foi substituída pela migração integrada para sistema operacional, Proxy e sites da [M23](M23-computador-os-proxy-e-sites.md). O fluxo Ghostkey não deve ser iniciado em paralelo.
 
 ## Objetivo
 

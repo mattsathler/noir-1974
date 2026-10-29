@@ -11,14 +11,14 @@ Cada melhoria deve explicar o problema observável, o resultado esperado, o esco
 | ID | Melhoria | Origem | Escopo |
 | --- | --- | --- | --- |
 | I01 | Compatibilidade da aparência procedural de NPCs | M15 — identidade visual procedural | Curto/médio |
-| I02 | Introdução visual após viagem confirmada pelo GATE | M17 — animações das ações | Curto |
+| I02 | Introdução visual após viagem confirmada pelo GATE (substituída) | M17 — animações das ações | Curto |
 | I03 | Minimizar janelas do computador | Interface do computador pessoal | Curto/médio |
 
 ## Triagem das milestones atuais
 
 | Milestone | Decisão | Motivo |
 | --- | --- | --- |
-| M17 — Animações das ações | Dividir entregas autônomas; I02 é um recorte | Introdução do destino, cena de carro, personagens e sistema de conversa têm resultados distintos. A cena de carro e o sistema de conversas seguem grandes o bastante para milestones ou melhorias próprias quando priorizados. |
+| M17 — Animações das ações | Dividir entregas autônomas; I02 é substituída pela M23 | Personagens e sistema de conversa permanecem em M17; viagem física do protagonista foi removida pelo novo fluxo de Proxy. |
 | M16 — Crime Reports | Manter como milestone | Cruza geração de casos, desaparecimento, descoberta e persistência de corpos, jornal e novo app; a consistência ponta a ponta excede uma melhoria. |
 | M15 — Identidade visual e customização | Dividir; I01 é prioritária | Compatibilidade de peças é um defeito delimitado. Expansão de catálogo e edição persistente do personagem do jogador são escopos independentes, mas maiores, a avaliar separadamente. |
 | M18 — Áudio e efeitos sonoros | Manter como milestone | Exige biblioteca de assets, integração com vários estados, preferências persistentes e acessibilidade. |

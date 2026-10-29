@@ -1,8 +1,8 @@
 # ADR 0010 — Geografia fixa e bairros procedurais
 
-- **Status:** Aceita
+- **Status:** Supersedida
 - **Data:** 2026-10-20
-- **Supersede:** nenhum
+- **Supersede:** [ADR 0012 — Computador pessoal, proxy e investigação por sites](0012-computador-proxy-e-sites-investigativos.md)
 
 ## Contexto
 

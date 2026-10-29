@@ -20,6 +20,8 @@ Diálogos, geração de crimes e NPCs, relações, instituições, locais, objet
 - **Elementos e ferramentas:** mapas, documentos, dispositivos, serviços, recursos de investigação e interfaces devem pertencer a essa realidade e mostrar como o poder corporativo condiciona o acesso, a informação e a ação do jogador.
 - **Tecnologia e costumes:** tecnologia avançada não deve converter automaticamente o mundo em uma sociedade culturalmente moderna. Inovações extraordinárias convivem com formas, hábitos e objetos antiquados; essa tensão deve ser intencional e coerente.
 - **GATE e Meridian Global:** criações relacionadas a transporte, acesso geográfico ou poder corporativo devem respeitar a importância mundial do GATE e da Meridian Global, sem contradizer sua premissa estabelecida.
+- **Rede e serviços digitais:** portais, sites, computadores e proxies são operados ou condicionados por empresas e instituições corporativas. A conexão remota não elimina jurisdições nem concede acesso irrestrito; cada sistema conserva suas permissões e seu escopo.
+- **Investigação remota:** o detetive conduz a investigação pelo computador pessoal e não precisa viajar fisicamente para consultar uma cidade. O Proxy define a jurisdição ativa; o GATE permanece como transporte físico do mundo e como fonte de registros investigativos.
 
 ## Requisitos de conformidade
 

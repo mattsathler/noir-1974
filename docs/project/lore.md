@@ -20,6 +20,16 @@ Após o lançamento do GATE, a Meridian Global tornou-se a maior empresa do mund
 
 A rede GATE afeta a vida cotidiana, as relações comerciais, as oportunidades e os conflitos. A presença ou ausência de um terminal pode determinar quem consegue chegar a um local e em quais condições.
 
+O GATE continua sendo uma infraestrutura física de transporte usada por pessoas, empresas e instituições. O detetive não precisa viajar para investigar: ele escolhe no computador um nó proxy associado à cidade que deseja consultar. Essa conexão muda sua jurisdição investigativa, mas não representa deslocamento físico nem presença no local.
+
+## O computador pessoal e a rede
+
+O computador pessoal do detetive é o espaço central da investigação. Sua interface apresenta um sistema operacional próprio, com navegador, janelas e ferramentas de trabalho. Portais públicos permitem consultar informações de uma jurisdição; o diretório nacional apresenta empresas de todas as cidades do país conectado, e cada empresa mantém seu próprio site e cadastro de funcionários.
+
+O **Proxy** conecta o computador a um nó de cidade e define a jurisdição ativa. Trocar de nó altera a cidade investigativa da sessão, sem mover o personagem. As consultas e ações continuam sujeitas às mesmas regras de conta, jurisdição e autorização do serviço. Os resultados de Person Search abrangem o país conectado; o diretório de funcionários de um site empresarial contém somente as pessoas empregadas por aquela empresa.
+
+Os portais e sistemas corporativos pertencem à ordem empresarial de Noir. A Meridian Global controla partes essenciais da infraestrutura de conexão, enquanto empresas e instituições operam seus próprios serviços. A aparência e a linguagem desses sistemas preservam formulários, diretórios e convenções antiquadas, mesmo quando sua capacidade de comunicação é extraordinária.
+
 ## Tecnologia e costumes
 
 O mundo expressa uma tensão constante: **a tecnologia avançou muito mais rápido que os costumes**. O GATE tem uma capacidade quase cyberpunk, mas o aparelho é uma cabina antiga, barulhenta e de funcionamento físico. Telefones continuam antiquados; as pessoas ainda usam roupas de época e mantêm hábitos tradicionais.
@@ -65,6 +75,7 @@ NPCs também terão representação visual modular. Suas peças serão escolhida
 ## Elementos ainda não definidos
 
 - As regras físicas, limitações, segurança e operação detalhada do GATE.
+- A topologia, os limites técnicos e os operadores da rede de dados e dos nós proxy.
 - A história pessoal de Adrian Voss e sua relação direta com a criação do dispositivo.
 - A estrutura interna da Meridian Global e a organização de sua rede mundial.
-- A natureza exata do antigo vínculo do detetive com a Interpol e quais recursos continuam acessíveis.
+- A natureza exata do antigo vínculo do detetive com a Interpol e quais recursos continuam acessíveis pela rede.
