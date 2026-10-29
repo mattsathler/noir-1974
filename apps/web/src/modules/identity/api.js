@@ -49,6 +49,13 @@ export function getCharacterVisuals() {
   return request("/api/character-visuals");
 }
 
+export function updateCharacterAppearance(visual) {
+  return request("/api/characters/appearance", {
+    method: "PUT",
+    body: JSON.stringify({ visual }),
+  });
+}
+
 export function logoutAccount() {
   return request("/api/auth/logout", { method: "POST" });
 }

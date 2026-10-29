@@ -235,6 +235,128 @@ func TestVersion5HairChoicesRespectAgeAndNPCStyleCatalog(t *testing.T) {
 	}
 }
 
+func TestAgeAppearanceRulesAndRegionalSkinMixes(t *testing.T) {
+	for profileIndex, weights := range regionalSkinMixes {
+		total := 0
+		minimum, maximum := 100, 0
+		for _, weight := range weights {
+			total += weight
+			if weight < minimum {
+				minimum = weight
+			}
+			if weight > maximum {
+				maximum = weight
+			}
+		}
+		if total != 100 || minimum == 0 || maximum-minimum > 4 {
+			t.Fatalf("regional skin profile %d is unbalanced: weights=%v total=%d", profileIndex, weights, total)
+		}
+	}
+
+	cases := []struct {
+		age      int
+		hairID   string
+		faceID   string
+		accepted bool
+	}{
+		{39, "hair_short_black", "face_wrinkles_fine", false},
+		{40, "hair_long_brown", "", true},
+		{44, "hair_balding_grey", "", false},
+		{45, "hair_balding_grey", "face_wrinkles_fine", true},
+		{59, "hair_sparse_sides_black", "face_wrinkles_deep", false},
+		{60, "hair_sparse_sides_grey", "face_wrinkles_deep", true},
+		{70, "hair_short_black", "", true},
+		{71, "hair_short_black", "", false},
+	}
+	for _, test := range cases {
+		visual := VisualIdentity{HairID: test.hairID, FaceID: test.faceID}
+		if got := visualIsAgeConsistent(visual, test.age); got != test.accepted {
+			t.Errorf("visualIsAgeConsistent(age=%d, %+v) = %t, want %t", test.age, visual, got, test.accepted)
+		}
+	}
+
+	for _, test := range []struct {
+		age  int
+		want int
+	}{{39, 0}, {40, 5}, {50, 20}, {60, 40}} {
+		grey := 0
+		const samples = 5000
+		for sample := 0; sample < samples; sample++ {
+			stream := newStream("m15-age-probability", GeneratorVersion8, fmt.Sprintf("%d/%d", test.age, sample))
+			if hairTone(generatedHairID(stream, test.age)) == "grey" {
+				grey++
+			}
+		}
+		percentage := grey * 100 / samples
+		if percentage < test.want-2 || percentage > test.want+2 {
+			t.Errorf("age %d grey hair = %d%%, want approximately %d%%", test.age, percentage, test.want)
+		}
+	}
+
+	for _, test := range []struct {
+		age              int
+		wantFine, wantDeep int
+	}{{44, 0, 0}, {45, 12, 0}, {60, 16, 20}} {
+		fine, deep := 0, 0
+		const samples = 5000
+		for sample := 0; sample < samples; sample++ {
+			key := fmt.Sprintf("npc-%d", sample)
+			detail := generatedFaceDetail("m15-age-cosmetics", GeneratorVersion8, key, test.age)
+			if detail == "face_wrinkles_fine" {
+				fine++
+			}
+			if detail == "face_wrinkles_deep" {
+				deep++
+			}
+		}
+		finePercentage, deepPercentage := fine*100/samples, deep*100/samples
+		if finePercentage < test.wantFine-2 || finePercentage > test.wantFine+2 || deepPercentage < test.wantDeep-2 || deepPercentage > test.wantDeep+2 {
+			t.Errorf("age %d wrinkle rates = fine %d%%, deep %d%%; want approximately %d%% and %d%%", test.age, finePercentage, deepPercentage, test.wantFine, test.wantDeep)
+		}
+	}
+}
+
+func TestGeneratorVersion8VisualsAreDeterministicAndReconstructible(t *testing.T) {
+	const seed = "m15-visual-version-eight"
+	districts := selectedDistricts(seed, GeneratorVersion8)
+	district := districts[0].slug
+	key := fmt.Sprintf("fr/lyon/people/%s/district/%s/company/01/person/01", seedFingerprint(seed, GeneratorVersion8), district)
+	first, err := GenerateNPC(seed, GeneratorVersion8, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := GenerateNPC(seed, GeneratorVersion8, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(first, second) {
+		t.Fatal("version 8 NPC identity changed for the same generation key")
+	}
+	if first.Visual == nil || ValidateVisualIdentity(*first.Visual) != nil || ValidateVisualIdentityForPresentation(*first.Visual, first.Presentation) != nil {
+		t.Fatalf("version 8 generated an invalid visual identity: %+v", first.Visual)
+	}
+	if !visualIsAgeConsistent(*first.Visual, first.Age) {
+		t.Fatalf("version 8 generated age-inconsistent visual for age %d: %+v", first.Age, first.Visual)
+	}
+	if first.Appearance != generatedAppearanceDescription(*first.Visual) {
+		t.Fatalf("appearance description does not match visual identity: %q", first.Appearance)
+	}
+
+	legacyDistrict := selectedDistricts(seed, GeneratorVersion7)[0].slug
+	legacyKey := fmt.Sprintf("fr/lyon/people/%s/district/%s/company/01/person/01", seedFingerprint(seed, GeneratorVersion7), legacyDistrict)
+	legacyBefore, err := GenerateNPC(seed, GeneratorVersion7, legacyKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyAfter, err := GenerateNPC(seed, GeneratorVersion7, legacyKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(legacyBefore, legacyAfter) {
+		t.Fatal("version 7 NPC changed while adding version 8 visuals")
+	}
+}
+
 func TestGeneratorVersion4VisualSnapshotRemainsReconstructible(t *testing.T) {
 	generated, err := Generate("m10-v4-visual-snapshot", GeneratorVersion4)
 	if err != nil {

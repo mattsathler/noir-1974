@@ -19,6 +19,7 @@ import Telephone from "./Telephone.jsx";
 import ResidentialSearchWindow from "./ResidentialSearchWindow.jsx";
 import AccusationWindow from "./AccusationWindow.jsx";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
+import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
 
 function buildingVisual(building) {
   const identity = `${building.locationId} ${building.name}`.toLowerCase();
@@ -96,6 +97,8 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [error, setError] = useState(null);
   const [identityAttempt, setIdentityAttempt] = useState(0);
   const [arrivalAttempt, setArrivalAttempt] = useState(0);
+  const [playerCharacter, setPlayerCharacter] = useState(null);
+  const [appearanceEditorOpen, setAppearanceEditorOpen] = useState(false);
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerEntry, setComputerEntry] = useState(null);
   const [computerContext, setComputerContext] = useState(null);
@@ -111,6 +114,12 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const closeComputer = useCallback(() => { setComputerOpen(false); setComputerContext(null); }, []);
   const closeNewspaper = useCallback(() => setNewspaperOpen(false), []);
   const closeTransit = useCallback(() => setTransitOpen(false), []);
+
+  useEffect(() => {
+    let active = true;
+    currentIdentity().then((identity) => { if (active) setPlayerCharacter(identity.character ?? null); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const travelViaGate = useCallback((destination) => {
     setError(null);
@@ -320,8 +329,10 @@ export default function GamePage({ initialWorld = null, onLogout }) {
         </div>
       </section>}
       {!interiorPlace && <footer className="game-location pos-absolute inset-x-0 bottom-0 flex items-end justify-end gap-4 p-6">
+        {playerCharacter && <button className="border-0 bg-transparent text-accent underline" type="button" onClick={() => setAppearanceEditorOpen(true)}>Appearance</button>}
         <button className="border-0 bg-transparent text-accent underline" type="button" onClick={onLogout}>Log out</button>
       </footer>}
+      {appearanceEditorOpen && playerCharacter && <CharacterAppearanceEditor character={playerCharacter} onClose={() => setAppearanceEditorOpen(false)} onSaved={(character) => { setPlayerCharacter(character); setAppearanceEditorOpen(false); }} />}
       {computerOpen && (
         <ComputerDesktop
           location={location}

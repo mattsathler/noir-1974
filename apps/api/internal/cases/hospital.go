@@ -121,7 +121,12 @@ func (store *PostgresStore) SearchHospitalPatients(ctx context.Context, serverID
 			continue
 		}
 		var status string
-		err := store.db.QueryRow(ctx, `SELECT value #>> '{}' FROM world_mutations WHERE server_id=$1::uuid AND entity_id=$2 AND field_key='status' ORDER BY mutation_order DESC LIMIT 1`, serverID, id).Scan(&status)
+		err := store.db.QueryRow(ctx, `SELECT COALESCE(
+			(SELECT 'dead' FROM cases c JOIN case_states s USING(server_id,case_id)
+			 WHERE c.server_id=$1::uuid AND c.victim_entity_id=$2 AND s.body_found_at IS NOT NULL AND s.body_found_at<=now()
+			 ORDER BY s.body_found_at DESC LIMIT 1),
+			(SELECT value #>> '{}' FROM world_mutations WHERE server_id=$1::uuid AND entity_id=$2 AND field_key='status' ORDER BY mutation_order DESC LIMIT 1),
+			'alive')`, serverID, id).Scan(&status)
 		if err == pgx.ErrNoRows {
 			status = "alive"
 		} else if err != nil {

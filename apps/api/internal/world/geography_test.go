@@ -112,7 +112,7 @@ func TestCityDistrictsAndLocationsAreDeterministicAndCityScoped(t *testing.T) {
 		if !strings.HasPrefix(district.ID, city.ID+"/district/") {
 			t.Fatalf("district ID %q is not scoped to city %q", district.ID, city.ID)
 		}
-		locations := generatedCityLocations("shared-world-seed", city, district.ID, district.Name)
+		locations := generatedCityLocations("shared-world-seed", city, district.ID, district.Name, GeneratorVersion6)
 		if len(locations) != 4 {
 			t.Errorf("district %q has %d locations, want four", district.ID, len(locations))
 		}

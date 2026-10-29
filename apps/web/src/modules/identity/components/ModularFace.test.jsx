@@ -35,4 +35,9 @@ describe("ModularFace", () => {
     rerender(<ModularFace visual={{ skinId: "skin_white", hairId: "hair_short_brown" }} />);
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
+
+  it("loads added facial details from crisp transparent SVG layers", () => {
+    render(<ModularFace visual={{ skinId: "skin_medium", hairId: "hair_long_curly_brown", eyesId: "eyes_hazel", faceId: "face_freckles_light" }} />);
+    expect(document.querySelector(".modular-face__layer[src='/images/characters/face/face_freckles_light.svg']")).toBeInTheDocument();
+  });
 });

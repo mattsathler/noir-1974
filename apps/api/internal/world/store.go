@@ -374,6 +374,84 @@ func (store *PostgresStore) Materialize(ctx context.Context, serverID, seed stri
 	return nil
 }
 
+// UpgradeMaterializedWorld adds the v7 generated content to an existing v5
+// shared world while retaining its seed, IDs, mutations, and prior entities.
+func (store *PostgresStore) UpgradeMaterializedWorld(ctx context.Context, serverID string) error {
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin world content upgrade: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	var seed string
+	var version int
+	if err := tx.QueryRow(ctx, `SELECT world_seed, generator_version FROM worlds WHERE server_id=$1::uuid FOR UPDATE`, serverID).Scan(&seed, &version); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrEntityNotFound
+		}
+		return fmt.Errorf("read world for content upgrade: %w", err)
+	}
+	if version >= GeneratorVersion7 {
+		return nil
+	}
+	if version != GeneratorVersion5 {
+		return fmt.Errorf("world content upgrade requires generator version %d; found %d", GeneratorVersion5, version)
+	}
+	base, err := Generate(seed, GeneratorVersion7)
+	if err != nil {
+		return err
+	}
+	if err := persistGeneratedCity(ctx, tx, serverID, base); err != nil {
+		return err
+	}
+	rows, err := tx.Query(ctx, `SELECT city_id, generator_version FROM world_city_generators WHERE server_id=$1::uuid ORDER BY city_id FOR UPDATE`, serverID)
+	if err != nil {
+		return fmt.Errorf("list materialized cities: %w", err)
+	}
+	type cityVersion struct {
+		id      string
+		version int
+	}
+	cities := make([]cityVersion, 0)
+	for rows.Next() {
+		var city cityVersion
+		if err := rows.Scan(&city.id, &city.version); err != nil {
+			rows.Close()
+			return err
+		}
+		cities = append(cities, city)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for _, city := range cities {
+		if city.version >= GeneratorVersion7 {
+			continue
+		}
+		if city.version != GeneratorVersion5 {
+			return fmt.Errorf("city %q content upgrade requires generator version %d; found %d", city.id, GeneratorVersion5, city.version)
+		}
+		generated, err := GenerateCity(seed, GeneratorVersion7, city.id)
+		if err != nil {
+			return fmt.Errorf("generate upgraded city %q: %w", city.id, err)
+		}
+		if err := persistGeneratedCity(ctx, tx, serverID, generated); err != nil {
+			return fmt.Errorf("persist upgraded city %q: %w", city.id, err)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE world_city_generators SET generator_version=$3 WHERE server_id=$1::uuid AND city_id=$2`, serverID, city.id, GeneratorVersion7); err != nil {
+			return fmt.Errorf("record upgraded city %q: %w", city.id, err)
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE worlds SET generator_version=$2 WHERE server_id=$1::uuid`, serverID, GeneratorVersion7); err != nil {
+		return fmt.Errorf("record upgraded world version: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit world content upgrade: %w", err)
+	}
+	return nil
+}
+
 // MaterializeCity adds a city's deterministic shared content the first time a
 // player reaches it. New cities use at least the current city-generation rules;
 // an existing city's stored version is never replaced.
@@ -1700,12 +1778,19 @@ func (store *PostgresStore) TransitDistrictsForCity(ctx context.Context, serverI
 	return result, nil
 }
 
-func generatedCityLocations(seed string, city WorldCity, districtID, districtName string) []LocationRecord {
+func generatedCityLocations(seed string, city WorldCity, districtID, districtName string, version int) []LocationRecord {
 	streets := []string{"Rue de la Gare", "Market Street", "Foundry Lane", "Exchange Road", "Riverside Walk", "Station Street"}
 	buildings := []string{"The Lantern Café", "Meridian Office", "Northstar Tailors", "Civic Exchange", "The Evening Ledger", "Bell & Finch Rooms"}
 	stream := newStream(seed, GeneratorVersion5, "city/"+city.ID+"/district/"+districtID+"/locations")
 	selectedStreets := shuffledCopy(streets, stream)[:2]
 	selectedBuildings := shuffledCopy(buildings, stream)[:2]
+	if version >= GeneratorVersion7 {
+		slug := strings.TrimPrefix(districtID, city.ID+"/district/")
+		selectedBuildings = make([]string, 0, 6)
+		for _, building := range districtBuildingSet(seed, version, slug) {
+			selectedBuildings = append(selectedBuildings, building.name)
+		}
+	}
 	locations := make([]LocationRecord, 0, 4)
 	for _, street := range selectedStreets {
 		name := street + " — " + districtName
@@ -2239,6 +2324,9 @@ func (store *PostgresStore) ExpandDistrictSociety(ctx context.Context, serverID,
 		if err != nil {
 			return err
 		}
+	}
+	if version >= GeneratorVersion7 {
+		return nil
 	}
 	tx, err := store.db.Begin(ctx)
 	if err != nil {

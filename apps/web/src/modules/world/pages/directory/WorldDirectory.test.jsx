@@ -38,7 +38,7 @@ describe("WorldDirectory activity records", () => {
     expect(screen.queryByText("MAXIMUM INTERVAL · 7 DAYS")).not.toBeInTheDocument();
     expect(screen.getByText("DEBIT · SENT")).toBeInTheDocument();
     expect(screen.getByText("−68 CREDITS")).toBeInTheDocument();
-    expect(screen.getByText("Tue, Nov 10, 5:42 PM")).toBeInTheDocument();
+    expect(screen.getByText("Sun, Nov 10, 5:42 PM")).toBeInTheDocument();
     expect(screen.getByText("FINANCIAL LEDGER")).toBeInTheDocument();
     expect(screen.queryByText(/case|extortion|evidence|clue/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/\b\d{4}\b/)).not.toBeInTheDocument();
@@ -71,7 +71,7 @@ describe("WorldDirectory activity records", () => {
     fireEvent.click(screen.getByRole("button", { name: "Pin GATE log" }));
     expect(onPin).toHaveBeenCalledWith(expect.objectContaining({
       id: "record:gate",
-      content: expect.stringContaining("GATE USED · Tue, Nov 10, 2:00 PM"),
+      content: expect.stringContaining("GATE USED · Sun, Nov 10, 2:00 PM"),
     }));
   });
 });

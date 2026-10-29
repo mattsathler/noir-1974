@@ -59,7 +59,10 @@ var hairLayerIDs = []string{
 }
 var skinLayerIDs = []string{"skin_white", "skin_pale", "skin_light", "skin_medium", "skin_olive", "skin_brown", "skin_dark"}
 var eyeLayerIDs = []string{"eyes_black", "eyes_blue", "eyes_brown", "eyes_green", "eyes_hazel", "eyes_gray", "eyes_amber"}
-var faceLayerIDs = []string{"face_scar_short"}
+var faceLayerIDs = []string{
+	"face_scar_short", "face_freckles_light", "face_freckles_dense", "face_mole",
+	"face_smile_lines", "face_wrinkles_fine", "face_wrinkles_deep",
+}
 var beardLayerIDs = []string{
 	"beard_moustache_black", "beard_moustache_brown", "beard_moustache_ginger", "beard_moustache_blonde", "beard_moustache_grey",
 	"beard_mutton_black", "beard_mutton_brown", "beard_mutton_ginger", "beard_mutton_blonde", "beard_mutton_grey",

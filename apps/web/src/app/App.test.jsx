@@ -88,8 +88,8 @@ describe("App routing", () => {
 
   it("returns an authenticated player to a requested board after login", async () => {
     window.history.replaceState({}, "", "/whiteboard/board_case-notes");
-    localStorage.setItem("noir:world-data:v1:gate-cities", JSON.stringify({ items: [{ id: "stale" }] }));
-    localStorage.setItem("noir:world-data:v1:neighborhoods:fr%2Flyon", JSON.stringify({ items: [{ id: "stale" }] }));
+    localStorage.setItem("noir:world-data:v2:gate-cities", JSON.stringify({ items: [{ id: "stale" }] }));
+    localStorage.setItem("noir:world-data:v2:neighborhoods:fr%2Flyon", JSON.stringify({ items: [{ id: "stale" }] }));
     localStorage.setItem("noir:whiteboard:v1:board_case-notes", JSON.stringify({ boardId: "board_case-notes" }));
     render(<App />);
     expect(await screen.findByText("Login screen")).toBeInTheDocument();
@@ -97,8 +97,8 @@ describe("App routing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Authenticate existing account" }));
     expect(await screen.findByText("Standalone whiteboard")).toBeInTheDocument();
     expect(window.location.pathname).toBe("/whiteboard/board_case-notes");
-    expect(localStorage.getItem("noir:world-data:v1:gate-cities")).toBeNull();
-    expect(localStorage.getItem("noir:world-data:v1:neighborhoods:fr%2Flyon")).toBeNull();
+    expect(localStorage.getItem("noir:world-data:v2:gate-cities")).toBeNull();
+    expect(localStorage.getItem("noir:world-data:v2:neighborhoods:fr%2Flyon")).toBeNull();
     expect(localStorage.getItem("noir:whiteboard:v1:board_case-notes")).not.toBeNull();
   });
 

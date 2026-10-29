@@ -39,7 +39,7 @@ var (
 	ErrPersistedConflict     = errors.New("persisted case does not match generated definition")
 )
 
-const residentialSearchCatalogVersion = 6
+const residentialSearchCatalogVersion = 7
 
 type caseDatabase interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
@@ -817,7 +817,7 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 			WHERE cr.server_id=c.server_id AND cr.case_id=c.case_id AND cr.relationship_role='paramour_employment' AND er.employee_npc_id=$3)
 		OR EXISTS (SELECT 1 FROM employment_relationships a JOIN employment_relationships b ON b.server_id=a.server_id AND b.employer_company_id=a.employer_company_id WHERE a.server_id=c.server_id AND a.employee_npc_id=$3 AND b.employee_npc_id IN (c.killer_entity_id,c.victim_entity_id))
 		OR EXISTS (SELECT 1 FROM personal_relationships r WHERE r.server_id=c.server_id AND ((r.person_a_npc_id=$3 AND r.person_b_npc_id IN (c.killer_entity_id,c.victim_entity_id)) OR (r.person_b_npc_id=$3 AND r.person_a_npc_id IN (c.killer_entity_id,c.victim_entity_id)))) )
-		AND s.status='open' AND COALESCE(c.crime_at,c.created_at)<=$4 ORDER BY c.created_at DESC LIMIT 1`, serverID, cityID, npcID, now.UTC()).Scan(&caseID, &archetype, &isKiller, &isVictim, &caseRole, &caseSceneID)
+		AND s.status IN ('open','solved') AND COALESCE(c.crime_at,c.created_at)<=$4 ORDER BY c.created_at DESC LIMIT 1`, serverID, cityID, npcID, now.UTC()).Scan(&caseID, &archetype, &isKiller, &isVictim, &caseRole, &caseSceneID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		archetype = ""
 	} else if err != nil {
@@ -1102,6 +1102,14 @@ func (store *PostgresStore) DeletePlayerMail(ctx context.Context, serverID, acco
 }
 
 // Create persists a compact case definition and its relationships and evidence references.
+// Exists reports whether a deterministic case ID is already stored. Startup
+// uses this to preserve opening cases created before a world-content upgrade.
+func (store *PostgresStore) Exists(ctx context.Context, serverID, caseID string) (bool, error) {
+	var exists bool
+	err := store.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM cases WHERE server_id=$1::uuid AND case_id=$2)`, serverID, caseID).Scan(&exists)
+	return exists, err
+}
+
 func (store *PostgresStore) Create(ctx context.Context, serverID string, base world.World, definition Definition) error {
 	if err := Validate(definition, base); err != nil {
 		return err

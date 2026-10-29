@@ -72,11 +72,25 @@ A aparência escolhida para o personagem do jogador tem outra origem: é uma pre
 
 A versão `5` preserva a identidade modular da versão 4, cria 20 bairros e amplia a sociedade inicial para oito NPCs e uma empresa por bairro. Lyon mantém seus IDs e conteúdo históricos. Cada outra cidade recebe uma seed local derivada da seed do servidor e de seu ID canônico, mais 160 NPCs, 20 empresas e 80 locais. Os bairros, relações e identidades são determinísticos por servidor e cidade.
 
-A geração visual da versão 5 também calibra cabelos por idade: NPCs abaixo de 40 anos não recebem cabelo grisalho; a chance aumenta gradualmente nas faixas seguintes. Calvície e cabelos ralos nas laterais só são selecionados a partir dos 45 anos. Cortes ausentes do catálogo de NPCs, como maria-chiquinha, não podem ser gerados. A versão 4 mantém sua saída histórica; novos mundos usam a versão 5.
+A geração visual da versão 5 também calibra cabelos por idade: NPCs abaixo de 40 anos não recebem cabelo grisalho; as chances são 5% entre 40–49, 20% entre 50–59 e 40% a partir de 60. Calvície e cabelos ralos nas laterais só são selecionados a partir dos 45 anos. Cortes ausentes do catálogo de NPCs, como maria-chiquinha, não podem ser gerados. A versão 4 mantém sua saída histórica; versões 5 a 8 permanecem disponíveis para reconstrução.
 
 ## Versão 6 — compatibilidade da aparência de NPCs
 
 A versão `6` preserva o mundo e as regras visuais da versão 5 e declara a apresentação visual de cada NPC (`masculine` ou `feminine`) em um fluxo determinístico próprio. Essa apresentação descreve a compatibilidade convencional das peças, não a orientação sexual do personagem. O catálogo declara compatibilidade por ID: barba é compatível com apresentação masculina; as demais peças atuais são compatíveis com ambas. A geração e a persistência rejeitam composições incompatíveis, e a descrição textual continua sendo derivada das peças selecionadas. Versões `1` a `5` permanecem reconstruíveis sem alteração.
+
+## Versão 7 — bairros comerciais ampliados
+
+A versão `7` mantém os bairros, a aparência e a apresentação visual da versão 6. Cada um dos 20 bairros de uma cidade recebe seis prédios comerciais, selecionados de um catálogo de 36 nomes. Cada prédio abriga seis empresas, totalizando 720 empresas por cidade. Cada empresa tem de quatro a dez funcionários, escolhidos deterministicamente; emprego, cargos, relações pessoais e sede apontam para os mesmos registros reconstruíveis. Os nomes das empresas incluem um catálogo ampliado e um ordinal estável para evitar colisões.
+
+Os bancos de nomes dos países com listas menores crescem em até sete vezes por categoria, usando compostos determinísticos; Lyon conserva seu catálogo municipal, que já comporta a população maior. A versão 7 foi a versão corrente antes da versão 8; mundos e cidades persistidos continuam usando sua versão. Versões anteriores continuam disponíveis e não mudam sua saída.
+
+## Versão 8 — aparência regional inclusiva e detalhes faciais
+
+A versão `8` preserva a estrutura comercial da versão 7 e introduz uma nova composição visual, sem reidentificar NPCs de versões anteriores. Toda mudança em cabelo, pele, barba ou detalhe facial usa fluxos independentes derivados da versão e da `generation_key`; cidades não materializadas passam a registrar a versão atual, enquanto cidades e mundos persistidos mantêm a sua versão.
+
+Os sete tons de pele usam quatro misturas regionais autorais, selecionadas deterministicamente pelo ID de cidade e bairro. Em todas, os sete tons (`white`, `pale`, `light`, `medium`, `olive`, `brown`, `dark`) aparecem entre 12% e 16% da distribuição. São perfis sintéticos do universo do jogo, não estimativas demográficas nem proxies de nacionalidade; nenhum perfil é ligado a país, nome, apresentação ou orientação sexual. Cabelo recebe um fluxo próprio; pele, olhos, barba e acessórios usam o fluxo visual determinístico do NPC. Barba continua sendo compatibilidade declarada de apresentação, sem qualquer dado de orientação sexual. O jogador escolhe diretamente a aparência do próprio personagem.
+
+A geração facial oferece cicatriz, sardas leves ou densas, sinal, linhas de sorriso e rugas finas ou profundas. Rugas finas só podem ser geradas a partir dos 45 anos; rugas profundas, a partir dos 60. Os limites de idade, paletas e compatibilidade são validados ao reconstruir NPCs. As versões 4 a 7 mantêm suas composições históricas.
 
 ## M11 — catálogo e viagem para bairros
 

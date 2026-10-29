@@ -303,6 +303,7 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/connections/{fromID}/{toID}", handler.disconnectWhiteboardPins)
 	}
 	mux.HandleFunc("POST /api/characters", handler.createCharacter)
+	mux.HandleFunc("PUT /api/characters/appearance", handler.updateCharacterAppearance)
 	measured := http.Handler(apiErrorMiddleware(mux))
 	measured = requestTimeoutMiddleware(apiRequestTimeout, measured)
 	if recorder != nil {
@@ -2094,6 +2095,43 @@ func (h *Handler) createCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, identityResponse{Account: publicAccount(current), Character: &created})
+}
+
+func (h *Handler) updateCharacterAppearance(w http.ResponseWriter, r *http.Request) {
+	token, err := r.Cookie(sessionCookie)
+	if err != nil || token.Value == "" {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	current, existing, err := h.store.accountForSession(r.Context(), token.Value, h.now())
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	if existing == nil {
+		http.Error(w, "character not found", http.StatusNotFound)
+		return
+	}
+	var input struct {
+		Visual world.VisualIdentity `json:"visual"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if err := world.ValidateVisualIdentity(input.Visual); err != nil {
+		http.Error(w, "invalid character appearance", http.StatusBadRequest)
+		return
+	}
+	updated, err := h.store.updateCharacterVisual(r.Context(), current.ID, input.Visual)
+	if errors.Is(err, ErrNotFound) {
+		http.Error(w, "character not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "could not update character appearance", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, identityResponse{Account: publicAccount(current), Character: &updated})
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {

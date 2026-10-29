@@ -46,6 +46,7 @@ type store interface {
 	createSession(context.Context, string, string, time.Time) error
 	accountForSession(context.Context, string, time.Time) (account, *character, error)
 	createCharacter(context.Context, string, string, world.VisualIdentity) (character, error)
+	updateCharacterVisual(context.Context, string, world.VisualIdentity) (character, error)
 	playerLocation(context.Context, string) (string, error)
 	setPlayerLocation(context.Context, string, string) error
 	deleteSession(context.Context, string) error
@@ -215,6 +216,28 @@ func (s *postgresStore) createCharacter(ctx context.Context, accountID, name str
 	}
 	result.Visual = visual
 	return result, nil
+}
+
+func (s *postgresStore) updateCharacterVisual(ctx context.Context, accountID string, visual world.VisualIdentity) (character, error) {
+	visualJSON, err := json.Marshal(visual)
+	if err != nil {
+		return character{}, err
+	}
+	var result character
+	var visualData []byte
+	err = s.db.QueryRow(ctx,
+		`UPDATE player_characters SET visual_identity = $2::jsonb
+		 WHERE account_id = $1::text::uuid
+		 RETURNING display_name, portrait_id, visual_identity`, accountID, string(visualJSON),
+	).Scan(&result.DisplayName, &result.PortraitID, &visualData)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return character{}, ErrNotFound
+	}
+	if err != nil {
+		return character{}, err
+	}
+	result.Visual, err = decodeVisualIdentity(visualData)
+	return result, err
 }
 
 func decodeVisualIdentity(data []byte) (world.VisualIdentity, error) {

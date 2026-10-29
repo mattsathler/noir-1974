@@ -1,6 +1,11 @@
 import { useMemo } from "react";
 import "./ModularFace.scss";
 
+const vectorFaceLayers = new Set([
+  "face_freckles_light", "face_freckles_dense", "face_mole", "face_smile_lines",
+  "face_wrinkles_fine", "face_wrinkles_deep",
+]);
+
 function spritePathFor(id) {
   const directory = id.startsWith("hair_") ? "hair"
     : id.startsWith("skin_") ? "skin"
@@ -8,7 +13,8 @@ function spritePathFor(id) {
         : id.startsWith("beard_") ? "beard"
           : id.startsWith("accessories_") ? "accessories"
             : "face";
-  return `/images/characters/${directory}/${id}.png`;
+  const extension = vectorFaceLayers.has(id) ? "svg" : "png";
+  return `/images/characters/${directory}/${id}.${extension}`;
 }
 
 export default function ModularFace({ visual, name = "Character" }) {

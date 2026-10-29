@@ -121,8 +121,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("generate opening case: %v", err)
 	}
-	if err := caseStore.Create(ctx, worldServerID, generatedWorld, openingCase); err != nil {
-		log.Fatalf("persist opening case: %v", err)
+	openingCaseExists, err := caseStore.Exists(ctx, worldServerID, openingCase.ID)
+	if err != nil {
+		log.Fatalf("check opening case: %v", err)
+	}
+	if !openingCaseExists {
+		if err := caseStore.Create(ctx, worldServerID, generatedWorld, openingCase); err != nil {
+			log.Fatalf("persist opening case: %v", err)
+		}
 	}
 	if openingCase.ArchetypeID != "financial_extortion" {
 		if _, err := ensureExtortionCase(ctx, caseStore, worldServerID, worldSeed, generatedWorld); err != nil {
@@ -177,6 +183,13 @@ func ensureExtortionCase(ctx context.Context, store *cases.PostgresStore, server
 		}
 		if definition.ArchetypeID != "financial_extortion" {
 			continue
+		}
+		exists, err := store.Exists(ctx, serverID, definition.ID)
+		if err != nil {
+			return cases.Definition{}, err
+		}
+		if exists {
+			return definition, nil
 		}
 		if err := store.Create(ctx, serverID, base, definition); err != nil {
 			return cases.Definition{}, err

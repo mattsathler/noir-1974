@@ -29,6 +29,7 @@ type fakeStore struct {
 	locationErr      error
 	createdName      string
 	createdVisual    world.VisualIdentity
+	updatedAccountID string
 	sessionToken     string
 	sessionAccountID string
 	deletedToken     string
@@ -175,6 +176,57 @@ func (f *fakeStore) createCharacter(_ context.Context, _, name string, visual wo
 	}
 	f.createdName, f.createdVisual = name, visual
 	return character{DisplayName: name, PortraitID: 1, Visual: visual}, nil
+}
+
+func (f *fakeStore) updateCharacterVisual(_ context.Context, accountID string, visual world.VisualIdentity) (character, error) {
+	if f.characterErr != nil {
+		return character{}, f.characterErr
+	}
+	f.updatedAccountID = accountID
+	f.createdVisual = visual
+	updated := character{DisplayName: "Ada", PortraitID: 1, Visual: visual}
+	f.character = &updated
+	return updated, nil
+}
+
+func TestUpdateCharacterAppearanceUsesAuthenticatedAccountAndValidatesSelection(t *testing.T) {
+	const payload = `{"visual":{"hairId":"hair_long_curly_ginger","skinId":"skin_brown","eyesId":"eyes_hazel","faceId":"face_freckles_light","beardId":"","accessoryIds":["accessories_glasses_round_brass"]}}`
+	for _, test := range []struct {
+		name       string
+		store      *fakeStore
+		withCookie bool
+		body       string
+		wantStatus int
+	}{
+		{name: "unauthenticated", store: &fakeStore{}, body: payload, wantStatus: http.StatusUnauthorized},
+		{name: "expired session", store: &fakeStore{sessionErr: ErrNotFound}, withCookie: true, body: payload, wantStatus: http.StatusUnauthorized},
+		{name: "no character", store: &fakeStore{}, withCookie: true, body: payload, wantStatus: http.StatusNotFound},
+		{name: "invalid layer", store: &fakeStore{character: &character{DisplayName: "Ada"}}, withCookie: true, body: `{"visual":{"hairId":"unknown","skinId":"skin_brown","eyesId":"eyes_hazel"}}`, wantStatus: http.StatusBadRequest},
+		{name: "too many accessories", store: &fakeStore{character: &character{DisplayName: "Ada"}}, withCookie: true, body: `{"visual":{"hairId":"hair_short_brown","skinId":"skin_brown","eyesId":"eyes_hazel","accessoryIds":["accessories_glasses_round_black","accessories_monocle_brass"]}}`, wantStatus: http.StatusBadRequest},
+		{name: "save failure", store: &fakeStore{character: &character{DisplayName: "Ada"}, characterErr: errors.New("database unavailable")}, withCookie: true, body: payload, wantStatus: http.StatusInternalServerError},
+		{name: "saved", store: &fakeStore{account: account{ID: "account-1", Username: "detective"}, character: &character{DisplayName: "Ada", PortraitID: 1}}, withCookie: true, body: payload, wantStatus: http.StatusOK},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPut, "/api/characters/appearance", strings.NewReader(test.body))
+			if test.withCookie {
+				request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "session-token"})
+			}
+			recorder := httptest.NewRecorder()
+			NewHandler(test.store, false).ServeHTTP(recorder, request)
+			if recorder.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d: %s", recorder.Code, test.wantStatus, recorder.Body.String())
+			}
+			if test.name == "saved" {
+				var response identityResponse
+				if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+					t.Fatal(err)
+				}
+				if test.store.updatedAccountID != "account-1" || response.Character == nil || response.Character.Visual.HairID != "hair_long_curly_ginger" || response.Character.Visual.FaceID != "face_freckles_light" {
+					t.Fatalf("saved appearance response = %+v, account = %q", response.Character, test.store.updatedAccountID)
+				}
+			}
+		})
+	}
 }
 
 func (f *fakeStore) playerLocation(context.Context, string) (string, error) {

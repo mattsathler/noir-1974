@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"hash"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -17,7 +18,9 @@ const (
 	GeneratorVersion4      = 4
 	GeneratorVersion5      = 5
 	GeneratorVersion6      = 6
-	LatestGeneratorVersion = GeneratorVersion6
+	GeneratorVersion7      = 7
+	GeneratorVersion8      = 8
+	LatestGeneratorVersion = GeneratorVersion8
 )
 
 var ErrUnsupportedGeneratorVersion = errors.New("unsupported world generator version")
@@ -83,6 +86,28 @@ var lyonBuildings = []namedPlace{
 	{slug: "tabac-du-rhone", name: "Tabac du Rhône"},
 }
 
+var expandedBuildings = []namedPlace{
+	{slug: "boulangerie-fournier", name: "Boulangerie Fournier"}, {slug: "cafe-des-ecoles", name: "Café des Écoles"}, {slug: "cinema-lumiere", name: "Cinéma Lumière"},
+	{slug: "hotel-des-voyageurs", name: "Hôtel des Voyageurs"}, {slug: "immeuble-saint-paul", name: "Immeuble Saint-Paul"}, {slug: "pharmacie-morel", name: "Pharmacie Morel"},
+	{slug: "tailleur-bernard", name: "Tailleur Bernard"}, {slug: "tabac-du-rhone", name: "Tabac du Rhône"}, {slug: "maison-des-artisans", name: "Maison des Artisans"},
+	{slug: "atelier-du-progres", name: "Atelier du Progrès"}, {slug: "comptoir-central", name: "Comptoir Central"}, {slug: "imprimerie-nationale", name: "Imprimerie Nationale"},
+	{slug: "grand-magasin", name: "Grand Magasin"}, {slug: "maison-de-la-presse", name: "Maison de la Presse"}, {slug: "entrepot-des-quais", name: "Entrepôt des Quais"},
+	{slug: "garage-bellecour", name: "Garage Bellecour"}, {slug: "brasserie-du-marche", name: "Brasserie du Marché"}, {slug: "maison-de-couture", name: "Maison de Couture"},
+	{slug: "bureau-des-transports", name: "Bureau des Transports"}, {slug: "clinique-saint-joseph", name: "Clinique Saint-Joseph"}, {slug: "librairie-du-centre", name: "Librairie du Centre"},
+	{slug: "maison-des-fleurs", name: "Maison des Fleurs"}, {slug: "fonderie-rhone", name: "Fonderie Rhône"}, {slug: "entrepot-ferrand", name: "Entrepôt Ferrand"},
+	{slug: "palais-du-commerce", name: "Palais du Commerce"}, {slug: "maison-montclair", name: "Maison Montclair"}, {slug: "garage-des-voutes", name: "Garage des Voûtes"},
+	{slug: "hotel-de-la-gare", name: "Hôtel de la Gare"}, {slug: "cooperative-ouvriere", name: "Coopérative Ouvrière"}, {slug: "maison-des-tissus", name: "Maison des Tissus"},
+	{slug: "entrepot-lafayette", name: "Entrepôt Lafayette"}, {slug: "atelier-saint-paul", name: "Atelier Saint-Paul"}, {slug: "courrier-du-soir", name: "Courrier du Soir"},
+	{slug: "domaine-des-cedres", name: "Domaine des Cèdres"}, {slug: "halle-aux-grains", name: "Halle aux Grains"}, {slug: "maison-des-machines", name: "Maison des Machines"},
+}
+
+func districtBuildingSet(seed string, version int, districtSlug string) []namedPlace {
+	if version < GeneratorVersion7 {
+		return shuffledCopy(lyonBuildings, newStream(seed, version, "district/"+districtSlug+"/buildings"))[:2]
+	}
+	return shuffledCopy(expandedBuildings, newStream(seed, version, "district/"+districtSlug+"/buildings"))[:6]
+}
+
 // Generate returns a stable, in-memory city slice for a world seed and generator version.
 func Generate(seed string, version int) (World, error) {
 	if strings.TrimSpace(seed) == "" {
@@ -101,6 +126,10 @@ func Generate(seed string, version int) (World, error) {
 		return generateSociety(seed, GeneratorVersion5)
 	case GeneratorVersion6:
 		return generateSociety(seed, GeneratorVersion6)
+	case GeneratorVersion7:
+		return generateExpandedSociety(seed, GeneratorVersion7)
+	case GeneratorVersion8:
+		return generateExpandedSociety(seed, GeneratorVersion8)
 	default:
 		return World{}, fmt.Errorf("%w: %d", ErrUnsupportedGeneratorVersion, version)
 	}
@@ -144,7 +173,7 @@ func GenerateCity(seed string, version int, cityID string) (World, error) {
 		newKey := cityGenerationKey(company.GenerationKey, city, targetDistrict)
 		company, err = GenerateCompany(seed, version, newKey)
 		if err != nil {
-			return World{}, err
+			return World{}, fmt.Errorf("rebuild company key %q for %s: %w", newKey, city.ID, err)
 		}
 		generated.Companies = append(generated.Companies, company)
 		generated.Entities = append(generated.Entities, Entity{
@@ -157,7 +186,7 @@ func GenerateCity(seed string, version int, cityID string) (World, error) {
 		newKey := cityGenerationKey(npc.GenerationKey, city, targetDistrict)
 		npc, err = GenerateNPC(seed, version, newKey)
 		if err != nil {
-			return World{}, err
+			return World{}, fmt.Errorf("rebuild NPC key %q for %s: %w", newKey, city.ID, err)
 		}
 		generated.NPCs = append(generated.NPCs, npc)
 		generated.Entities = append(generated.Entities, Entity{
@@ -181,8 +210,16 @@ func GenerateCity(seed string, version int, cityID string) (World, error) {
 		generated.PersonalRelationships = append(generated.PersonalRelationships, relation)
 	}
 	for _, company := range generated.Companies {
+		buildingIndex := 1
+		parts := strings.Split(company.GenerationKey, "/")
+		if version >= GeneratorVersion7 && len(parts) == 10 {
+			buildingIndex, _ = strconv.Atoi(parts[7])
+		}
+		districtSlug := strings.TrimPrefix(company.RegionID, city.ID+"/district/")
+		building := districtBuildingSet(CitySeed(seed, city.ID), version, districtSlug)[(buildingIndex-1)%6]
+		locationID := "location:" + city.ID + "/district/" + districtSlug + "/building/" + building.slug
 		for _, entity := range generated.Entities {
-			if entity.EntityType == "location" && entity.RegionID == company.RegionID && entity.LocationKind == "building" {
+			if entity.EntityType == "location" && entity.ID == locationID && entity.RegionID == company.RegionID && entity.LocationKind == "building" {
 				generated.CompanyLocations = append(generated.CompanyLocations, CompanyLocation{
 					ID:        "company-location:" + company.ID + ":" + entity.ID,
 					CompanyID: company.ID, LocationID: entity.ID, LocationRole: "headquarters",
@@ -214,7 +251,7 @@ func generateCityGeography(seed string, version int, cityID string) (World, erro
 	generated := World{GeneratorVersion: version, Regions: []Region{{ID: city.ID, Kind: "city", Name: city.Name}}}
 	for _, district := range CityDistricts(citySeed, city) {
 		generated.Regions = append(generated.Regions, Region{ID: district.ID, ParentID: city.ID, Kind: "district", Name: district.Name})
-		for _, location := range generatedCityLocations(citySeed, city, district.ID, district.Name) {
+		for _, location := range generatedCityLocations(citySeed, city, district.ID, district.Name, version) {
 			address := location.Address
 			key := strings.TrimPrefix(address.LocationID, "location:")
 			generated.Entities = append(generated.Entities, Entity{
@@ -324,7 +361,7 @@ func generateCity(seed string, version int) World {
 			})
 		}
 
-		buildings := shuffledCopy(lyonBuildings, newStream(seed, version, "district/"+district.slug+"/buildings"))[:2]
+		buildings := districtBuildingSet(seed, version, district.slug)
 		for _, building := range buildings {
 			key := "lyon/district/" + district.slug + "/building/" + building.slug
 			world.Entities = append(world.Entities, Entity{

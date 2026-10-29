@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import Typewriter from "../../../../../@noir-ui/components/Typewriter.jsx";
-import "./GateTransition.scss";
 
 export default function GateTransition({ destination, origin, onArrive, onComplete, onError }) {
   const [phase, setPhase] = useState("entering");
@@ -71,7 +70,6 @@ export default function GateTransition({ destination, origin, onArrive, onComple
       ) : phase === "typing" ? (
         <div className="screen-transition__content">
           <p className="screen-transition__message"><Typewriter className="screen-transition__text" text={`ARRIVING IN ${destination.district.name.toUpperCase()}, ${destination.city.name.toUpperCase()}`} speed={48} onComplete={finishTypewriter} /></p>
-          <button className="screen-transition__skip" type="button" onClick={finishTypewriter}>COMPLETE INTRODUCTION</button>
         </div>
       ) : (
         <div className="screen-transition__content">

@@ -17,6 +17,7 @@ import (
 var ErrInvalidGenerationKey = errors.New("invalid generated entity key")
 
 var personNameOrderCache sync.Map
+var personNameCatalogCache sync.Map
 
 type NPC struct {
 	ID              string             `json:"id"`
@@ -123,6 +124,39 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 	}
 
 	parts := strings.Split(generationKey, "/")
+	if version >= GeneratorVersion7 && len(parts) > 2 && parts[2] == "people" {
+		legacyVersion := 0
+		if len(parts) == 10 {
+			cityID := parts[0] + "/" + parts[1]
+			if city, ok := CityByID(cityID); ok {
+				citySeed := CitySeed(seed, city.ID)
+				for candidate := version - 1; candidate >= GeneratorVersion7; candidate-- {
+					if parts[3] == seedFingerprint(citySeed, candidate) {
+						legacyVersion = candidate
+						break
+					}
+				}
+			}
+		} else if len(parts) == 8 {
+			cityID := parts[0] + "/" + parts[1]
+			if city, ok := CityByID(cityID); ok {
+				citySeed := CitySeed(seed, city.ID)
+				for candidate := GeneratorVersion6; candidate >= GeneratorVersion3; candidate-- {
+					if parts[3] == seedFingerprint(citySeed, candidate) {
+						legacyVersion = candidate
+						break
+					}
+				}
+			}
+		} else if len(parts) == 7 && parts[0] == "lyon" {
+			if parts[2] == seedFingerprint(seed, GeneratorVersion2) {
+				legacyVersion = GeneratorVersion2
+			}
+		}
+		if legacyVersion != 0 {
+			return GenerateNPC(seed, legacyVersion, generationKey)
+		}
+	}
 	countrySlug, citySlug, districtSlug := "fr", "lyon", ""
 	cityID := "fr/lyon"
 	citySeed := seed
@@ -148,6 +182,21 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 			return NPC{}, ErrInvalidGenerationKey
 		}
 		districtSlug, slotPart = parts[5], parts[7]
+	case GeneratorVersion7, GeneratorVersion8:
+		if len(parts) != 10 || parts[2] != "people" || parts[4] != "district" || parts[6] != "company" || parts[8] != "person" {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		countrySlug, citySlug = parts[0], parts[1]
+		cityID = countrySlug + "/" + citySlug
+		city, ok := CityByID(cityID)
+		if !ok {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		citySeed = CitySeed(seed, city.ID)
+		if parts[3] != seedFingerprint(citySeed, version) {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		districtSlug, slotPart = parts[5], parts[9]
 	default:
 		return NPC{}, ErrUnsupportedGeneratorVersion
 	}
@@ -173,7 +222,22 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 		return NPC{}, err
 	}
 	nameIndex := districtIndex*8 + slot - 1
-	if slot > 8 {
+	if version >= GeneratorVersion7 {
+		companyIndex, e := strconv.Atoi(parts[7])
+		if e != nil || companyIndex < 1 || companyIndex > 36 {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		personSlot, e := strconv.Atoi(parts[9])
+		if e != nil || personSlot < 1 {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		count := employeeCount(citySeed, version, companyIndex)
+		if personSlot > count {
+			return NPC{}, ErrInvalidGenerationKey
+		}
+		nameIndex = districtIndex*252 + (companyIndex-1)*10 + personSlot - 1
+	}
+	if version < GeneratorVersion7 && slot > 8 {
 		nameIndex = len(districts)*8 + (slot-9)*len(districts) + districtIndex
 	}
 	cacheKey := fmt.Sprintf("%d:%s:%s", version, citySeed, personNameScope(version, countrySlug, citySlug))
@@ -197,6 +261,9 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 	}
 	regionID := cityID + "/district/" + districtSlug
 	npc := npcFor(citySeed, version, regionID, generationKey, name)
+	if version >= GeneratorVersion5 && (npc.Visual == nil || ValidateVisualIdentity(*npc.Visual) != nil || !visualIsAgeConsistent(*npc.Visual, npc.Age)) {
+		return NPC{}, ErrInvalidVisualIdentity
+	}
 	if version >= GeneratorVersion6 && (npc.Visual == nil || ValidateVisualIdentityForPresentation(*npc.Visual, npc.Presentation) != nil) {
 		return NPC{}, ErrInvalidVisualIdentity
 	}
@@ -207,7 +274,7 @@ func GenerateNPC(seed string, version int, generationKey string) (NPC, error) {
 // city-scoped key, falling back to the server's legacy version for Lyon.
 func GenerateNPCFromKey(seed string, fallbackVersion int, generationKey string) (NPC, error) {
 	parts := strings.Split(generationKey, "/")
-	if len(parts) == 8 {
+	if len(parts) == 8 || (len(parts) == 10 && parts[2] == "people") {
 		cityID := parts[0] + "/" + parts[1]
 		if city, ok := CityByID(cityID); ok && city.ID != "fr/lyon" {
 			citySeed := CitySeed(seed, city.ID)
@@ -308,6 +375,39 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 	}
 
 	parts := strings.Split(generationKey, "/")
+	if version >= GeneratorVersion7 && ((len(parts) >= 3 && parts[2] == "companies") || (len(parts) >= 2 && parts[1] == "companies")) {
+		legacyVersion := 0
+		if len(parts) == 10 {
+			cityID := parts[0] + "/" + parts[1]
+			if city, ok := CityByID(cityID); ok {
+				citySeed := CitySeed(seed, city.ID)
+				for candidate := version - 1; candidate >= GeneratorVersion7; candidate-- {
+					if parts[3] == seedFingerprint(citySeed, candidate) {
+						legacyVersion = candidate
+						break
+					}
+				}
+			}
+		} else if len(parts) == 7 {
+			cityID := parts[0] + "/" + parts[1]
+			if city, ok := CityByID(cityID); ok {
+				citySeed := CitySeed(seed, city.ID)
+				for candidate := GeneratorVersion6; candidate >= GeneratorVersion3; candidate-- {
+					if parts[3] == seedFingerprint(citySeed, candidate) {
+						legacyVersion = candidate
+						break
+					}
+				}
+			}
+		} else if len(parts) == 6 && parts[0] == "lyon" {
+			if parts[2] == seedFingerprint(seed, GeneratorVersion2) {
+				legacyVersion = GeneratorVersion2
+			}
+		}
+		if legacyVersion != 0 {
+			return GenerateCompany(seed, legacyVersion, generationKey)
+		}
+	}
 	districtSlug := ""
 	switch version {
 	case GeneratorVersion2:
@@ -317,6 +417,20 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 		districtSlug = parts[4]
 	case GeneratorVersion3, GeneratorVersion4, GeneratorVersion5, GeneratorVersion6:
 		if len(parts) != 7 || parts[2] != "companies" || parts[4] != "district" || parts[6] != "company" {
+			return Company{}, ErrInvalidGenerationKey
+		}
+		cityID := parts[0] + "/" + parts[1]
+		city, ok := CityByID(cityID)
+		if !ok {
+			return Company{}, ErrInvalidGenerationKey
+		}
+		seed = CitySeed(seed, city.ID)
+		if parts[3] != seedFingerprint(seed, version) {
+			return Company{}, ErrInvalidGenerationKey
+		}
+		districtSlug = parts[5]
+	case GeneratorVersion7, GeneratorVersion8:
+		if len(parts) != 10 || parts[2] != "companies" || parts[4] != "district" || parts[6] != "building" || parts[8] != "company" {
 			return Company{}, ErrInvalidGenerationKey
 		}
 		cityID := parts[0] + "/" + parts[1]
@@ -352,18 +466,33 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 	if districtIndex >= len(names) {
 		return Company{}, ErrInvalidGenerationKey
 	}
+	companyName := names[districtIndex]
+	if version >= GeneratorVersion7 {
+		building, e1 := strconv.Atoi(parts[7])
+		companyNo, e2 := strconv.Atoi(parts[9])
+		if e1 != nil || e2 != nil || building < 1 || building > 6 || companyNo < 1 || companyNo > 6 {
+			return Company{}, ErrInvalidGenerationKey
+		}
+		ordinal := districtIndex*36 + (building-1)*6 + companyNo
+		companyName = expandedCompanyNames[(ordinal-1)%len(expandedCompanyNames)] + " " + strconv.Itoa(ordinal)
+	}
 	return Company{
 		ID:            "company:" + generationKey,
 		GenerationKey: generationKey,
 		RegionID:      city.ID + "/district/" + districtSlug,
-		Name:          names[districtIndex],
+		Name:          companyName,
 	}, nil
+}
+
+func employeeCount(seed string, version int, company int) int {
+	stream := newStream(seed, version, fmt.Sprintf("staff/company/%02d", company))
+	return 4 + stream.intn(7)
 }
 
 // GenerateCompanyFromKey mirrors GenerateNPCFromKey for a city-scoped company.
 func GenerateCompanyFromKey(seed string, fallbackVersion int, generationKey string) (Company, error) {
 	parts := strings.Split(generationKey, "/")
-	if len(parts) == 7 {
+	if len(parts) == 7 || (len(parts) == 10 && parts[2] == "companies") {
 		cityID := parts[0] + "/" + parts[1]
 		if city, ok := CityByID(cityID); ok && city.ID != "fr/lyon" {
 			citySeed := CitySeed(seed, city.ID)
@@ -479,6 +608,55 @@ func generateSociety(seed string, version int) (World, error) {
 	return world, nil
 }
 
+func generateExpandedSociety(seed string, version int) (World, error) {
+	w := generateCity(seed, version)
+	districts := selectedDistricts(seed, version)
+	w.NPCs = []NPC{}
+	w.Companies = []Company{}
+	w.EmploymentRelationships = []EmploymentRelationship{}
+	w.PersonalRelationships = []PersonalRelationship{}
+	w.CompanyLocations = []CompanyLocation{}
+	for _, d := range districts {
+		buildings := districtBuildingSet(seed, version, d.slug)
+		for b := 1; b <= 6; b++ {
+			building := buildings[b-1]
+			locationID := "location:lyon/district/" + d.slug + "/building/" + building.slug
+			for c := 1; c <= 6; c++ {
+				key := fmt.Sprintf("fr/lyon/companies/%s/district/%s/building/%02d/company/%02d", seedFingerprint(seed, version), d.slug, b, c)
+				company, err := GenerateCompany(seed, version, key)
+				if err != nil {
+					return World{}, err
+				}
+				w.Companies = append(w.Companies, company)
+				w.Entities = append(w.Entities, Entity{ID: company.ID, EntityType: "company", RegionID: company.RegionID, GenerationKey: key, Name: company.Name})
+				w.CompanyLocations = append(w.CompanyLocations, CompanyLocation{ID: "company-location:" + company.ID + ":" + locationID, CompanyID: company.ID, LocationID: locationID, LocationRole: "headquarters"})
+				staff := employeeCount(seed, version, (b-1)*6+c)
+				people := make([]NPC, 0, staff)
+				for p := 1; p <= staff; p++ {
+					personKey := fmt.Sprintf("fr/lyon/people/%s/district/%s/company/%02d/person/%02d", seedFingerprint(seed, version), d.slug, (b-1)*6+c, p)
+					npc, err := GenerateNPC(seed, version, personKey)
+					if err != nil {
+						return World{}, err
+					}
+					people = append(people, npc)
+					w.NPCs = append(w.NPCs, npc)
+					w.Entities = append(w.Entities, Entity{ID: npc.ID, EntityType: "npc", RegionID: npc.RegionID, GenerationKey: personKey, Name: npc.Name})
+					w.EmploymentRelationships = append(w.EmploymentRelationships, EmploymentRelationship{ID: "employment:" + npc.ID + ":" + company.ID, EmployeeNPCID: npc.ID, EmployerCompanyID: company.ID, Role: employmentRoles[(p-1)%len(employmentRoles)]})
+				}
+				for i := 0; i+1 < len(people); i += 2 {
+					a, b := people[i].ID, people[i+1].ID
+					if b < a {
+						a, b = b, a
+					}
+					w.PersonalRelationships = append(w.PersonalRelationships, PersonalRelationship{ID: "personal:marriage:" + a + ":" + b, PersonANPCID: a, PersonBNPCID: b, RelationshipType: "marriage"})
+				}
+			}
+		}
+	}
+	sortWorld(&w)
+	return w, nil
+}
+
 func npcFor(seed string, version int, regionID, generationKey string, name personName) NPC {
 	stream := newStream(seed, version, "npc/attributes/"+generationKey)
 	maritalStream := newStream(seed, version, "npc/marital-status/"+generationKey)
@@ -494,7 +672,7 @@ func npcFor(seed string, version int, regionID, generationKey string, name perso
 		GenerationKey: generationKey,
 		RegionID:      regionID,
 		Name:          name.first + " " + name.last,
-		Age:           18 + stream.intn(53),
+		Age:           generatedNPCAgeMin + stream.intn(generatedNPCAgeMax-generatedNPCAgeMin+1),
 		Appearance:    appearances[stream.intn(len(appearances))],
 		Personality:   personalities[stream.intn(len(personalities))],
 		Status:        "alive",
@@ -509,22 +687,28 @@ func npcFor(seed string, version int, regionID, generationKey string, name perso
 				npc.Presentation = PresentationFeminine
 			}
 		}
-		visual := visualIdentityForNPC(seed, version, generationKey, npc.Age, npc.Presentation)
+		visual := visualIdentityForNPC(seed, version, generationKey, regionID, npc.Age, npc.Presentation)
 		npc.Visual = &visual
 		npc.Appearance = generatedAppearanceDescription(visual)
 	}
 	return npc
 }
 
-func visualIdentityForNPC(seed string, version int, generationKey string, age int, presentation VisualPresentation) VisualIdentity {
+func visualIdentityForNPC(seed string, version int, generationKey, regionID string, age int, presentation VisualPresentation) VisualIdentity {
 	if version == GeneratorVersion4 {
 		return legacyVisualIdentityForNPC(seed, generationKey)
 	}
 	stream := newStream(seed, version, "npc/visual/"+generationKey)
 	hairStream := newStream(seed, version, "npc/visual/hair/"+generationKey)
+	var skinID string
+	if version >= GeneratorVersion8 {
+		skinID = generatedRegionalSkinID(stream, regionID)
+	} else {
+		skinID = skinLayerIDs[stream.intn(len(skinLayerIDs))]
+	}
 	identity := VisualIdentity{
 		HairID:       generatedHairID(hairStream, age),
-		SkinID:       skinLayerIDs[stream.intn(len(skinLayerIDs))],
+		SkinID:       skinID,
 		EyesID:       eyeLayerIDs[stream.intn(len(eyeLayerIDs))],
 		AccessoryIDs: []string{},
 	}
@@ -537,13 +721,90 @@ func visualIdentityForNPC(seed string, version int, generationKey string, age in
 		styles := []string{"moustache", "mutton", "soul_patch", "goatee", "full"}
 		identity.BeardID = "beard_" + styles[stream.intn(len(styles))] + "_" + hairTone(identity.HairID)
 	}
-	if stream.intn(8) == 0 {
+	if version >= GeneratorVersion8 {
+		identity.FaceID = generatedFaceDetail(seed, version, generationKey, age)
+	} else if stream.intn(8) == 0 {
 		identity.FaceID = "face_scar_short"
 	}
 	if stream.intn(5) == 0 {
 		identity.AccessoryIDs = append(identity.AccessoryIDs, accessoryLayerIDs[stream.intn(len(accessoryLayerIDs))])
 	}
 	return identity
+}
+
+// Regional skin mixes are authored game-world distributions, not demographic
+// claims. Every district profile contains all skin palettes at similar weights.
+var regionalSkinMixes = [][7]int{
+	{16, 14, 15, 15, 14, 14, 12},
+	{12, 16, 14, 15, 14, 15, 14},
+	{14, 12, 16, 14, 15, 15, 14},
+	{13, 14, 13, 15, 15, 14, 16},
+}
+
+func generatedRegionalSkinID(stream randomStream, regionID string) string {
+	profileStream := newStream("noir-1974-authored-visual-mixes", GeneratorVersion8, regionID)
+	profile := profileStream.intn(len(regionalSkinMixes))
+	roll := stream.intn(100)
+	for index, weight := range regionalSkinMixes[profile] {
+		if roll < weight {
+			return skinLayerIDs[index]
+		}
+		roll -= weight
+	}
+	return skinLayerIDs[len(skinLayerIDs)-1]
+}
+
+func generatedFaceDetail(seed string, version int, generationKey string, age int) string {
+	rollStream := newStream(seed, version, "npc/visual/face/"+generationKey)
+	roll := rollStream.intn(100)
+	switch {
+	case age >= 60:
+		switch {
+		case roll < 20:
+			return "face_wrinkles_deep"
+		case roll < 36:
+			return "face_wrinkles_fine"
+		case roll < 45:
+			return "face_scar_short"
+		case roll < 60:
+			return "face_freckles_light"
+		case roll < 67:
+			return "face_freckles_dense"
+		case roll < 74:
+			return "face_mole"
+		case roll < 82:
+			return "face_smile_lines"
+		}
+	case age >= 45:
+		switch {
+		case roll < 12:
+			return "face_wrinkles_fine"
+		case roll < 21:
+			return "face_scar_short"
+		case roll < 37:
+			return "face_freckles_light"
+		case roll < 44:
+			return "face_freckles_dense"
+		case roll < 51:
+			return "face_mole"
+		case roll < 60:
+			return "face_smile_lines"
+		}
+	default:
+		switch {
+		case roll < 10:
+			return "face_scar_short"
+		case roll < 27:
+			return "face_freckles_light"
+		case roll < 34:
+			return "face_freckles_dense"
+		case roll < 42:
+			return "face_mole"
+		case roll < 50:
+			return "face_smile_lines"
+		}
+	}
+	return ""
 }
 
 func legacyVisualIdentityForNPC(seed, generationKey string) VisualIdentity {
@@ -567,27 +828,70 @@ func legacyVisualIdentityForNPC(seed, generationKey string) VisualIdentity {
 	return identity
 }
 
+const (
+	generatedNPCAgeMin  = 18
+	generatedNPCAgeMax  = 70
+	ageBaldingHairStart = 45
+	ageFirstGreyHair    = 40
+	ageGreyHairFrequent = 50
+	ageGreyHairCommon   = 60
+)
+
+type ageAppearanceProfile struct {
+	greyHairChance int
+	allowsThinning bool
+}
+
+func appearanceProfileForAge(age int) ageAppearanceProfile {
+	profile := ageAppearanceProfile{}
+	if age >= ageBaldingHairStart {
+		profile.allowsThinning = true
+	}
+	switch {
+	case age >= ageGreyHairCommon:
+		profile.greyHairChance = 40
+	case age >= ageGreyHairFrequent:
+		profile.greyHairChance = 20
+	case age >= ageFirstGreyHair:
+		profile.greyHairChance = 5
+	}
+	return profile
+}
+
 func generatedHairID(stream randomStream, age int) string {
 	styles := []string{"short", "long", "long_wavy", "long_curly", "messy", "wavy", "bob", "slicked", "mohawk"}
-	if age >= 45 {
+	profile := appearanceProfileForAge(age)
+	if profile.allowsThinning {
 		styles = append(styles, "balding", "sparse_sides")
 	}
 	style := styles[stream.intn(len(styles))]
 
 	tones := []string{"black", "brown", "ginger", "blonde"}
-	greyChance := 0
-	switch {
-	case age >= 60:
-		greyChance = 40
-	case age >= 50:
-		greyChance = 20
-	case age >= 40:
-		greyChance = 5
-	}
-	if greyChance > 0 && stream.intn(100) < greyChance {
+	if profile.greyHairChance > 0 && stream.intn(100) < profile.greyHairChance {
 		return "hair_" + style + "_grey"
 	}
 	return "hair_" + style + "_" + tones[stream.intn(len(tones))]
+}
+
+func visualIsAgeConsistent(identity VisualIdentity, age int) bool {
+	if age < generatedNPCAgeMin || age > generatedNPCAgeMax || !containsLayer(hairLayerIDs, identity.HairID) {
+		return false
+	}
+	profile := appearanceProfileForAge(age)
+	if !profile.allowsThinning && (strings.Contains(identity.HairID, "balding") || strings.Contains(identity.HairID, "sparse_sides")) {
+		return false
+	}
+	if profile.greyHairChance == 0 && hairTone(identity.HairID) == "grey" {
+		return false
+	}
+	switch identity.FaceID {
+	case "face_wrinkles_fine":
+		return age >= ageBaldingHairStart
+	case "face_wrinkles_deep":
+		return age >= ageGreyHairCommon
+	default:
+		return true
+	}
 }
 
 func generatedAppearanceDescription(identity VisualIdentity) string {
@@ -677,8 +981,21 @@ func beardDescription(id string) string {
 }
 
 func faceDescription(id string) string {
-	if id == "face_scar_short" {
+	switch id {
+	case "face_scar_short":
 		return "a short scar"
+	case "face_freckles_light":
+		return "light freckles"
+	case "face_freckles_dense":
+		return "freckles"
+	case "face_mole":
+		return "a beauty mark"
+	case "face_smile_lines":
+		return "subtle smile lines"
+	case "face_wrinkles_fine":
+		return "fine facial lines"
+	case "face_wrinkles_deep":
+		return "deep facial lines"
 	}
 	return ""
 }
@@ -728,15 +1045,27 @@ func allPersonNames() []personName {
 }
 
 func personNamesForVersion(version int, countrySlug, citySlug string) ([]personName, error) {
-	if version == GeneratorVersion2 {
-		return allPersonNames(), nil
+	cacheKey := fmt.Sprintf("%d:%s:%s", version, countrySlug, citySlug)
+	if cached, ok := personNameCatalogCache.Load(cacheKey); ok {
+		return cached.([]personName), nil
 	}
-	if version != GeneratorVersion3 && version != GeneratorVersion4 && version != GeneratorVersion5 && version != GeneratorVersion6 {
+	if version == GeneratorVersion2 {
+		result := allPersonNames()
+		cached, _ := personNameCatalogCache.LoadOrStore(cacheKey, result)
+		return cached.([]personName), nil
+	}
+	if version < GeneratorVersion3 || version > GeneratorVersion8 {
 		return nil, ErrUnsupportedGeneratorVersion
 	}
 	catalog, ok := names.ForCity(countrySlug, citySlug)
 	if !ok || len(catalog.GivenNames) == 0 || len(catalog.FamilyNames) == 0 {
-		return allPersonNames(), nil
+		result := allPersonNames()
+		cached, _ := personNameCatalogCache.LoadOrStore(cacheKey, result)
+		return cached.([]personName), nil
+	}
+	if version >= GeneratorVersion7 && len(catalog.GivenNames) < 100 {
+		catalog.GivenNames = expandedNameBank(catalog.GivenNames)
+		catalog.FamilyNames = expandedNameBank(catalog.FamilyNames)
 	}
 	result := make([]personName, 0, len(catalog.GivenNames)*len(catalog.FamilyNames))
 	for _, first := range catalog.GivenNames {
@@ -744,7 +1073,19 @@ func personNamesForVersion(version int, countrySlug, citySlug string) ([]personN
 			result = append(result, personName{first: first, last: last})
 		}
 	}
-	return result, nil
+	cached, _ := personNameCatalogCache.LoadOrStore(cacheKey, result)
+	return cached.([]personName), nil
+}
+
+func expandedNameBank(base []string) []string {
+	result := make([]string, 0, len(base)*7)
+	for i, name := range base {
+		result = append(result, name)
+		for offset := 1; offset <= 6; offset++ {
+			result = append(result, name+"-"+base[(i+offset)%len(base)])
+		}
+	}
+	return result
 }
 
 func personNameScope(version int, countrySlug, citySlug string) string {
@@ -769,7 +1110,11 @@ func selectedDistricts(seed string, version int) []namedPlace {
 				candidates = append(candidates, namedPlace{slug: slug, name: name})
 			}
 		}
-		selected := shuffledCopy(candidates, newStream(seed, version, "city/districts"))[:20]
+		selectionVersion := version
+		if version >= GeneratorVersion7 {
+			selectionVersion = GeneratorVersion5
+		}
+		selected := shuffledCopy(candidates, newStream(seed, selectionVersion, "city/districts"))[:20]
 		sort.Slice(selected, func(i, j int) bool { return selected[i].slug < selected[j].slug })
 		return selected
 	}
@@ -783,6 +1128,15 @@ var expandedCompanyNames = []string{
 	"Lumière Corporation", "Montclair Industries", "Rhône Commercial Group", "Bastion Mutual", "Civic Assurance",
 	"Continental Relay Company", "Dargent Shipping", "Eastbank Provisions", "Fallow & March", "Garnier Foundry",
 	"Hearthstone Exchange", "Imperial Ledger Company", "Juno Telegraph Works", "Kingswell Security", "Lanterne Properties",
+	"Maison Arnaud", "Bureau Saint-Clair", "Compagnie des Quais", "Ateliers du Rhône", "Comptoir Bellecour",
+	"Société des Transports", "Fonderies Montbrun", "Éditions du Marché", "Mutuelle des Artisans", "Manufacture Vignal",
+	"Domaine Fournier", "Grands Magasins Perrin", "Maison des Métaux", "Services Lafayette", "Coopérative des Tisserands",
+	"Compagnie du Levant", "Établissements Moreau", "Crédit des Provinces", "Réseau Continental", "Bureau des Messageries",
+	"Société du Progrès", "Verreries Saint-Paul", "Négociants Réunis", "Maison du Courrier", "Ateliers de la Gare",
+	"Union Commerciale", "Compagnie des Halles", "Mécaniques Durand", "Comptoir National", "Dépôts de France",
+	"Groupe des Cèdres", "Bureau Rhône-Alpes", "Maison des Étoffes", "Papeteries Bernard", "Société Montaigne",
+	"Compagnie du Midi", "Services du Centre", "Ateliers Lumière", "Fournitures Générales", "Établissements Rivière",
+	"Maison des Machines", "Mutuelle Centrale", "Entrepôts du Nord", "Comptoir des Voyageurs", "Société de la Place",
 }
 
 func companyNamesForVersion(version int) []string {

@@ -7,6 +7,7 @@
     "dev:api": "node scripts/dev-api.mjs",
     "dev:web": "vite --host 127.0.0.1",
     "generate:character-variants": "node scripts/generate_character_color_variants.mjs",
+    "validate:character-assets": "node scripts/validate_character_assets.mjs",
     "build": "vite build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

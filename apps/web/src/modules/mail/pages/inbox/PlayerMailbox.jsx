@@ -3,6 +3,7 @@ import { MapPin } from "pixelarticons/react/MapPin";
 import { Files } from "pixelarticons/react/Files";
 import { Note } from "pixelarticons/react/Note";
 import { Box } from "pixelarticons/react/Box";
+import { Trash } from "pixelarticons/react/Trash";
 import { deletePlayerEmail, getPlayerEmails } from "../../../world/api.js";
 
 const ATTACHMENT_ICONS = { document: Files, paper: Note, object: Box };
@@ -16,8 +17,8 @@ function displayDate(value, timeZone) {
 export default function PlayerMailbox({ timeZone, onPin }) {
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("OPENING PRIVATE MAILBOX…");
-  const [deletingID, setDeletingID] = useState("");
   const deletedIDs = useRef(new Set());
+  const pendingDeleteIDs = useRef(new Set());
 
   useEffect(() => {
     let active = true;
@@ -25,7 +26,7 @@ export default function PlayerMailbox({ timeZone, onPin }) {
     const refresh = () => getPlayerEmails().then((items) => {
       if (!active) return;
       loaded = true;
-      const visible = items.filter((item) => !deletedIDs.current.has(item.id));
+      const visible = items.filter((item) => !deletedIDs.current.has(item.id) && !pendingDeleteIDs.current.has(item.id));
       setMessages(visible);
       setStatus(visible.length ? `${visible.length} MESSAGE${visible.length === 1 ? "" : "S"} ON FILE` : "NO PERSONAL MAIL ON FILE");
     }).catch((error) => { if (active && !loaded) setStatus(error.message || "MAILBOX UNAVAILABLE"); });
@@ -35,19 +36,24 @@ export default function PlayerMailbox({ timeZone, onPin }) {
   }, []);
 
   async function deleteMessage(message) {
-    setDeletingID(message.id);
+    const originalIndex = messages.findIndex((item) => item.id === message.id);
+    pendingDeleteIDs.current.add(message.id);
+    const remaining = messages.filter((item) => item.id !== message.id);
+    setMessages(remaining);
+    setStatus(remaining.length ? `${remaining.length} MESSAGE${remaining.length === 1 ? "" : "S"} ON FILE` : "NO PERSONAL MAIL ON FILE");
     try {
       await deletePlayerEmail(message.id);
       deletedIDs.current.add(message.id);
-      setMessages((current) => {
-        const remaining = current.filter((item) => item.id !== message.id);
-        setStatus(remaining.length ? `${remaining.length} MESSAGE${remaining.length === 1 ? "" : "S"} ON FILE` : "NO PERSONAL MAIL ON FILE");
-        return remaining;
-      });
+      pendingDeleteIDs.current.delete(message.id);
     } catch (error) {
+      pendingDeleteIDs.current.delete(message.id);
+      setMessages((current) => {
+        if (current.some((item) => item.id === message.id)) return current;
+        const restored = [...current];
+        restored.splice(Math.min(Math.max(originalIndex, 0), restored.length), 0, message);
+        return restored;
+      });
       setStatus(error.message || "COULD NOT DELETE MESSAGE");
-    } finally {
-      setDeletingID("");
     }
   }
 
@@ -82,7 +88,7 @@ export default function PlayerMailbox({ timeZone, onPin }) {
           </section>}
         </div>
       </details>
-      <button className="email-message__delete" type="button" disabled={deletingID === message.id} aria-label={`Delete email: ${message.subject}`} onClick={() => deleteMessage(message)}>{deletingID === message.id ? "DELETING…" : "DELETE"}</button>
+      <button className="email-message__delete" type="button" aria-label={`Delete email: ${message.subject}`} title="Delete email" onClick={() => deleteMessage(message)}><Trash aria-hidden="true" /></button>
     </div>)}
   </div>;
 }

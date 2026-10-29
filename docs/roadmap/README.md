@@ -38,7 +38,7 @@ Ordem e regras de entrada/saída: [`ciclos.md`](ciclos.md).
 | 12 | Interações investigativas em locais | [M12](achieved/M12-busca-e-apreensao.md) |
 | 13 | Acusação e julgamento | [M13](achieved/M13-acusacao-e-julgamento.md) |
 | 14 | Otimização, cache e estabilidade | [M14](achieved/M14-otimizacao-cache-e-estabilidade.md) |
-| 15 | Identidade visual procedural e customização do personagem | [M15](milestones/M15-identidade-visual-e-customizacao.md) |
+| 15 | Identidade visual procedural e customização do personagem | [M15](achieved/M15-identidade-visual-e-customizacao.md) |
 | 16 | Crime Reports | [M16](achieved/M16-crime-reports.md) |
 | 17 | Animações das ações do jogo | [M17](milestones/M17-animacoes-de-acoes.md) |
 | 18 | Áudio e efeitos sonoros | [M18](milestones/M18-audio-e-efeitos-sonoros.md) |

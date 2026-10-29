@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createCharacter, currentIdentity, loginAccount, logoutAccount, registerAccount } from "./api.js";
+import { createCharacter, currentIdentity, loginAccount, logoutAccount, registerAccount, updateCharacterAppearance } from "./api.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -51,5 +51,20 @@ describe("identity API", () => {
     vi.stubGlobal("fetch", fetch);
     await expect(currentIdentity()).resolves.toEqual(identity);
     expect(fetch).toHaveBeenCalledWith("/api/me", expect.objectContaining({ credentials: "same-origin" }));
+  });
+
+  it("updates the authenticated character appearance with a PUT request", async () => {
+    const visual = { hairId: "hair_long_curly_brown", skinId: "skin_medium", eyesId: "eyes_hazel", faceId: "face_freckles_light", beardId: "", accessoryIds: [] };
+    const fetch = vi.fn().mockResolvedValue(new Response('{"character":{"visual":{"hairId":"hair_long_curly_brown"}}}', {
+      headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(updateCharacterAppearance(visual)).resolves.toEqual({ character: { visual: { hairId: "hair_long_curly_brown" } } });
+    expect(fetch).toHaveBeenCalledWith("/api/characters/appearance", expect.objectContaining({
+      method: "PUT",
+      credentials: "same-origin",
+      body: JSON.stringify({ visual }),
+    }));
   });
 });
