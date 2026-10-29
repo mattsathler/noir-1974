@@ -48,15 +48,15 @@ function displayRecordDate(value, timeZone) {
   }).format(date);
 }
 
-export default function WorldDirectory({ program, companyLocationId = "", companyId = "", facilityLocationId = "", accessAttemptId = "", cityId = "", countryName = "", serverTime = new Date(), timeZone = "Europe/Paris", onPrint, onOpenCompany }) {
-  const [query, setQuery] = useState("");
+export default function WorldDirectory({ program, companyLocationId = "", companyId = "", facilityLocationId = "", accessAttemptId = "", cityId = "", countryName = "", serverTime = new Date(), timeZone = "Europe/Paris", onPrint, onOpenCompany, onNavigateCompanyWebsite, initialSearch = "", initialCompanies = [] }) {
+  const [query, setQuery] = useState(initialSearch);
   const [people, setPeople] = useState([]);
   const [selectedPerson, setSelectedPerson] = useState(null);
-  const [companies, setCompanies] = useState([]);
+  const [companies, setCompanies] = useState(initialCompanies);
   const [locations, setLocations] = useState([]);
   const isStaffDirectory = program === "staff-directory";
   const isCompanyPortal = program === "company-portal";
-  const [message, setMessage] = useState(isStaffDirectory ? "Enter a company name to search its staff directory." : isCompanyPortal ? "Search national company websites in the connected country." : program === "interpol" ? "Enter a name to search countrywide personnel files." : "Enter a name or address to search the city records.");
+  const [message, setMessage] = useState(isStaffDirectory ? "Connecting to the company employee directory…" : isCompanyPortal ? initialCompanies.length ? "NATIONAL COMPANY LISTINGS RETRIEVED" : "Search national company websites in the connected country." : program === "interpol" ? "Enter a name to search countrywide personnel files." : "Enter a name or address to search the city records.");
   const [busy, setBusy] = useState(false);
   const [recordRange, setRecordRange] = useState(() => {
     const through = inputDate(serverTime, timeZone);
@@ -189,7 +189,8 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
     setBusy(true);
     setMessage(`CONNECTING TO ${record.company.name.toUpperCase()}…`);
     try {
-      await onOpenCompany(record);
+      const site = await onOpenCompany(record);
+      if (site) onNavigateCompanyWebsite?.(site, { query, companies });
     } catch (error) {
       setMessage(error.message || "THE COMPANY WEBSITE COULD NOT BE REACHED.");
     } finally {
@@ -204,9 +205,9 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
       {isInterpol && <p className="world-directory__scope">SEARCH JURISDICTION · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</p>}
       {isCompanyPortal && <p className="world-directory__scope">CONNECTED COUNTRY · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"} · NATIONAL LISTINGS</p>}
       {!isStaffDirectory && !selectedPerson && <form className="world-directory__search" onSubmit={submitSearch}>
-        <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isCompanyPortal ? "COMPANY NAME OR WEBSITE" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
+        <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isCompanyPortal ? "COMPANY, WEBSITE OR ADDRESS" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
         <div className="world-directory__searchline">
-          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Search a company directory" : isCompanyPortal ? "Search national company websites" : isPeopleSearch ? "Search personnel files" : "Search companies and locations"} />
+          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Search a company directory" : isCompanyPortal ? "Search company, website, service, or address" : isPeopleSearch ? "Search personnel files" : "Search companies and locations"} />
           <button type="submit" disabled={busy}>{busy ? "SEARCHING…" : "SEARCH"}</button>
         </div>
       </form>}
@@ -295,11 +296,10 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
 
       {isCompanyPortal && companies.map(({ company, address }) => (
         <article className="world-record world-company-site" key={company.id}>
-          <header className="world-record__header"><h2>{company.name}</h2><span>COMPANY WEBSITE</span></header>
+          <p><strong><a href={`#${company.id}`} className="world-directory__company-link" onClick={(event) => { event.preventDefault(); openCompanyWebsite({ company, address }); }}>{company.name}</a></strong> · {company.websiteDescription || "PUBLIC COMPANY INFORMATION"}</p>
+          <p>WEBSITE · {company.websiteDomain || "NO DOMAIN LISTING"}</p>
           <p>HEADQUARTERS · {address.full}</p>
-          <button type="button" className="world-company-site__open" disabled={busy} onClick={() => openCompanyWebsite({ company, address })}>
-            {busy ? "CONNECTING…" : "OPEN COMPANY WEBSITE"} <span aria-hidden="true">↗</span>
-          </button>
+          {busy && <p role="status" aria-live="polite">CONNECTING TO {company.name.toUpperCase()}…</p>}
         </article>
       ))}
 

@@ -24,5 +24,6 @@ Status: `Proposta` | `Aceita` | `Supersedida` | `Rejeitada`.
 | [0010](0010-geografia-fixa-e-bairros-procedurais.md) | Geografia fixa e bairros procedurais | Supersedida |
 | [0011](0011-predios-e-empresas.md) | Prédios e empresas como entidades distintas | Supersedida |
 | [0012](0012-computador-proxy-e-sites-investigativos.md) | Computador pessoal, proxy e investigação por sites | Aceita |
+| [0013](0013-company-websites-procedurais.md) | Websites empresariais procedurais sob demanda | Aceita |
 
 Quando uma decisão nova **substitui** outra, marcar a antiga como `Supersedida` e apontar o ADR sucessor.

@@ -1,0 +1,191 @@
+.company-website {
+  --company-accent: #176b68;
+  --company-paper: #f4f2e8;
+  --company-ink: #172d30;
+  min-height: 100%;
+  color: var(--company-ink);
+  background: var(--company-paper);
+  font: 0.86rem/1.45 Arial, Helvetica, sans-serif;
+}
+
+.company-website__masthead {
+  display: flex;
+  min-height: 6rem;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 2rem;
+  color: var(--company-paper);
+  background: var(--company-accent);
+  border-bottom: 3px solid var(--company-ink);
+}
+
+.company-website__masthead > div { flex: 1; }
+.company-website__masthead p,.company-website__eyebrow { margin: 0 0 .3rem; font-size: .62rem; letter-spacing: .08em; }
+.company-website__masthead h1 { margin: 0; overflow-wrap: anywhere; font-size: clamp(1.2rem, 3vw, 1.8rem); }
+.company-website__masthead > div > span { display: block; margin-top: .25rem; }
+.company-website__mark { display: grid; width: 2.75rem; height: 2.75rem; flex: 0 0 auto; place-items: center; color: var(--company-accent); background: var(--company-paper); border: 1px solid currentColor; }
+.company-website__mark svg { width: 2rem; height: 2rem; fill: currentColor; shape-rendering: crispEdges; }
+.company-website__masthead > button,.company-website__account button { padding: .45rem .6rem; color: var(--company-paper); background: var(--company-ink); border: 1px solid var(--company-paper); font-size: .62rem; }
+.company-website__masthead > button:disabled,.company-website__account button:disabled { opacity: .8; cursor: not-allowed; }
+.company-website__masthead--masthead-centered { justify-content: center; text-align: center; }
+.company-website__masthead--masthead-centered .company-website__mark { order: 2; }
+.company-website__masthead--split-banner { align-items: flex-end; }
+.company-website__masthead--compact-bar { min-height: 4rem; }
+.company-website__masthead--framed-title { margin: .5rem; border: 1px solid var(--company-accent); }
+.company-website__masthead--catalogue-head { border-bottom-width: 5px; }
+.company-website__masthead--office-sign { margin: .5rem 2rem 0; }
+.company-website__nav { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--company-accent); }
+.company-website__nav a,.company-website__staff-link { padding: .45rem .7rem; color: var(--company-accent); border-right: 1px solid var(--company-accent); font-size: .66rem; }
+.company-website__nav a[aria-current="page"] { color: var(--company-paper); background: var(--company-accent); }
+.company-website__staff-link { margin-left: auto; background: transparent; border-top: 0; border-bottom: 0; border-left: 0; cursor: pointer; }
+.company-website__nav :focus-visible,.company-website__account :focus-visible { outline: 2px solid var(--company-accent); outline-offset: 2px; }
+.company-website__feature { max-width: 72rem; min-height: 18rem; margin: 0 auto; padding: 1.4rem 2rem; }
+.company-website__staff-page { max-width: 72rem; min-height: 18rem; margin: 0 auto; padding: 1.4rem 2rem; }
+.company-website__staff-page .world-directory { color: var(--company-ink); font: inherit; letter-spacing: normal; }
+.company-website__staff-page .world-directory > h1 { margin: .2rem 0 .8rem; color: var(--company-accent); font: 700 clamp(1.25rem, 3vw, 2rem)/1.2 Arial, Helvetica, sans-serif; letter-spacing: normal; }
+.company-website__staff-page .world-directory__message { min-height: 1.2em; margin: .5rem 0 1rem; color: var(--company-ink); font-size: .68rem; }
+.company-website__staff-page .world-record { margin-top: 1rem; padding: .75rem 0; color: var(--company-ink); background: transparent; border: 0; border-top: 2px solid var(--company-accent); }
+.company-website__staff-page .world-record__header { align-items: baseline; padding-bottom: .5rem; border-bottom: 1px solid color-mix(in srgb, var(--company-accent) 45%, var(--company-paper)); }
+.company-website__staff-page .world-record__header h2 { color: var(--company-accent); font: 700 1rem Arial, Helvetica, sans-serif; letter-spacing: normal; }
+.company-website__staff-page .world-record__header span { color: var(--company-ink); }
+.company-website__staff-page .world-record__staff-list { display: block; margin-top: .25rem; }
+.company-website__staff-page .world-record__staff-list .world-record__detail,
+.company-website__staff-page .world-record__staff-member { padding: .55rem 0; color: var(--company-ink); background: transparent; border-bottom: 1px solid color-mix(in srgb, var(--company-accent) 28%, var(--company-paper)); }
+.company-website__staff-page .world-record__staff-portrait { width: 48px; height: 48px; flex-basis: 48px; border-color: color-mix(in srgb, var(--company-accent) 55%, var(--company-paper)); background: var(--company-paper); }
+.company-website__staff-page .world-record__staff-portrait .modular-face { width: 46px; }
+.company-website__staff-page .world-record__staff-member strong { color: var(--company-ink); font-weight: 700; }
+.company-website__staff-page .world-record__staff-member span { color: var(--company-accent); font-size: .62rem; }
+.company-website__staff-page .world-record__staff-member small { color: var(--company-ink); font: .72rem Arial, Helvetica, sans-serif; letter-spacing: normal; }
+.company-website__feature h2 { margin: .2rem 0 .8rem; color: var(--company-accent); font-size: clamp(1.25rem, 3vw, 2rem); }
+.company-website__eyebrow { color: var(--company-accent); }
+.company-website__sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1.4rem; }
+.company-website__section { min-width: 0; padding: .65rem 0; border-top: 1px solid var(--company-accent); overflow-wrap: anywhere; }
+.company-website__section h3 { margin: 0 0 .3rem; color: var(--company-accent); font-size: .7rem; }
+.company-website__section p { margin: .2rem 0; }
+.company-website__section ul { margin: .4rem 0; padding-left: 1.2rem; }
+.company-website__section--address { border-top: 2px double var(--company-accent); }
+.company-website__section--bulletin { font-style: italic; }
+.company-website__section--fact p { font-weight: bold; }
+.company-website__feature address { padding: .5rem 0; font-style: normal; }
+.company-website__account { max-width: 34rem; padding: .75rem; border: 1px solid var(--company-accent); }
+.company-website__notice { padding: .5rem 2rem; border-top: 1px solid var(--company-accent); }
+.company-website__ad { display: grid; min-width: 0; align-content: center; gap: .18rem; padding: .65rem; color: var(--company-ink); background: color-mix(in srgb, var(--company-accent) 8%, var(--company-paper)); border: 1px solid color-mix(in srgb, var(--company-accent) 48%, var(--company-paper)); overflow-wrap: anywhere; }
+.company-website__ad-label { color: var(--company-accent); font-size: .48rem; font-weight: 700; letter-spacing: .13em; }
+.company-website__ad strong { color: var(--company-accent); font-size: .62rem; letter-spacing: .04em; }
+.company-website__ad b { font-size: .76rem; }
+.company-website__ad--banner { grid-template-columns: auto minmax(0, 1fr) minmax(8rem, .6fr); align-items: center; gap: .35rem .8rem; padding: .55rem 2rem; border-width: 0 0 1px; }
+.company-website__ad--banner .company-website__ad-label { grid-row: span 2; }
+.company-website__ad--banner strong { align-self: end; }
+.company-website__ad--banner b { grid-column: 2; align-self: start; }
+.company-website__ad--banner > span:last-child { grid-column: 3; grid-row: 1 / span 2; }
+.company-website__ad--inline { grid-column: 1 / -1; margin: .35rem 0; border-left: .25rem solid var(--company-accent); }
+.company-website__ad-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; max-width: 72rem; margin: 0 auto; padding: 0 2rem 1rem; }
+.company-website__ad-grid .company-website__ad { min-height: 5.25rem; }
+.company-website__footer { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem 2rem; color: var(--company-ink); border-top: 1px solid var(--company-accent); font-size: .6rem; overflow-wrap: anywhere; }
+
+/* Distinct page structures use simple rules suited to an older web style. */
+.company-website--editorial { font-family: Georgia, "Times New Roman", serif; }
+.company-website--editorial .company-website__masthead { justify-content: center; text-align: center; border-bottom: 4px double var(--company-ink); }
+.company-website--editorial .company-website__mark { display: none; }
+.company-website--editorial .company-website__feature { max-width: 58rem; }
+.company-website--editorial .company-website__sections { display: block; columns: 2; column-gap: 2rem; }
+.company-website--editorial .company-website__section { break-inside: avoid; }
+.company-website--corporate .company-website__masthead { min-height: 4.5rem; }
+.company-website--corporate .company-website__sections { grid-template-columns: 1.3fr .7fr; }
+.company-website--corporate .company-website__section--list { grid-row: span 2; }
+.company-website--workshop { font-family: "Courier New", monospace; }
+.company-website--workshop .company-website__masthead { min-height: 4.5rem; border-bottom: 5px solid var(--company-accent); }
+.company-website--workshop .company-website__section { border-top-style: dashed; }
+.company-website--catalogue .company-website__masthead { justify-content: center; text-align: center; }
+.company-website--catalogue .company-website__masthead > button { align-self: flex-start; }
+.company-website--catalogue .company-website__sections { grid-template-columns: 1fr; }
+.company-website--catalogue .company-website__section--list { border: 1px solid var(--company-accent); padding: .6rem; }
+.company-website--directory .company-website__feature { border-left: 1px solid var(--company-accent); }
+.company-website--directory .company-website__sections { grid-template-columns: minmax(8rem, .65fr) 1.35fr; }
+.company-website--directory .company-website__section h3 { text-transform: uppercase; }
+.company-website--shop-window .company-website__sections { display: block; max-width: 48rem; }
+.company-website--shop-window .company-website__section:first-child { border-top-width: 3px; }
+.company-website__feature--wide-columns .company-website__sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.company-website__feature--stacked-sections .company-website__sections { display: block; }
+.company-website__feature--feature-first .company-website__section:first-child { border-top-width: 3px; font-size: 1.05rem; }
+.company-website__feature--notice-board .company-website__section { border-top-style: dotted; }
+.company-website__feature--text-led .company-website__section { border-top: 0; border-bottom: 1px solid var(--company-accent); }
+
+/* Additional header families use simple period-appropriate rules and type. */
+.company-website__masthead--ribbon { position: relative; padding-left: 3rem; border-bottom-width: 0; }
+.company-website__masthead--ribbon::before { position: absolute; inset: 0 auto 0 0; width: 1.35rem; background: var(--company-ink); content: ""; }
+.company-website__masthead--split-logo .company-website__mark { order: 3; width: 4rem; height: 4rem; }
+.company-website__masthead--split-logo > div { border-left: 1px solid color-mix(in srgb, var(--company-paper) 55%, transparent); padding-left: 1rem; }
+.company-website__masthead--ticker-strip { min-height: 3.5rem; padding-block: .5rem; border-bottom-width: 1px; font-family: "Courier New", monospace; }
+.company-website__masthead--ticker-strip p { opacity: .8; }
+.company-website__masthead--notice-column { align-items: flex-start; border-left: .65rem solid var(--company-ink); }
+.company-website__masthead--notice-column .company-website__mark { align-self: flex-start; }
+.company-website__masthead--letterhead { min-height: 8rem; color: var(--company-ink); background: var(--company-paper); border-bottom: 4px double var(--company-accent); }
+.company-website__masthead--letterhead .company-website__mark { color: var(--company-paper); background: var(--company-accent); }
+.company-website__masthead--letterhead > button { color: var(--company-accent); background: transparent; border-color: var(--company-accent); }
+.company-website__masthead--illustrated-banner { min-height: 8rem; background: linear-gradient(105deg, var(--company-accent) 0 68%, color-mix(in srgb, var(--company-accent) 76%, var(--company-paper)) 68%); }
+.company-website__masthead--serif-plaque { justify-content: center; min-height: 7rem; text-align: center; font-family: Georgia, "Times New Roman", serif; }
+.company-website__masthead--serif-plaque .company-website__mark { order: 2; border-radius: 50%; }
+.company-website__masthead--serif-plaque h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; letter-spacing: .04em; }
+.company-website__masthead--double-rule { min-height: 5rem; color: var(--company-ink); background: var(--company-paper); border-top: 3px double var(--company-accent); border-bottom: 3px double var(--company-accent); }
+.company-website__masthead--double-rule .company-website__mark { color: var(--company-paper); background: var(--company-accent); }
+.company-website__masthead--double-rule > button { color: var(--company-accent); background: transparent; border-color: var(--company-accent); }
+.company-website__masthead--side-rail { min-height: 7rem; padding-left: 2.4rem; border-left: 1.1rem solid var(--company-ink); }
+.company-website__masthead--side-rail .company-website__mark { width: 3.5rem; height: 3.5rem; }
+.company-website__masthead--shop-awning { position: relative; min-height: 7rem; padding-top: 1.4rem; background-image: repeating-linear-gradient(90deg, transparent 0 2.4rem, color-mix(in srgb, var(--company-paper) 12%, transparent) 2.4rem 4.8rem); border-bottom: .45rem solid var(--company-ink); }
+.company-website__masthead--shop-awning::before { position: absolute; inset: 0 0 auto; height: .55rem; background: var(--company-paper); content: ""; opacity: .85; }
+.company-website__masthead--nameplate { min-height: 7rem; background: var(--company-paper); }
+.company-website__masthead--nameplate > div { padding: .65rem .85rem; color: var(--company-ink); border: 2px solid var(--company-accent); outline: 1px solid color-mix(in srgb, var(--company-accent) 45%, transparent); outline-offset: 3px; }
+.company-website__masthead--nameplate h1 { color: var(--company-accent); }
+.company-website__masthead--nameplate > button { color: var(--company-accent); background: transparent; border-color: var(--company-accent); }
+.company-website__masthead--market-banner { min-height: 8rem; align-items: flex-end; padding-bottom: 1.3rem; background: linear-gradient(180deg, var(--company-accent) 0 72%, var(--company-ink) 72%); }
+.company-website__masthead--market-banner .company-website__mark { width: 3.4rem; height: 3.4rem; transform: translateY(-.4rem); }
+.company-website__masthead--market-banner > div { padding-bottom: .25rem; }
+.company-website__masthead--stacked-columns { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr) auto; min-height: 6.5rem; border-bottom-width: 0; }
+.company-website__masthead--stacked-columns > div { padding-left: .8rem; border-left: 1px solid color-mix(in srgb, var(--company-paper) 55%, transparent); }
+
+/* New site archetypes have visibly different page composition. */
+.company-website--classifieds { font-family: "Courier New", monospace; }
+.company-website--classifieds .company-website__feature { max-width: 64rem; }
+.company-website--classifieds .company-website__sections { display: block; }
+.company-website--classifieds .company-website__section { border-top-style: dotted; }
+.company-website--classifieds .company-website__section--list { columns: 2; }
+.company-website--bulletin .company-website__feature { max-width: 58rem; }
+.company-website--bulletin .company-website__sections { display: block; }
+.company-website--bulletin .company-website__section { padding: .8rem 1rem; border: 1px solid color-mix(in srgb, var(--company-accent) 38%, var(--company-paper)); margin-bottom: .6rem; }
+.company-website--bulletin .company-website__section--bulletin { border-left: .45rem solid var(--company-accent); background: color-mix(in srgb, var(--company-accent) 7%, var(--company-paper)); }
+.company-website--ledger { font-family: "Courier New", monospace; }
+.company-website--ledger .company-website__masthead { color: var(--company-ink); background: var(--company-paper); border-bottom: 3px double var(--company-ink); }
+.company-website--ledger .company-website__masthead .company-website__mark { display: none; }
+.company-website--ledger .company-website__masthead > button { color: var(--company-ink); background: transparent; border-color: var(--company-ink); }
+.company-website--ledger .company-website__feature { max-width: 54rem; }
+.company-website--ledger .company-website__sections { display: block; }
+.company-website--ledger .company-website__section { border-top: 1px dotted var(--company-accent); }
+.company-website--brochure .company-website__masthead { text-align: center; }
+.company-website--brochure .company-website__feature { max-width: 62rem; }
+.company-website--brochure .company-website__sections { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.company-website--brochure .company-website__section { padding: .85rem; border: 1px solid color-mix(in srgb, var(--company-accent) 40%, var(--company-paper)); }
+.company-website__feature--page-services .company-website__sections { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.company-website__feature--page-contact .company-website__sections { grid-template-columns: 1.4fr .8fr .8fr; }
+.company-website__feature--page-account .company-website__sections { display: block; max-width: 34rem; }
+.company-website__ad-grid--crowded { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 80rem; }
+.company-website__ad-grid--crowded .company-website__ad { min-height: 4.4rem; padding: .45rem; }
+
+@media (max-width: 42rem) {
+  .company-website__masthead { flex-wrap: wrap; padding: .75rem; }
+  .company-website__masthead--stacked-columns { grid-template-columns: 2.75rem minmax(0, 1fr); }
+  .company-website__masthead--stacked-columns > button { grid-column: 1 / -1; }
+  .company-website__masthead > button { width: 100%; }
+  .company-website__feature { padding: 1rem; }
+  .company-website__staff-page { padding: 1rem; }
+  .company-website__sections,.company-website--corporate .company-website__sections,.company-website--directory .company-website__sections { display: block; }
+  .company-website--editorial .company-website__sections { columns: 1; }
+  .company-website--classifieds .company-website__section--list { columns: 1; }
+  .company-website--brochure .company-website__sections,.company-website__feature--page-services .company-website__sections,.company-website__feature--page-contact .company-website__sections { display: block; }
+  .company-website__ad-grid--crowded { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .company-website__ad--banner { grid-template-columns: 1fr; padding: .55rem 1rem; }
+  .company-website__ad--banner .company-website__ad-label,.company-website__ad--banner b,.company-website__ad--banner > span:last-child { grid-column: auto; grid-row: auto; }
+  .company-website__ad-grid { grid-template-columns: 1fr; padding-inline: 1rem; }
+  .company-website__footer { flex-direction: column; padding: .5rem 1rem; }
+  .company-website__staff-link { margin-left: 0; }
+}

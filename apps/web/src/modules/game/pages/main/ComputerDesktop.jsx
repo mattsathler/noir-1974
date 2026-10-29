@@ -28,6 +28,7 @@ import HospitalWebsite from "./HospitalWebsite.jsx";
 import MeridianEnterprisesWebsite from "./MeridianEnterprisesWebsite.jsx";
 import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx";
 import DeepLinkWebsite from "./DeepLinkWebsite.jsx";
+import CompanyWebsite from "./CompanyWebsite.jsx";
 
 const BOOT_LINES = [
   "NOIR PERSONAL TERMINAL · PRIVATE SESSION",
@@ -119,9 +120,11 @@ function browserAddress(program, countryName, facilityContext) {
     return `www.${slug}-hospital.noir.local${recordPath}`;
   }
   if (program.id === "staff-directory") {
-    const company = facilityContext?.label?.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, "") || "company";
-    return `www.${company}.noir.local/staff`;
+    const website = program.website;
+    const domain = website?.domain || (facilityContext?.label?.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, "") || "company") + ".noir.local";
+    return `www.${domain}/staff`;
   }
+  if (program.id === "company-website") return `www.${program.website?.domain || "company.noir.local"}${program.pageId && program.pageId !== "home" ? `/${program.pageId}` : ""}`;
   if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "crime-reports"].includes(program.id)) {
     const paths = { "police-notices": "/notices", "police-about": "/about", "police-bureaus": "/district-bureaus", "police-policies": "/records-policy", "police-contact": "/contact", "crime-reports": "/public-records/crime-reports" };
     return `www.police.noir.local${paths[program.id] || ""}`;
@@ -130,7 +133,7 @@ function browserAddress(program, countryName, facilityContext) {
   return `www.${program.id}.noir.local`;
 }
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenService, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenProxy, onOpenTelephone, onOpenWhiteboard, onAppearance, onLogout }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenProxy, onOpenTelephone, onOpenWhiteboard, onAppearance, onLogout }) {
   const programs = programsFor(facilityContext);
   const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PERSONAL_PROGRAMS.find((program) => program.id === "newspaper")] : programs;
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
@@ -323,7 +326,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     setWindows((previous) => previous.map((item) => item.id === windowId ? { ...item, zIndex } : item));
   }
 
-  function launchProgram(program, sourceWindowId = null) {
+  function launchProgram(program, sourceWindowId = null, sourceState = null) {
     if (!program?.available) return;
     if (persistent) {
       if (program.id === "newspaper") {
@@ -339,7 +342,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       if (browserWindow) {
         const zIndex = nextZIndexRef.current++;
         setWindows((previous) => previous.map((item) => item.id === browserWindow.id
-          ? { ...item, program, zIndex, history: program.id === "web-browser" ? [] : [...(item.history || []), item.program] }
+          ? { ...item, program, zIndex, history: program.id === "web-browser" ? [] : [...(item.history || []), sourceState ? { ...item.program, ...sourceState } : item.program] }
           : item));
         return;
       }
@@ -497,6 +500,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
 
             {windows.map((desktopWindow) => {
               const { id, program, position, zIndex } = desktopWindow;
+              const companySiteName = program.id === "company-website"
+                ? program.website?.company?.name || program.website?.Company?.name || program.label
+                : program.label;
               return <section
                 ref={(element) => { if (element) windowRefs.current.set(id, element); else windowRefs.current.delete(id); }}
                 className={`computer-window${position ? " computer-window--positioned" : ""}${persistent && program.id !== "newspaper" ? " computer-window--website" : ""}${persistent && program.id === "newspaper" ? " computer-window--app" : ""}`}
@@ -504,17 +510,27 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 data-window-id={id}
                 key={id}
                 style={{ ...(position || {}), zIndex }}
-                aria-label={`${program.label} ${program.id === "newspaper" ? "application" : "website"} window`}
+                aria-label={`${companySiteName} ${program.id === "newspaper" ? "application" : "website"} window`}
                 onMouseDown={() => focusWindow(id)}
               >
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
-                  <span>{persistent && !["web-browser", "newspaper"].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "NOIR BROWSER" : program.label}</span>
-                  <button type="button" className="computer-window__close" aria-label={`Close ${program.label}`} onClick={() => closeWindow(id)}>×</button>
+                  <span>{persistent && !["web-browser", "newspaper"].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "NOIR BROWSER" : companySiteName}</span>
+                  <button type="button" className="computer-window__close" aria-label={`Close ${companySiteName}`} onClick={() => closeWindow(id)}>×</button>
                 </header>
                 <div className="computer-browser-address" aria-label="Website address"><span aria-hidden="true">▣</span><span>{browserAddress(program, countryName, facilityContext)}</span><span className="computer-browser-address__secure">PRIVATE RELAY</span></div>
                 <div className={`computer-window__body${persistent && program.id !== "newspaper" ? " computer-window__body--website" : ""}`}>
                   {program.id === "web-browser"
-                    ? <LegacyCountryPortal countryName={countryName} location={location} cityId={cityId} programs={programs} navigate={(destination) => launchProgram(destination, id)} />
+                    ? <LegacyCountryPortal
+                        countryName={countryName}
+                        location={location}
+                        cityId={cityId}
+                        programs={programs}
+                        navigate={(destination) => launchProgram(destination, id)}
+                        onOpenCompany={onOpenCompany}
+                        initialSearch={program.searchTerm}
+                        initialCompanies={program.searchResults}
+                        onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })}
+                      />
                     : ["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "crime-reports"].includes(program.id)
                       ? <PoliceWebsite page={program.id} navigate={(destination) => launchProgram(destination, id)}>{program.id === "crime-reports" && <CaseFiles key={`${id}:crime-reports:${program.searchTerm || ""}`} initialSearch={program.searchTerm} cityId={cityId} issueDay={issueDay} timeZone={timeZone} />}</PoliceWebsite>
                       : program.id === "deep-link"
@@ -525,10 +541,30 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         ? <MeridianEnterprisesWebsite location={location} cityId={cityId} countryName={countryName} onOpenService={onOpenService} />
                       : program.id === "hospital-website"
                         ? <HospitalWebsite service={program.service} onConnect={onOpenService} />
+                      : program.id === "company-website"
+                        ? <CompanyWebsite
+                            site={program.website}
+                            pageId={program.pageId}
+                            onNavigate={(pageId) => launchProgram({ ...program, pageId, label: `${program.website.company.name} · ${pageId.toUpperCase()}` }, id)}
+                            onOpenStaff={async (site) => {
+                              const attempt = await onOpenCompanyStaff?.(site);
+                              if (!attempt) throw new Error("The employee directory is unavailable.");
+                              launchProgram({ id: "staff-directory", label: `${site.company.name} · EMPLOYEE DIRECTORY`, state: "ONLINE", available: true, website: site, companyLocationId: site.address.locationId, companyId: site.company.id, accessAttemptId: String(attempt.attemptId) }, id);
+                              return attempt;
+                            }}
+                          />
+                      : program.id === "staff-directory"
+                        ? <CompanyWebsite
+                            site={program.website}
+                            pageId="staff"
+                            onNavigate={(pageId) => launchProgram({ id: "company-website", label: `${program.website?.company?.name || "COMPANY"} · ${pageId.toUpperCase()}`, website: program.website, pageId, state: "ONLINE", available: true }, id)}
+                          >
+                            <WorldDirectory key={`${id}:staff-directory`} program="staff-directory" companyLocationId={program.companyLocationId} companyId={program.companyId} accessAttemptId={program.accessAttemptId} onPrint={requestPrint} />
+                          </CompanyWebsite>
                       : <InstitutionalWebsiteFrame
                         variant={institutionalVariant(program.id)}
-                        organizationName={["staff-directory", "patient-search", "hospital-patient-record"].includes(program.id) ? facilityContext?.label : ""}
-                        onHome={program.id === "gate-records" ? () => launchProgram(MERIDIAN_ENTERPRISES_PROGRAM, id) : ["patient-search", "hospital-patient-record"].includes(program.id) ? () => launchProgram({
+                        organizationName={program.id === "staff-directory" ? program.website?.company?.name || program.website?.Company?.name : ["patient-search", "hospital-patient-record"].includes(program.id) ? facilityContext?.label : ""}
+                        onHome={program.id === "staff-directory" ? () => launchProgram({ id: "company-website", label: program.website?.company?.name || "COMPANY WEBSITE", website: program.website, pageId: "home", state: "ONLINE", available: true }, id) : program.id === "gate-records" ? () => launchProgram(MERIDIAN_ENTERPRISES_PROGRAM, id) : ["patient-search", "hospital-patient-record"].includes(program.id) ? () => launchProgram({
                           id: "hospital-website",
                           label: "HOSPITAL WEBSITE",
                           Icon: Cross,
@@ -559,7 +595,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                                     ? <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} onClose={() => closeWindow(id)} />
                                     : program.id === "murder-accusation"
                                       ? <AccusationWindow key={id} stationLocationId={facilityContext?.locationId} onClose={() => closeWindow(id)} />
-                                      : <WorldDirectory key={`${id}:${program.id}`} program={program.id} companyLocationId={program.id === "staff-directory" ? facilityContext?.locationId : undefined} companyId={program.id === "staff-directory" ? facilityContext?.companyId : undefined} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} />}
+                                          : <WorldDirectory key={`${id}:${program.id}`} program={program.id} companyLocationId={program.id === "staff-directory" ? program.companyLocationId : undefined} companyId={program.id === "staff-directory" ? program.companyId : undefined} facilityLocationId={facilityContext?.locationId} accessAttemptId={program.id === "staff-directory" ? program.accessAttemptId : accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} initialSearch={program.searchTerm} initialCompanies={program.searchResults} onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })} />}
                       </InstitutionalWebsiteFrame>}
                 </div>
               </section>;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { currentIdentity } from "../../../identity/api.js";
 import ComputerDesktop from "./ComputerDesktop.jsx";
-import { connectProxy, getCurrentWorld, requestFacilitySiteAccess } from "../../../world/api.js";
+import { connectProxy, getCompanyWebsite, getCurrentWorld, requestFacilitySiteAccess } from "../../../world/api.js";
 import ProxyConnection from "../../../world/components/ProxyConnection.jsx";
 import Telephone from "./Telephone.jsx";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
@@ -79,19 +79,21 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     const response = await connectProxy(cityId);
     setWorld(response.world);
     setServerTime(new Date(response.world.serverTime));
-    const facility = {
+    return getCompanyWebsite(company.id);
+  }, []);
+  const openCompanyStaffDirectory = useCallback(async (site) => {
+    const company = site.company || site.Company;
+    const address = site.address || site.Address;
+    const response = await connectProxy(cityIdFromLocation(address.locationId));
+    setWorld(response.world);
+    setServerTime(new Date(response.world.serverTime));
+    const attempt = await requestFacilitySiteAccess({
       kind: "company",
-      label: company.name,
-      city: address.city,
-      locationId: address.locationId,
       companyId: company.id,
-      district: address.district,
-    };
-    const attempt = await requestFacilitySiteAccess(facility);
-    if (attempt.status !== "granted") throw new Error("Company website access was denied.");
-    setCompanyAccessAttemptId(String(attempt.attemptId));
-    setComputerContext(facility);
-    setComputerOpen(true);
+      locationId: address.locationId,
+    });
+    if (attempt.status !== "granted") throw new Error("Company directory access was denied.");
+    return attempt;
   }, []);
   const openPublicServiceWebsite = useCallback(async ({ address, kind }) => {
     const cityId = cityIdFromLocation(address.locationId);
@@ -153,6 +155,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           initialFacilityAccessGranted={Boolean(companyAccessAttemptId)}
           onClose={closeComputer}
           onOpenCompany={openCompanyWebsite}
+          onOpenCompanyStaff={openCompanyStaffDirectory}
           onOpenService={openPublicServiceWebsite}
           persistent
           onOpenProxy={() => { setProxyOpen(true); setTelephoneOpen(false); }}

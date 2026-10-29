@@ -89,6 +89,10 @@ type countryCompanySearchReader interface {
 	SearchCompaniesInCountry(context.Context, string, string, string) ([]world.CompanyPortalRecord, error)
 }
 
+type companyWebsiteReader interface {
+	CompanyWebsite(context.Context, string, string, string) (world.CompanyWebsite, error)
+}
+
 type cityNPCReader interface {
 	NPCBelongsToCity(context.Context, string, string, string) (bool, error)
 }
@@ -248,6 +252,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/world/npcs", handler.searchNPCs)
 		mux.HandleFunc("GET /api/world/companies", handler.searchCompanies)
 		mux.HandleFunc("GET /api/world/companies/national", handler.searchCompaniesInCountry)
+		if _, ok := reader.(companyWebsiteReader); ok {
+			mux.HandleFunc("GET /api/world/companies/{companyID}/website", handler.companyWebsite)
+		}
 		mux.HandleFunc("GET /api/world/locations", handler.searchLocations)
 		mux.HandleFunc("GET /api/world/transit", handler.transitDistricts)
 		mux.HandleFunc("GET /api/world/gate/destinations", handler.gateDestinations)
@@ -1705,6 +1712,34 @@ func (h *Handler) searchCompaniesInCountry(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results, "countryId": city.CountryID, "limit": 10})
+}
+
+func (h *Handler) companyWebsite(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
+		return
+	}
+	state := h.worldFor(r.Context(), current.ID)
+	city, exists := world.CityByID(state.CityID)
+	if !exists {
+		h.writeAPIError(w, r, http.StatusConflict, "PROXY_JURISDICTION_UNAVAILABLE", "Connect a valid Proxy city before opening company websites.", nil)
+		return
+	}
+	reader, ok := h.worldReader.(companyWebsiteReader)
+	if !ok {
+		h.writeAPIError(w, r, http.StatusServiceUnavailable, "COMPANY_WEBSITE_UNAVAILABLE", "Company websites are temporarily unavailable.", nil)
+		return
+	}
+	site, err := reader.CompanyWebsite(r.Context(), h.worldServerID, city.CountryID, r.PathValue("companyID"))
+	if errors.Is(err, world.ErrEntityNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "COMPANY_WEBSITE_FAILED", "The company website could not be opened.", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"website": site})
 }
 
 func (h *Handler) searchLocations(w http.ResponseWriter, r *http.Request) {

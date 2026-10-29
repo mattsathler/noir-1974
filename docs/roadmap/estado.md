@@ -11,8 +11,8 @@ Fonte única do **onde estamos**. Regenerar com a skill `atualizar-estado-roadma
 
 | Campo | Valor |
 | --- | --- |
-| Data de referência | 2026-10-23 |
-| Milestone vigente | nenhum (fluxo criminal completo aceito) |
+| Data de referência | 2026-10-29 |
+| Milestone vigente | M24 — Company Websites procedurais (trilha independente; fluxo criminal completo permanece aceito) |
 | Último aceito | M13 — Acusação e julgamento |
 | Primeiro playtest | M06 aceito; recorte mínimo pronto para playtest interno. Fluxo completo até a prisão também aceito. |
 | Fluxo do crime até a prisão | **100%** (14 de 14 milestones) |

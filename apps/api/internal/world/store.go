@@ -204,8 +204,10 @@ type CompanyRecord struct {
 }
 
 type CompanyPortalRecord struct {
-	Company Company `json:"company"`
-	Address Address `json:"address"`
+	Company            Company `json:"company"`
+	Address            Address `json:"address"`
+	WebsiteDomain      string  `json:"websiteDomain"`
+	WebsiteDescription string  `json:"websiteDescription"`
 }
 
 type CompanyEmployee struct {
@@ -1602,7 +1604,9 @@ func (store *PostgresStore) countryCompanyIndex(ctx context.Context, serverID, c
 			}
 			for _, company := range generated.Companies {
 				if locationID := locations[company.ID]; locationID != "" {
-					companies = append(companies, CompanyPortalRecord{Company: company, Address: makeAddress(entities[locationID], regions)})
+					record := CompanyPortalRecord{Company: company, Address: makeAddress(entities[locationID], regions)}
+					record.WebsiteDomain, record.WebsiteDescription = companyWebsiteSearchMetadata(seed, worldVersion, record)
+					companies = append(companies, record)
 				}
 			}
 		}
@@ -1648,9 +1652,10 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 	companies := entry.companies
 	results, exact := make([]CompanyPortalRecord, 0), make([]CompanyPortalRecord, 0)
 	for _, record := range companies {
-		if strings.EqualFold(strings.TrimSpace(record.Company.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Full), query) {
+		searchable := record.Company.Name + " " + record.Address.Name + " " + record.Address.Full + " " + record.WebsiteDomain + " " + record.WebsiteDescription
+		if strings.EqualFold(strings.TrimSpace(record.Company.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Full), query) || strings.EqualFold(strings.TrimSpace(record.WebsiteDomain), query) {
 			exact = append(exact, record)
-		} else if strings.Contains(strings.ToLower(record.Company.Name+" "+record.Address.Full), query) {
+		} else if strings.Contains(strings.ToLower(searchable), query) {
 			results = append(results, record)
 		}
 	}
@@ -1667,6 +1672,20 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 		results = results[:10]
 	}
 	return results, nil
+}
+
+// CompanyWebsite returns the deterministic public site for one company in the active country.
+func (store *PostgresStore) CompanyWebsite(ctx context.Context, serverID, countryID, companyID string) (CompanyWebsite, error) {
+	entry, err := store.countryCompanyIndex(ctx, serverID, countryID)
+	if err != nil {
+		return CompanyWebsite{}, err
+	}
+	for _, company := range entry.companies {
+		if company.Company.ID == companyID {
+			return GenerateCompanyWebsite(entry.seed, entry.version, company), nil
+		}
+	}
+	return CompanyWebsite{}, ErrEntityNotFound
 }
 
 func searchCompaniesInWorld(ctx context.Context, store *PostgresStore, serverID string, base World, query string) ([]CompanyRecord, error) {

@@ -56,4 +56,6 @@ M20 realiza a auditoria integral de estabilidade e consistência visual/funciona
 
 M21 abre o serviço Hospital já presente no catálogo geográfico, implementa Patient Search e prontuários pós-morte, e acrescenta códigos estáveis de impressão digital e vestígios de cabelo ou digitais parciais para comparação investigativa. Não muda a fórmula de acusação do M13.
 
+M23 migra a navegação investigativa para o computador pessoal, Proxy e sites. M24, na trilha independente, transforma cada empresa em um website procedural próprio, encontrável nacionalmente pelo Meridian Directory; preserva as permissões de fontes restritas e deixa login apenas como elemento diegético sem autenticação.
+
 Pular um ciclo só com ADR explicando por que o critério deixou de ser necessário.
