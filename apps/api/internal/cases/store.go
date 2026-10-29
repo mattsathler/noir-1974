@@ -203,29 +203,47 @@ type PublicBodyDiscovery struct {
 	FoundAt      time.Time `json:"foundAt"`
 }
 
-// PersonSearchScenes returns scene addresses only for case victims in the requested city.
-func (store *PostgresStore) PersonSearchScenes(ctx context.Context, serverID, cityID string, npcIDs []string) (map[string]world.PersonSearchScene, error) {
+// PersonSearchScenes returns public scene addresses for case victims across one country.
+func (store *PostgresStore) PersonSearchScenes(ctx context.Context, serverID, countryID string, npcIDs []string) (map[string]world.PersonSearchScene, error) {
 	scenes := make(map[string]world.PersonSearchScene)
 	if len(npcIDs) == 0 {
 		return scenes, nil
 	}
+	cities := make([]world.WorldCity, 0, 4)
+	cityIDs := make([]string, 0, 5)
+	for _, city := range world.Cities() {
+		if city.CountryID == countryID {
+			cities = append(cities, city)
+			cityIDs = append(cityIDs, city.ID)
+		}
+	}
+	if len(cities) == 0 {
+		return scenes, nil
+	}
+	if countryID == "fr" {
+		cityIDs = append(cityIDs, "lyon")
+	}
 	rows, err := store.db.Query(ctx, `
-		SELECT DISTINCT ON (c.victim_entity_id) c.victim_entity_id, c.location_entity_id
+		SELECT DISTINCT ON (c.victim_entity_id) c.victim_entity_id, c.location_entity_id, c.city_id
 		FROM cases c JOIN case_states s USING (server_id, case_id)
-		WHERE c.server_id = $1::uuid AND c.city_id = $2
+		WHERE c.server_id = $1::uuid AND c.city_id = ANY($2::text[])
 		  AND s.status IN ('open', 'solved') AND c.victim_entity_id = ANY($3::text[])
-		ORDER BY c.victim_entity_id, c.created_at DESC, c.case_id DESC`, serverID, cityID, npcIDs)
+		ORDER BY c.victim_entity_id, c.created_at DESC, c.case_id DESC`, serverID, cityIDs, npcIDs)
 	if err != nil {
 		return nil, err
 	}
-	locationsByVictim := make(map[string]string)
+	type victimScene struct{ locationID, cityID string }
+	locationsByVictim := make(map[string]victimScene)
 	for rows.Next() {
-		var victimID, locationID string
-		if err := rows.Scan(&victimID, &locationID); err != nil {
+		var victimID, locationID, cityID string
+		if err := rows.Scan(&victimID, &locationID, &cityID); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		locationsByVictim[victimID] = locationID
+		if cityID == "lyon" {
+			cityID = "fr/lyon"
+		}
+		locationsByVictim[victimID] = victimScene{locationID: locationID, cityID: cityID}
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
@@ -240,36 +258,54 @@ func (store *PostgresStore) PersonSearchScenes(ctx context.Context, serverID, ci
 	if err := store.db.QueryRow(ctx, `SELECT world_seed, generator_version FROM worlds WHERE server_id = $1::uuid`, serverID).Scan(&seed, &version); err != nil {
 		return nil, err
 	}
-	cityVersion := version
-	if cityID != "fr/lyon" {
-		err := store.db.QueryRow(ctx, `SELECT generator_version FROM world_city_generators WHERE server_id = $1::uuid AND city_id = $2`, serverID, cityID).Scan(&cityVersion)
-		if errors.Is(err, pgx.ErrNoRows) {
-			if version < world.LatestGeneratorVersion {
-				cityVersion = world.LatestGeneratorVersion
-			}
-		} else if err != nil {
-			return nil, err
-		}
+	type sceneCityIndex struct {
+		city     world.WorldCity
+		entities map[string]world.Entity
+		regions  map[string]string
 	}
-	generated, err := world.GenerateCity(seed, cityVersion, cityID)
-	if err != nil {
-		return nil, err
-	}
-	entities := make(map[string]world.Entity, len(generated.Entities))
-	for _, entity := range generated.Entities {
-		entities[entity.ID] = entity
-	}
-	regions := make(map[string]string, len(generated.Regions))
-	for _, region := range generated.Regions {
-		regions[region.ID] = region.Name
-	}
-	city, _ := world.CityByID(cityID)
-	for victimID, locationID := range locationsByVictim {
-		entity, ok := entities[locationID]
-		if !ok {
+	byCity := make(map[string]sceneCityIndex)
+	for _, scene := range locationsByVictim {
+		if _, exists := byCity[scene.cityID]; exists {
 			continue
 		}
-		address := strings.Trim(strings.Join([]string{entity.Name, regions[entity.RegionID], city.Name, city.Country}, ", "), ", ")
+		city, exists := world.CityByID(scene.cityID)
+		if !exists || city.CountryID != countryID {
+			continue
+		}
+		cityVersion := version
+		if city.ID != "fr/lyon" {
+			err := store.db.QueryRow(ctx, `SELECT generator_version FROM world_city_generators WHERE server_id = $1::uuid AND city_id = $2`, serverID, city.ID).Scan(&cityVersion)
+			if errors.Is(err, pgx.ErrNoRows) {
+				if version < world.LatestGeneratorVersion {
+					cityVersion = world.LatestGeneratorVersion
+				}
+			} else if err != nil {
+				return nil, err
+			}
+		}
+		generated, err := world.GenerateCity(seed, cityVersion, city.ID)
+		if err != nil {
+			return nil, err
+		}
+		index := sceneCityIndex{city: city, entities: make(map[string]world.Entity, len(generated.Entities)), regions: make(map[string]string, len(generated.Regions))}
+		for _, entity := range generated.Entities {
+			index.entities[entity.ID] = entity
+		}
+		for _, region := range generated.Regions {
+			index.regions[region.ID] = region.Name
+		}
+		byCity[city.ID] = index
+	}
+	for victimID, scene := range locationsByVictim {
+		index, exists := byCity[scene.cityID]
+		if !exists {
+			continue
+		}
+		entity, exists := index.entities[scene.locationID]
+		if !exists {
+			continue
+		}
+		address := strings.Trim(strings.Join([]string{entity.Name, index.regions[entity.RegionID], index.city.Name, index.city.Country}, ", "), ", ")
 		scenes[victimID] = world.PersonSearchScene{Name: entity.Name, Address: address}
 	}
 	return scenes, nil

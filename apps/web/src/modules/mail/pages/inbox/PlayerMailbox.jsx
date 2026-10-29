@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MapPin } from "pixelarticons/react/MapPin";
+import { Printer } from "pixelarticons/react/Printer";
 import { Files } from "pixelarticons/react/Files";
 import { Note } from "pixelarticons/react/Note";
 import { Box } from "pixelarticons/react/Box";
@@ -14,7 +14,7 @@ function displayDate(value, timeZone) {
   return new Intl.DateTimeFormat("en-US", { timeZone: timeZone || "Europe/Paris", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }
 
-export default function PlayerMailbox({ timeZone, onPin }) {
+export default function PlayerMailbox({ timeZone, onPrint }) {
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("OPENING PRIVATE MAILBOX…");
   const deletedIDs = useRef(new Set());
@@ -82,7 +82,7 @@ export default function PlayerMailbox({ timeZone, onPin }) {
                 <header><span>{bodyFound ? "BODY DISCOVERY · CONFIRMED" : "CASE · ATTACHMENT"}</span></header>
                 <span className={`search-attachment__icon search-attachment__icon--${item.kind}`} aria-hidden="true"><AttachmentIcon /></span>
                 <h4>{item.title}</h4><p>{item.content}</p>
-                <footer><button className="whiteboard-pin-button" type="button" aria-label={`Pin ${item.title} to a whiteboard`} onClick={() => onPin?.({ id: item.id, source: item.source, title: item.title, content: item.content, metadata: item.metadata })}><MapPin aria-hidden="true" /></button></footer>
+                <footer><button className="page-print-button" type="button" aria-label={`Print ${item.title}`} title="Print page" onClick={() => onPrint?.({ id: item.id, source: item.source, title: item.title, content: item.content, metadata: item.metadata })}><Printer aria-hidden="true" /></button></footer>
               </article>;
             })}</div>
           </section>}

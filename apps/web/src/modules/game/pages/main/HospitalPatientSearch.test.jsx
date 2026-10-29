@@ -8,8 +8,8 @@ vi.mock("../../../world/api.js", () => ({ searchHospitalPatients: vi.fn() }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("HospitalPatientSearch", () => {
-  it("opens a patient file, compares the fingerprint, and pins report and trace", async () => {
-    const onPin = vi.fn();
+  it("opens a patient file, compares the fingerprint, and sends the report and trace to print destinations", async () => {
+    const onPrint = vi.fn();
     searchHospitalPatients.mockResolvedValue([{
       id: "npc:fr/lyon/victim",
       name: "Pascal Poulin",
@@ -25,7 +25,7 @@ describe("HospitalPatientSearch", () => {
       },
     }]);
 
-    render(<HospitalPatientSearch accessAttemptId="71" timeZone="Europe/Paris" onPin={onPin} />);
+    render(<HospitalPatientSearch accessAttemptId="71" timeZone="Europe/Paris" onPrint={onPrint} />);
     fireEvent.change(screen.getByLabelText("PATIENT NAME"), { target: { value: "Pascal" } });
     fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));
 
@@ -36,14 +36,14 @@ describe("HospitalPatientSearch", () => {
     expect(screen.getByText("A partial fingerprint code begins AB12.")).toBeInTheDocument();
     expect(screen.queryByText(/killer|match confirmed|culprit/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Pin post-mortem report for Pascal Poulin" }));
-    expect(onPin).toHaveBeenLastCalledWith(expect.objectContaining({
+    fireEvent.click(screen.getByRole("button", { name: "Print post-mortem report for Pascal Poulin" }));
+    expect(onPrint).toHaveBeenLastCalledWith(expect.objectContaining({
       id: "case:postmortem:case-1",
       source: "case",
       content: expect.stringContaining("BODY FOUND · Immeuble Saint-Paul"),
     }));
-    fireEvent.click(screen.getByRole("button", { name: "Pin Post-mortem trace" }));
-    expect(onPin).toHaveBeenLastCalledWith(expect.objectContaining({ id: "hospital:case-1:trace", source: "case" }));
+    fireEvent.click(screen.getByRole("button", { name: "Print Post-mortem trace" }));
+    expect(onPrint).toHaveBeenLastCalledWith(expect.objectContaining({ id: "hospital:case-1:trace", source: "case" }));
   });
 
   it("shows no homicide data for ordinary patient files", async () => {

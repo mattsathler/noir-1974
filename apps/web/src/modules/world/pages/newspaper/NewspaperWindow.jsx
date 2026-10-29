@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getNewspaperIssue } from "../../api.js";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
 
-export default function NewspaperWindow({ cityId, issueDay, onClose }) {
+export default function NewspaperWindow({ cityId, issueDay, onClose, embedded = false }) {
   const [issue, setIssue] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -27,6 +27,7 @@ export default function NewspaperWindow({ cityId, issueDay, onClose }) {
   }, [loadIssue]);
 
   useEffect(() => {
+    if (embedded) return undefined;
     const previousFocus = document.activeElement;
     closeRef.current?.focus();
     function handleKeyDown(event) {
@@ -50,15 +51,14 @@ export default function NewspaperWindow({ cityId, issueDay, onClose }) {
       window.removeEventListener("keydown", handleKeyDown);
       if (typeof previousFocus?.focus === "function") previousFocus.focus();
     };
-  }, [onClose]);
+  }, [embedded, onClose]);
 
-  return (
-    <div className="modal-overlay newspaper-overlay" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Daily newspaper" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
-      <article className="newspaper-sheet">
+  const sheet = (
+      <article className={`newspaper-sheet${embedded ? " newspaper-sheet--app" : ""}`}>
         <header className="newspaper-utility">
           <span>{issue?.city ? `${issue.city.toUpperCase()} CITY EDITION` : "CITY EDITION"}</span>
           <span>PRICE: 20 CREDITS</span>
-          <button ref={closeRef} type="button" className="newspaper-close" aria-label="Close newspaper" onClick={onClose}>×</button>
+          {!embedded && <button ref={closeRef} type="button" className="newspaper-close" aria-label="Close newspaper" onClick={onClose}>×</button>}
         </header>
 
         {loading && <div className="newspaper-state" role="status" aria-live="polite">The presses are running…</div>}
@@ -93,6 +93,8 @@ export default function NewspaperWindow({ cityId, issueDay, onClose }) {
           </>
         )}
       </article>
-    </div>
   );
+
+  if (embedded) return <div className="newspaper-app">{sheet}</div>;
+  return <div className="modal-overlay newspaper-overlay" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Daily newspaper" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>{sheet}</div>;
 }

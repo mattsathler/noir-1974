@@ -18,7 +18,7 @@ Esta milestone é uma trilha independente: não altera a contagem nem o aceite d
 
 ### Ghostkey e autorização
 
-- Substituir `bypassdecrypt.exe`, o comando de terminal e as animações atuais pelo arquivo executável `ghostkey.exe`, creditado a The Crow.
+- Projetar o acesso local por meio do arquivo executável `ghostkey.exe`, creditado a The Crow, sem comando de terminal.
 - Ao entrar no computador invadido, abrir um explorador inicial com `ghostkey.exe` e as pastas protegidas visíveis, porém bloqueadas. Abrir o executável inicia o desafio; resolvê-lo destranca as pastas sem trocar para uma grade de aplicativos.
 - Abrir o executável inicia um desafio de senha com quatro campos numéricos. A senha aceita zeros à esquerda e cada palpite deve conter exatamente quatro dígitos.
 - Depois de cada palpite, cada campo recebe um dos três resultados: vermelho quando o dígito não aparece na senha; amarelo quando aparece em outra posição; verde quando está na posição correta. A validação considera dígitos repetidos sem contabilizar uma ocorrência mais de uma vez.
@@ -55,7 +55,7 @@ Esta milestone é uma trilha independente: não altera a contagem nem o aceite d
 
 ## Critérios de aceite
 
-- [ ] Nenhum computador local invadido usa a interface de grade de aplicativos ou o fluxo `bypassdecrypt.exe`; os sistemas listados nesta milestone são navegados por pastas e arquivos.
+- [ ] Nenhum computador local acessado usa a interface de grade de aplicativos ou um fluxo de comando em terminal; os sistemas listados nesta milestone são navegados por pastas e arquivos.
 - [ ] Ao entrar em um computador invadido, o jogador encontra o explorador inicial e pode abrir `ghostkey.exe`; as pastas protegidas só ficam acessíveis depois da senha correta.
 - [ ] `ghostkey.exe`, identificado como criação de The Crow, abre um minigame com quatro campos numéricos e impede o acesso até a solução.
 - [ ] Cada campo retorna somente um dos três estados especificados; dígitos repetidos, senha com zero inicial, palpite malformado, desafio expirado e respostas fora de ordem têm comportamento definido e coberto.

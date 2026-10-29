@@ -16,6 +16,7 @@ A migração altera apresentação, navegação e escopo das buscas explicitamen
 ### Sistema operacional e navegador
 
 - Tornar o computador pessoal a interface persistente da tela principal do jogo, com área de trabalho, janelas e barra de navegação.
+- Apresentar a área de trabalho em tela cheia, sem moldura, com papel de parede configurável, atalho do navegador à esquerda e sites navegados dentro de uma única janela do navegador; utilitários do sistema ficam no menu Iniciar. O portal inicial lista os sites do país conectado. Sites institucionais oferecem navegação interna, avisos e publicidade fictícia em páginas claras de estilo web antigo, com identidade visual própria por instituição.
 - Migrar as funções atuais — Crime Reports, email, jornal, telefone, quadro investigativo e fontes de consulta — para superfícies acessíveis dentro desse sistema.
 - Apresentar empresas e instituições como sites. Remover Neighborhood, interiores de prédios e a animação de viagem como etapas obrigatórias para consultar fontes.
 - Preservar os estados de carregamento, vazio, erro, sucesso e janela já aberta durante a navegação entre páginas.
@@ -31,7 +32,7 @@ A migração altera apresentação, navegação e escopo das buscas explicitamen
 
 - No país conectado, pesquisar empresas por nome e apresentar até dez resultados por consulta, com nome, cidade e informações breves de identificação.
 - Não incluir funcionários nos resultados do portal. Abrir o site da empresa é uma consulta separada.
-- Abrir o site de uma empresa e, após `bypassdecrypt` e autorização concedida, carregar somente o diretório daquela empresa. Nenhum funcionário de outra empresa ou cidade deve aparecer nesse diretório.
+- Abrir o site de uma empresa e, após a autorização concedida pelo servidor, carregar somente o diretório daquela empresa. Nenhum funcionário de outra empresa ou cidade deve aparecer nesse diretório.
 - Identificar empresas por ID estável e cidade, incluindo quando nomes visíveis se repetirem.
 - Consultar funcionários sob demanda, sem baixar todos os diretórios na abertura do portal ou durante a busca.
 
@@ -43,11 +44,11 @@ A migração altera apresentação, navegação e escopo das buscas explicitamen
 - Consultas por NPC devem carregar o NPC selecionado e o intervalo solicitado; não devem carregar os NPCs ou registros de todo o país.
 - Manter registros de viagem GATE como eventos do mundo e pistas sobre NPCs, apesar da remoção da viagem física do protagonista como fluxo de navegação.
 
-### Autorização e bypassdecrypt
+### Autorização dos sites restritos
 
 - Reutilizar a autorização server-side atual, vinculando tentativa a conta, jurisdição, empresa/site e sistema acessado.
 - Manter o período de validade e impedir reutilização de uma tentativa em outra empresa, cidade, conta ou sistema.
-- Fazer `bypassdecrypt` operar como ferramenta de acesso ao site corporativo no navegador. O resultado visual do cliente nunca concede acesso sem confirmação da API.
+- Solicitar autorização ao servidor ao conectar a um site restrito. A interface nunca concede acesso sem confirmação da API.
 - Não introduzir autenticação real, acesso à rede externa ou acesso ao sistema de arquivos do computador do jogador.
 
 ### Performance
@@ -61,7 +62,7 @@ A migração altera apresentação, navegação e escopo das buscas explicitamen
 
 ## Critérios de aceite
 
-- [ ] A tela principal do jogo é o sistema operacional do computador pessoal; os fluxos investigativos não dependem de viajar ou entrar fisicamente em prédios.
+- [ ] A tela principal do jogo é o sistema operacional do computador pessoal, com desktop em tela cheia sem moldura, navegador no desktop, portal de sites do país conectado e navegação dos sites na mesma janela em superfície clara; os fluxos investigativos não dependem de viajar ou entrar fisicamente em prédios.
 - [ ] O Proxy seleciona uma cidade e atualiza a jurisdição investigativa sem representar viagem ou presença física.
 - [ ] O portal de empresas pesquisa somente as quatro cidades do país conectado e retorna até dez resultados com cidade identificável.
 - [ ] Resultados do portal não incluem funcionários; abrir uma empresa consulta somente o diretório daquela empresa.
@@ -82,9 +83,9 @@ Person Search global entre países; diretórios nacionais de funcionários; aces
 
 ## Sequência de execução
 
-1. **Fundação narrativa e arquitetura:** registrar lore e ADR 0012; revisar contratos e dependências de M22. (Iniciado.)
-2. **Casca do sistema operacional:** criar shell persistente e migrar a tela de jogo e as janelas atuais.
-3. **Proxy e contexto:** selecionar jurisdição e integrar o contexto ao navegador e às autorizações existentes.
-4. **Portal nacional de empresas:** criar busca leve por país, resultados limitados e abertura do site empresarial; medir performance.
-5. **Person Search e fontes:** preservar a busca nacional, corrigir cenas entre cidades e integrar as fontes restantes sem ampliar escopo acidentalmente.
-6. **Remoção do fluxo físico e auditoria:** retirar a navegação antiga, atualizar documentação e cobrir regressões de autorização, conteúdo e performance.
+1. **Fundação narrativa e arquitetura:** registrar lore e ADR 0012; revisar contratos e dependências de M22. (Concluída.)
+2. **Casca do sistema operacional:** criar shell persistente e migrar a tela de jogo e as janelas atuais. (Concluída: shell principal com janela de navegador, barra de tarefas, telefone, jornal como aplicativo do desktop, quadro e aparência; desktop Win96 em tela cheia, portal nacional com links e avisos, sites institucionais com identidades próprias, portal policial com pesquisa, categorias e anúncios, hospital público com pesquisa de pacientes protegida por autorização do servidor, e navegação interna na mesma janela. Seletor de papel de parede permanece para implementação futura.)
+3. **Proxy e contexto:** selecionar jurisdição e integrar o contexto ao navegador e às autorizações existentes. (Concluída para Proxy, sites empresariais e serviços públicos; fluxos de acesso existentes preservados.)
+4. **Portal nacional de empresas:** criar busca leve por país, resultados limitados e abertura do site empresarial; medir performance. (Busca limitada, cache de catálogo e abertura implementadas; linha de base e medições fria/aquecida pendentes.)
+5. **Person Search e fontes:** preservar a busca nacional, corrigir cenas entre cidades e integrar as fontes restantes sem ampliar escopo acidentalmente. (Cenas agora resolvidas entre cidades do país; auditoria das fontes e autorizações pendente.)
+6. **Remoção do fluxo físico e auditoria:** retirar a navegação antiga, atualizar documentação e cobrir regressões de autorização, conteúdo e performance. (Navegação do protagonista por bairros e interiores removida; GATE segue acessível como site de registros. Auditoria de autorização e performance pendente.)

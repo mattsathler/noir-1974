@@ -65,6 +65,7 @@ export function clearWorldLocationCache() {
 
 export const searchPeople = (query) => search("/api/world/npcs", query);
 export const searchCompanies = (query, cityId) => search("/api/world/companies", query, cityId);
+export const searchNationalCompanies = (query) => search("/api/world/companies/national", query);
 export const searchLocations = (query) => search("/api/world/locations", query);
 
 export async function getCompanyAtLocation(locationId, companyId = "", accessAttemptId = "") {
@@ -88,6 +89,21 @@ export async function getGateDestinations() {
   return cachedWorldList(`${worldCachePrefix}:gate-cities`, async () => {
     const payload = await apiRequest("/api/world/gate/destinations");
     return payload.destinations ?? [];
+  });
+}
+
+export async function getProxyNodes() {
+  // The canonical catalog can change with a backend deployment; stale browser
+  // cache entries can submit IDs the server no longer recognizes.
+  const payload = await apiRequest("/api/world/proxy/nodes");
+  return payload.nodes ?? [];
+}
+
+export async function connectProxy(cityId) {
+  return apiRequest("/api/world/proxy/connect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cityId }),
   });
 }
 
@@ -187,7 +203,7 @@ export function requestResidentialSearch(targetNpcId, stationLocationId) {
   });
 }
 
-export function requestLocalSystemAccess(facility, command) {
+export function requestFacilitySiteAccess(facility) {
   return requestCase("/api/facilities/access", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -195,7 +211,6 @@ export function requestLocalSystemAccess(facility, command) {
       locationId: facility.locationId,
       companyId: facility.companyId ?? "",
       facility: facility.kind,
-      command,
     }),
   });
 }

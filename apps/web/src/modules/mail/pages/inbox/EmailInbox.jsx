@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { MapPin } from "pixelarticons/react/MapPin";
+import { Printer } from "pixelarticons/react/Printer";
 import { getNPCEmails, searchPeople } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
@@ -24,7 +24,7 @@ function displayDate(value, timeZone) {
   }).format(date);
 }
 
-export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe/Paris", cityId = "", facilityLocationId = "", accessAttemptId = "", runHack, onPin }) {
+export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe/Paris", cityId = "", facilityLocationId = "", accessAttemptId = "", onPrint }) {
   const throughToday = serverTime.toISOString().slice(0, 10);
   const rangeStart = `${throughToday.slice(0, 4)}-01-01`;
   const [query, setQuery] = useState("");
@@ -36,10 +36,6 @@ export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe
   const [message, setMessage] = useState("Search for a name to consult a correspondence file.");
   const [busy, setBusy] = useState(false);
   const requestId = useRef(0);
-
-  async function hackRequest(loadRequest) {
-    return runHack ? runHack(loadRequest) : loadRequest();
-  }
 
   function updateFrom(nextFrom) {
     setFrom(nextFrom);
@@ -71,7 +67,7 @@ export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe
     setMessages([]);
     setMessage("");
     try {
-      const results = await hackRequest(() => searchPeople(term));
+      const results = await searchPeople(term);
       if (request !== requestId.current) return;
       const cityResults = cityId
         ? results.filter(({ npc }) => npc?.id.startsWith(`npc:${cityId}/`) || (cityId === "fr/lyon" && npc?.id.startsWith("npc:lyon/")))
@@ -94,7 +90,7 @@ export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe
     setMessage("REQUESTING PRIVATE CORRESPONDENCE…");
     try {
       const loadMessages = () => getNPCEmails(mailbox.id, from, through, facilityLocationId, accessAttemptId);
-      const results = await hackRequest(loadMessages);
+      const results = await loadMessages();
       if (request !== requestId.current) return;
       setMessages(results);
       setMessage(results.length ? "CORRESPONDENCE RETRIEVED" : "NO MESSAGES ON FILE FOR THIS INTERVAL");
@@ -152,7 +148,7 @@ export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe
               <div className="email-message__body">
                 <p className="email-message__service">{item.service}</p>
                 <p>{item.body}</p>
-                <button className="whiteboard-pin-button" type="button" aria-label={`Pin email: ${item.subject}`} onClick={() => onPin?.({ id: item.id, source: "email", title: item.subject || "EMAIL", content: `${item.sender} → ${item.recipient}\n${item.body}`, metadata: item })}><MapPin aria-hidden="true" /></button>
+                <button className="page-print-button" type="button" aria-label={`Print email: ${item.subject}`} title="Print page" onClick={() => onPrint?.({ id: item.id, source: "email", title: item.subject || "EMAIL", content: `${item.sender} → ${item.recipient}\n${item.body}`, metadata: item })}><Printer aria-hidden="true" /></button>
               </div>
             </details>
           ))}

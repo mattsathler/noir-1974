@@ -53,7 +53,7 @@ export default function RegisterPage({ onLogin, onAccountCreated }) {
     <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-atmosphere text-primary">
       <div className="pd-backdrop pos-absolute inset-0" aria-hidden="true" />
       <div className="pos-relative w-full max-w-sm">
-        <img className="brand-mark" src="/images/logo.png" alt="NOIR 1974" />
+        <span className="brand-mark" role="img" aria-label="NOIR">NOIR</span>
         <section className="w-full p-6 surface shadow-panel" aria-labelledby="register-title">
           <h1 id="register-title" className="text-2xl m-0 mb-8">Create account</h1>
           <form className="grid gap-3" onSubmit={handleSubmit} noValidate>

@@ -54,11 +54,18 @@ type PostgresStore struct {
 	worldForCasesCache       map[string]worldForCasesCacheEntry
 	worldCasesExpansionCache map[string]worldCasesExpansionCacheEntry
 	worldCasesRevision       map[string]uint64
+	countryCompanyCache      map[string]countryCompanyCacheEntry
+}
+
+type countryCompanyCacheEntry struct {
+	companies []CompanyPortalRecord
+	expiresAt time.Time
 }
 
 const (
 	countryWorldCacheTTL      = 10 * time.Minute
 	countryWorldCacheSize     = 16
+	countryCompanyCacheSize   = 16
 	cityWorldCacheSize        = 32
 	countryExpansionCacheSize = 64
 	cityExpansionCacheSize    = 64
@@ -192,6 +199,11 @@ type CompanyRecord struct {
 	Company   Company           `json:"company"`
 	Address   Address           `json:"address"`
 	Employees []CompanyEmployee `json:"employees"`
+}
+
+type CompanyPortalRecord struct {
+	Company Company `json:"company"`
+	Address Address `json:"address"`
 }
 
 type CompanyEmployee struct {
@@ -1511,6 +1523,131 @@ func (store *PostgresStore) SearchCompaniesInCity(ctx context.Context, serverID,
 		}
 	}
 	return searchCompaniesInWorld(ctx, store, serverID, base, query)
+}
+
+// SearchCompaniesInCountry returns lightweight company listings across a country's cities.
+// Employee directories are deliberately loaded only by CompanyDirectoryAtLocation.
+func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, serverID, countryID, query string) ([]CompanyPortalRecord, error) {
+	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return []CompanyPortalRecord{}, nil
+	}
+	cities := make([]WorldCity, 0, 4)
+	cityIDs := make([]string, 0, 4)
+	for _, city := range Cities() {
+		if city.CountryID == countryID {
+			cities = append(cities, city)
+			cityIDs = append(cityIDs, city.ID)
+		}
+	}
+	if len(cities) == 0 {
+		return []CompanyPortalRecord{}, nil
+	}
+	rows, err := store.db.Query(ctx,
+		`SELECT w.world_seed, w.generator_version, COALESCE(g.city_id, ''), COALESCE(g.generator_version, 0)
+		 FROM worlds w LEFT JOIN world_city_generators g
+		 ON g.server_id=w.server_id AND g.city_id=ANY($2::text[])
+		 WHERE w.server_id=$1::uuid ORDER BY g.city_id`, serverID, cityIDs)
+	if err != nil {
+		return nil, err
+	}
+	cityVersions := make(map[string]int, len(cityIDs))
+	var seed string
+	var worldVersion int
+	for rows.Next() {
+		var cityID string
+		var version int
+		if err := rows.Scan(&seed, &worldVersion, &cityID, &version); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if cityID != "" {
+			cityVersions[cityID] = version
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if seed == "" {
+		return nil, ErrEntityNotFound
+	}
+	cacheKey := "companies:" + countryWorldCacheKey(seed, worldVersion, cities, cityVersions)
+	store.countryWorldCacheMu.Lock()
+	entry, cached := store.countryCompanyCache[cacheKey]
+	if cached && time.Now().After(entry.expiresAt) {
+		delete(store.countryCompanyCache, cacheKey)
+		cached = false
+	}
+	store.countryWorldCacheMu.Unlock()
+	store.observeCache("country_company_index", cached)
+	companies := entry.companies
+	if !cached {
+		companies = make([]CompanyPortalRecord, 0, len(cities)*720)
+		for _, city := range cities {
+			version := countryCityGeneratorVersion(city, worldVersion, cityVersions)
+			generated, err := GenerateCity(seed, version, city.ID)
+			if err != nil {
+				return nil, err
+			}
+			entities := make(map[string]Entity, len(generated.Entities))
+			regions := make(map[string]string, len(generated.Regions))
+			for _, entity := range generated.Entities {
+				entities[entity.ID] = entity
+			}
+			for _, region := range generated.Regions {
+				regions[region.ID] = region.Name
+			}
+			locations := make(map[string]string, len(generated.CompanyLocations))
+			for _, relation := range generated.CompanyLocations {
+				if relation.LocationRole == "headquarters" {
+					locations[relation.CompanyID] = relation.LocationID
+				}
+			}
+			for _, company := range generated.Companies {
+				if locationID := locations[company.ID]; locationID != "" {
+					companies = append(companies, CompanyPortalRecord{Company: company, Address: makeAddress(entities[locationID], regions)})
+				}
+			}
+		}
+		store.countryWorldCacheMu.Lock()
+		if store.countryCompanyCache == nil {
+			store.countryCompanyCache = make(map[string]countryCompanyCacheEntry)
+		}
+		if _, exists := store.countryCompanyCache[cacheKey]; !exists && len(store.countryCompanyCache) >= countryCompanyCacheSize {
+			oldestKey := ""
+			var oldestExpiry time.Time
+			for cachedKey, cachedEntry := range store.countryCompanyCache {
+				if oldestKey == "" || cachedEntry.expiresAt.Before(oldestExpiry) {
+					oldestKey, oldestExpiry = cachedKey, cachedEntry.expiresAt
+				}
+			}
+			delete(store.countryCompanyCache, oldestKey)
+		}
+		store.countryCompanyCache[cacheKey] = countryCompanyCacheEntry{companies: companies, expiresAt: time.Now().Add(countryWorldCacheTTL)}
+		store.countryWorldCacheMu.Unlock()
+	}
+	results, exact := make([]CompanyPortalRecord, 0), make([]CompanyPortalRecord, 0)
+	for _, record := range companies {
+		if strings.EqualFold(strings.TrimSpace(record.Company.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Full), query) {
+			exact = append(exact, record)
+		} else if strings.Contains(strings.ToLower(record.Company.Name+" "+record.Address.Full), query) {
+			results = append(results, record)
+		}
+	}
+	if len(exact) > 0 {
+		results = exact
+	}
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].Company.Name == results[j].Company.Name {
+			return results[i].Company.ID < results[j].Company.ID
+		}
+		return results[i].Company.Name < results[j].Company.Name
+	})
+	if len(results) > 10 {
+		results = results[:10]
+	}
+	return results, nil
 }
 
 func searchCompaniesInWorld(ctx context.Context, store *PostgresStore, serverID string, base World, query string) ([]CompanyRecord, error) {

@@ -1,4 +1,17 @@
 const inFlightGETs = new Map();
+let activeRequestCount = 0;
+
+function beginRequestCursor() {
+  activeRequestCount += 1;
+  if (typeof document !== "undefined") document.documentElement.classList.add("noir-api-pending");
+  let ended = false;
+  return () => {
+    if (ended) return;
+    ended = true;
+    activeRequestCount = Math.max(0, activeRequestCount - 1);
+    if (activeRequestCount === 0 && typeof document !== "undefined") document.documentElement.classList.remove("noir-api-pending");
+  };
+}
 
 export class APIRequestError extends Error {
   constructor(payload, status) {
@@ -40,10 +53,15 @@ function dedupeKey(path, options) {
 }
 
 async function performRequest(path, options) {
-  const response = await fetch(path, options);
-  const payload = await readPayload(response);
-  if (!response.ok) throw new APIRequestError(payload, response.status);
-  return payload;
+  const finishRequest = beginRequestCursor();
+  try {
+    const response = await fetch(path, options);
+    const payload = await readPayload(response);
+    if (!response.ok) throw new APIRequestError(payload, response.status);
+    return payload;
+  } finally {
+    finishRequest();
+  }
 }
 
 // Identical GETs share only their in-flight promise. Mutations are never cached,

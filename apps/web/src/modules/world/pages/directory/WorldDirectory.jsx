@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { MapPin } from "pixelarticons/react/MapPin";
-import { getCompanyAtLocation, getNPCRecords, searchCompanies, searchLocations, searchPeople } from "../../api.js";
+import { Printer } from "pixelarticons/react/Printer";
+import { getCompanyAtLocation, getNPCRecords, searchCompanies, searchLocations, searchNationalCompanies, searchPeople } from "../../api.js";
 import DatePicker from "../../components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 import { phoneNumberForNPC } from "../../phoneDirectory.js";
@@ -48,14 +48,15 @@ function displayRecordDate(value, timeZone) {
   }).format(date);
 }
 
-export default function WorldDirectory({ program, companyLocationId = "", companyId = "", facilityLocationId = "", accessAttemptId = "", cityId = "", countryName = "", serverTime = new Date(), timeZone = "Europe/Paris", runHack, onPin }) {
+export default function WorldDirectory({ program, companyLocationId = "", companyId = "", facilityLocationId = "", accessAttemptId = "", cityId = "", countryName = "", serverTime = new Date(), timeZone = "Europe/Paris", onPrint, onOpenCompany }) {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState([]);
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [locations, setLocations] = useState([]);
   const isStaffDirectory = program === "staff-directory";
-  const [message, setMessage] = useState(isStaffDirectory ? "Enter a company name to search its staff directory." : program === "interpol" ? "Enter a name to search countrywide personnel files." : "Enter a name or address to search the city records.");
+  const isCompanyPortal = program === "company-portal";
+  const [message, setMessage] = useState(isStaffDirectory ? "Enter a company name to search its staff directory." : isCompanyPortal ? "Search national company websites in the connected country." : program === "interpol" ? "Enter a name to search countrywide personnel files." : "Enter a name or address to search the city records.");
   const [busy, setBusy] = useState(false);
   const [recordRange, setRecordRange] = useState(() => {
     const through = inputDate(serverTime, timeZone);
@@ -72,7 +73,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
   const isCityRecords = program === "city-records";
   const isBankRecords = program === "bank-records";
   const isGateRecords = program === "gate-records";
-  const isPeopleSearch = !isCityRecords && !isStaffDirectory;
+  const isPeopleSearch = !isCityRecords && !isStaffDirectory && !isCompanyPortal;
   const isPrivilegedSystem = isBankRecords || isGateRecords;
   const staffCompanies = companyId ? companies.filter(({ company }) => company.id === companyId) : companies;
 
@@ -87,7 +88,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
     setBusy(true);
     setMessage("LOADING EMPLOYEE DIRECTORY…");
     const loadDirectory = () => getCompanyAtLocation(companyLocationId, companyId, accessAttemptId);
-    const request = runHack ? runHack(loadDirectory) : loadDirectory();
+    const request = loadDirectory();
     Promise.resolve(request)
       .then((results) => {
         if (!active) return;
@@ -101,7 +102,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
       .finally(() => { if (active) setBusy(false); });
 
     return () => { active = false; };
-  }, [accessAttemptId, companyId, companyLocationId, isStaffDirectory, runHack]);
+  }, [accessAttemptId, companyId, companyLocationId, isStaffDirectory]);
 
   function updateRecordFrom(from) {
     setRecordRange((previous) => ({
@@ -130,7 +131,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
     try {
       const source = isBankRecords ? "bank" : "gate";
       const loadRecords = () => getNPCRecords(npcID, recordRange.from, recordRange.to, source, facilityLocationId, accessAttemptId);
-      const results = runHack ? await runHack(loadRecords) : await loadRecords();
+      const results = await loadRecords();
       if (request !== activityRequestId.current) return;
       setActivity(results);
       setActivityMessage(results.length ? "ACTIVITY RECORDS RETRIEVED" : "NO ACTIVITY ON FILE FOR THIS INTERVAL");
@@ -159,17 +160,18 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
     try {
       if (isPeopleSearch) {
         const loadPeople = () => searchPeople(term);
-        const results = (isInterpol || isPrivilegedSystem) && runHack
-          ? await runHack(loadPeople)
-          : await loadPeople();
+        const results = await loadPeople();
         if (currentRequest !== requestId.current) return;
         setPeople(results);
         setMessage(results.length ? "PERSONNEL FILES RETRIEVED" : "NO MATCHING PERSONNEL FILES");
+      } else if (isCompanyPortal) {
+        const results = await searchNationalCompanies(term);
+        if (currentRequest !== requestId.current) return;
+        setCompanies(results);
+        setMessage(results.length ? "NATIONAL COMPANY LISTINGS RETRIEVED" : "NO MATCHING COMPANY WEBSITES");
       } else {
         const loadRecords = () => Promise.all([searchCompanies(term, isCityRecords ? cityId : ""), searchLocations(term)]);
-        const [companyResults, locationResults] = isPrivilegedSystem && runHack
-          ? await runHack(loadRecords)
-          : await loadRecords();
+        const [companyResults, locationResults] = await loadRecords();
         if (currentRequest !== requestId.current) return;
         setCompanies(companyResults);
         setLocations(locationResults);
@@ -182,34 +184,49 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
     }
   }
 
+  async function openCompanyWebsite(record) {
+    if (!onOpenCompany || busy) return;
+    setBusy(true);
+    setMessage(`CONNECTING TO ${record.company.name.toUpperCase()}…`);
+    try {
+      await onOpenCompany(record);
+    } catch (error) {
+      setMessage(error.message || "THE COMPANY WEBSITE COULD NOT BE REACHED.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="world-directory">
-      <p className="computer-window__eyebrow">{isInterpol ? `CORPORATE SECURITY OFFICE · ${countryName ? `${countryName.toUpperCase()} ` : "COUNTRYWIDE "}PERSONNEL SEARCH` : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "MERIDIAN GLOBAL SETTLEMENT OFFICE · PRIVILEGED SESSION" : "MERIDIAN GLOBAL · GATE CONTROL ARCHIVE · PRIVILEGED SESSION"}</p>
-      <h1>{isInterpol ? "COUNTRYWIDE PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE MOVEMENT SEARCH"}</h1>
+      <p className="computer-window__eyebrow">{isInterpol ? `CORPORATE SECURITY OFFICE · ${countryName ? `${countryName.toUpperCase()} ` : "COUNTRYWIDE "}PERSONNEL SEARCH` : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCompanyPortal ? "MERIDIAN GLOBAL · NATIONAL COMPANY PORTAL" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "MERIDIAN GLOBAL SETTLEMENT OFFICE · PRIVILEGED SESSION" : "MERIDIAN ENTERPRISES · GATE CONTROL ARCHIVE · AUTHORIZED SESSION"}</p>
+      <h1>{isInterpol ? "COUNTRYWIDE PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCompanyPortal ? "COMPANY WEBSITES" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE ACCESS LOGS"}</h1>
       {isInterpol && <p className="world-directory__scope">SEARCH JURISDICTION · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</p>}
+      {isCompanyPortal && <p className="world-directory__scope">CONNECTED COUNTRY · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"} · NATIONAL LISTINGS</p>}
       {!isStaffDirectory && !selectedPerson && <form className="world-directory__search" onSubmit={submitSearch}>
-        <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
+        <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isCompanyPortal ? "COMPANY NAME OR WEBSITE" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
         <div className="world-directory__searchline">
-          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Search a company directory" : isPeopleSearch ? "Search personnel files" : "Search companies and locations"} />
+          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Search a company directory" : isCompanyPortal ? "Search national company websites" : isPeopleSearch ? "Search personnel files" : "Search companies and locations"} />
           <button type="submit" disabled={busy}>{busy ? "SEARCHING…" : "SEARCH"}</button>
         </div>
       </form>}
       {!selectedPerson && <p className="world-directory__message" role="status" aria-live="polite">{message}</p>}
 
-      {isPeopleSearch && !selectedPerson && people.map((record) => {
-        const { npc } = record;
-        return <button className="world-person-result" type="button" key={npc.id} onClick={() => {
-          activityRequestId.current++;
-          setActivity([]);
-          setActivityMessage("");
-          setActivityBusy(false);
-          setSelectedPerson(record);
-        }}>
-          <figure className="world-directory__person-portrait"><ModularFace visual={npc.visual ?? FALLBACK_NPC_VISUAL} name={npc.name} /></figure>
-          <span className="world-person-result__copy"><strong>{npc.name}</strong><small>{isInterpol ? "PERSONNEL FILE" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"} · {npc.status?.toUpperCase() || "STATUS UNKNOWN"}</small></span>
-          <span className="world-person-result__open">OPEN FILE →</span>
-        </button>;
-      })}
+      {isPeopleSearch && !selectedPerson && people.length > 0 && <div className="world-directory__person-list" aria-label="People found">
+        {people.map((record) => {
+          const { npc } = record;
+          return <article className="world-directory__person-listing" key={npc.id}>
+            <p>{isInterpol ? "PERSONNEL FILE" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"} · {npc.status?.toUpperCase() || "STATUS UNKNOWN"}</p>
+            <button className="world-directory__person-link" type="button" aria-label={`${npc.name} · ${isInterpol ? "PERSONNEL FILE" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"}`} onClick={() => {
+              activityRequestId.current++;
+              setActivity([]);
+              setActivityMessage("");
+              setActivityBusy(false);
+              setSelectedPerson(record);
+            }}>{npc.name} »</button>
+          </article>;
+        })}
+      </div>}
 
       {selectedPerson && (() => {
         const { npc, workplaces = [], maritalStatus, reportedScene } = selectedPerson;
@@ -228,11 +245,11 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               <div><dt>MARITAL STATUS</dt><dd>{maritalStatus?.toUpperCase() || "UNKNOWN"}</dd></div>
               {reportedScene && <div><dt>REPORTED SCENE</dt><dd>{reportedScene.address}</dd></div>}
             </dl>
-            <button className="whiteboard-pin-button" type="button" aria-label={`Pin personnel file for ${npc.name}`} onClick={() => onPin?.({
+            <button className="page-print-button" type="button" aria-label={`Print personnel file for ${npc.name}`} title="Print file" onClick={() => onPrint?.({
               id: `person:${npc.id}`, source: "person", title: npc.name,
               content: [`AGE · ${npc.age} YEARS`, `STATUS · ${npc.status?.toUpperCase() || "UNKNOWN"}`, `DESCRIPTION · ${npc.appearance || "NOT RECORDED"}`, `EMPLOYMENT · ${employment}`, `MARITAL STATUS · ${maritalStatus?.toUpperCase() || "UNKNOWN"}`, ...(reportedScene ? [`REPORTED SCENE · ${reportedScene.address}`] : [])].join("\n"),
               metadata: selectedPerson,
-            })}><MapPin aria-hidden="true" /></button>
+            })}><Printer aria-hidden="true" /></button>
           </>}
 
           {(isBankRecords || isGateRecords) && <section className="world-record__activity" aria-label={`${isBankRecords ? "Financial ledger" : "GATE travel file"} for ${npc.name}`}>
@@ -248,7 +265,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               <p>{record.description}</p><p>{record.operator}{record.reference ? ` · ${record.reference}` : ""}</p>
               {isBankRecords && record.amount > 0 && <p className={`world-record__amount world-record__amount--${record.direction || "outgoing"}`}><span>{record.direction === "incoming" ? "CREDIT · RECEIVED" : "DEBIT · SENT"}</span><strong>{record.direction === "incoming" ? "+" : "−"}{record.amount} CREDITS</strong></p>}
               {(record.origin || record.destination) && <div className="world-record__route" aria-label={`Recorded route from ${record.origin || "unknown location"} to ${record.destination || "unknown location"}`}><span>RECORDED PASSAGE</span><div><strong>{record.origin || "UNKNOWN ORIGIN"}</strong><b aria-hidden="true">→</b><strong>{record.destination || "UNKNOWN DESTINATION"}</strong></div></div>}
-              <button className="whiteboard-pin-button" type="button" aria-label={`Pin ${isGateRecords ? "GATE log" : "financial record"}`} onClick={() => onPin?.({ id: record.id, source: record.source, title: isGateRecords ? "GATE ACCESS LOG" : "FINANCIAL RECORD", content: `${isGateRecords ? `GATE USED · ${displayRecordDate(record.occurredAt, timeZone)} · ` : ""}${record.description}${record.amount > 0 ? ` · ${record.direction === "incoming" ? "CREDIT" : "DEBIT"} · ${record.amount} Credits` : ""}${record.reference ? ` · ACCOUNT REFERENCE · ${record.reference}` : ""}${record.origin || record.destination ? ` · ${record.origin || "UNKNOWN"} → ${record.destination || "UNKNOWN"}` : ""}`, metadata: record })}><MapPin aria-hidden="true" /></button>
+              <button className="page-print-button" type="button" aria-label={`Print ${isGateRecords ? "GATE log" : "financial record"}`} title="Print record" onClick={() => onPrint?.({ id: record.id, source: record.source, title: isGateRecords ? "GATE ACCESS LOG" : "FINANCIAL RECORD", content: `${isGateRecords ? `GATE USED · ${displayRecordDate(record.occurredAt, timeZone)} · ` : ""}${record.description}${record.amount > 0 ? ` · ${record.direction === "incoming" ? "CREDIT" : "DEBIT"} · ${record.amount} Credits` : ""}${record.reference ? ` · ACCOUNT REFERENCE · ${record.reference}` : ""}${record.origin || record.destination ? ` · ${record.origin || "UNKNOWN"} → ${record.destination || "UNKNOWN"}` : ""}`, metadata: record })}><Printer aria-hidden="true" /></button>
             </article>)}
           </section>}
         </section>;
@@ -259,10 +276,11 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
           <header className="world-record__header"><h2>{company.name}</h2><span>COMPANY</span></header>
           <p>HEADQUARTERS · {address.full}</p>
           <button
-            className="whiteboard-pin-button"
+            className="page-print-button"
             type="button"
-            aria-label={`Pin company file for ${company.name}`}
-            onClick={() => onPin?.({
+            aria-label={`Print company file for ${company.name}`}
+            title="Print record"
+            onClick={() => onPrint?.({
               id: company.id,
               source: "company",
               title: company.name,
@@ -270,7 +288,17 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               metadata: { company, address },
             })}
           >
-            <MapPin aria-hidden="true" />
+            <Printer aria-hidden="true" />
+          </button>
+        </article>
+      ))}
+
+      {isCompanyPortal && companies.map(({ company, address }) => (
+        <article className="world-record world-company-site" key={company.id}>
+          <header className="world-record__header"><h2>{company.name}</h2><span>COMPANY WEBSITE</span></header>
+          <p>HEADQUARTERS · {address.full}</p>
+          <button type="button" className="world-company-site__open" disabled={busy} onClick={() => openCompanyWebsite({ company, address })}>
+            {busy ? "CONNECTING…" : "OPEN COMPANY WEBSITE"} <span aria-hidden="true">↗</span>
           </button>
         </article>
       ))}

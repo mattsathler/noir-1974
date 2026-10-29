@@ -30,5 +30,5 @@ A investigação precisa continuar limitada pelas regras atuais de conta, cidade
 - A busca de pessoas já possui caminho nacional por país. A associação de cenas continua limitada à cidade ativa e deve ser corrigida para cobrir resultados de outras cidades do mesmo país.
 - O campo persistido hoje usado como cidade do jogador pode continuar armazenando a jurisdição proxy ativa durante a migração. O contrato deve passar a nomear claramente essa semântica, sem tratar a conexão como presença física.
 - Os endpoints de acesso e de dados restritos precisam aceitar o contexto de site remoto depois da conexão proxy, conservando validações server-side e a expiração atual das autorizações.
-- A M22 de exploração local com Ghostkey é substituída pela migração integrada do computador, do Proxy, dos sites e do bypassdecrypt descrita na M23. Não se inicia uma segunda interface de arquivos locais em paralelo.
+- A M22 de exploração local com Ghostkey é substituída pela migração integrada do computador, do Proxy e dos sites descrita na M23. Não se inicia uma segunda interface de arquivos locais em paralelo.
 - O desempenho da lista nacional de empresas deve ser medido separadamente da busca nacional de pessoas. A linha de base histórica de Person Search não prediz o custo de uma listagem resumida de empresas.

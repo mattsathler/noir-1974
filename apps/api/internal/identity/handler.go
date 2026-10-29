@@ -85,6 +85,10 @@ type cityCompanySearchReader interface {
 	SearchCompaniesInCity(context.Context, string, string, string) ([]world.CompanyRecord, error)
 }
 
+type countryCompanySearchReader interface {
+	SearchCompaniesInCountry(context.Context, string, string, string) ([]world.CompanyPortalRecord, error)
+}
+
 type cityNPCReader interface {
 	NPCBelongsToCity(context.Context, string, string, string) (bool, error)
 }
@@ -239,10 +243,13 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 	if reader != nil {
 		mux.HandleFunc("GET /api/world/npcs", handler.searchNPCs)
 		mux.HandleFunc("GET /api/world/companies", handler.searchCompanies)
+		mux.HandleFunc("GET /api/world/companies/national", handler.searchCompaniesInCountry)
 		mux.HandleFunc("GET /api/world/locations", handler.searchLocations)
 		mux.HandleFunc("GET /api/world/transit", handler.transitDistricts)
 		mux.HandleFunc("GET /api/world/gate/destinations", handler.gateDestinations)
 		mux.HandleFunc("POST /api/world/gate/travel", handler.gateTravel)
+		mux.HandleFunc("GET /api/world/proxy/nodes", handler.proxyNodes)
+		mux.HandleFunc("POST /api/world/proxy/connect", handler.proxyConnect)
 		if _, ok := reader.(phoneDirectoryReader); ok && caseReader != nil {
 			mux.HandleFunc("GET /api/world/phone/{number}", handler.lookupPhoneContact)
 		}
@@ -367,7 +374,6 @@ type localAccessRequest struct {
 	LocationID string `json:"locationId"`
 	CompanyID  string `json:"companyId"`
 	Facility   string `json:"facility"`
-	Command    string `json:"command"`
 }
 
 func (h *Handler) requestLocalAccess(w http.ResponseWriter, r *http.Request) {
@@ -389,7 +395,7 @@ func (h *Handler) requestLocalAccess(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusBadRequest, "LOCAL_ACCESS_CONTEXT_REQUIRED", "a local address and system are required", nil)
 		return
 	}
-	valid := input.Command == "run bypassdecrypt.exe" && input.LocationID != "" && state.CityID != ""
+	valid := input.LocationID != "" && state.CityID != ""
 	switch input.Facility {
 	case "company":
 		valid = valid && input.CompanyID != ""
@@ -972,7 +978,7 @@ func (h *Handler) requireLocalAccessAttempt(w http.ResponseWriter, r *http.Reque
 func (h *Handler) requireLocalAccessAttemptInCity(w http.ResponseWriter, r *http.Request, accountID, cityID, facility, locationID, companyID string) bool {
 	attemptID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("accessAttemptId")), 10, 64)
 	if err != nil || attemptID < 1 {
-		h.writeAPIError(w, r, http.StatusForbidden, "LOCAL_ACCESS_REQUIRED", "authenticate with the local terminal before requesting these records", nil)
+		h.writeAPIError(w, r, http.StatusForbidden, "LOCAL_ACCESS_REQUIRED", "connect to the institution's website before requesting these records", nil)
 		return false
 	}
 	reader, ok := h.caseReader.(LocalAccessAttemptReader)
@@ -982,11 +988,11 @@ func (h *Handler) requireLocalAccessAttemptInCity(w http.ResponseWriter, r *http
 	}
 	valid, err := reader.ValidateLocalAccessAttempt(r.Context(), h.worldServerID, accountID, attemptID, cityID, locationID, companyID, facility, h.now().UTC())
 	if err != nil {
-		h.writeAPIError(w, r, http.StatusInternalServerError, "LOCAL_ACCESS_VALIDATION_FAILED", "could not validate local terminal access", err)
+		h.writeAPIError(w, r, http.StatusInternalServerError, "LOCAL_ACCESS_VALIDATION_FAILED", "could not validate institutional website access", err)
 		return false
 	}
 	if !valid {
-		h.writeAPIError(w, r, http.StatusForbidden, "LOCAL_ACCESS_REQUIRED", "authenticate with the local terminal before requesting these records", nil)
+		h.writeAPIError(w, r, http.StatusForbidden, "LOCAL_ACCESS_REQUIRED", "connect to the institution's website before requesting these records", nil)
 		return false
 	}
 	return true
@@ -1496,7 +1502,7 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 			for _, result := range results {
 				npcIDs = append(npcIDs, result.NPC.ID)
 			}
-			scenes, err := reader.PersonSearchScenes(r.Context(), h.worldServerID, cityID, npcIDs)
+			scenes, err := reader.PersonSearchScenes(r.Context(), h.worldServerID, city.CountryID, npcIDs)
 			if err != nil {
 				h.writeAPIError(w, r, http.StatusInternalServerError, "PERSON_SEARCH_FAILED", "could not retrieve case scene references", err)
 				return
@@ -1640,6 +1646,49 @@ func (h *Handler) searchCompanies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
+func (h *Handler) searchCompaniesInCountry(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.worldReader.(countryCompanySearchReader)
+	if !ok {
+		h.writeAPIError(w, r, http.StatusServiceUnavailable, "COMPANY_PORTAL_UNAVAILABLE", "The national company portal is temporarily unavailable.", nil)
+		return
+	}
+	query, ok := directoryQuery(w, r)
+	if !ok {
+		return
+	}
+	activeCity := h.worldFor(r.Context(), current.ID).CityID
+	city, exists := world.CityByID(activeCity)
+	if !exists {
+		h.writeAPIError(w, r, http.StatusConflict, "PROXY_JURISDICTION_UNAVAILABLE", "Connect a valid Proxy city before using the company portal.", nil)
+		return
+	}
+	results, err := reader.SearchCompaniesInCountry(r.Context(), h.worldServerID, city.CountryID, query)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "COMPANY_PORTAL_SEARCH_FAILED", "Company listings could not be searched.", err)
+		return
+	}
+	if len(results) > 10 {
+		results = results[:10]
+	}
+	if h.whiteboardReader != nil {
+		items := make([]cases.DiscoveredItem, 0, len(results))
+		for _, result := range results {
+			metadata, _ := json.Marshal(result)
+			items = append(items, cases.DiscoveredItem{ID: result.Company.ID, Source: "company", Title: result.Company.Name, Content: "HEADQUARTERS · " + result.Address.Full, Metadata: metadata})
+		}
+		if err := h.whiteboardReader.RecordDiscoveredItems(r.Context(), h.worldServerID, current.ID, items); err != nil {
+			log.Printf("record national company files for whiteboard: %v", err)
+			h.writeAPIError(w, r, http.StatusInternalServerError, "COMPANY_PORTAL_RECORD_FAILED", "Company search results could not be saved to your case files.", err)
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results, "countryId": city.CountryID, "limit": 10})
+}
+
 func (h *Handler) searchLocations(w http.ResponseWriter, r *http.Request) {
 	current, ok := h.authorizedPlayer(w, r)
 	if !ok {
@@ -1758,6 +1807,52 @@ func (h *Handler) gateDestinations(w http.ResponseWriter, r *http.Request) {
 		"catalogVersion": world.GeographyCatalogVersion,
 		"destinations":   world.Cities(),
 	})
+}
+
+func (h *Handler) proxyNodes(w http.ResponseWriter, r *http.Request) {
+	if !h.authorizeWorldRequest(w, r) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"catalogVersion": world.GeographyCatalogVersion,
+		"nodes":          world.Cities(),
+	})
+}
+
+func (h *Handler) proxyConnect(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
+		return
+	}
+	var input struct {
+		CityID string `json:"cityId"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	node, exists := world.CityByID(input.CityID)
+	if !exists {
+		h.writeAPIError(w, r, http.StatusBadRequest, "UNKNOWN_PROXY_NODE", "The selected proxy node is not available.", nil)
+		return
+	}
+	if materializer, ok := h.worldReader.(cityWorldMaterializer); ok {
+		if err := materializer.MaterializeCity(r.Context(), h.worldServerID, node.ID); err != nil {
+			h.writeAPIError(w, r, http.StatusInternalServerError, "PROXY_NODE_UNAVAILABLE", "The selected proxy node could not be prepared. Your jurisdiction has not changed.", err)
+			return
+		}
+	}
+	if err := h.store.setPlayerLocation(r.Context(), current.ID, node.ID); err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "PROXY_CONNECTION_FAILED", "The selected proxy node is ready, but your jurisdiction could not be updated.", err)
+		return
+	}
+	state := h.worldAt()
+	state.CityID = node.ID
+	state.City = node.Name
+	state.Country = node.Country
+	state.TimeZone = node.TimeZone
+	state.LocationID = node.ID
+	state.PlaceName = ""
+	writeJSON(w, http.StatusOK, map[string]any{"node": node, "world": state})
 }
 
 func (h *Handler) gateTravel(w http.ResponseWriter, r *http.Request) {

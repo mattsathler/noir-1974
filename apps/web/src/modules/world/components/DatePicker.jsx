@@ -22,7 +22,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
   const monthDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const offset = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7;
   const days = [...Array(offset).fill(null), ...Array.from({ length: monthDays }, (_, index) => index + 1)];
-  const modal = triggerRef.current?.closest(".computer-window, .local-terminal-screen");
+  const modal = triggerRef.current?.closest(".computer-window");
 
   useEffect(() => setVisibleMonth(`${value.slice(0, 7)}-01`), [value]);
 
@@ -49,7 +49,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
       return;
     }
     const trigger = triggerRef.current;
-    const parent = trigger?.closest(".computer-window, .local-terminal-screen");
+    const parent = trigger?.closest(".computer-window");
     if (trigger && parent) {
       const triggerRect = trigger.getBoundingClientRect();
       const parentRect = parent.getBoundingClientRect();
@@ -76,12 +76,12 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
         <strong>{monthLabel(month + 1)}</strong>
         <button type="button" aria-label="Next month" onClick={() => moveMonth(1)}>›</button>
       </header>
-      <div className="world-calendar__grid" role="group" aria-label={`${monthLabel(month + 1)} ${year}`}>
+      <div className="world-calendar__grid" role="group" aria-label={monthLabel(month + 1)}>
         {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <span className="world-calendar__weekday" key={`${day}-${index}`}>{day}</span>)}
         {days.map((day, index) => {
           if (day === null) return <span className="world-calendar__blank" key={`blank-${index}`} />;
           const candidate = dateKey(year, month + 1, day);
-          return <button key={candidate} type="button" aria-label={candidate} aria-pressed={candidate === value} disabled={candidate < minDate || candidate > maxDate} className={candidate === value ? "world-calendar__day world-calendar__day--selected" : "world-calendar__day"} onClick={() => { onChange(candidate); setOpen(false); }}>{day}</button>;
+          return <button key={candidate} type="button" aria-label={`${monthLabel(month + 1)} ${day}`} aria-pressed={candidate === value} disabled={candidate < minDate || candidate > maxDate} className={candidate === value ? "world-calendar__day world-calendar__day--selected" : "world-calendar__day"} onClick={() => { onChange(candidate); setOpen(false); }}>{day}</button>;
         })}
       </div>
     </section>, modal,

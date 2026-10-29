@@ -26,12 +26,12 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function CaseFiles({ cityId, issueDay, timeZone }) {
+export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = "" }) {
   const initialTo = issueDay || todayKey();
   const [cases, setCases] = useState([]);
   const [missing, setMissing] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [fromDate, setFromDate] = useState(dateDaysBefore(initialTo, 30));
   const [toDate, setToDate] = useState(initialTo);
   const [appliedRange, setAppliedRange] = useState({ from: dateDaysBefore(initialTo, 30), to: initialTo });
@@ -131,12 +131,11 @@ export default function CaseFiles({ cityId, issueDay, timeZone }) {
         {visibleCases.length ? (
           <div className="case-files__list">
             {visibleCases.map((record) => (
-              <button className="case-files__select" key={record.id} type="button" onClick={() => openRecord("case", record)}>
+              <article className="case-files__record" key={record.id}>
                 <span className="case-files__select-status">{missingIds.has(record.victimId) ? "MISSING PERSON · OPEN INQUIRY" : "OPEN HOMICIDE INQUIRY"}</span>
-                <strong>{record.victimName || "UNIDENTIFIED VICTIM"}</strong>
+                <button className="case-files__name-link" type="button" onClick={() => openRecord("case", record)}>{record.victimName || "UNIDENTIFIED VICTIM"}</button>
                 <time dateTime={record.crimeAt}>REPORTED · {formatReportDate(record.crimeAt, timeZone)}</time>
-                <span className="case-files__open-link">OPEN FILE →</span>
-              </button>
+              </article>
             ))}
           </div>
         ) : <p className="case-files__empty">{needle ? "NO MATCHING OPEN INQUIRIES." : "NO OPEN INQUIRIES IN THIS DATE RANGE."}</p>}
@@ -147,12 +146,11 @@ export default function CaseFiles({ cityId, issueDay, timeZone }) {
         {additionalMissing.length ? (
           <div className="case-files__list">
             {additionalMissing.map((person) => (
-              <button className="case-files__select case-files__select--missing" key={person.npcId} type="button" onClick={() => openRecord("missing", person)}>
+              <article className="case-files__record case-files__record--missing" key={person.npcId}>
                 <span className="case-files__select-status">MISSING PERSON</span>
-                <strong>{person.name}</strong>
+                <button className="case-files__name-link" type="button" onClick={() => openRecord("missing", person)}>{person.name}</button>
                 <time dateTime={person.missingAt}>MISSING SINCE · {formatReportDate(person.missingAt, timeZone)}</time>
-                <span className="case-files__open-link">OPEN FILE →</span>
-              </button>
+              </article>
             ))}
           </div>
         ) : <p className="case-files__empty">{visibleMissing.length ? "ALL MISSING PERSONS ARE LISTED WITH THEIR OPEN INQUIRY ABOVE." : needle ? "NO MATCHING MISSING PERSONS." : "NO MISSING PERSONS REPORTED IN THIS CITY."}</p>}

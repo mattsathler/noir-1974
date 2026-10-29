@@ -21,7 +21,7 @@ O catálogo inicial cobre pelo menos:
 
 - **Telefonar:** tirar do gancho ou iniciar chamada, tom de discagem/conexão e encerramento; ocupado, sem resposta ou chamada cancelada recebem sinais breves próprios quando esses resultados existirem no fluxo.
 - **Conectar o Proxy:** início da conexão, confirmação do nó ativo e sinais distintos para falha ou cancelamento. A confirmação só toca depois que a jurisdição for aceita pelo backend; não sugere deslocamento físico.
-- **Acessar um site restrito:** início do bypassdecrypt, atividade curta enquanto a autorização aguarda ou processa e sinais distintos para acesso concedido, negado, interrompido ou falho. O áudio não pode indicar se um dado é pista, crime ou informação oculta.
+- **Acessar um site restrito:** atividade curta enquanto a autorização aguarda ou processa e sinais distintos para acesso concedido, negado, interrompido ou falho. O áudio não pode indicar se um dado é pista, crime ou informação oculta.
 - **Abrir ferramentas e janelas:** inicializar o computador e abrir ou fechar ferramentas com sons curtos e consistentes. Páginas diferentes podem compartilhar uma família de sons; não é necessário criar um efeito único para cada site.
 - **Transições visuais:** mudanças de página e conexão recebem efeitos sincronizados com estados confirmados, sem antecipar jurisdições ou resultados. Ações policiais só entram no escopo de áudio quando suas animações forem especificadas.
 
