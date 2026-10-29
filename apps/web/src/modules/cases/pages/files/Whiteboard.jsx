@@ -71,12 +71,14 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
   const noteVersionsRef = useRef(new Map());
   const activeNoteSavesRef = useRef(0);
   const lastSyncSnapshotRef = useRef("");
+  const boardSelectionRequestRef = useRef(0);
 
   useEffect(() => () => noteTimersRef.current.forEach((timer) => clearTimeout(timer)), []);
 
 
-  async function loadBoard(id) {
+  async function loadBoard(id, selectionRequest = null) {
     const result = await getWhiteboard(id);
+    if (selectionRequest !== null && selectionRequest !== boardSelectionRequestRef.current) return;
     lastSyncSnapshotRef.current = JSON.stringify(result);
     setBoard(result);
     setConnectionStartID(null);
@@ -86,8 +88,22 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
   }
 
   function selectBoard(id) {
+    const selectionRequest = ++boardSelectionRequestRef.current;
     focusBoard?.(id);
-    loadBoard(id).catch((error) => setMessage(error.message || "THE SELECTED BOARD COULD NOT BE OPENED"));
+    const cached = getCachedWhiteboard(id);
+    if (cached) {
+      lastSyncSnapshotRef.current = JSON.stringify(cached);
+      setBoard(cached);
+      setConnectionStartID(null);
+      setConnectionPreview(null);
+      setSaveState(getWhiteboardSaveState(id));
+      setMessage(`${cached.pins.length} RECORD${cached.pins.length === 1 ? "" : "S"} ON THIS BOARD`);
+    } else {
+      setMessage("OPENING SELECTED BOARD…");
+    }
+    loadBoard(id, selectionRequest).catch((error) => {
+      if (selectionRequest === boardSelectionRequestRef.current) setMessage(error.message || "THE SELECTED BOARD COULD NOT BE OPENED");
+    });
   }
 
   useEffect(() => {
@@ -97,8 +113,9 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
       setBoards(results);
       const preferred = results.find((item) => item.id === initialBoardId)?.id ?? results[0]?.id;
       if (preferred) {
+        const selectionAtStart = boardSelectionRequestRef.current;
         const result = await getWhiteboard(preferred);
-        if (active) {
+        if (active && selectionAtStart === boardSelectionRequestRef.current) {
           lastSyncSnapshotRef.current = JSON.stringify(result);
           setBoard(result);
           setSaveState(getWhiteboardSaveState(preferred));
@@ -110,11 +127,6 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
     }).catch((error) => { if (active) setMessage(error.message || "PERSONAL BOARDS ARE UNAVAILABLE"); });
     return () => { active = false; };
   }, []);
-
-  useEffect(() => {
-    if (!initialBoardId || !boards.some((item) => item.id === initialBoardId) || board?.id === initialBoardId) return;
-    loadBoard(initialBoardId).catch((error) => setMessage(error.message || "THE SELECTED BOARD COULD NOT BE OPENED"));
-  }, [initialBoardId, boards, board?.id]);
 
   useEffect(() => {
     function handleExternalBoardUpdate(event) {
@@ -582,7 +594,7 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
   return (
     <section className={`personal-whiteboard${standalone ? " personal-whiteboard--standalone" : ""}`} aria-label="Personal investigation whiteboard">
       <header className="personal-whiteboard__header">
-        <div><p className="computer-window__eyebrow">PRIVATE INVESTIGATION · PERSONAL RECORD</p>
+        <div><p className="computer-window__eyebrow">NOIR CASEWORK · INVESTIGATION BOARD</p>
           {renamingBoardId === board?.id && !boardLocked
             ? <input ref={renameInputRef} className="personal-whiteboard__title-input" aria-label="Rename investigation board" maxLength={64} value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onBlur={finishRename} onKeyDown={(event) => {
               if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); }
@@ -648,6 +660,7 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
                   className="personal-whiteboard__note-content"
                   aria-label="Note text"
                   maxLength={5000}
+                  spellCheck={false}
                   value={(noteDrafts[pin.id] ?? pin).content}
                   disabled={boardLocked || pin.pending}
                   onChange={(event) => updateNoteDraft(pin, "content", event.target.value)}

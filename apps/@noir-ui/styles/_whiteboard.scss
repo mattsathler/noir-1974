@@ -1,0 +1,105 @@
+.whiteboard-standalone {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100svh;
+  padding: 0;
+  color: #263a3b;
+  background: #e8eeea;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.whiteboard-standalone .personal-whiteboard {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-height: 100svh;
+  margin: 0;
+  padding: clamp(.8rem, 2vw, 1.5rem);
+  color: #263a3b;
+  background: #fff;
+  border: 1px solid #b7c5bf;
+  font: .86rem/1.45 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+}
+
+.whiteboard-standalone .personal-whiteboard__header {
+  min-height: 4.25rem;
+  padding-bottom: .75rem;
+  border-bottom: 3px solid #117a70;
+}
+
+.whiteboard-standalone .personal-whiteboard__header .computer-window__eyebrow {
+  color: #53716b;
+  font: 700 .62rem Arial, Helvetica, sans-serif;
+  letter-spacing: .08em;
+}
+
+.whiteboard-standalone .personal-whiteboard__title { color: #164f52; font: 700 clamp(1.15rem, 2.5vw, 1.55rem) Arial, Helvetica, sans-serif; letter-spacing: normal; }
+.whiteboard-standalone .personal-whiteboard__title-input { color: #263a3b; background: #fff; border: 1px solid #829c93; font: 700 1.2rem Arial, Helvetica, sans-serif; }
+.whiteboard-standalone .personal-whiteboard__rename { color: #117a70; }
+.whiteboard-standalone .personal-whiteboard__rename:hover { color: #164f52; }
+.whiteboard-standalone .personal-whiteboard__header-actions { gap: .5rem; }
+.whiteboard-standalone .personal-whiteboard__new { padding: .48rem .7rem; color: #fff; background: #117a70; border: 1px solid #0c625a; font: 700 .68rem Arial, Helvetica, sans-serif; letter-spacing: .04em; }
+.whiteboard-standalone .personal-whiteboard__new:hover { background: #0c625a; border-color: #084e48; }
+.whiteboard-standalone .personal-whiteboard__delete-board { box-sizing: border-box; width: 2rem; height: 2rem; color: #a92330; background: #fff8f7; border: 1px solid #d7aeb0; }
+.whiteboard-standalone .personal-whiteboard__delete-board svg { width: 18px; height: 18px; }
+.whiteboard-standalone .personal-whiteboard__delete-board:hover { color: #8f1724; background: #ffeded; border-color: #b42332; }
+.whiteboard-standalone .personal-whiteboard__pages { gap: 0; margin-top: .65rem; background: #edf2ef; border-bottom: 1px solid #bdcbc4; scrollbar-color: #91aaa0 #edf2ef; scrollbar-width: thin; }
+.whiteboard-standalone .personal-whiteboard__pages::-webkit-scrollbar { height: 5px; }
+.whiteboard-standalone .personal-whiteboard__pages::-webkit-scrollbar-track { background: #edf2ef; }
+.whiteboard-standalone .personal-whiteboard__pages::-webkit-scrollbar-thumb { background: #91aaa0; }
+.whiteboard-standalone .personal-whiteboard__pages button { padding: .55rem .8rem; color: #315b58; background: transparent; border-bottom-width: 3px; font: .76rem Arial, Helvetica, sans-serif; }
+.whiteboard-standalone .personal-whiteboard__pages button[aria-current="page"] { color: #104e4a; background: #e7f2ee; border-bottom-color: #117a70; font-weight: 700; }
+.whiteboard-standalone .personal-whiteboard__pages button:hover { background: #f0f6f3; }
+.whiteboard-standalone .personal-whiteboard__status { min-height: 1.2rem; margin: .6rem 0; color: #49635c !important; font: .7rem Arial, Helvetica, sans-serif !important; }
+.whiteboard-standalone .personal-whiteboard__empty { color: #344e49; background: #f7faf8; border: 1px dashed #9cafa6; }
+.whiteboard-standalone .personal-whiteboard__empty > span { color: #117a70; }
+.whiteboard-standalone .personal-whiteboard__empty p { color: #536861; }
+.whiteboard-standalone .personal-whiteboard__tools { color: #536861; font: .68rem Arial, Helvetica, sans-serif; }
+.whiteboard-standalone .personal-whiteboard__tools button { padding: .42rem .65rem; color: #12665e; background: #f4f8f5; border: 1px solid #92aaa0; font: 700 .67rem Arial, Helvetica, sans-serif; }
+.whiteboard-standalone .personal-whiteboard__tools button:hover { background: #e8f2ed; border-color: #117a70; }
+.whiteboard-standalone .personal-whiteboard__tools select { color: #263a3b; background: #fff; border-color: #a9bab2; font: .72rem Arial, Helvetica, sans-serif; }
+.whiteboard-standalone .personal-whiteboard__save { color: #287244; font: 700 .67rem Arial, Helvetica, sans-serif; }
+.whiteboard-standalone .personal-whiteboard__save--saving { color: #9a6a13; }
+.whiteboard-standalone .personal-whiteboard__save--save { color: #a42c35; }
+.whiteboard-standalone .personal-whiteboard__save--save { text-decoration: underline; }
+.whiteboard-standalone .personal-whiteboard__viewport { border-color: #aebdb5; background: #d9e1dc; scrollbar-color: #879a91 #e7ece8; }
+.whiteboard-standalone .personal-whiteboard__stage {
+  background: radial-gradient(circle at 1px 1px, rgb(88 119 105 / 20%) 1px, transparent 1px) 0 0 / 20px 20px, #e5ebe6;
+  box-shadow: inset 0 0 0 5px #d2ddd6;
+}
+.whiteboard-standalone .personal-whiteboard__strings polyline { stroke: #b43d43; }
+.whiteboard-standalone .personal-whiteboard__strings .personal-whiteboard__string-shadow { stroke: #f0f2ed; }
+.whiteboard-standalone .personal-whiteboard__pin { background: #fff4b5; border: 1px solid #e2d27a; box-shadow: 2px 3px 0 rgb(62 66 49 / 24%); }
+.whiteboard-standalone .personal-whiteboard__pin p,
+.whiteboard-standalone .personal-whiteboard__pin--note .personal-whiteboard__note-content { background: transparent; }
+.whiteboard-standalone .personal-whiteboard__pin:focus-visible { outline-color: #287c73; }
+.whiteboard-standalone .personal-whiteboard__tack { background: #b43d43; border-color: #fff; box-shadow: 1px 1px 0 #53655c; }
+.whiteboard-standalone .personal-whiteboard__pin header { color: #596a5e; }
+.whiteboard-standalone .personal-whiteboard__pin header button.personal-whiteboard__remove-pin { color: #b42332; }
+.whiteboard-standalone .personal-whiteboard__pin h2 { color: #303d34; }
+.whiteboard-standalone .personal-whiteboard__person-portrait { background: #f5f1df; border-color: #c2b77e; }
+.whiteboard-standalone .personal-whiteboard__designation { color: #596a5e; }
+.whiteboard-standalone .personal-whiteboard__designation select { color: #263a3b; background: #fffdf3; border-color: #b4aa76; }
+.whiteboard-standalone .personal-whiteboard__pin--selected { outline-color: #27857b; }
+.whiteboard-standalone .personal-whiteboard__links { border-color: #bdcbc4; }
+.whiteboard-standalone .personal-whiteboard__links h2 { color: #164f52; font: 700 .72rem Arial, Helvetica, sans-serif; }
+.whiteboard-standalone .personal-whiteboard__links > div { color: #344e49; border-color: #d7e0db; }
+.whiteboard-standalone .personal-whiteboard__links b { color: #b43d43; }
+.whiteboard-standalone .personal-whiteboard__links button { color: #a42c35; }
+.whiteboard-standalone .personal-whiteboard button:focus-visible,
+.whiteboard-standalone .personal-whiteboard__title-input:focus-visible { outline: 2px solid #147c72; outline-offset: 2px; }
+.whiteboard-standalone .personal-whiteboard__confirm-backdrop { background: rgb(26 45 39 / 45%); }
+.whiteboard-standalone .personal-whiteboard__confirm { color: #263a3b; background: #fff; border: 1px solid #b42332; box-shadow: 3px 3px 0 rgb(35 49 44 / 22%); }
+.whiteboard-standalone .personal-whiteboard__confirm .computer-window__eyebrow { color: #a42c35; }
+.whiteboard-standalone .personal-whiteboard__confirm h2 { color: #263a3b; font: 700 1.05rem Arial, Helvetica, sans-serif; }
+.whiteboard-standalone .personal-whiteboard__confirm > p:not(.computer-window__eyebrow) { color: #536861; }
+.whiteboard-standalone .personal-whiteboard__confirm button { color: #315b58; background: #f4f8f5; border-color: #a9bab2; font: .72rem Arial, Helvetica, sans-serif; }
+.whiteboard-standalone .personal-whiteboard__confirm button.personal-whiteboard__confirm-delete { color: #a42c35; border-color: #b42332; }
+
+@media (max-width: 42rem) {
+  .whiteboard-standalone .personal-whiteboard { min-height: 100svh; padding: .75rem; }
+  .whiteboard-standalone .personal-whiteboard__header { align-items: flex-start; flex-direction: column; }
+  .whiteboard-standalone .personal-whiteboard__header-actions { width: 100%; justify-content: space-between; }
+  .whiteboard-standalone .personal-whiteboard__viewport { height: 62svh; min-height: 22rem; }
+}
