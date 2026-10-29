@@ -59,6 +59,8 @@ type PostgresStore struct {
 
 type countryCompanyCacheEntry struct {
 	companies []CompanyPortalRecord
+	seed      string
+	version   int
 	expiresAt time.Time
 }
 
@@ -1525,13 +1527,7 @@ func (store *PostgresStore) SearchCompaniesInCity(ctx context.Context, serverID,
 	return searchCompaniesInWorld(ctx, store, serverID, base, query)
 }
 
-// SearchCompaniesInCountry returns lightweight company listings across a country's cities.
-// Employee directories are deliberately loaded only by CompanyDirectoryAtLocation.
-func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, serverID, countryID, query string) ([]CompanyPortalRecord, error) {
-	query = strings.ToLower(strings.TrimSpace(query))
-	if query == "" {
-		return []CompanyPortalRecord{}, nil
-	}
+func (store *PostgresStore) countryCompanyIndex(ctx context.Context, serverID, countryID string) (countryCompanyCacheEntry, error) {
 	cities := make([]WorldCity, 0, 4)
 	cityIDs := make([]string, 0, 4)
 	for _, city := range Cities() {
@@ -1541,7 +1537,7 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 		}
 	}
 	if len(cities) == 0 {
-		return []CompanyPortalRecord{}, nil
+		return countryCompanyCacheEntry{}, nil
 	}
 	rows, err := store.db.Query(ctx,
 		`SELECT w.world_seed, w.generator_version, COALESCE(g.city_id, ''), COALESCE(g.generator_version, 0)
@@ -1549,7 +1545,7 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 		 ON g.server_id=w.server_id AND g.city_id=ANY($2::text[])
 		 WHERE w.server_id=$1::uuid ORDER BY g.city_id`, serverID, cityIDs)
 	if err != nil {
-		return nil, err
+		return countryCompanyCacheEntry{}, err
 	}
 	cityVersions := make(map[string]int, len(cityIDs))
 	var seed string
@@ -1559,7 +1555,7 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 		var version int
 		if err := rows.Scan(&seed, &worldVersion, &cityID, &version); err != nil {
 			rows.Close()
-			return nil, err
+			return countryCompanyCacheEntry{}, err
 		}
 		if cityID != "" {
 			cityVersions[cityID] = version
@@ -1567,10 +1563,10 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return countryCompanyCacheEntry{}, err
 	}
 	if seed == "" {
-		return nil, ErrEntityNotFound
+		return countryCompanyCacheEntry{}, ErrEntityNotFound
 	}
 	cacheKey := "companies:" + countryWorldCacheKey(seed, worldVersion, cities, cityVersions)
 	store.countryWorldCacheMu.Lock()
@@ -1588,7 +1584,7 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 			version := countryCityGeneratorVersion(city, worldVersion, cityVersions)
 			generated, err := GenerateCity(seed, version, city.ID)
 			if err != nil {
-				return nil, err
+				return countryCompanyCacheEntry{}, err
 			}
 			entities := make(map[string]Entity, len(generated.Entities))
 			regions := make(map[string]string, len(generated.Regions))
@@ -1624,9 +1620,32 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 			}
 			delete(store.countryCompanyCache, oldestKey)
 		}
-		store.countryCompanyCache[cacheKey] = countryCompanyCacheEntry{companies: companies, expiresAt: time.Now().Add(countryWorldCacheTTL)}
+		entry = countryCompanyCacheEntry{companies: companies, seed: seed, version: worldVersion, expiresAt: time.Now().Add(countryWorldCacheTTL)}
+		store.countryCompanyCache[cacheKey] = entry
 		store.countryWorldCacheMu.Unlock()
 	}
+	if cached {
+		entry.seed = seed
+		entry.version = worldVersion
+	}
+	return entry, nil
+}
+
+// SearchCompaniesInCountry returns lightweight company listings across a country's cities.
+// Employee directories are deliberately loaded only by CompanyDirectoryAtLocation.
+func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, serverID, countryID, query string) ([]CompanyPortalRecord, error) {
+	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return []CompanyPortalRecord{}, nil
+	}
+	entry, err := store.countryCompanyIndex(ctx, serverID, countryID)
+	if err != nil {
+		return nil, err
+	}
+	if entry.companies == nil {
+		return []CompanyPortalRecord{}, nil
+	}
+	companies := entry.companies
 	results, exact := make([]CompanyPortalRecord, 0), make([]CompanyPortalRecord, 0)
 	for _, record := range companies {
 		if strings.EqualFold(strings.TrimSpace(record.Company.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Full), query) {
@@ -1774,6 +1793,24 @@ func (store *PostgresStore) CompanyAtLocation(ctx context.Context, serverID, loc
 
 // CompanyDirectoryAtLocation returns staff only for a company occupying the selected building.
 func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serverID, locationID, companyID string) ([]CompanyRecord, error) {
+	if city, exists := CityForLocation(locationID); exists {
+		entry, err := store.countryCompanyIndex(ctx, serverID, city.CountryID)
+		if err != nil {
+			return nil, err
+		}
+		for _, company := range entry.companies {
+			if company.Address.LocationID != locationID || company.Company.ID != companyID {
+				continue
+			}
+			store.observeCache("company_directory_index", true)
+			employees, err := store.employeesOfCompany(ctx, serverID, companyID, entry.seed, entry.version)
+			if err != nil {
+				return nil, err
+			}
+			return []CompanyRecord{{Company: company.Company, Address: company.Address, Employees: employees}}, nil
+		}
+		store.observeCache("company_directory_index", false)
+	}
 	companies, err := store.CompanyAtLocation(ctx, serverID, locationID)
 	if err != nil {
 		return nil, err
@@ -1788,6 +1825,33 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 		}
 		record.Employees = employees
 		return []CompanyRecord{record}, nil
+	}
+	return []CompanyRecord{}, nil
+}
+
+// CompanySiteAtLocation validates a site against the current country index without loading employee data.
+func (store *PostgresStore) CompanySiteAtLocation(ctx context.Context, serverID, locationID, companyID string) ([]CompanyRecord, error) {
+	if city, exists := CityForLocation(locationID); exists {
+		entry, err := store.countryCompanyIndex(ctx, serverID, city.CountryID)
+		if err != nil {
+			return nil, err
+		}
+		for _, company := range entry.companies {
+			if company.Address.LocationID == locationID && company.Company.ID == companyID {
+				store.observeCache("company_site_index", true)
+				return []CompanyRecord{{Company: company.Company, Address: company.Address}}, nil
+			}
+		}
+		store.observeCache("company_site_index", false)
+	}
+	companies, err := store.CompanyAtLocation(ctx, serverID, locationID)
+	if err != nil {
+		return nil, err
+	}
+	for _, record := range companies {
+		if record.Company.ID == companyID {
+			return []CompanyRecord{record}, nil
+		}
 	}
 	return []CompanyRecord{}, nil
 }
@@ -2652,7 +2716,11 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 	if company.ID != companyID {
 		return nil, ErrGeneratedConflict
 	}
+	return store.employeesOfCompany(ctx, serverID, companyID, seed, version)
+}
 
+// employeesOfCompany reuses the versioned country index config when available.
+func (store *PostgresStore) employeesOfCompany(ctx context.Context, serverID, companyID, seed string, version int) ([]CompanyEmployee, error) {
 	rows, err := store.db.Query(ctx,
 		`SELECT e.entity_id, e.generation_key, r.role,
 		 COALESCE((SELECT value #>> '{}' FROM world_mutations m

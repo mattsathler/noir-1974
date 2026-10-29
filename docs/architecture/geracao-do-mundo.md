@@ -28,7 +28,7 @@ WORLD SEED
 
 ## Geografia de referência e expansão dos bairros
 
-A geografia terá duas camadas. A camada de referência é fixa e igual em todos os servidores: o catálogo inicial de 25 países e 100 cidades, registrado no M11. Esses nomes e identidades não variam com a seed do servidor. O app GATE apresenta países, cidades e bairros nessa ordem; o jogador escolhe cidade e bairro de destino antes de viajar. Construções não são destinos GATE: após a chegada, cards mostram as construções do bairro e uma seleção abre a tela de interior. A localização persistida do jogador identifica somente sua cidade; o bairro de chegada e a construção aberta são contextos transitórios e não são gravados como localização atual.
+A geografia tem duas camadas. A camada de referência é fixa e igual em todos os servidores: o catálogo inicial de 25 países e 100 cidades, registrado no M11. Esses nomes e identidades não variam com a seed do servidor. A interface Proxy apresenta países e cidades para selecionar a jurisdição ativa; bairros e construções continuam como contexto lógico de endereços, sem uma etapa de viagem ou visita para o protagonista. A localização persistida do jogador identifica a cidade Proxy; não registra presença física.
 
 Dentro das cidades, os bairros serão partições lógicas para distribuir detetives e ocorrências, evitando a concentração de jogadores em um único lugar. Cada cidade recebe 20 bairros compostos deterministicamente a partir de seu banco de palavras ao ser materializada. Seus nomes e IDs são únicos dentro da cidade e estáveis para todos os jogadores daquele servidor. Ao adicionar cidades, cada uma receberá seu próprio banco de palavras e as mesmas regras de composição; aumentar a quantidade de bairros será uma mudança versionada do gerador.
 
@@ -92,13 +92,13 @@ Os sete tons de pele usam quatro misturas regionais autorais, selecionadas deter
 
 A geração facial oferece cicatriz, sardas leves ou densas, sinal, linhas de sorriso e rugas finas ou profundas. Rugas finas só podem ser geradas a partir dos 45 anos; rugas profundas, a partir dos 60. Os limites de idade, paletas e compatibilidade são validados ao reconstruir NPCs. As versões 4 a 7 mantêm suas composições históricas.
 
-## M11 — catálogo e viagem para bairros
+## Catálogo geográfico, materialização e Proxy
 
-O catálogo geográfico fixo e versionado associa cada cidade canônica a um país e fuso horário. O GATE apresenta países, cidades e bairros em sequência, e valida o bairro escolhido dentro da cidade selecionada. A viagem persiste apenas a cidade; o bairro de chegada fica como contexto transitório da sessão.
+O catálogo geográfico fixo e versionado associa cada cidade canônica a um país e fuso horário. O Proxy apresenta os nós de cidade e altera a jurisdição investigativa ativa; não representa uma viagem do protagonista. Distritos e endereços continuam sendo dados do mundo usados para descrever instituições e validar o escopo dos serviços.
 
-Em Central, todas as cidades apresentam Police Station, Bank, GATE Central e Hospital. O Hospital fica fechado e indisponível até uma feature futura. Selecionar ou abrir um desses prédios só troca a representação visual; não persiste uma visita. Ações investigativas futuras recebem o local como contexto da solicitação e validam que pertence à cidade atual do jogador.
+Em Central, todas as cidades apresentam Police Station, Bank, GATE Central e Hospital como serviços do mundo. Esses serviços são acessados por seus sites, após conexão Proxy e validação da tentativa de acesso no backend. A presença de um endereço numa resposta não significa que o protagonista o visitou.
 
-A primeira viagem a uma cidade materializa seu conteúdo no mundo compartilhado do servidor. A tabela `world_city_generators` registra a versão usada por cidade para que NPCs, empresas e relações mantenham suas identidades em reconstruções futuras. Cada cidade materializada mantém sua própria população e seus próprios casos. A geração recorrente alterna entre essas cidades e seleciona os candidatos apenas dentro da cidade sorteada; a expansão pode adicionar NPCs ao bairro menos povoado dessa cidade.
+A primeira conexão Proxy a uma cidade pode materializar seu conteúdo no mundo compartilhado do servidor. A tabela `world_city_generators` registra a versão usada por cidade para que NPCs, empresas e relações mantenham suas identidades em reconstruções futuras. Cada cidade materializada mantém sua própria população e seus próprios casos. A geração recorrente alterna entre essas cidades e seleciona os candidatos apenas dentro da cidade sorteada; a expansão pode adicionar NPCs ao bairro menos povoado dessa cidade.
 
 ## Determinismo e identidade
 

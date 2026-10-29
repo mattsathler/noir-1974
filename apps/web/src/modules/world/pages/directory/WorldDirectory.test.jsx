@@ -30,7 +30,7 @@ describe("WorldDirectory activity records", () => {
     expect(screen.queryByText(/WORKPLACE|MARITAL STATUS|41 YEARS|dark hair/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Ada Morel.*ACCOUNT HOLDER/ }));
     fireEvent.click(screen.getByRole("button", { name: "Select date FROM" }));
-    fireEvent.click(screen.getByRole("button", { name: "1974-11-08" }));
+    fireEvent.click(screen.getByRole("button", { name: "Nov 8" }));
     fireEvent.click(screen.getByRole("button", { name: "READ FINANCIAL RECORDS" }));
 
     expect(await screen.findByText("A private remittance cleared.")).toBeInTheDocument();

@@ -136,6 +136,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
 
   return (
     <main className="game-screen pos-relative min-h-screen overflow-hidden bg-atmosphere text-primary" aria-label="Detective computer desktop">
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">Proxy jurisdiction: {location || "not connected"}</p>
       {error && <APIErrorNotice error={error.cause ?? error} onRetry={error.retry} retryLabel={error.retryLabel} className="game-api-error pos-relative m-6 text-sm text-danger" />}
       {appearanceEditorOpen && playerCharacter && <CharacterAppearanceEditor character={playerCharacter} onClose={() => setAppearanceEditorOpen(false)} onSaved={(character) => { setPlayerCharacter(character); setAppearanceEditorOpen(false); }} />}
       {world && (

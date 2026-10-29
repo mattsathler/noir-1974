@@ -13,7 +13,7 @@ function dateDaysBefore(dateKey, days) {
 
 function formatReportDate(value, timeZone) {
   if (!value) return "DATE NOT RECORDED";
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("en-US", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",

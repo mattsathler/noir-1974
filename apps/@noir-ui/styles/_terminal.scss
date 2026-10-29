@@ -1567,6 +1567,8 @@
 .legacy-site__ad--small { min-height: 6rem; }
 .legacy-site__ad--small b { font-size: 0.8rem; }
 .legacy-police__masthead { background: linear-gradient(90deg, #173b66, #356995); }
+.legacy-police .legacy-site__toplinks { gap: 0.25rem; }
+.legacy-police .legacy-site__toplinks > button { flex: 0 0 auto; padding: 0.2rem 0.7rem; }
 .legacy-police__masthead > div:first-child { grid-template-columns: 2rem auto; }
 .legacy-police__masthead .legacy-site__brand-sub { grid-column: 2; }
 .legacy-police__crest { display: grid; width: 1.75rem; height: 2rem; grid-row: span 2; place-items: center; color: #173b66; background: #f1d77b; border: 1px solid #fff1b4; font: bold 1rem Georgia, serif; clip-path: polygon(0 0,100% 0,100% 75%,50% 100%,0 75%); }

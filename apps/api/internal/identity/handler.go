@@ -113,6 +113,10 @@ type companyDirectoryReader interface {
 	CompanyDirectoryAtLocation(context.Context, string, string, string) ([]world.CompanyRecord, error)
 }
 
+type companySiteReader interface {
+	CompanySiteAtLocation(context.Context, string, string, string) ([]world.CompanyRecord, error)
+}
+
 type NewspaperReader interface {
 	Issue(context.Context, string, string, string, string, time.Time) (newspaper.Issue, error)
 }
@@ -399,18 +403,26 @@ func (h *Handler) requestLocalAccess(w http.ResponseWriter, r *http.Request) {
 	switch input.Facility {
 	case "company":
 		valid = valid && input.CompanyID != ""
-		companyReader, available := h.worldReader.(companyDirectoryReader)
-		if !available {
+		locationCity, locationExists := world.CityForLocation(input.LocationID)
+		valid = valid && locationExists && locationCity.ID == state.CityID
+		if !valid {
+			break
+		}
+		var records []world.CompanyRecord
+		var err error
+		if companyReader, available := h.worldReader.(companySiteReader); available {
+			records, err = companyReader.CompanySiteAtLocation(r.Context(), h.worldServerID, input.LocationID, input.CompanyID)
+		} else if companyReader, available := h.worldReader.(companyDirectoryReader); available {
+			records, err = companyReader.CompanyDirectoryAtLocation(r.Context(), h.worldServerID, input.LocationID, input.CompanyID)
+		} else {
 			valid = false
 			break
 		}
-		records, err := companyReader.CompanyDirectoryAtLocation(r.Context(), h.worldServerID, input.LocationID, input.CompanyID)
 		if err != nil {
 			h.writeAPIError(w, r, http.StatusInternalServerError, "LOCAL_ACCESS_FAILED", "could not validate local system", err)
 			return
 		}
-		city, exists := world.CityByID(state.CityID)
-		valid = valid && exists && len(records) == 1 && records[0].Address.City == city.Name
+		valid = valid && len(records) == 1
 	case "police", "bank", "gate":
 		valid = valid && input.CompanyID == "" && input.LocationID == expectedServiceLocationID(state.CityID, input.Facility)
 	case "hospital":
@@ -860,7 +872,12 @@ func (h *Handler) caseAccountAndCity(w http.ResponseWriter, r *http.Request) (ac
 		if !valid {
 			return account{}, "", false
 		}
-		return current, h.worldFor(r.Context(), current.ID).CityID, true
+		cityID := h.worldFor(r.Context(), current.ID).CityID
+		if _, exists := world.CityByID(cityID); !exists {
+			h.writeAPIError(w, r, http.StatusConflict, "PROXY_JURISDICTION_UNAVAILABLE", "connect a valid Proxy city before using local records", nil)
+			return account{}, "", false
+		}
+		return current, cityID, true
 	}
 	token, err := r.Cookie(sessionCookie)
 	if err != nil || token.Value == "" {
@@ -872,11 +889,12 @@ func (h *Handler) caseAccountAndCity(w http.ResponseWriter, r *http.Request) (ac
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return account{}, "", false
 	}
-	cityID := h.worldAt().CityID
-	if city, ok := world.CityForLocation(locationID); ok {
-		cityID = city.ID
+	city, ok := world.CityForLocation(locationID)
+	if !ok {
+		h.writeAPIError(w, r, http.StatusConflict, "PROXY_JURISDICTION_UNAVAILABLE", "connect a valid Proxy city before using local records", nil)
+		return account{}, "", false
 	}
-	return current, cityID, true
+	return current, city.ID, true
 }
 
 func (h *Handler) getCase(w http.ResponseWriter, r *http.Request) {
@@ -2120,21 +2138,31 @@ func (h *Handler) worldFor(ctx context.Context, accountID string) worldResponse 
 	state := h.worldAt()
 	locationID, err := h.store.playerLocation(ctx, accountID)
 	if err != nil {
+		state.CityID = ""
+		state.City = ""
+		state.Country = ""
+		state.TimeZone = ""
+		state.LocationID = ""
 		return state
 	}
-	if city, ok := world.CityForLocation(locationID); ok {
-		state.CityID = city.ID
-		state.City = city.Name
-		state.Country = city.Country
-		state.TimeZone = city.TimeZone
-		if isDistrictLocation(locationID, city.ID) {
-			state.DistrictID = locationID
-			state.District = districtNameFromID(locationID)
-		}
-		state.LocationID = city.ID
-	} else {
+	city, ok := world.CityForLocation(locationID)
+	if !ok {
+		state.CityID = ""
+		state.City = ""
+		state.Country = ""
+		state.TimeZone = ""
 		state.LocationID = locationID
+		return state
 	}
+	state.CityID = city.ID
+	state.City = city.Name
+	state.Country = city.Country
+	state.TimeZone = city.TimeZone
+	if isDistrictLocation(locationID, city.ID) {
+		state.DistrictID = locationID
+		state.District = districtNameFromID(locationID)
+	}
+	state.LocationID = city.ID
 	return state
 }
 

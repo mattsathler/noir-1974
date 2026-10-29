@@ -223,7 +223,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               setActivityMessage("");
               setActivityBusy(false);
               setSelectedPerson(record);
-            }}>{npc.name} »</button>
+            }}>{npc.name} <span aria-hidden="true">»</span></button>
           </article>;
         })}
       </div>}
