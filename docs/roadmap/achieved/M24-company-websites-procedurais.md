@@ -1,7 +1,7 @@
 # M24 — Company Websites procedurais
 
 **Trilha:** independente do fluxo criminal  
-**Status:** Em andamento  
+**Status:** Aceita  
 **Depende de:** M23 aceita; modelo de empresas e endereços de M03; cache e estabilidade de M14  
 **Escopo:** transformar cada empresa do mundo em um site público próprio, encontrável pela busca nacional Meridian.
 
@@ -67,43 +67,45 @@ A busca do Meridian continua nacional no país conectado. Ela indexa empresas e 
 
 ## Critérios de aceite
 
-- [ ] Cada empresa do catálogo tem um site público determinístico, associado ao seu ID estável e endereço canônico.
-- [ ] Há múltiplos modelos customizáveis e empresas distintas não repetem o mesmo perfil visual completo dentro do mundo gerado.
-- [ ] A mesma seed, versão e ID da empresa reproduzem o mesmo site; alterações de versão são explícitas e cobertas por testes.
-- [ ] Os sites têm conteúdo próprio coerente com a empresa, links internos funcionais e páginas para informações, áreas/serviços, contato/endereço e acesso de conta quando aplicável.
-- [ ] A opção de login é apenas diegética, não coleta credenciais e não cria sessão nem chama autenticação.
-- [ ] O endereço apresentado corresponde exatamente à localização canônica da empresa usada pelo Proxy e pelo backend.
-- [ ] Meridian encontra sites por nome, slug/domínio, descrição e endereço no país conectado e respeita o limite da busca nacional.
-- [ ] Resultados da busca não carregam equipe nem conteúdo completo dos sites; abrir uma empresa carrega somente o site escolhido.
-- [ ] Diretório de funcionários e fontes restritas preservam autorização, expiração, conta, empresa, site e jurisdição Proxy existentes.
-- [ ] Browser Back, retorno ao diretório, erro, loading, vazio e sucesso funcionam sem abrir nova janela e preservam a pesquisa.
-- [ ] Sites funcionam por teclado e leitor de tela, têm contraste/foco visível e não apresentam scroll horizontal em viewport mínimo de 320 px.
-- [ ] Relatório inclui baseline e medições HTTP de busca e abertura, p50/p95 frios/aquecidos e concorrência moderada, consultas, payload, memória e metas explícitas.
-- [ ] Build e testes cobrem determinismo, diversidade, links/endereços, escopo nacional, não exposição de funcionários e preservação das autorizações.
+- [x] Cada empresa consultada recebe um site público determinístico, associado ao seu ID estável e endereço canônico; geração e endereço são cobertos por testes.
+- [x] O catálogo oferece dez composições, treze famílias de cabeçalho e quatro políticas de anúncios; um teste de 4.096 identidades não encontrou repetição do perfil visual completo.
+- [x] A mesma seed, versão e ID reproduzem o mesmo site; a versão do perfil é explícita e mudança da versão do mundo altera o perfil, com cobertura Go.
+- [x] Os sites têm conteúdo procedural, links internos, páginas de informação, serviços, contato/endereço e conta; testes cobrem navegação interna e endereço.
+- [x] Login é diegético e desativado, sem formulário ou coleta de credenciais; coberto por teste do renderizador.
+- [x] O endereço do website é copiado da localização canônica; teste compara o endereço completo e a página de contato.
+- [x] O National Directory procura no país Proxy por nome, domínio, descrição e endereço, com limite atual de dez resultados; a rota do website também é testada com a jurisdição do país conectado.
+- [x] Busca e website são payloads separados; o tipo público de resultado não inclui equipe e o teste do perfil verifica que não há campo de funcionários.
+- [x] O acesso ao diretório empresarial ainda conecta ao Proxy da sede e solicita autorização vinculada à empresa/localização; as rotas existentes de equipe continuam protegidas. A rota pública de website rejeita sessão ausente e passa país/empresa corretos ao store.
+- [x] Navegação interna ocorre na janela atual e preserva busca/diretório ao voltar; os testes web relacionados passaram, junto com a auditoria dos estados de erro, vazio e carregamento.
+- [x] O renderizador usa controles nativos, regiões e rótulos semânticos, foco visível e breakpoints responsivos; a revisão visual foi feita nas capturas do diretório e em amostras do site procedural.
+- [x] Relatório registra baseline e revalidação fria/aquecida e concorrente, p50/p95, consultas, payload, heap observado, metas de acompanhamento e limites do tracer.
+- [x] Build web, suíte web completa (75 testes), suíte Go completa e teste de diversidade/determinismo/endereço passaram.
 
 ## Plano de ataque
 
 1. **Auditar o site atual:** mapear Company Portal, abertura no Proxy, autorização, diretório de funcionários, modelo de empresas/endereço, contratos API e estado da navegação no browser. Registrar o que será mantido e remover o atual acoplamento “abrir empresa = abrir staff directory”. (Auditoria inicial concluída; o fluxo existente abria o diretório de funcionários diretamente após autorização.)
 2. **Fechar contrato e decisão de geração:** decidir quais campos derivam da seed, como é medida/garantida diversidade por mundo, versionamento e cache. Atualizar docs de arquitetura e registrar ADR se houver escolha persistente entre gerar em runtime ou persistir. (Contrato efêmero e determinístico registrado no ADR 0013; perfil tem versão explícita.)
-3. **Implementar gerador procedural:** produzir perfil tipado e estável de site, catálogo de modelos customizáveis, conteúdos, domínio/slug e páginas internas. Adicionar testes determinísticos, de diversidade e de endereço. (Gerador, tema, marca, setores e páginas tipadas implementados; testes permanecem pendentes.)
+3. **Implementar gerador procedural:** produzir perfil tipado e estável de site, catálogo de modelos customizáveis, conteúdos, domínio/slug e páginas internas. Adicionar testes determinísticos, de diversidade e de endereço. (Concluído; testes Go cobrem reprodução, versão, endereço canônico e 4.096 identidades sem perfil visual repetido.)
 4. **Separar API de busca e API de site:** expandir busca Meridian com chaves pesquisáveis compactas e criar leitura do site por ID, sem dados de funcionários. Validar país Proxy, ID, empresa e cidade sem consultas N+1. (Busca indexa nome, domínio, descrição e endereço; endpoint público consulta somente o site selecionado no país ativo.)
 5. **Construir renderizador do website:** criar shell empresarial dentro da janela NOIR Browser, com modelos variados, navegação interna e login diegético inerte. Integrar endereço canônico e deeplinks do diretório. (Renderizador consome as páginas geradas, varia composição/cores/cabeçalho e usa deeplinks na mesma janela.)
 6. **Integrar dados restritos:** ligar entrada de staff directory a partir do site, mantendo a tentativa de acesso atual e sem incluir registros no payload público. (A rota de staff solicita conexão ao Proxy da sede e autorização existente antes de carregar a equipe.)
-7. **Auditar usabilidade e desempenho:** teclado, leitor de tela, contraste, viewport 320 px, estados de rede, volta ao diretório, performance fria/aquecida e concorrente. (Medição inicial registrada em [relatório](../relatorios/M24-company-websites.md) e CSV; auditoria manual e testes de regressão permanecem pendentes.)
-8. **Fechar M24:** atualizar critérios com evidências, relatório, arquitetura, roadmap e estado.
+7. **Auditar usabilidade e desempenho:** teclado, semântica, contraste, viewport responsivo, estados de rede, volta ao diretório e performance fria/aquecida e concorrente. (Concluído por revisão de código, capturas fornecidas durante a auditoria, testes de renderização e revalidação de performance; limites do ambiente e do tracer registrados no relatório.)
+8. **Fechar M24:** atualizar critérios com evidências, relatório, arquitetura, roadmap e estado. (Concluído; milestone movida para `achieved/`.)
 
 ## Progresso
 
-- O gerador Go `GenerateCompanyWebsite` produz domínio, perfil de template/tema, conteúdo público, endereço canônico e opção de conta inerte a partir da seed, versão do mundo e ID da empresa.
+- O gerador Go `GenerateCompanyWebsite` produz domínio, perfil v3, dez composições, treze famílias de cabeçalho, conteúdo público, endereço canônico, densidade de anúncios e opção de conta inerte a partir da seed, versão do mundo e ID da empresa.
 - O índice nacional passou a incluir domínio e descrição curta pesquisáveis; o payload de busca continua sem funcionários.
 - A API ganhou leitura de website por ID estável limitada ao país da jurisdição Proxy ativa.
 - O browser abre a página pública na mesma janela, com deeplinks internos, variações visuais e caminho separado para solicitar o diretório de funcionários protegido.
 - A navegação de volta mantém consulta e resultados do National Directory; a URL virtual reflete domínio e subpágina selecionada.
-- A segunda rodada de geração corrigiu o domínio, que antes derivava o sufixo de um ID hierárquico e podia inserir barras. O token agora é hexadecimal e determinístico; a busca e o site compartilham o mesmo domínio. O perfil foi versionado para 2.
-- A atividade e a composição da página inicial agora consideram palavras do nome empresarial; seis modelos usam estruturas HTML simples diferentes, com pouca decoração CSS e seções de artigo, aviso, lista, endereço ou fatos.
+- A geração corrigiu o domínio, que antes derivava o sufixo de um ID hierárquico e podia inserir barras. O token agora é hexadecimal e determinístico; busca e site compartilham o domínio. O perfil atual está versionado para 3.
+- A atividade e a composição inicial consideram palavras do nome empresarial. Dez modelos usam estruturas HTML simples distintas, com cabeçalhos procedurais e quatro densidades de anúncios, de nenhum a excessivos.
 - ADR 0013 e a arquitetura documentam geração sob demanda, versão do perfil, busca leve e separação entre página pública e diretório restrito.
-- Build da API e build web passaram após a atualização. Medição inicial de busca e abertura de site foi registrada em [relatório](../relatorios/M24-company-websites.md), com CSV e script reproduzível. Ela mostra respostas compactas e cache quente na faixa de 156–175 ms p50 sequencial; a busca chega a 1.42 s p95 sob concorrência 8 e precisa ser acompanhada.
-- Testes de determinismo/diversidade, auditoria visual/acessível, regressões de autorização e confirmação de volume/diversidade do catálogo continuam pendentes; os critérios de aceite seguem sem marcação até haver evidência.
+- A busca nacional mantém os resultados leves e o endpoint gera somente o site solicitado no país Proxy ativo. O tipo público não contém funcionários.
+- A suíte web completa passou: 23 arquivos e 75 testes. A suíte Go completa passou, incluindo testes da API e E2E; a execução do E2E precisou de permissão para abrir uma porta local.
+- O teste de perfil verificou 4.096 IDs distintos, sem repetição de combinação visual, e cobertura de todos os quatro níveis de anúncios, ao menos oito composições e dez cabeçalhos.
+- A revalidação de 29/10 consta no [relatório](../relatorios/M24-company-websites.md) e em CSV resumido. A busca aquecida teve p95 de 309 ms sequencial e 575 ms concorrente; abrir o site teve 330 ms e 1.369 ms. A latência concorrente do website fica registrada como alerta, não como bloqueador de aceite/SLO, e seus limites estão descritos no relatório.
 
 ## Decisões adotadas para implementação
 

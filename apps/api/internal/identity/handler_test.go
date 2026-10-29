@@ -37,6 +37,17 @@ type fakeStore struct {
 
 type fakeDirectory struct{}
 
+type companyWebsiteDirectory struct {
+	fakeDirectory
+	serverID, countryID, companyID string
+	website                        world.CompanyWebsite
+}
+
+func (directory *companyWebsiteDirectory) CompanyWebsite(_ context.Context, serverID, countryID, companyID string) (world.CompanyWebsite, error) {
+	directory.serverID, directory.countryID, directory.companyID = serverID, countryID, companyID
+	return directory.website, nil
+}
+
 type locationDirectory struct {
 	fakeDirectory
 	queriedDistrict string
@@ -415,6 +426,38 @@ func TestNeighborhoodTravelAndVisitDoNotPersistLocations(t *testing.T) {
 	}
 	if worldResponseRecorder.Code != http.StatusOK || state.CityID != "fr/lyon" || state.LocationID != "fr/lyon" || state.DistrictID != "" || state.District != "" || state.PlaceName != "" {
 		t.Fatalf("world response should persist only the current city: status=%d state=%+v", worldResponseRecorder.Code, state)
+	}
+}
+
+func TestCompanyWebsiteRequiresSessionAndUsesConnectedCountry(t *testing.T) {
+	directory := &companyWebsiteDirectory{website: world.GenerateCompanyWebsite("api-test-world", 4, world.CompanyPortalRecord{
+		Company: world.Company{ID: "company:atelier", Name: "Ateliers de la Gare"},
+		Address: world.Address{LocationID: "location:atelier", Name: "Ateliers de la Gare", City: "Lyon", Country: "France", Full: "Ateliers de la Gare, Lyon, France"},
+	})}
+	repository := &fakeStore{account: account{ID: "account-1", Username: "detective"}, locationID: "fr/lyon"}
+	handler := NewHandlerWithWorld(repository, false, directory, "server-1")
+
+	unauthenticated := httptest.NewRecorder()
+	handler.ServeHTTP(unauthenticated, httptest.NewRequest(http.MethodGet, "/api/world/companies/company%3Aatelier/website", nil))
+	if unauthenticated.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated website status = %d, want %d", unauthenticated.Code, http.StatusUnauthorized)
+	}
+	if directory.companyID != "" {
+		t.Fatal("unauthenticated request reached the company website reader")
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/world/companies/company%3Aatelier/website", nil)
+	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid-session"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("authenticated website status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if directory.serverID != "server-1" || directory.countryID != "fr" || directory.companyID != "company:atelier" {
+		t.Fatalf("website lookup scope = (%q, %q, %q), want (server-1, fr, company:atelier)", directory.serverID, directory.countryID, directory.companyID)
+	}
+	if !strings.Contains(response.Body.String(), "Ateliers de la Gare") || strings.Contains(response.Body.String(), "employees") {
+		t.Fatalf("unexpected public website payload: %s", response.Body.String())
 	}
 }
 

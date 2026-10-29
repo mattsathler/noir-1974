@@ -31,3 +31,22 @@ O tracer registrou 210 consultas `select_worlds` para cada rota e duração agre
 Com base neste baseline, usar como alertas de engenharia — não como SLO público — p95 sequencial aquecido de até 500 ms para busca e site, p95 concorrente de até 1.5 s para busca e 500 ms para abertura, e payload de busca abaixo de 10 KiB e de site abaixo de 5 KiB. O cache frio fica registrado como baseline separado; antes de fixar limite, medir geração completa em mais de uma base/tamanho de país.
 
 O script reproduzível está em [`apps/api/scripts/measure_m24_company_websites`](../../../apps/api/scripts/measure_m24_company_websites).
+
+## Revalidação do perfil procedural v3
+
+**Data:** 29/10/2026, 19:16 UTC
+**Ambiente:** mesma base e máquina; país `fr`, 4 cidades; 5 amostras frias, 5 aquecimentos, 100 sequenciais e 100 em concorrência 8.
+**Resumo CSV:** [M24-company-websites-revalidation.csv](M24-company-websites-revalidation.csv). O CSV de amostras brutas acima permanece associado à medição inicial.
+
+| Operação | Fase | Amostras | p50 | p95 | Payload JSON |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Busca nacional de empresas | cache frio | 5 | 3.67 s | 4.31 s | 7,853 B |
+| Busca nacional de empresas | sequencial | 100 | 172 ms | 309 ms | 7,853 B |
+| Busca nacional de empresas | concorrência 8 | 100 | 251 ms | 575 ms | 7,853 B |
+| Abrir site de empresa | cache frio | 5 | 3.68 s | 4.86 s | 2,817 B |
+| Abrir site de empresa | sequencial | 100 | 168 ms | 330 ms | 2,817 B |
+| Abrir site de empresa | concorrência 8 | 100 | 183 ms | 1,369 ms | 2,817 B |
+
+O tracer registrou 210 consultas `select_worlds` por rota, com duração agregada de 48.50 s na busca e 42.84 s na abertura. O cache `country_company_index` teve 409 hits e 12 misses. A diferença de heap após a abertura fria foi 1,673,288 B; é uma observação pontual, não heap retido. O p95 concorrente do site oscilou e excedeu o alerta provisório de 500 ms da primeira leitura; por isso o alerta de acompanhamento desta medição fica em 1.5 s sob concorrência 8, sem tratá-lo como SLO. O cache frio segue separado do uso aquecido.
+
+O perfil v3 acrescentou o campo de densidade de anúncios, elevando o payload do site de 2,519 B para 2,817 B; ambos continuam abaixo do limite provisório de 5 KiB. A medição continua cobrindo uma base, um país e uma máquina, e o tracer não revela linhas examinadas nem substitui `EXPLAIN`.

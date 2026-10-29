@@ -1,0 +1,7 @@
+operation,phase,samples,concurrency,p50_ms,p95_ms,payload_bytes
+company_search,cold,5,1,3670.27,4314.70,7853
+company_search,sequential,100,1,171.70,308.75,7853
+company_search,concurrent,100,8,251.11,574.84,7853
+company_website,cold,5,1,3682.77,4855.99,2817
+company_website,sequential,100,1,168.35,330.20,2817
+company_website,concurrent,100,8,182.79,1368.82,2817
