@@ -56,7 +56,6 @@
   .appearance-editor__panel { padding: 1rem; }
   .appearance-editor__content { grid-template-columns: 1fr; }
   .appearance-editor__preview { min-height: 10rem; }
-  .proxy-interface-overlay { padding: 0.5rem; }
   .proxy-interface { max-height: calc(100dvh - 1rem); }
   .proxy-interface__header,.proxy-interface__footer { align-items: flex-start; flex-wrap: wrap; padding: 0.8rem; }
   .proxy-interface__status { display: none; }
@@ -109,16 +108,6 @@
 .computer-modal {
   z-index: 20;
 }
-.proxy-interface-overlay {
-  position: fixed;
-  z-index: 40;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  overflow: auto;
-  padding: var(--noir-space-4);
-  background: var(--noir-modal-backdrop);
-}
 .proxy-interface {
   display: flex;
   width: min(58rem, 100%);
@@ -137,7 +126,6 @@
 .proxy-interface__header p,
 .proxy-interface__footer p span { margin: 0 0 0.4rem; color: var(--noir-brass-300); font-size: 0.65rem; letter-spacing: 0.08em; }
 .proxy-interface__header h2 { margin: 0; font-size: 1.1rem; font-weight: 400; }
-.proxy-interface__header > button { width: 2.25rem; height: 2.25rem; color: inherit; background: transparent; border: 1px solid rgb(205 176 67 / 45%); font: inherit; cursor: pointer; }
 .proxy-interface__status { color: var(--noir-brass-300); font-size: 0.62rem; }
 .proxy-interface__status i { display: inline-block; width: 0.45rem; height: 0.45rem; margin-right: 0.35rem; background: #8fbd77; border-radius: 50%; }
 .proxy-interface__body { display: grid; min-height: 0; grid-template-columns: 0.8fr 1.2fr; gap: 1.25rem; padding: 1.25rem; overflow: auto; }
@@ -156,6 +144,67 @@
 .proxy-interface__footer > button { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; color: #111; background: var(--noir-brass-300); border: 0; font: inherit; font-size: 0.72rem; cursor: pointer; }
 .proxy-interface__footer > button:disabled { opacity: 0.55; cursor: wait; }
 .proxy-interface__error { margin: 0 1.25rem 1rem; }
+.proxy-interface--app {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  max-height: none;
+  color: #e9e1c8;
+  background: #181915;
+  border: 0;
+  box-shadow: none;
+}
+.proxy-interface--app .proxy-interface__header {
+  min-height: 4.2rem;
+  flex: 0 0 auto;
+  padding: 0.75rem 1rem;
+  color: #eee5cd;
+  background: linear-gradient(110deg, #28271f, #1b1c18);
+  border-bottom: 1px solid #66502a;
+}
+.proxy-interface--app .proxy-interface__header p { margin: 0 0 0.3rem; color: #d2a34e; font-size: 0.55rem; }
+.proxy-interface--app .proxy-interface__header h2 { font: bold 0.9rem var(--noir-font-mono); letter-spacing: 0.04em; }
+.proxy-interface--app .proxy-interface__status { color: #d3c39d; font-size: 0.56rem; }
+.proxy-interface--app .proxy-interface__status i { background: #c78039; border: 1px solid #e0b66b; }
+.proxy-interface--app .proxy-interface__body { flex: 1 1 auto; grid-template-columns: minmax(10rem, 0.8fr) minmax(0, 1.2fr); gap: 1rem; padding: 1rem; }
+.proxy-interface--app .proxy-interface__body section { min-width: 0; }
+.proxy-interface--app .proxy-interface__body section > header { align-items: baseline; margin-bottom: 0.45rem; color: #d2a34e; font: bold 0.58rem var(--noir-font-mono); letter-spacing: 0.08em; }
+.proxy-interface--app .proxy-interface__body section > header small { color: #a99a76; font-size: 0.5rem; }
+.proxy-interface--app .proxy-interface__body nav { gap: 0.3rem; }
+.proxy-interface--app .proxy-interface__body nav button { min-height: 2.8rem; padding: 0.5rem 0.65rem; color: #e7dfc9; background: #252620; border: 1px solid #514d3d; box-shadow: inset 1px 1px #34352d; font-size: 0.65rem; }
+.proxy-interface--app .proxy-interface__body nav button:hover:not(:disabled),.proxy-interface--app .proxy-interface__body nav button:focus-visible { background: #343127; border-color: #a07a36; outline: 1px solid #a07a36; }
+.proxy-interface--app .proxy-interface__body nav button[aria-pressed="true"] { color: #fff0c5; background: #393022; border-color: #c89542; box-shadow: inset 3px 0 #c89542; }
+.proxy-interface--app .proxy-interface__body nav button small { color: #c0a66b; font-size: 0.5rem; }
+.proxy-interface--app .proxy-interface__empty,.proxy-interface--app .proxy-interface__loading { color: #c4b995; }
+.proxy-interface--app .proxy-interface__footer { min-height: 4rem; flex: 0 0 auto; padding: 0.7rem 1rem; background: #22231e; border-top: 1px solid #51482f; }
+.proxy-interface--app .proxy-interface__footer p { color: #e8dfc7; font-size: 0.62rem; }
+.proxy-interface--app .proxy-interface__footer p span { color: #c49a49; font-size: 0.52rem; }
+.proxy-interface--app .proxy-interface__footer > button { padding: 0.65rem 0.85rem; color: #fff0cf; background: linear-gradient(#7b4b2b, #58331f); border: 1px solid #a16e37; box-shadow: inset 1px 1px #ae7a46; font-size: 0.6rem; }
+.proxy-interface--app .proxy-interface__footer > button:hover:not(:disabled) { background: linear-gradient(#925d34, #694027); }
+.proxy-interface--app .proxy-interface__error { margin: 0 1rem 0.75rem; }
+.proxy-route-confirm__backdrop { position: absolute; z-index: 5; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(8 8 7 / 82%); }
+.proxy-route-confirm { width: min(27rem, 100%); padding: 1.1rem; color: #e9e1c8; background: #211f1a; border: 1px solid #a67a38; box-shadow: 0 0.8rem 2.5rem rgb(0 0 0 / 65%), inset 0 0 0 1px #403526; }
+.proxy-route-confirm__eyebrow { margin: 0 0 0.5rem; color: #d2a34e; font: bold 0.52rem var(--noir-font-mono); letter-spacing: 0.1em; }
+.proxy-route-confirm h3 { margin: 0 0 0.65rem; color: #fff0c5; font: bold 0.85rem var(--noir-font-mono); }
+.proxy-route-confirm > p:not(.proxy-route-confirm__eyebrow) { margin: 0; color: #c9c0a8; font: 0.68rem/1.55 Arial, sans-serif; }
+.proxy-route-confirm footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+.proxy-route-confirm footer button { min-height: 2.25rem; padding: 0.45rem 0.7rem; color: #ded4b8; background: #2a2922; border: 1px solid #62583e; cursor: pointer; font: bold 0.55rem var(--noir-font-mono); }
+.proxy-route-confirm footer button:last-child { color: #fff0cf; background: linear-gradient(#7b4b2b, #58331f); border-color: #a16e37; }
+.proxy-route-confirm footer button:hover:not(:disabled),.proxy-route-confirm footer button:focus-visible { outline: 1px solid #d2a34e; outline-offset: 1px; }
+.proxy-route-confirm footer button:disabled { opacity: 0.55; cursor: wait; }
+.computer-frame--persistent .computer-window--proxy { width: min(60rem, calc(100% - 7rem)); height: min(76vh, 48rem); }
+.computer-frame--persistent .computer-window--proxy .computer-window__titlebar { color: #e8dfc7; background: linear-gradient(#302d25, #211f1a); border-bottom-color: #70552a; text-shadow: none; }
+.computer-frame--persistent .computer-window--proxy .computer-status-light { background: #c78039; border-color: #e0b66b; }
+@media (max-width: 38rem) {
+  .proxy-interface--app .proxy-interface__header { align-items: flex-start; }
+  .proxy-interface--app .proxy-interface__status { display: none; }
+  .proxy-interface--app .proxy-interface__body { grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 0.75rem; }
+  .proxy-interface--app .proxy-interface__footer { align-items: stretch; flex-direction: column; }
+  .proxy-interface--app .proxy-interface__footer > button { width: 100%; justify-content: space-between; }
+}
 .computer-frame--modal {
   display: flex;
   width: min(84vw, 80rem);
@@ -469,6 +518,10 @@
 .computer-sequence--boot span { animation: none; }
 .computer-sequence--boot { color: var(--noir-brass-300); }
 .computer-sequence--boot .typewriter__line[data-last-line="true"] { color: var(--noir-success); }
+.computer-sequence--proxy { z-index: 10002; gap: 1rem; color: #d6bd83; background: #030504; letter-spacing: 0.06em; }
+.computer-sequence--proxy__heading { margin: 0; color: #d39a43; font-size: 0.62rem; font-weight: bold; letter-spacing: 0.14em; }
+.computer-sequence--proxy .typewriter__line { display: block; min-height: 1.45em; }
+.computer-sequence--proxy .typewriter__line[data-last-line="true"] { color: #d9c891; }
 .computer-sequence--hack { align-items: flex-start; color: var(--noir-danger); }
 .computer-sequence--hack span { animation: computer-hack-line 400ms steps(5, end) both; }
 .computer-sequence--hack span:nth-child(2) { animation-delay: 180ms; }

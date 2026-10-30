@@ -520,7 +520,11 @@ func (store *PostgresStore) MaterializeCity(ctx context.Context, serverID, cityI
 	if err != nil {
 		return err
 	}
-	if err := persistGeneratedCity(ctx, tx, serverID, generated); err != nil {
+	// The city marker is inserted before persistence in this transaction. It
+	// serializes first-time materialization for this city, so no rows for this
+	// city can already exist when this transaction wins the marker insert.
+	// COPY avoids executing one INSERT per generated entity on this cold path.
+	if err := copyGeneratedCity(ctx, tx, serverID, generated); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -542,6 +546,57 @@ func (store *PostgresStore) cityGeneratorVersion(ctx context.Context, serverID, 
 		return fallback, nil
 	}
 	return version, err
+}
+
+func copyGeneratedCity(ctx context.Context, tx pgx.Tx, serverID string, generated World) error {
+	for _, npc := range generated.NPCs {
+		if generated.GeneratorVersion >= GeneratorVersion6 {
+			if npc.Visual == nil || ValidateVisualIdentityForPresentation(*npc.Visual, npc.Presentation) != nil {
+				return fmt.Errorf("persist NPC %q: %w", npc.ID, ErrInvalidVisualIdentity)
+			}
+		}
+	}
+
+	regionRows := make([][]any, 0, len(generated.Regions))
+	for _, region := range generated.Regions {
+		regionRows = append(regionRows, []any{serverID, region.ID, optionalString(region.ParentID), region.Kind, region.Name})
+	}
+	if _, err := tx.CopyFrom(ctx, pgx.Identifier{"world_regions"}, []string{"server_id", "region_id", "parent_region_id", "region_kind", "display_name"}, pgx.CopyFromRows(regionRows)); err != nil {
+		return fmt.Errorf("copy city regions: %w", err)
+	}
+
+	entityRows := make([][]any, 0, len(generated.Entities))
+	for _, entity := range generated.Entities {
+		entityRows = append(entityRows, []any{serverID, entity.ID, entity.EntityType, entity.RegionID, entity.GenerationKey, optionalString(entity.LocationKind)})
+	}
+	if _, err := tx.CopyFrom(ctx, pgx.Identifier{"world_entities"}, []string{"server_id", "entity_id", "entity_type", "region_id", "generation_key", "location_kind"}, pgx.CopyFromRows(entityRows)); err != nil {
+		return fmt.Errorf("copy city entities: %w", err)
+	}
+
+	employmentRows := make([][]any, 0, len(generated.EmploymentRelationships))
+	for _, relation := range generated.EmploymentRelationships {
+		employmentRows = append(employmentRows, []any{serverID, relation.ID, relation.EmployeeNPCID, relation.EmployerCompanyID, relation.Role})
+	}
+	if _, err := tx.CopyFrom(ctx, pgx.Identifier{"employment_relationships"}, []string{"server_id", "relationship_id", "employee_npc_id", "employer_company_id", "role"}, pgx.CopyFromRows(employmentRows)); err != nil {
+		return fmt.Errorf("copy city employment: %w", err)
+	}
+
+	personalRows := make([][]any, 0, len(generated.PersonalRelationships))
+	for _, relation := range generated.PersonalRelationships {
+		personalRows = append(personalRows, []any{serverID, relation.ID, relation.PersonANPCID, relation.PersonBNPCID, relation.RelationshipType})
+	}
+	if _, err := tx.CopyFrom(ctx, pgx.Identifier{"personal_relationships"}, []string{"server_id", "relationship_id", "person_a_npc_id", "person_b_npc_id", "relationship_type"}, pgx.CopyFromRows(personalRows)); err != nil {
+		return fmt.Errorf("copy city personal relationships: %w", err)
+	}
+
+	companyLocationRows := make([][]any, 0, len(generated.CompanyLocations))
+	for _, relation := range generated.CompanyLocations {
+		companyLocationRows = append(companyLocationRows, []any{serverID, relation.ID, relation.CompanyID, relation.LocationID, relation.LocationRole})
+	}
+	if _, err := tx.CopyFrom(ctx, pgx.Identifier{"company_locations"}, []string{"server_id", "relationship_id", "company_id", "location_id", "location_role"}, pgx.CopyFromRows(companyLocationRows)); err != nil {
+		return fmt.Errorf("copy city headquarters: %w", err)
+	}
+	return nil
 }
 
 func persistGeneratedCity(ctx context.Context, tx pgx.Tx, serverID string, generated World) error {

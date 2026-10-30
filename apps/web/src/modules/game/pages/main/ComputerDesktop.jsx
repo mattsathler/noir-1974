@@ -32,6 +32,7 @@ import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx"
 import DeepLinkWebsite from "./DeepLinkWebsite.jsx";
 import CompanyWebsite from "./CompanyWebsite.jsx";
 import DesktopSettings from "./DesktopSettings.jsx";
+import ProxyConnection from "../../../world/components/ProxyConnection.jsx";
 import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
 import { DEFAULT_DESKTOP_PREFERENCES, DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
 
@@ -64,6 +65,7 @@ const PERSONAL_PROGRAMS = [
 ];
 const WEB_BROWSER_PROGRAM = PERSONAL_PROGRAMS[0];
 const SETTINGS_PROGRAM = { id: "settings", label: "SETTINGS", Icon: Brush, state: "READY", available: true };
+const PROXY_PROGRAM = { id: "proxy", label: "ROGUE DNS", Icon: Wifi, state: "UNLISTED", available: true };
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -162,7 +164,7 @@ function browserAddress(program, countryName, facilityContext) {
   return `www.${program.id}.merid.local`;
 }
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenProxy, onOpenTelephone, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onPrepareProxy, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenTelephone, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
   const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
@@ -170,6 +172,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const bootLines = isCompanyComputer ? [`${facilityContext.label} WORKSTATION`, "MERIDIAN AUTHENTICATION SERVICE…", "LOCAL SESSION READY"] : BOOT_LINES;
   const facilityAccessGranted = !isCompanyComputer || initialFacilityAccessGranted;
   const [startMenuOpen, setStartMenuOpen] = useState(false);
+  const [proxyBoot, setProxyBoot] = useState({ active: false, target: "" });
   const [characterPreviewVisual, setCharacterPreviewVisual] = useState(character?.visual);
   const [accessAttemptId, setAccessAttemptId] = useState(initialAccessAttemptId);
   const [windows, setWindows] = useState(() => {
@@ -177,7 +180,11 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       const saved = JSON.parse(sessionStorage.getItem("noir:computer:windows") || "null");
       if (!saved || Date.now() - saved.savedAt > 5 * 60 * 1000) return [];
       const restored = saved.windows.flatMap((item) => {
-        const program = item.programId === SETTINGS_PROGRAM.id && persistent ? SETTINGS_PROGRAM : programs.find((entry) => entry.id === item.programId);
+        const program = item.programId === SETTINGS_PROGRAM.id && persistent
+          ? SETTINGS_PROGRAM
+          : item.programId === PROXY_PROGRAM.id && persistent
+            ? PROXY_PROGRAM
+            : programs.find((entry) => entry.id === item.programId);
         return program?.available ? [{ ...item, program }] : [];
       });
       return persistent
@@ -364,7 +371,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   function launchProgram(program, sourceWindowId = null, sourceState = null) {
     if (!program?.available) return;
     if (persistent) {
-      if (["newspaper", "settings", "character-appearance"].includes(program.id)) {
+      if (["newspaper", "settings", "character-appearance", "proxy"].includes(program.id)) {
         const existingApp = windows.find((item) => item.program.id === program.id);
         if (existingApp) { focusWindow(existingApp.id); return; }
         const zIndex = nextZIndexRef.current++;
@@ -507,14 +514,14 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               )}
             </div>
             {persistent && <nav className="computer-menubar__actions" aria-label="System controls">
-              <button type="button" onClick={onOpenProxy}>PROXY</button>
+                  <button type="button" onClick={() => { onPrepareProxy?.(); launchProgram(PROXY_PROGRAM); }}>ROGUE DNS</button>
               <button type="button" onClick={onOpenTelephone}>TELEPHONE</button>
               <button type="button" onClick={onOpenWhiteboard}>CASE BOARD</button>
             </nav>}
             {!persistent && <button ref={closeButtonRef} className="computer-modal__close" type="button" aria-label="Close computer" onClick={exitComputer}>×</button>}
           </header>
 
-          {!booting && facilityAccessGranted && <div className="computer-desktop__content">
+          {!booting && facilityAccessGranted && <div className="computer-desktop__content" inert={proxyBoot.active}>
             <div className="computer-desktop__heading">
               <p>{facilityContext?.label || "PRIVATE INVESTIGATION SYSTEM"}</p>
               <span>PRIVATE LINE · ACCOUNT CHARGED</span>
@@ -545,24 +552,32 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 : program.label;
               return <section
                 ref={(element) => { if (element) windowRefs.current.set(id, element); else windowRefs.current.delete(id); }}
-                className={`computer-window${position ? " computer-window--positioned" : ""}${persistent && !["newspaper", "settings", "character-appearance"].includes(program.id) ? " computer-window--website" : ""}${persistent && ["newspaper", "settings", "character-appearance"].includes(program.id) ? " computer-window--app" : ""}${program.id === "settings" ? " computer-window--settings" : ""}${program.id === "character-appearance" ? " computer-window--character-appearance" : ""}`}
+                className={`computer-window${position ? " computer-window--positioned" : ""}${persistent && !["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? " computer-window--website" : ""}${persistent && ["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? " computer-window--app" : ""}${program.id === "settings" ? " computer-window--settings" : ""}${program.id === "character-appearance" ? " computer-window--character-appearance" : ""}${program.id === "proxy" ? " computer-window--proxy" : ""}`}
                 data-site-variant={institutionalVariant(program.id)}
                 data-window-id={id}
                 key={id}
                 style={{ ...(position || {}), zIndex, ...(program.id === "character-appearance" ? { height: "min(48vh, 30rem)" } : {}) }}
-                aria-label={`${companySiteName} ${["newspaper", "settings", "character-appearance"].includes(program.id) ? "application" : "website"} window`}
+                aria-label={`${companySiteName} ${["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? "application" : "website"} window`}
                 onMouseDown={() => focusWindow(id)}
               >
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
-                  <span>{persistent && !["web-browser", "newspaper", "settings", "character-appearance"].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "MERIDIAN WEB" : program.id === "settings" ? "MERID_OS SETTINGS" : companySiteName}</span>
+                  <span>{persistent && !["web-browser", "newspaper", "settings", "character-appearance", "proxy"].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "MERIDIAN WEB" : program.id === "settings" ? "MERID_OS SETTINGS" : program.id === "proxy" ? "ROGUE DNS" : companySiteName}</span>
                   <button type="button" className="computer-window__close" aria-label={`Close ${companySiteName}`} onClick={() => closeWindow(id)}>×</button>
                 </header>
-                <div className={`computer-browser-address${["newspaper", "settings", "character-appearance"].includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : browserAddress(program, countryName, facilityContext)}</span><span className="computer-browser-address__secure">PRIVATE RELAY</span></div>
-                <div className={`computer-window__body${persistent && !["newspaper", "settings", "character-appearance"].includes(program.id) ? " computer-window__body--website" : ""}`}>
+                <div className={`computer-browser-address${["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : program.id === "proxy" ? "control://rogue-dns" : browserAddress(program, countryName, facilityContext)}</span><span className="computer-browser-address__secure">{program.id === "proxy" ? "UNLISTED NETWORK" : "PRIVATE RELAY"}</span></div>
+                <div className={`computer-window__body${persistent && !["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? " computer-window__body--website" : ""}`}>
                   {program.id === "settings"
                     ? <DesktopSettings preferences={desktopPreferences} accountUsername={accountUsername} character={character} characterPreviewVisual={characterPreviewVisual} location={location} onEditCharacter={() => launchProgram(CHARACTER_APPEARANCE_PROGRAM)} onChange={(patch) => onDesktopPreferencesChange?.(patch)} onLogout={onLogout} />
                     : program.id === "character-appearance"
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
+                    : program.id === "proxy"
+                    ? <ProxyConnection
+                        world={{ city: location?.split(",")[0], cityId, country: countryName }}
+                        hasOpenBrowser={windows.some((item) => item.id.startsWith("noir-browser:"))}
+                        onConnected={onProxyConnected}
+                        onRouteChanged={() => setWindows((previous) => previous.filter((item) => !item.id.startsWith("noir-browser:")))}
+                        onBusyChange={(active, node) => setProxyBoot({ active, target: node ? `${node.name}, ${node.country}` : "" })}
+                      />
                     : program.id === "web-browser"
                     ? <LegacyCountryPortal
                         countryName={countryName}
@@ -676,7 +691,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               <section className="computer-start-menu__tools" aria-labelledby="start-menu-tools-title">
                 <h2 id="start-menu-tools-title">SYSTEM TOOLS</h2>
                 <div>
-                  <button type="button" onClick={() => { onOpenProxy?.(); setStartMenuOpen(false); }}><Wifi aria-hidden="true" /><span>PROXY</span></button>
+                  <button type="button" onClick={() => { onPrepareProxy?.(); launchProgram(PROXY_PROGRAM); setStartMenuOpen(false); }}><Wifi aria-hidden="true" /><span>ROGUE DNS</span></button>
                   <button type="button" onClick={() => { onOpenTelephone?.(); setStartMenuOpen(false); }}><Phone aria-hidden="true" /><span>TELEPHONE</span></button>
                   <button type="button" onClick={() => { onOpenWhiteboard?.(); setStartMenuOpen(false); }}><Files aria-hidden="true" /><span>CASE BOARD</span></button>
                 </div>
@@ -684,7 +699,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             </nav>}
           </div>}
 
-          <footer className={`computer-taskbar${persistent ? " computer-taskbar--desktop" : ""}`}>
+          <footer className={`computer-taskbar${persistent ? " computer-taskbar--desktop" : ""}`} inert={proxyBoot.active}>
             <div className="computer-taskbar__left">
               {persistent && <button type="button" className="computer-start" aria-expanded={startMenuOpen} onClick={() => setStartMenuOpen((open) => !open)}><span className="computer-brand__mark">M</span> START</button>}
               {!persistent && <span className="computer-taskbar__system"><span className="computer-brand__mark">M</span> {isCompanyComputer ? "WORKSTATION SESSION" : "PERSONAL SESSION"}</span>}
@@ -695,6 +710,17 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               : <span className="computer-taskbar__clock">{display?.time}</span>
               : <button className="computer-logout" type="button" onClick={exitComputer}>Exit <span aria-hidden="true">↗</span></button>}
           </footer>
+          {proxyBoot.active && <div className="computer-sequence computer-sequence--proxy" role="status" aria-label="Rogue DNS route switch in progress">
+            <p className="computer-sequence--proxy__heading">ROGUE DNS · ROUTE HANDSHAKE</p>
+            <Typewriter className="computer-sequence__typewriter" texts={[
+              "rogue-dns://bootstrap --unregistered",
+              "[cache] flushing resolver records ...... OK",
+              "[key] rotating ephemeral route token .. OK",
+              "[udp:53] opening shadow tunnel ........ ACK",
+              `[exit] ${proxyBoot.target || "UNKNOWN NODE"} · VERIFYING`,
+              "[dns] recursive chain established ...... OK",
+            ]} speed={10} lineDelay={80} />
+          </div>}
         </div>
       </div>
       {!persistent && <div className="computer-indicator" aria-hidden="true"><span /> POWER</div>}

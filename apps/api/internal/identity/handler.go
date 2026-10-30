@@ -1888,14 +1888,8 @@ func (h *Handler) proxyConnect(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusBadRequest, "UNKNOWN_PROXY_NODE", "The selected proxy node is not available.", nil)
 		return
 	}
-	if materializer, ok := h.worldReader.(cityWorldMaterializer); ok {
-		if err := materializer.MaterializeCity(r.Context(), h.worldServerID, node.ID); err != nil {
-			h.writeAPIError(w, r, http.StatusInternalServerError, "PROXY_NODE_UNAVAILABLE", "The selected proxy node could not be prepared. Your jurisdiction has not changed.", err)
-			return
-		}
-	}
 	if err := h.store.setPlayerLocation(r.Context(), current.ID, node.ID); err != nil {
-		h.writeAPIError(w, r, http.StatusInternalServerError, "PROXY_CONNECTION_FAILED", "The selected proxy node is ready, but your jurisdiction could not be updated.", err)
+		h.writeAPIError(w, r, http.StatusInternalServerError, "PROXY_CONNECTION_FAILED", "The selected proxy route could not be saved.", err)
 		return
 	}
 	state := h.worldAt()

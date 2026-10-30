@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { currentIdentity } from "../../../identity/api.js";
 import ComputerDesktop from "./ComputerDesktop.jsx";
 import { connectProxy, getCompanyWebsite, getCurrentWorld, requestFacilitySiteAccess } from "../../../world/api.js";
-import ProxyConnection from "../../../world/components/ProxyConnection.jsx";
 import Telephone from "./Telephone.jsx";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
 import { readDesktopPreferences, saveDesktopPreferences } from "./desktopPreferences.js";
@@ -57,9 +56,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [computerContext, setComputerContext] = useState(null);
   const [companyAccessAttemptId, setCompanyAccessAttemptId] = useState("");
   const [telephoneOpen, setTelephoneOpen] = useState(false);
-  const [proxyOpen, setProxyOpen] = useState(false);
   const closeComputer = useCallback(() => { setComputerOpen(false); setComputerContext(null); }, []);
-  const closeProxy = useCallback(() => setProxyOpen(false), []);
 
   useEffect(() => {
     let active = true;
@@ -76,8 +73,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     const nextWorld = response.world;
     setWorld(nextWorld);
     setServerTime(new Date(nextWorld.serverTime));
-    closeProxy();
-  }, [closeProxy]);
+  }, []);
   const openCompanyWebsite = useCallback(async ({ company, address }) => {
     const cityId = cityIdFromLocation(address.locationId);
     setError(null);
@@ -167,7 +163,8 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           onOpenCompanyStaff={openCompanyStaffDirectory}
           onOpenService={openPublicServiceWebsite}
           persistent
-          onOpenProxy={() => { setProxyOpen(true); setTelephoneOpen(false); }}
+          onProxyConnected={connectToProxy}
+          onPrepareProxy={() => setTelephoneOpen(false)}
           onOpenTelephone={() => setTelephoneOpen(true)}
           onOpenWhiteboard={() => window.open("/whiteboard", "_blank", "noopener,noreferrer")}
           accountUsername={accountUsername}
@@ -179,7 +176,6 @@ export default function GamePage({ initialWorld = null, onLogout }) {
         />
       )}
       {telephoneOpen && <Telephone onClose={() => setTelephoneOpen(false)} />}
-      {proxyOpen && <ProxyConnection world={world} onConnected={connectToProxy} onClose={closeProxy} />}
     </main>
   );
 }
