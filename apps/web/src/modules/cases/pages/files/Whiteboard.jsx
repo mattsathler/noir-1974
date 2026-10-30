@@ -594,7 +594,7 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
   return (
     <section className={`personal-whiteboard${standalone ? " personal-whiteboard--standalone" : ""}`} aria-label="Personal investigation whiteboard">
       <header className="personal-whiteboard__header">
-        <div><p className="computer-window__eyebrow">NOIR CASEWORK · INVESTIGATION BOARD</p>
+        <div><p className="computer-window__eyebrow">PERSONAL CASEWORK · INVESTIGATION BOARD</p>
           {renamingBoardId === board?.id && !boardLocked
             ? <input ref={renameInputRef} className="personal-whiteboard__title-input" aria-label="Rename investigation board" maxLength={64} value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onBlur={finishRename} onKeyDown={(event) => {
               if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); }

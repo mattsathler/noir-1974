@@ -124,7 +124,7 @@ func GenerateCompanyWebsite(seed string, generatorVersion int, company CompanyPo
 		Version:     CompanyWebsiteProfileVersion,
 		Company:     company.Company,
 		Address:     company.Address,
-		Domain:      slug + "-" + companyToken + ".noir.local",
+		Domain:      slug + "-" + companyToken + ".merid.local",
 		Template:    template,
 		Advertising: advertising,
 		Theme: CompanyWebsiteTheme{
@@ -168,7 +168,7 @@ func companyWebsiteSearchMetadata(seed string, generatorVersion int, company Com
 	if slug == "" {
 		slug = "company"
 	}
-	return slug + "-" + companyToken + ".noir.local", sector.tagline
+	return slug + "-" + companyToken + ".merid.local", sector.tagline
 }
 
 func companyWebsiteSectorForCompany(name string, digest [32]byte) companyWebsiteSector {

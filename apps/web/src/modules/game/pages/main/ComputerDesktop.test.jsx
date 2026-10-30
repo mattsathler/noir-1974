@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ComputerDesktop from "./ComputerDesktop.jsx";
 
@@ -25,15 +25,28 @@ afterEach(() => {
 
 describe("ComputerDesktop boot sequence", () => {
   it("boots the personal computer only once per browser session", async () => {
-    const firstOpen = render(<ComputerDesktop facilityContext={{ kind: "personal", label: "NOIR PERSONAL COMPUTER" }} />);
+    const firstOpen = render(<ComputerDesktop facilityContext={{ kind: "personal", label: "MERID_OS PERSONAL COMPUTER" }} />);
     expect(screen.getByRole("status")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Complete boot sequence" }));
-    expect(await screen.findByText("NOIR PERSONAL COMPUTER", {}, { timeout: 1500 })).toBeInTheDocument();
+    expect(await screen.findByText("MERID_OS PERSONAL COMPUTER", {}, { timeout: 1500 })).toBeInTheDocument();
     firstOpen.unmount();
 
-    render(<ComputerDesktop facilityContext={{ kind: "personal", label: "NOIR PERSONAL COMPUTER" }} />);
+    render(<ComputerDesktop facilityContext={{ kind: "personal", label: "MERID_OS PERSONAL COMPUTER" }} />);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.getByText("NOIR PERSONAL COMPUTER")).toBeInTheDocument();
+    expect(screen.getByText("MERID_OS PERSONAL COMPUTER")).toBeInTheDocument();
+  });
+
+  it("opens the settings app and lets the player change desktop preferences", async () => {
+    sessionStorage.setItem("noir:computer:personal-booted", "true");
+    const onDesktopPreferencesChange = vi.fn();
+    render(<ComputerDesktop persistent facilityContext={{ kind: "personal", label: "MERID_OS PERSONAL COMPUTER" }} desktopPreferences={{ wallpaper: "meridian-night", theme: "dark" }} onDesktopPreferencesChange={onDesktopPreferencesChange} onAppearance={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "SETTINGS application, READY" }));
+    expect(await screen.findByRole("heading", { name: "Desktop settings" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Relay blue/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Light A brighter desktop/i }));
+    await waitFor(() => expect(onDesktopPreferencesChange).toHaveBeenNthCalledWith(2, { theme: "light" }));
+    expect(onDesktopPreferencesChange).toHaveBeenNthCalledWith(1, { wallpaper: "relay-blue" });
   });
 });

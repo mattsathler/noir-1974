@@ -5,7 +5,7 @@ import { connectProxy, getCompanyWebsite, getCurrentWorld, requestFacilitySiteAc
 import ProxyConnection from "../../../world/components/ProxyConnection.jsx";
 import Telephone from "./Telephone.jsx";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
-import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
+import { readDesktopPreferences, saveDesktopPreferences } from "./desktopPreferences.js";
 
 function cityIdFromLocation(locationId = "") {
   const path = locationId.replace(/^service:/u, "").replace(/^location:/u, "");
@@ -50,8 +50,9 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [serverTime, setServerTime] = useState(initialWorld ? new Date(initialWorld.serverTime) : null);
   const [error, setError] = useState(null);
   const [identityAttempt, setIdentityAttempt] = useState(0);
+  const [accountUsername, setAccountUsername] = useState("");
   const [playerCharacter, setPlayerCharacter] = useState(null);
-  const [appearanceEditorOpen, setAppearanceEditorOpen] = useState(false);
+  const [desktopPreferences, setDesktopPreferences] = useState(readDesktopPreferences);
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerContext, setComputerContext] = useState(null);
   const [companyAccessAttemptId, setCompanyAccessAttemptId] = useState("");
@@ -62,7 +63,11 @@ export default function GamePage({ initialWorld = null, onLogout }) {
 
   useEffect(() => {
     let active = true;
-    currentIdentity().then((identity) => { if (active) setPlayerCharacter(identity.character ?? null); }).catch(() => {});
+    currentIdentity().then((identity) => {
+      if (!active) return;
+      setAccountUsername(identity.account?.username || "");
+      setPlayerCharacter(identity.character ?? null);
+    }).catch(() => {});
     return () => { active = false; };
   }, []);
 
@@ -135,12 +140,16 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const display = world && serverTime ? formatServerDateTime(serverTime, world.timeZone) : null;
   const issueDay = localDateKey(serverTime, world?.timeZone);
   const location = world ? [world.city, world.country].filter(Boolean).join(", ") : "";
+  const updateDesktopPreferences = useCallback((patch) => {
+    setDesktopPreferences((current) => ({ ...current, ...patch }));
+  }, []);
+
+  useEffect(() => { saveDesktopPreferences(desktopPreferences); }, [desktopPreferences]);
 
   return (
     <main className="game-screen pos-relative min-h-screen overflow-hidden bg-atmosphere text-primary" aria-label="Detective computer desktop">
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">Proxy jurisdiction: {location || "not connected"}</p>
       {error && <APIErrorNotice error={error.cause ?? error} onRetry={error.retry} retryLabel={error.retryLabel} className="game-api-error pos-relative m-6 text-sm text-danger" />}
-      {appearanceEditorOpen && playerCharacter && <CharacterAppearanceEditor character={playerCharacter} onClose={() => setAppearanceEditorOpen(false)} onSaved={(character) => { setPlayerCharacter(character); setAppearanceEditorOpen(false); }} />}
       {world && (
         <ComputerDesktop
           location={location}
@@ -150,7 +159,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           cityId={world?.cityId}
           countryName={world?.country}
           issueDay={issueDay}
-          facilityContext={computerOpen ? computerContext : { kind: "personal", label: "NOIR PERSONAL COMPUTER", city: world?.city }}
+          facilityContext={computerOpen ? computerContext : { kind: "personal", label: "MERID_OS PERSONAL COMPUTER", city: world?.city }}
           initialAccessAttemptId={companyAccessAttemptId}
           initialFacilityAccessGranted={Boolean(companyAccessAttemptId)}
           onClose={closeComputer}
@@ -161,7 +170,11 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           onOpenProxy={() => { setProxyOpen(true); setTelephoneOpen(false); }}
           onOpenTelephone={() => setTelephoneOpen(true)}
           onOpenWhiteboard={() => window.open("/whiteboard", "_blank", "noopener,noreferrer")}
-          onAppearance={() => setAppearanceEditorOpen(true)}
+          accountUsername={accountUsername}
+          character={playerCharacter}
+          onCharacterSaved={setPlayerCharacter}
+          desktopPreferences={desktopPreferences}
+          onDesktopPreferencesChange={updateDesktopPreferences}
           onLogout={onLogout}
         />
       )}

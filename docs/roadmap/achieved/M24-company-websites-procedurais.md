@@ -109,7 +109,7 @@ A busca do Meridian continua nacional no país conectado. Ela indexa empresas e 
 
 ## Decisões adotadas para implementação
 
-- Usar endereço procedural legível, por exemplo `nomedaempresa.noir.local`, com sufixo estável quando necessário para evitar colisões. O ID da empresa continua sendo a chave canônica da API e do estado de navegação.
+- Usar endereço procedural legível, por exemplo `nomedaempresa.merid.local`, com sufixo estável quando necessário para evitar colisões. O ID da empresa continua sendo a chave canônica da API e do estado de navegação.
 - Garantir endereço e contato em todos os sites. `ABOUT`, `SERVICES`/`PRODUCTS` e `ACCOUNT` podem variar por modelo, mas cada perfil deve oferecer um caminho claro de volta à página inicial.
 - Exibir o login como elemento visual inerte/desativado, sem formulário nem coleta de dados. O diretório protegido de funcionários usa a autorização investigativa já existente, separada desse login.
 

@@ -231,7 +231,7 @@ export async function getPlayerEmails() {
 }
 
 export function deletePlayerEmail(messageId) {
-  return requestCase(`/api/player/emails/${encodeURIComponent(messageId)}`, { method: "DELETE" });
+  return requestCase(`/api/player/emails/${encodeURIComponent(messageId)}`, { method: "DELETE", pendingCursor: false });
 }
 
 export function saveCaseProgress(caseId, progress) {
@@ -367,6 +367,7 @@ export function createWhiteboard(title = "", boardId = null) {
   const id = boardId ?? createWhiteboardDraft().id;
   return whiteboardRequest("/api/whiteboards", {
     method: "POST",
+    pendingCursor: false,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, id }),
   }).then((payload) => {
@@ -384,6 +385,7 @@ export function renameWhiteboard(boardId, title) {
   const previousList = readWhiteboardCache("list");
   return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`, {
     method: "PATCH",
+    pendingCursor: false,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title }),
   }).then((result) => {
@@ -402,7 +404,7 @@ export async function deleteWhiteboard(boardId) {
   removeWhiteboardCache(boardId);
   whiteboardSaveStates.delete(boardId);
   try {
-    const result = await whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`, { method: "DELETE" });
+    const result = await whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}`, { method: "DELETE", pendingCursor: false });
     announceWhiteboardUpdate(boardId, "deleted");
     return result;
   } catch (error) {
@@ -434,7 +436,7 @@ export function pinWhiteboardItem(boardId, itemId, x = 700, y = 700) {
 
 export function designateWhiteboardPin(boardId, itemId, designation) {
   return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/pins/${encodeURIComponent(itemId)}/designation`, {
-    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ designation }),
+    method: "PUT", pendingCursor: false, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ designation }),
   }).then((result) => {
     updateWhiteboardCache(boardId, (board) => ({
       ...board,
@@ -459,6 +461,7 @@ export function createWhiteboardNote(boardId, x = 700, y = 700, optimisticId = n
 
   return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/notes`, {
     method: "POST",
+    pendingCursor: false,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ x, y }),
   }).then(({ pin }) => {
@@ -484,6 +487,7 @@ export function createWhiteboardNote(boardId, x = 700, y = 700, optimisticId = n
 export function updateWhiteboardNote(boardId, itemId, title, content) {
   return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/notes/${encodeURIComponent(itemId)}`, {
     method: "PATCH",
+    pendingCursor: false,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, content }),
   }).then((result) => {
@@ -498,6 +502,7 @@ export function updateWhiteboardNote(boardId, itemId, title, content) {
 export function moveWhiteboardPin(boardId, itemId, x, y) {
   return whiteboardRequest(`/api/whiteboards/${encodeURIComponent(boardId)}/pins/${encodeURIComponent(itemId)}`, {
     method: "PATCH",
+    pendingCursor: false,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ x, y }),
   }).then((result) => { updateWhiteboardCache(boardId, (board) => ({ ...board, pins: board.pins.map((pin) => pin.id === itemId ? { ...pin, x, y } : pin) })); return result; });

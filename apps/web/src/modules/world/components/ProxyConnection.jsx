@@ -71,7 +71,7 @@ export default function ProxyConnection({ world, onConnected, onClose }) {
     <div className="proxy-interface-overlay" role="dialog" aria-modal="true" aria-label="Proxy city connection" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose?.(); }}>
       <section className="proxy-interface" aria-labelledby="proxy-title" aria-busy={busy}>
         <header className="proxy-interface__header">
-          <div><p>NOIR NETWORK · JURISDICTION RELAY</p><h2 id="proxy-title">Proxy connection</h2></div>
+          <div><p>MERIDIAN NETWORK · JURISDICTION RELAY</p><h2 id="proxy-title">Proxy connection</h2></div>
           <span className="proxy-interface__status"><i aria-hidden="true" /> {world?.city?.toUpperCase() ?? "NODE OFFLINE"} · ACTIVE NODE</span>
           <button ref={closeRef} type="button" onClick={onClose} disabled={busy} aria-label="Close Proxy">×</button>
         </header>

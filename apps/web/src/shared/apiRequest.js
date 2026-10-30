@@ -1,4 +1,17 @@
 const inFlightGETs = new Map();
+let activeCursorRequests = 0;
+
+function trackPendingCursor(promise, enabled) {
+  if (!enabled || typeof document === "undefined") return promise;
+  activeCursorRequests += 1;
+  document.documentElement.classList.add("noir-api-pending");
+  const finish = () => {
+    activeCursorRequests = Math.max(0, activeCursorRequests - 1);
+    if (activeCursorRequests === 0) document.documentElement.classList.remove("noir-api-pending");
+  };
+  promise.then(finish, finish);
+  return promise;
+}
 
 export class APIRequestError extends Error {
   constructor(payload, status) {
@@ -49,7 +62,7 @@ async function performRequest(path, options) {
 // Identical GETs share only their in-flight promise. Mutations are never cached,
 // and requests with an AbortSignal stay independent so one caller cannot cancel another.
 export function apiRequest(path, options = {}) {
-  const { dedupeKey: contextKey, ...fetchOptions } = options;
+  const { dedupeKey: contextKey, pendingCursor = true, ...fetchOptions } = options;
   const method = (fetchOptions.method ?? "GET").toUpperCase();
   const requestOptions = {
     credentials: "same-origin",
@@ -57,11 +70,11 @@ export function apiRequest(path, options = {}) {
   };
   if (fetchOptions.method) requestOptions.method = method;
 
-  if (method !== "GET" || requestOptions.signal) return performRequest(path, requestOptions);
+  if (method !== "GET" || requestOptions.signal) return trackPendingCursor(performRequest(path, requestOptions), pendingCursor);
 
   const key = dedupeKey(path, { ...requestOptions, dedupeKey: contextKey });
   const current = inFlightGETs.get(key);
-  if (current) return current;
+  if (current) return trackPendingCursor(current, pendingCursor);
 
   const request = performRequest(path, requestOptions);
   inFlightGETs.set(key, request);
@@ -69,5 +82,5 @@ export function apiRequest(path, options = {}) {
     () => { if (inFlightGETs.get(key) === request) inFlightGETs.delete(key); },
     () => { if (inFlightGETs.get(key) === request) inFlightGETs.delete(key); },
   );
-  return request;
+  return trackPendingCursor(request, pendingCursor);
 }

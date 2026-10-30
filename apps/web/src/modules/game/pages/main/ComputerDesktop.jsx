@@ -6,10 +6,12 @@ import { Mail } from "pixelarticons/react/Mail";
 import { Map as MapIcon } from "pixelarticons/react/Map";
 import { Message } from "pixelarticons/react/Message";
 import { Note } from "pixelarticons/react/Note";
+import { Phone } from "pixelarticons/react/Phone";
 import { Printer } from "pixelarticons/react/Printer";
 import { User } from "pixelarticons/react/User";
 import { Users } from "pixelarticons/react/Users";
 import { Wifi } from "pixelarticons/react/Wifi";
+import { Brush } from "pixelarticons/react/Brush";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
 import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, setWhiteboardSaveState } from "../../../world/api.js";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
@@ -29,9 +31,12 @@ import MeridianEnterprisesWebsite from "./MeridianEnterprisesWebsite.jsx";
 import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx";
 import DeepLinkWebsite from "./DeepLinkWebsite.jsx";
 import CompanyWebsite from "./CompanyWebsite.jsx";
+import DesktopSettings from "./DesktopSettings.jsx";
+import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
+import { DEFAULT_DESKTOP_PREFERENCES, DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
 
 const BOOT_LINES = [
-  "NOIR PERSONAL TERMINAL · PRIVATE SESSION",
+  "MERID_OS PERSONAL COMPUTER · PRIVATE SESSION",
   "CHECKING RELAY CONNECTION…",
   "ACTIVE PROXY NODE FOUND",
   "PRIVATE SYSTEM READY",
@@ -49,7 +54,7 @@ function markPersonalComputerBooted() {
 }
 
 const PERSONAL_PROGRAMS = [
-  { id: "web-browser", label: "NOIR WEB", Icon: Wifi, state: "ONLINE", available: true },
+  { id: "web-browser", label: "MERIDIAN WEB", Icon: Wifi, state: "ONLINE", available: true },
   { id: "police-website", label: "MERIDIAN POLICE", Icon: Files, state: "ONLINE", available: true },
   { id: "newspaper", label: "THE EVENING COURIER", Icon: Note, state: "ONLINE", available: true },
   { id: "personal-mail", label: "PERSONAL MAIL", Icon: Mail, state: "ONLINE", available: true },
@@ -58,7 +63,31 @@ const PERSONAL_PROGRAMS = [
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
 ];
 const WEB_BROWSER_PROGRAM = PERSONAL_PROGRAMS[0];
+const SETTINGS_PROGRAM = { id: "settings", label: "SETTINGS", Icon: Brush, state: "READY", available: true };
+const PERSONAL_START_MENU_PROGRAMS = [
+  WEB_BROWSER_PROGRAM,
+  PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
+  SETTINGS_PROGRAM,
+  ...PERSONAL_PROGRAMS.filter((program) => !["web-browser", "newspaper"].includes(program.id)),
+];
+const CHARACTER_APPEARANCE_PROGRAM = { id: "character-appearance", label: "USER APPEARANCE", Icon: User, state: "READY", available: true };
 const MERIDIAN_ENTERPRISES_PROGRAM = { id: "meridian-enterprises", label: "MERIDIAN ENTERPRISES", Icon: MapIcon, state: "ONLINE", available: true };
+const START_MENU_DESCRIPTIONS = {
+  "web-browser": "Browse connected websites",
+  "police-website": "Public records and notices",
+  newspaper: "Local news and city reports",
+  "personal-mail": "Private correspondence",
+  "company-portal": "National business directory",
+  "public-services": "Hospitals and civic offices",
+  "city-records": "People and places index",
+  settings: "Desktop and account settings",
+  "interpol": "Personnel search",
+  emails: "Institutional mail archive",
+  "patient-search": "Hospital patient records",
+  "bank-records": "Financial records",
+  "gate-records": "Transit access logs",
+  "staff-directory": "Company staff listings",
+};
 
 function programsFor(facilityContext) {
   if (!facilityContext || facilityContext.kind === "personal") return PERSONAL_PROGRAMS;
@@ -103,11 +132,11 @@ function institutionalVariant(programId) {
 }
 
 function browserAddress(program, countryName, facilityContext) {
-  if (program.id === "web-browser") return `noir://portal/${countryName || "country"}`;
-  if (program.id === "newspaper") return "www.eveningcourier.noir.local";
-  if (program.id === "meridian-enterprises") return "www.meridian-enterprises.noir.local";
-  if (program.id === "gate-records") return "www.meridian-enterprises.noir.local/gate/access-logs";
-  if (program.id === "deep-link") return `www.${program.linkId}.noir.local`;
+  if (program.id === "web-browser") return `merid_os://portal/${countryName || "country"}`;
+  if (program.id === "newspaper") return "www.eveningcourier.merid.local";
+  if (program.id === "meridian-enterprises") return "www.meridian-enterprises.merid.local";
+  if (program.id === "gate-records") return "www.meridian-enterprises.merid.local/gate/access-logs";
+  if (program.id === "deep-link") return `www.${program.linkId}.merid.local`;
   if (["hospital-website", "patient-search", "hospital-patient-record"].includes(program.id)) {
     const institution = program.service?.address?.name || facilityContext?.label || "Hôpital Sainte-Claire";
     const city = institution.normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/\b(?:hopital|hospital)\b/iu, "").trim();
@@ -117,36 +146,38 @@ function browserAddress(program, countryName, facilityContext) {
         ? `/patient-services/post-mortem/${encodeURIComponent(program.patient.name)}`
         : `/patient-services/records/${encodeURIComponent(program.patient?.id || "record")}`
       : "";
-    return `www.${slug}-hospital.noir.local${recordPath}`;
+    return `www.${slug}-hospital.merid.local${recordPath}`;
   }
   if (program.id === "staff-directory") {
     const website = program.website;
-    const domain = website?.domain || (facilityContext?.label?.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, "") || "company") + ".noir.local";
+    const domain = website?.domain || (facilityContext?.label?.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, "") || "company") + ".merid.local";
     return `www.${domain}/staff`;
   }
-  if (program.id === "company-website") return `www.${program.website?.domain || "company.noir.local"}${program.pageId && program.pageId !== "home" ? `/${program.pageId}` : ""}`;
+  if (program.id === "company-website") return `www.${program.website?.domain || "company.merid.local"}${program.pageId && program.pageId !== "home" ? `/${program.pageId}` : ""}`;
   if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "crime-reports"].includes(program.id)) {
     const paths = { "police-notices": "/notices", "police-about": "/about", "police-bureaus": "/district-bureaus", "police-policies": "/records-policy", "police-contact": "/contact", "crime-reports": "/public-records/crime-reports" };
-    return `www.police.noir.local${paths[program.id] || ""}`;
+    return `www.police.merid.local${paths[program.id] || ""}`;
   }
-  if (program.id === "personal-mail") return "www.meridian-mail.noir.local";
-  return `www.${program.id}.noir.local`;
+  if (program.id === "personal-mail") return "www.meridian-mail.merid.local";
+  return `www.${program.id}.merid.local`;
 }
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenProxy, onOpenTelephone, onOpenWhiteboard, onAppearance, onLogout }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenProxy, onOpenTelephone, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
   const programs = programsFor(facilityContext);
-  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PERSONAL_PROGRAMS.find((program) => program.id === "newspaper")] : programs;
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
+  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
+  const startMenuPrograms = persistent ? PERSONAL_START_MENU_PROGRAMS : programs;
   const bootLines = isCompanyComputer ? [`${facilityContext.label} WORKSTATION`, "MERIDIAN AUTHENTICATION SERVICE…", "LOCAL SESSION READY"] : BOOT_LINES;
   const facilityAccessGranted = !isCompanyComputer || initialFacilityAccessGranted;
   const [startMenuOpen, setStartMenuOpen] = useState(false);
+  const [characterPreviewVisual, setCharacterPreviewVisual] = useState(character?.visual);
   const [accessAttemptId, setAccessAttemptId] = useState(initialAccessAttemptId);
   const [windows, setWindows] = useState(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem("noir:computer:windows") || "null");
       if (!saved || Date.now() - saved.savedAt > 5 * 60 * 1000) return [];
       const restored = saved.windows.flatMap((item) => {
-        const program = programs.find((entry) => entry.id === item.programId);
+        const program = item.programId === SETTINGS_PROGRAM.id && persistent ? SETTINGS_PROGRAM : programs.find((entry) => entry.id === item.programId);
         return program?.available ? [{ ...item, program }] : [];
       });
       return persistent
@@ -171,6 +202,10 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   useEffect(() => {
     return () => window.clearTimeout(bootTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    setCharacterPreviewVisual(character?.visual);
+  }, [character?.visual]);
 
   useEffect(() => {
     if (!persistent || !isCompanyComputer || !initialFacilityAccessGranted) return;
@@ -329,11 +364,11 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   function launchProgram(program, sourceWindowId = null, sourceState = null) {
     if (!program?.available) return;
     if (persistent) {
-      if (program.id === "newspaper") {
-        const existingNewspaper = windows.find((item) => item.program.id === "newspaper");
-        if (existingNewspaper) { focusWindow(existingNewspaper.id); return; }
+      if (["newspaper", "settings", "character-appearance"].includes(program.id)) {
+        const existingApp = windows.find((item) => item.program.id === program.id);
+        if (existingApp) { focusWindow(existingApp.id); return; }
         const zIndex = nextZIndexRef.current++;
-        setWindows((previous) => [...previous, { id: `newspaper:${zIndex}`, program, zIndex, position: null }]);
+        setWindows((previous) => [...previous, { id: `${program.id}:${zIndex}`, program, zIndex, position: null }]);
         return;
       }
       const browserWindow = sourceWindowId
@@ -378,6 +413,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   }
 
   function closeWindow(windowId) {
+    if (windowsStateRef.current.find((item) => item.id === windowId)?.program.id === "character-appearance") {
+      setCharacterPreviewVisual(character?.visual);
+    }
     setWindows((previous) => previous.filter((item) => item.id !== windowId));
     windowRefs.current.delete(windowId);
   }
@@ -448,15 +486,17 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       aria-label="Detective computer desktop"
       onMouseDown={(event) => { if (!persistent && event.target === event.currentTarget) exitComputer(); }}
     >
-      <section className={`computer-frame ${persistent ? "computer-frame--persistent" : "computer-frame--modal"}`} aria-label="Desktop">
+      <section className={`computer-frame ${persistent ? "computer-frame--persistent" : "computer-frame--modal"}`} data-desktop-theme={persistent ? desktopPreferences.theme : undefined} aria-label="Desktop">
       <div className="computer-bezel">
-        <div className={`computer-screen${persistent ? " computer-screen--desktop" : ""}`}>
+        <div className={`computer-screen${persistent ? " computer-screen--desktop" : ""}`} style={persistent ? { "--noir-desktop-wallpaper": `url("${DESKTOP_WALLPAPERS.find((wallpaper) => wallpaper.id === desktopPreferences.wallpaper)?.image || DESKTOP_WALLPAPERS[0].image}") center / cover` } : undefined} onMouseDown={(event) => {
+          if (startMenuOpen && !event.target.closest(".computer-start-menu") && !event.target.closest(".computer-start")) setStartMenuOpen(false);
+        }}>
           <div className="computer-screen__glass texture-scanlines" aria-hidden="true" />
           {booting && <div className="computer-sequence computer-sequence--boot" role="status">
             <Typewriter className="computer-sequence__typewriter" texts={bootLines} speed={26} lineDelay={220} onComplete={finishBoot} />
           </div>}
           <header className={`computer-menubar${persistent ? " computer-menubar--desktop-hidden" : ""}`}>
-            <p className="computer-brand"><span className="computer-brand__mark">N</span> NOIR TERMINAL <span className="computer-brand__divider">/</span> MERIDIAN GLOBAL RELAY</p>
+            <p className="computer-brand"><span className="computer-brand__mark">M</span> MERID_OS <span className="computer-brand__divider">/</span> MERIDIAN ENTERPRISES</p>
             <div className="computer-menubar__status">
               <span className="computer-status-light" />
               <span>{location || "WORLD CONNECTION PENDING"}</span>
@@ -485,7 +525,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                   key={program.id}
                   className={`computer-program${windows.some((item) => item.program.id === program.id) ? " computer-program--selected" : ""}`}
                   type="button"
-                  aria-label={`${program.label}${persistent ? " website" : " application"}, ${program.state}`}
+                  aria-label={`${program.label}${persistent && !["newspaper", "settings"].includes(program.id) ? " website" : " application"}, ${program.state}`}
                   disabled={!program.available}
                   onClick={() => launchProgram(program)}
                 >
@@ -505,21 +545,25 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 : program.label;
               return <section
                 ref={(element) => { if (element) windowRefs.current.set(id, element); else windowRefs.current.delete(id); }}
-                className={`computer-window${position ? " computer-window--positioned" : ""}${persistent && program.id !== "newspaper" ? " computer-window--website" : ""}${persistent && program.id === "newspaper" ? " computer-window--app" : ""}`}
+                className={`computer-window${position ? " computer-window--positioned" : ""}${persistent && !["newspaper", "settings", "character-appearance"].includes(program.id) ? " computer-window--website" : ""}${persistent && ["newspaper", "settings", "character-appearance"].includes(program.id) ? " computer-window--app" : ""}${program.id === "settings" ? " computer-window--settings" : ""}${program.id === "character-appearance" ? " computer-window--character-appearance" : ""}`}
                 data-site-variant={institutionalVariant(program.id)}
                 data-window-id={id}
                 key={id}
-                style={{ ...(position || {}), zIndex }}
-                aria-label={`${companySiteName} ${program.id === "newspaper" ? "application" : "website"} window`}
+                style={{ ...(position || {}), zIndex, ...(program.id === "character-appearance" ? { height: "min(48vh, 30rem)" } : {}) }}
+                aria-label={`${companySiteName} ${["newspaper", "settings", "character-appearance"].includes(program.id) ? "application" : "website"} window`}
                 onMouseDown={() => focusWindow(id)}
               >
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
-                  <span>{persistent && !["web-browser", "newspaper"].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "NOIR BROWSER" : companySiteName}</span>
+                  <span>{persistent && !["web-browser", "newspaper", "settings", "character-appearance"].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "MERIDIAN WEB" : program.id === "settings" ? "MERID_OS SETTINGS" : companySiteName}</span>
                   <button type="button" className="computer-window__close" aria-label={`Close ${companySiteName}`} onClick={() => closeWindow(id)}>×</button>
                 </header>
-                <div className="computer-browser-address" aria-label="Website address"><span aria-hidden="true">▣</span><span>{browserAddress(program, countryName, facilityContext)}</span><span className="computer-browser-address__secure">PRIVATE RELAY</span></div>
-                <div className={`computer-window__body${persistent && program.id !== "newspaper" ? " computer-window__body--website" : ""}`}>
-                  {program.id === "web-browser"
+                <div className={`computer-browser-address${["newspaper", "settings", "character-appearance"].includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : browserAddress(program, countryName, facilityContext)}</span><span className="computer-browser-address__secure">PRIVATE RELAY</span></div>
+                <div className={`computer-window__body${persistent && !["newspaper", "settings", "character-appearance"].includes(program.id) ? " computer-window__body--website" : ""}`}>
+                  {program.id === "settings"
+                    ? <DesktopSettings preferences={desktopPreferences} accountUsername={accountUsername} character={character} characterPreviewVisual={characterPreviewVisual} location={location} onEditCharacter={() => launchProgram(CHARACTER_APPEARANCE_PROGRAM)} onChange={(patch) => onDesktopPreferencesChange?.(patch)} onLogout={onLogout} />
+                    : program.id === "character-appearance"
+                    ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
+                    : program.id === "web-browser"
                     ? <LegacyCountryPortal
                         countryName={countryName}
                         location={location}
@@ -616,24 +660,36 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 </div>
               </div>
             </section>}
+            {startMenuOpen && persistent && <nav className="computer-start-menu" style={{ zIndex: Math.max(20, ...windows.map((item) => item.zIndex + 1)) }} aria-label="Start menu">
+              <header className="computer-start-menu__header">
+                <span className="computer-start-menu__brand" aria-hidden="true">M</span>
+                <span><strong>MERID_OS</strong><small>PERSONAL COMPUTER</small></span>
+              </header>
+              <section className="computer-start-menu__programs" aria-labelledby="start-menu-programs-title">
+                <h2 id="start-menu-programs-title">PROGRAMS</h2>
+                {startMenuPrograms.map((program) => <button key={program.id} type="button" onClick={() => { launchProgram(program); setStartMenuOpen(false); }}>
+                  <span className="computer-start-menu__icon" aria-hidden="true"><program.Icon /></span>
+                  <span className="computer-start-menu__copy"><strong>{program.label}</strong><small>{START_MENU_DESCRIPTIONS[program.id] || "Open this system program"}</small></span>
+                  <span className="computer-start-menu__arrow" aria-hidden="true">›</span>
+                </button>)}
+              </section>
+              <section className="computer-start-menu__tools" aria-labelledby="start-menu-tools-title">
+                <h2 id="start-menu-tools-title">SYSTEM TOOLS</h2>
+                <div>
+                  <button type="button" onClick={() => { onOpenProxy?.(); setStartMenuOpen(false); }}><Wifi aria-hidden="true" /><span>PROXY</span></button>
+                  <button type="button" onClick={() => { onOpenTelephone?.(); setStartMenuOpen(false); }}><Phone aria-hidden="true" /><span>TELEPHONE</span></button>
+                  <button type="button" onClick={() => { onOpenWhiteboard?.(); setStartMenuOpen(false); }}><Files aria-hidden="true" /><span>CASE BOARD</span></button>
+                </div>
+              </section>
+            </nav>}
           </div>}
 
           <footer className={`computer-taskbar${persistent ? " computer-taskbar--desktop" : ""}`}>
             <div className="computer-taskbar__left">
-              {persistent && <button type="button" className="computer-start" aria-expanded={startMenuOpen} onClick={() => setStartMenuOpen((open) => !open)}><span className="computer-brand__mark">N</span> START</button>}
-              {!persistent && <span className="computer-taskbar__system"><span className="computer-brand__mark">N</span> {isCompanyComputer ? "WORKSTATION SESSION" : "PERSONAL SESSION"}</span>}
+              {persistent && <button type="button" className="computer-start" aria-expanded={startMenuOpen} onClick={() => setStartMenuOpen((open) => !open)}><span className="computer-brand__mark">M</span> START</button>}
+              {!persistent && <span className="computer-taskbar__system"><span className="computer-brand__mark">M</span> {isCompanyComputer ? "WORKSTATION SESSION" : "PERSONAL SESSION"}</span>}
               {windows.map((item) => <button key={item.id} className={`computer-taskbar__active${item.zIndex === Math.max(...windows.map((windowItem) => windowItem.zIndex)) ? " computer-taskbar__active--focused" : ""}`} type="button" onClick={() => focusWindow(item.id)}>{item.program.label}</button>)}
             </div>
-            {startMenuOpen && persistent && <nav className="computer-start-menu" aria-label="System menu">
-              <strong>NOIR PERSONAL COMPUTER</strong>
-              <button type="button" onClick={() => { launchProgram(PERSONAL_PROGRAMS[0]); setStartMenuOpen(false); }}>OPEN NOIR WEB</button>
-              <button type="button" onClick={() => { launchProgram(PERSONAL_PROGRAMS.find((program) => program.id === "newspaper")); setStartMenuOpen(false); }}>THE EVENING COURIER</button>
-              <button type="button" onClick={() => { onOpenProxy?.(); setStartMenuOpen(false); }}>PROXY CONNECTION</button>
-              <button type="button" onClick={() => { onOpenTelephone?.(); setStartMenuOpen(false); }}>TELEPHONE</button>
-              <button type="button" onClick={() => { onOpenWhiteboard?.(); setStartMenuOpen(false); }}>CASE BOARD</button>
-              <button type="button" onClick={() => { onAppearance?.(); setStartMenuOpen(false); }}>APPEARANCE</button>
-              {!isCompanyComputer && <button type="button" onClick={() => { onLogout?.(); setStartMenuOpen(false); }}>LOG OUT ↗</button>}
-            </nav>}
             {persistent ? isCompanyComputer
               ? <span className="computer-taskbar__clock">{display?.time}</span>
               : <span className="computer-taskbar__clock">{display?.time}</span>

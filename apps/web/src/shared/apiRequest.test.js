@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiRequest, APIRequestError } from "./apiRequest.js";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  document.documentElement.classList.remove("noir-api-pending");
+});
 
 describe("apiRequest", () => {
   it("shares an identical in-flight GET and releases it when complete", async () => {
@@ -14,12 +17,41 @@ describe("apiRequest", () => {
     const first = apiRequest("/api/world?cityId=fr%2Flyon");
     const second = apiRequest("/api/world?cityId=fr%2Flyon");
     expect(fetch).toHaveBeenCalledTimes(1);
+    expect(document.documentElement).toHaveClass("noir-api-pending");
 
     resolveResponse(new Response('{"city":"Lyon"}', { headers: { "content-type": "application/json" } }));
     await expect(Promise.all([first, second])).resolves.toEqual([{ city: "Lyon" }, { city: "Lyon" }]);
+    expect(document.documentElement).not.toHaveClass("noir-api-pending");
 
     await apiRequest("/api/world?cityId=fr%2Flyon");
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the cursor normal for optimistic requests", async () => {
+    let resolveResponse;
+    const fetch = vi.fn(() => new Promise((resolve) => { resolveResponse = resolve; }));
+    vi.stubGlobal("fetch", fetch);
+
+    const request = apiRequest("/api/whiteboards/board", { method: "PATCH", pendingCursor: false, body: "{}" });
+    expect(document.documentElement).not.toHaveClass("noir-api-pending");
+    expect(fetch.mock.calls[0][1]).not.toHaveProperty("pendingCursor");
+    resolveResponse(new Response("{}", { headers: { "content-type": "application/json" } }));
+    await request;
+  });
+
+  it("keeps the cursor active until every visible request finishes", async () => {
+    const resolvers = [];
+    const fetch = vi.fn(() => new Promise((resolve) => resolvers.push(resolve)));
+    vi.stubGlobal("fetch", fetch);
+
+    const first = apiRequest("/api/first");
+    const second = apiRequest("/api/second");
+    resolvers[0](new Response("{}", { headers: { "content-type": "application/json" } }));
+    await first;
+    expect(document.documentElement).toHaveClass("noir-api-pending");
+    resolvers[1](new Response("{}", { headers: { "content-type": "application/json" } }));
+    await second;
+    expect(document.documentElement).not.toHaveClass("noir-api-pending");
   });
 
   it("does not share mutations, cancellable requests, or different request contexts", async () => {

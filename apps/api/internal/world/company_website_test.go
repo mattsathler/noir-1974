@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -37,6 +38,9 @@ func TestGenerateCompanyWebsiteIsDeterministicAndKeepsCanonicalAddress(t *testin
 	}
 	if first.Address != company.Address {
 		t.Fatalf("website address = %+v, want canonical address %+v", first.Address, company.Address)
+	}
+	if !strings.HasSuffix(first.Domain, ".merid.local") {
+		t.Fatalf("website domain = %q, want Meridian relay domain", first.Domain)
 	}
 	if first.Account.Available {
 		t.Fatal("diegetic account unexpectedly became functional")

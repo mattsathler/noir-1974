@@ -6,7 +6,7 @@ function labelFor(id) {
   return id.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export default function CharacterAppearanceEditor({ character, onClose, onSaved }) {
+export default function CharacterAppearanceEditor({ character, onClose, onSaved, onPreview, windowed = false }) {
   const [options, setOptions] = useState(null);
   const [visual, setVisual] = useState(character.visual);
   const [error, setError] = useState("");
@@ -23,6 +23,10 @@ export default function CharacterAppearanceEditor({ character, onClose, onSaved 
       .catch((reason) => { if (active) setError(reason.message); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    onPreview?.(visual);
+  }, [onPreview, visual]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -43,7 +47,7 @@ export default function CharacterAppearanceEditor({ character, onClose, onSaved 
       dialog?.removeEventListener("keydown", handleKeys);
       if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };
-  }, []);
+  }, [windowed]);
 
   function setPart(key, value) { setVisual((current) => ({ ...current, [key]: value })); }
   async function save(event) {
@@ -67,26 +71,42 @@ export default function CharacterAppearanceEditor({ character, onClose, onSaved 
     </select>
   </label>;
 
+  const fields = options ? <div className="appearance-editor__fields">
+    {select("Hair", "hairId", options.hair)}
+    {select("Skin", "skinId", options.skin)}
+    {select("Eyes", "eyesId", options.eyes)}
+    {select("Beard", "beardId", options.beard, true)}
+    {select("Face detail", "faceId", options.face, true)}
+    <label className="appearance-editor__field"><span>Accessories</span><select value={visual.accessoryIds?.[0] ?? ""} onChange={(event) => setPart("accessoryIds", event.target.value ? [event.target.value] : [])}><option value="">None</option>{options.accessories.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}</select></label>
+  </div> : <p role="status">Loading appearance catalog…</p>;
+  if (windowed) return <section ref={dialogRef} className="appearance-editor__windowed" role="dialog" aria-labelledby="appearance-editor-window-title" tabIndex={-1}>
+    <header><p>MERIDIAN SYSTEM USER</p><h2 id="appearance-editor-window-title">Change appearance</h2></header>
+    <form onSubmit={save}>
+      <div className="appearance-editor__content">
+        <div className="appearance-editor__preview" aria-live="polite"><ModularFace visual={visual} name={character.displayName} /></div>
+        <fieldset disabled={!options || saving}>
+          <legend>User appearance</legend>
+          {fields}
+        </fieldset>
+      </div>
+      {error && <p className="appearance-editor__error" role="alert">{error}</p>}
+      <footer><button type="button" disabled={saving} onClick={onClose}>CANCEL</button><button type="submit" disabled={!options || saving}>{saving ? "SAVING…" : "SAVE APPEARANCE"}</button></footer>
+    </form>
+  </section>;
+
   return <div className="appearance-editor" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
     <section ref={dialogRef} className="appearance-editor__panel" role="dialog" aria-modal="true" aria-labelledby="appearance-editor-title" tabIndex={-1}>
-      <header><p>PERSONNEL FILE · AMENDMENT</p><h2 id="appearance-editor-title">Change appearance</h2></header>
+      <header><p>MY ACCOUNT · USER PROFILE</p><h2 id="appearance-editor-title">Change appearance</h2></header>
       <form onSubmit={save}>
         <div className="appearance-editor__content">
           <div className="appearance-editor__preview" aria-live="polite"><ModularFace visual={visual} name={character.displayName} /></div>
           <fieldset disabled={!options || saving}>
-            <legend>Appearance</legend>
-            {options ? <div className="appearance-editor__fields">
-              {select("Hair", "hairId", options.hair)}
-              {select("Skin", "skinId", options.skin)}
-              {select("Eyes", "eyesId", options.eyes)}
-              {select("Beard", "beardId", options.beard, true)}
-              {select("Face detail", "faceId", options.face, true)}
-              <label className="appearance-editor__field"><span>Accessories</span><select value={visual.accessoryIds?.[0] ?? ""} onChange={(event) => setPart("accessoryIds", event.target.value ? [event.target.value] : [])}><option value="">None</option>{options.accessories.map((id) => <option value={id} key={id}>{labelFor(id)}</option>)}</select></label>
-            </div> : <p role="status">Loading appearance catalog…</p>}
+            <legend>User appearance</legend>
+            {fields}
           </fieldset>
         </div>
         {error && <p className="appearance-editor__error" role="alert">{error}</p>}
-        <footer><button type="button" disabled={saving} onClick={onClose}>Cancel</button><button type="submit" disabled={!options || saving}>{saving ? "Saving…" : "Save appearance"}</button></footer>
+        <footer><button type="button" disabled={saving} onClick={onClose}>CANCEL</button><button type="submit" disabled={!options || saving}>{saving ? "SAVING…" : "SAVE APPEARANCE"}</button></footer>
       </form>
     </section>
   </div>;

@@ -8,7 +8,7 @@ function makeSite(advertising = "standard") {
   return {
     company: { id: "company:atelier", name: "Ateliers de la Gare" },
     address: { full: "Ateliers de la Gare, Central, Lyon, France", city: "Lyon" },
-    domain: "ateliers-de-la-gare-7c12.noir.local",
+    domain: "ateliers-de-la-gare-7c12.merid.local",
     template: "workshop",
     advertising,
     tagline: "Serving the district since 1948.",

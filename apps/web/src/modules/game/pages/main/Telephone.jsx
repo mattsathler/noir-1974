@@ -96,7 +96,7 @@ export default function Telephone({ onClose }) {
   return (
     <div className="telephone-overlay" role="dialog" aria-modal="true" aria-label="Telephone">
       <section className="telephone-device">
-        <header className="telephone-device__header"><span>NOIR · PRIVATE LINE</span><button type="button" aria-label="Close telephone" onClick={onClose}>×</button></header>
+        <header className="telephone-device__header"><span>MERIDIAN · PRIVATE LINE</span><button type="button" aria-label="Close telephone" onClick={onClose}>×</button></header>
         <div className="telephone-device__body">
           <div className={`telephone-device__handset${callState === "calling" || callState === "connected" ? " telephone-device__handset--active" : ""}`} aria-hidden="true">
             <svg className="telephone-device__receiver" viewBox="0 0 24 24">
