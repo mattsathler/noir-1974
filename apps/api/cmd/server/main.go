@@ -26,7 +26,10 @@ import (
 )
 
 const defaultWorldServerID = "00000000-0000-4000-8000-000000000001"
-const startupTimeout = 90 * time.Second
+// Startup materializes the shared world before applying case backfills. On a
+// cold or heavily populated database this can take longer than a normal API
+// request, so give the complete startup sequence room to finish.
+const startupTimeout = 5 * time.Minute
 
 func main() {
 	for _, envFile := range []string{".env.local", ".env", "../../.env.local", "../../.env"} {

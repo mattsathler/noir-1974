@@ -10,7 +10,7 @@ const POLICE_CONTACT_PAGE = { id: "police-contact", label: "CONTACT THE POLICE S
 
 export { CRIME_REPORTS_PAGE, POLICE_NOTICES_PAGE, POLICE_ABOUT_PAGE, POLICE_BUREAUS_PAGE, POLICE_POLICIES_PAGE, POLICE_CONTACT_PAGE };
 
-export default function PoliceWebsite({ page = "police-website", navigate, children }) {
+export default function PoliceWebsite({ page = "police-website", navigate, children, searchId = "police-site-search" }) {
   const [search, setSearch] = useState("");
   const title = page === "police-notices" ? "Department notices" : page === "police-about" ? "About the department" : "Meridian Police Service";
   function searchReports(event) {
@@ -30,7 +30,7 @@ export default function PoliceWebsite({ page = "police-website", navigate, child
         <button type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}>PUBLIC NOTICES</button>
         <button type="button" onClick={() => navigate(POLICE_ABOUT_PAGE)}>ABOUT</button>
       </nav>
-      <form className="legacy-police__site-search" onSubmit={searchReports}><label htmlFor="police-site-search">SEARCH POLICE INFORMATION</label><input id="police-site-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Type a name, then press Enter" aria-keyshortcuts="Enter" /><button className="search-enter-submit" type="submit" aria-label="Press Enter to search reports">ENTER ↵</button></form>
+      <form className="legacy-police__site-search" onSubmit={searchReports}><label htmlFor={searchId}>SEARCH POLICE INFORMATION</label><input id={searchId} type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Type a name, then press Enter" aria-keyshortcuts="Enter" /><button className="search-enter-submit" type="submit" aria-label="Press Enter to search reports">ENTER ↵</button></form>
       <div className="legacy-site__layout legacy-police__layout">
         <aside className="legacy-site__sidebar">
           <section className="legacy-police__date"><b>THURSDAY</b><strong>29</strong><span>OCTOBER</span></section>
@@ -59,6 +59,7 @@ export default function PoliceWebsite({ page = "police-website", navigate, child
           {page === "police-policies" && <section className="legacy-site__section legacy-police__article"><p className="legacy-site__eyebrow">POLICE DESK / PUBLICATION POLICIES</p><h1>Public information and records</h1><p>Published records are reviewed by the local office before release. Active investigations, sealed files and private identifying details are withheld.</p><h2>Requesting a record</h2><p>Include the incident date and district when writing to the records bureau. Requests are answered in the order received during office hours.</p><button className="legacy-site__text-link" type="button" onClick={() => navigate(CRIME_REPORTS_PAGE)}>Browse published crime reports »</button></section>}
           {page === "police-contact" && <section className="legacy-site__section legacy-police__article"><p className="legacy-site__eyebrow">POLICE DESK / CONTACT</p><h1>Contact the Meridian Police Service</h1><p>For an emergency, telephone 17. For routine matters, call the local exchange and ask for the Meridian Police central desk.</p><h2>Public information office</h2><p>Records and directory enquiries are received Monday through Saturday, 9:00 AM to 5:00 PM. Please include your district and a return address with written requests.</p><button className="legacy-site__text-link" type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}>View office hours and notices »</button></section>}
           {page === "crime-reports" && <section className="legacy-police__crime-reports"><p className="legacy-site__eyebrow">POLICE DESK / PUBLIC RECORDS</p><h1>Published crime reports</h1><p>Search incidents released by the connected city police office.</p>{children}</section>}
+          {["person-search", "warrant-request", "murder-accusation"].includes(page) && <section className="legacy-site__section legacy-police__article legacy-police__restricted">{children}</section>}
           <footer id="contact" className="legacy-site__directory-footer"><b>Meridian Police Service</b><span>Public Information Office · National relay directory</span><span>Emergency: 17 · Non-emergency: consult your local exchange</span></footer>
         </div>
       </div>

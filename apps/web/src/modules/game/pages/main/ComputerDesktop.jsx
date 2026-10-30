@@ -91,7 +91,9 @@ const PERSON_SEARCH_PROGRAM = { id: "person-search", label: "PERSON_SEARCH_APP.E
 const PATIENT_SEARCH_PROGRAM = { id: "patient-search", label: "PATIENT_SEARCH_APP.EXE", Icon: Cross, state: "PRIVILEGED", available: true };
 const GATE_RECORDS_PROGRAM = { id: "gate-records", label: "GATE_ACCESS_LOG_APP.EXE", Icon: MapIcon, state: "PRIVILEGED", available: true };
 const EMPLOYEE_DIRECTORY_PROGRAM = { id: "employee-directory", label: "EMPLOYEE_DIRECTORY_APP.EXE", Icon: Users, state: "PRIVILEGED", available: true };
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "ghostkey", "person-search", "patient-search", "gate-records", "employee-directory"];
+const RESIDENTIAL_SEARCH_PROGRAM = { id: "warrant-request", label: "SEARCH_WARRANT.EXE", Icon: Files, state: "PRIVILEGED", available: true };
+const ARREST_WARRANT_PROGRAM = { id: "murder-accusation", label: "ARREST_WARRANT_APP.EXE", Icon: Files, state: "PRIVILEGED", available: true };
+const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "ghostkey", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "murder-accusation"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -680,9 +682,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "character-appearance"
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
                     : program.id === "ghostkey"
-                      ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => launchProgram({ ...PATIENT_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenGateRecords={(siteAddress) => launchProgram({ ...GATE_RECORDS_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} />
+                      ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => launchProgram({ ...PATIENT_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenGateRecords={(siteAddress) => launchProgram({ ...GATE_RECORDS_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenArrestWarrant={(siteAddress) => launchProgram({ ...ARREST_WARRANT_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
                       : program.id === "person-search"
-                        ? <InstitutionalWebsiteFrame variant="police" organizationName="MERIDIAN POLICE SERVICE"><WorldDirectory key={`${id}:person-search`} program="interpol" countryName={countryName} cityId={cityId} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} /></InstitutionalWebsiteFrame>
+                        ? <PoliceWebsite page="person-search" navigate={(destination) => launchProgram(destination, id)} searchId={`police-site-search-${id}`}><WorldDirectory key={`${id}:person-search`} program="interpol" countryName={countryName} cityId={cityId} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} /></PoliceWebsite>
                       : program.id === "employee-directory"
                         ? <EmployeeDirectoryApp companyRecord={program.companyRecord} onOpenCompanyStaff={onOpenCompanyStaff} onPrint={requestPrint} />
                     : program.id === "proxy"
@@ -721,6 +723,12 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                             pageId={program.pageId}
                             onNavigate={(pageId) => launchProgram({ ...program, pageId, label: `${program.website.company.name} · ${pageId.toUpperCase()}` }, id)}
                           />
+                      : ["warrant-request", "murder-accusation"].includes(program.id)
+                        ? <PoliceWebsite page={program.id} navigate={(destination) => launchProgram(destination, id)} searchId={`police-site-search-${id}`}>
+                            {program.id === "warrant-request"
+                              ? <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} standalone onClose={() => closeWindow(id)} />
+                              : <AccusationWindow key={id} stationLocationId={facilityContext?.locationId} standalone onClose={() => closeWindow(id)} />}
+                          </PoliceWebsite>
                       : <InstitutionalWebsiteFrame
                         variant={institutionalVariant(program.id)}
                         organizationName={["patient-search", "hospital-patient-record"].includes(program.id) ? facilityContext?.label : ""}

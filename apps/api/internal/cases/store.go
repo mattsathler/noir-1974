@@ -619,12 +619,16 @@ func (store *PostgresStore) Migrate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, statement := range splitSQLStatements(string(contents)) {
+	for index, statement := range splitSQLStatements(string(contents)) {
 		if strings.TrimSpace(statement) == "" {
 			continue
 		}
 		if _, err := store.db.Exec(ctx, statement); err != nil {
-			return fmt.Errorf("apply case schema: %w", err)
+			summary := strings.Join(strings.Fields(statement), " ")
+			if len(summary) > 160 {
+				summary = summary[:160] + "…"
+			}
+			return fmt.Errorf("apply case schema statement %d (%s): %w", index+1, summary, err)
 		}
 	}
 	return nil
@@ -737,8 +741,8 @@ func (store *PostgresStore) RequestResidentialSearch(ctx context.Context, server
 	if err := store.db.QueryRow(ctx, `SELECT EXISTS (
 		SELECT 1 FROM world_entities e JOIN world_regions r USING (server_id, region_id)
 		WHERE e.server_id=$1::uuid AND e.entity_id=$2 AND e.entity_type='npc'
-		AND (r.region_id=$3 OR r.region_id LIKE $3 || '/district/%')
-	)`, serverID, npcID, cityID).Scan(&targetExists); err != nil {
+		AND (r.region_id=$3 OR r.region_id LIKE $3 || '/%')
+	)`, serverID, npcID, strings.SplitN(cityID, "/", 2)[0]).Scan(&targetExists); err != nil {
 		return WarrantRequest{}, fmt.Errorf("validate residential search target: %w", err)
 	}
 	if !targetExists {

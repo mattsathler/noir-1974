@@ -50,7 +50,7 @@ Ordem e regras de entrada/saída: [`ciclos.md`](ciclos.md).
 
 | Milestone | Tema | Documento |
 | --- | --- | --- |
-| 22 | Refatoração do bypass e navegação de arquivos com Ghostkey (substituída) | [M22](milestones/M22-refatoracao-ghostkey.md) |
+| 22 | Ghostkey: escopo substituído e incorporado à M23 | [M22](milestones/M22-refatoracao-ghostkey.md) |
 | 23 | Sistema operacional, Proxy e sites investigativos | [M23](milestones/M23-computador-os-proxy-e-sites.md) |
 | 24 | Company Websites procedurais | [M24](achieved/M24-company-websites-procedurais.md) |
 

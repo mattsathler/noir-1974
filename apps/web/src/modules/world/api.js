@@ -63,7 +63,7 @@ export function clearWorldLocationCache() {
   }
 }
 
-export const searchPeople = (query) => search("/api/world/npcs", query);
+export const searchPeople = (query, cityId = "") => search("/api/world/npcs", query, cityId);
 export const searchCompanies = (query, cityId) => search("/api/world/companies", query, cityId);
 export const searchNationalCompanies = (query) => search("/api/world/companies/national", query);
 export async function getCompanyWebsite(companyId) {

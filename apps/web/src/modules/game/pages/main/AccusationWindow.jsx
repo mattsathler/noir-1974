@@ -9,7 +9,7 @@ function boardReadiness(board) {
   return { hasProof, hasAccused, hasVictim, ready: hasProof && hasAccused && hasVictim };
 }
 
-export default function AccusationWindow({ stationLocationId, onClose }) {
+export default function AccusationWindow({ stationLocationId, onClose, standalone = false }) {
   const [boards, setBoards] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -78,8 +78,7 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
     } finally { setBusy(false); }
   }
 
-  return <div className="warrant-window" role="dialog" aria-modal="true" aria-labelledby="accusation-title">
-    <section className="warrant-window__panel accusation-window__panel">
+  const panel = <section className={`warrant-window__panel accusation-window__panel${standalone ? " police-restricted-app__panel" : ""}`}>
       <header className="warrant-window__header"><div><p className="computer-window__eyebrow">CORPORATE SECURITY OFFICE · FORM 74-C</p><h1 id="accusation-title">MURDER ACCUSATION</h1></div><button type="button" aria-label="Close accusation form" onClick={onClose}>×</button></header>
       <p className="warrant-window__copy">Submit an investigation board naming the accused person, the victim, and supporting proof. The review decision will be delivered to personal mail.</p>
       <form className="accusation-window__form" onSubmit={submit}>
@@ -98,8 +97,10 @@ export default function AccusationWindow({ stationLocationId, onClose }) {
         {selectedBoard && !readiness.ready && <p className="accusation-window__warning" role="alert">This board is missing required pins. Complete all three items above before submitting.</p>}
         {selectedBoard?.lockedAt && <p className="accusation-window__warning" role="alert">This board is locked while its review is in progress. It will unlock when the decision is delivered.</p>}
         <p className="world-directory__message" role="status" aria-live="polite">{loading ? "LOADING INVESTIGATION BOARDS…" : message}</p>
-        <footer className="warrant-window__actions"><button type="button" disabled={busy} onClick={onClose}>CANCEL</button><button type="submit" disabled={loading || busy || submitted || selectedBoard?.lockedAt || !readiness.ready}>{busy ? "SUBMITTING…" : submitted ? "SUBMITTED" : "SUBMIT ACCUSATION"}</button></footer>
+        <footer className="warrant-window__actions"><button type="submit" disabled={loading || busy || submitted || selectedBoard?.lockedAt || !readiness.ready}>{busy ? "SUBMITTING…" : submitted ? "SUBMITTED" : "SUBMIT ACCUSATION"}</button></footer>
       </form>
-    </section>
-  </div>;
+    </section>;
+  return standalone
+    ? <section className="police-restricted-app">{panel}</section>
+    : <div className="warrant-window" role="dialog" aria-modal="true" aria-labelledby="accusation-title">{panel}</div>;
 }

@@ -469,6 +469,18 @@ func (h *Handler) requestResidentialSearch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	state := h.worldFor(r.Context(), current.ID)
+	currentCity, currentCityExists := world.CityByID(state.CityID)
+	targetCity, targetCityExists := cityForNPCID(input.TargetNPCID)
+	if !currentCityExists || !targetCityExists || currentCity.CountryID != targetCity.CountryID {
+		http.Error(w, "the target or police station is not valid for the current country", http.StatusBadRequest)
+		return
+	}
+	if materializer, ok := h.worldReader.(cityWorldMaterializer); ok {
+		if err := materializer.MaterializeCity(r.Context(), h.worldServerID, targetCity.ID); err != nil {
+			h.writeAPIError(w, r, http.StatusInternalServerError, "RESIDENTIAL_SEARCH_CITY_UNAVAILABLE", "the subject's city could not be prepared for the search request", err)
+			return
+		}
+	}
 	result, err := reader.RequestResidentialSearch(r.Context(), h.worldServerID, current.ID, state.CityID, input.StationLocationID, input.TargetNPCID, state.ServerTime)
 	if errors.Is(err, cases.ErrCaseNotFound) {
 		http.Error(w, "the target or police station is not valid for the current city", http.StatusBadRequest)
@@ -479,6 +491,18 @@ func (h *Handler) requestResidentialSearch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusCreated, result)
+}
+
+func cityForNPCID(npcID string) (world.WorldCity, bool) {
+	for _, city := range world.Cities() {
+		if strings.HasPrefix(npcID, "npc:"+city.ID+"/") {
+			return city, true
+		}
+	}
+	if strings.HasPrefix(npcID, "npc:lyon/") {
+		return world.CityByID("fr/lyon")
+	}
+	return world.WorldCity{}, false
 }
 
 func (h *Handler) playerEmails(w http.ResponseWriter, r *http.Request) {
@@ -1503,9 +1527,32 @@ func (h *Handler) searchNPCs(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	requestedCityID := strings.TrimSpace(r.URL.Query().Get("cityId"))
+	if requestedCityID != "" {
+		requestedCity, exists := world.CityByID(requestedCityID)
+		if !exists || requestedCity.ID != city.ID {
+			h.writeAPIError(w, r, http.StatusForbidden, "PERSON_SEARCH_SCOPE_UNAVAILABLE", "personnel search is restricted to the connected city", nil)
+			return
+		}
+	}
 	var results []world.PersonSearchRecord
 	var err error
-	if countryReader, ok := h.worldReader.(countryPersonSearchReader); ok {
+	if requestedCityID != "" {
+		if cityReader, supported := h.worldReader.(cityPersonSearchReader); supported {
+			results, err = cityReader.SearchNPCsInCity(r.Context(), h.worldServerID, city.ID, query)
+		} else {
+			results, err = h.worldReader.SearchNPCs(r.Context(), h.worldServerID, query)
+			for index := 0; err == nil && index < len(results); {
+				npcID := results[index].NPC.ID
+				valid := strings.HasPrefix(npcID, "npc:"+city.ID+"/") || (city.ID == "fr/lyon" && strings.HasPrefix(npcID, "npc:lyon/"))
+				if !valid {
+					results = append(results[:index], results[index+1:]...)
+					continue
+				}
+				index++
+			}
+		}
+	} else if countryReader, ok := h.worldReader.(countryPersonSearchReader); ok {
 		results, err = countryReader.SearchNPCsInCountry(r.Context(), h.worldServerID, city.CountryID, query)
 	} else {
 		results, err = h.worldReader.SearchNPCs(r.Context(), h.worldServerID, query)

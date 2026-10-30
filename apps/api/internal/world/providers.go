@@ -92,7 +92,11 @@ func HostingProviders(countryID string) ([]NetworkProvider, bool) {
 			}
 			if index == 0 && folderIndex == 0 {
 				directory.SiteName = "MERIDIAN POLICE SERVICE"
-				directory.Files = []ProviderFile{{ID: "person-search", Name: "person_search_app.exe", Kind: "person-search"}}
+				directory.Files = []ProviderFile{
+					{ID: "person-search", Name: "person_search_app.exe", Kind: "person-search"},
+					{ID: "warrant-request", Name: "search_warrant.exe", Kind: "warrant-request"},
+					{ID: "murder-accusation", Name: "arrest_warrant_app.exe", Kind: "murder-accusation"},
+				}
 			} else if folderIndex == 0 && index == 2 {
 				directory.SiteName = "MERIDIAN ENTERPRISES"
 				directory.SiteAddress = directory.Address + "gate/access-logs"

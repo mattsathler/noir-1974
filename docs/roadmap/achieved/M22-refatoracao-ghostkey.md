@@ -1,10 +1,16 @@
-# M22 — Ghostkey: invasão e exploração de arquivos locais
+# M22 — Ghostkey: exploração de provedores
 
 **Trilha:** Independente do fluxo criminal  
-**Status:** Substituída pela M23
+**Status:** Substituída pela M23; fluxo Ghostkey entregue como parte da M23
 **Depende de:** M07, M08 e M12 aceitos (fontes de dados e acesso a sistemas locais existentes)
 
-> Esta proposta de navegação isolada em computadores locais foi substituída pela migração integrada para sistema operacional, Proxy e sites da [M23](M23-computador-os-proxy-e-sites.md). O fluxo Ghostkey não deve ser iniciado em paralelo.
+> Esta proposta de navegação isolada em computadores locais foi substituída pela migração integrada para sistema operacional, Proxy e sites da [M23](M23-computador-os-proxy-e-sites.md). O fluxo Ghostkey entregue pertence à M23 e usa provedores e sites remotos; não implementa o minigame de senha nem o explorador local descritos nesta proposta.
+
+## Registro da substituição
+
+A M23 incorporou o Ghostkey como ferramenta de exploração de provedores. O aplicativo abre com aviso de autorização do MeridOS, apresenta o Network Explorer e permite navegar por provedores, endereços IP, pastas virtuais e executáveis. Arquivos executáveis restritos — Person Search da polícia, Patient Search do hospital, Employee Directory de empresas e GATE Access Logs — são acessíveis por esse fluxo, com validação no servidor. A interface usa efeitos visuais de acesso comprometido, mantendo a moldura e o ambiente comuns do MeridOS.
+
+Essa entrega substitui a intenção geral de usar Ghostkey para alcançar sistemas protegidos, mas não os requisitos originais de senha, arquivos locais de NPC, banco, `NETWORK STATUS` ou `PRINT QUEUE`. O escopo e os critérios vigentes estão registrados na M23.
 
 ## Objetivo
 
@@ -55,21 +61,15 @@ Esta milestone é uma trilha independente: não altera a contagem nem o aceite d
 
 ## Critérios de aceite
 
-- [ ] Nenhum computador local acessado usa a interface de grade de aplicativos ou um fluxo de comando em terminal; os sistemas listados nesta milestone são navegados por pastas e arquivos.
-- [ ] Ao entrar em um computador invadido, o jogador encontra o explorador inicial e pode abrir `ghostkey.exe`; as pastas protegidas só ficam acessíveis depois da senha correta.
-- [ ] `ghostkey.exe`, identificado como criação de The Crow, abre um minigame com quatro campos numéricos e impede o acesso até a solução.
-- [ ] Cada campo retorna somente um dos três estados especificados; dígitos repetidos, senha com zero inicial, palpite malformado, desafio expirado e respostas fora de ordem têm comportamento definido e coberto.
-- [ ] A senha permanece no backend. Uma sessão, conta, cidade, país, sistema ou computador diferentes não podem reutilizar a autorização de outra sessão.
-- [ ] Cada pasta e arquivo de NPC é apresentado em ordem alfabética. Não existe pesquisa por nome; os arquivos com conteúdo temporal aceitam somente filtro por data.
-- [ ] O Banco mostra todos e somente os NPCs cadastrados naquela jurisdição, abre os ledgers individuais e conserva os registros e limites temporais definidos pelas fontes existentes.
-- [ ] A Polícia disponibiliza Person Search e emails por NPC, preserva o conteúdo e o contexto atuais e não mistura dados de outra jurisdição.
-- [ ] GATE, empresas e Hospital mantêm suas operações atuais após migrarem para estruturas de pastas e arquivos; o acesso continua restrito ao sistema local autorizado.
-- [ ] Consultas de conteúdo são feitas sob demanda ao abrir o arquivo. Listas nacionais não carregam todos os registros detalhados no primeiro acesso e não são truncadas silenciosamente.
-- [ ] Alterar cidade/país, perder autorização, fechar o computador ou expirar a sessão impede consultas posteriores com contexto antigo.
-- [ ] O toggle de `NETWORK STATUS` bloqueia listagem, abertura e atualização de arquivos remotos naquele computador, preserva pastas locais e restabelece a conexão quando religado.
-- [ ] A `PRINT QUEUE` sempre apresenta alguns documentos de ambientação; sua interação não altera casos, evidências, descobertas ou persistência do mundo.
-- [ ] Pastas, arquivos, respostas do minigame e estados de carregamento, vazio, erro, offline e sucesso funcionam por teclado e leitor de tela, sem depender apenas de cor.
-- [ ] Os fluxos antigos de banco, GATE, email, Person Search, diretório de equipe e Hospital mantêm a integridade dos dados e as validações de autorização após a migração.
+- [x] Antes de abrir `ghostkey.exe`, o MeridOS mostra o aviso de aplicativo não autorizado; o app inicia com boot interno e oferece o Network Explorer.
+- [x] O Network Explorer lista provedores corporativos do país conectado e navega por pastas virtuais, sem linguagem ou comportamento de FTP.
+- [x] Abrir um provedor carrega seus diretórios de hosts. Os endereços IP dos sites empresariais são determinísticos a partir da empresa e podem ser encontrados sem visita prévia pelo navegador.
+- [x] Os hosts são apresentados em páginas de 20 itens, com filtro por endereço IP que ignora pontos; uma busca vazia restaura a listagem e a consulta só é enviada por ação explícita.
+- [x] As pastas usam nomes genéricos e contêm arquivos plausíveis. Executáveis têm nomes técnicos e ícones próprios; tentar abrir um arquivo não suportado mostra o modal de erro padrão do MeridOS.
+- [x] Person Search, Residential Search & Seizure e Arrest Warrant da polícia, Patient Search do Hospital, Employee Directory empresarial e GATE Access Logs são acessíveis pelos executáveis encontrados no Ghostkey e continuam sujeitos à autorização validada pelo servidor.
+- [x] Os apps abertos pelo Ghostkey recebem efeitos visuais de acesso comprometido, mantendo a interface e a moldura comuns do MeridOS.
+- [x] Carregamentos internos ficam limitados à janela/app correspondente; o blank loading de página inteira é usado apenas para navegação entre páginas.
+- [x] A navegação é virtual e não expõe o sistema de arquivos real do computador ou do servidor.
 
 ## Fora de escopo
 
