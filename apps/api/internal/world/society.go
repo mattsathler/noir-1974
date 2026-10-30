@@ -489,6 +489,42 @@ func employeeCount(seed string, version int, company int) int {
 	return 4 + stream.intn(7)
 }
 
+func generatedCompanyEmployees(seed string, version int, company Company) ([]CompanyEmployee, error) {
+	parts := strings.Split(company.GenerationKey, "/")
+	if version < GeneratorVersion7 || len(parts) != 10 || parts[2] != "companies" || parts[4] != "district" || parts[6] != "building" || parts[8] != "company" {
+		return []CompanyEmployee{}, nil
+	}
+	cityID := parts[0] + "/" + parts[1]
+	city, ok := CityByID(cityID)
+	if !ok {
+		return nil, ErrInvalidGenerationKey
+	}
+	building, err := strconv.Atoi(parts[7])
+	if err != nil || building < 1 || building > 6 {
+		return nil, ErrInvalidGenerationKey
+	}
+	companyNumber, err := strconv.Atoi(parts[9])
+	if err != nil || companyNumber < 1 || companyNumber > 6 {
+		return nil, ErrInvalidGenerationKey
+	}
+	companyIndex := (building-1)*6 + companyNumber
+	citySeed := CitySeed(seed, city.ID)
+	count := employeeCount(citySeed, version, companyIndex)
+	employees := make([]CompanyEmployee, 0, count)
+	for slot := 1; slot <= count; slot++ {
+		key := fmt.Sprintf("%s/people/%s/district/%s/company/%02d/person/%02d", city.ID, parts[3], parts[5], companyIndex, slot)
+		npc, err := GenerateNPC(seed, version, key)
+		if err != nil {
+			return nil, err
+		}
+		employees = append(employees, CompanyEmployee{
+			ID: npc.ID, Name: npc.Name, Role: employmentRoles[(slot-1)%len(employmentRoles)],
+			Status: npc.Status, Visual: npc.Visual,
+		})
+	}
+	return employees, nil
+}
+
 // GenerateCompanyFromKey mirrors GenerateNPCFromKey for a city-scoped company.
 func GenerateCompanyFromKey(seed string, fallbackVersion int, generationKey string) (Company, error) {
 	parts := strings.Split(generationKey, "/")

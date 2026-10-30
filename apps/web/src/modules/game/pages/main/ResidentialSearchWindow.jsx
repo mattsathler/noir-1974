@@ -49,7 +49,7 @@ export default function ResidentialSearchWindow({ cityId, stationLocationId, onC
       <p className="warrant-window__copy">Identify a person to request authorization for a search of their residence. The subject may be living or deceased.</p>
       {!selected && <form className="world-directory__search" onSubmit={findPeople}>
         <label className="world-directory__label" htmlFor="warrant-person-search">PERSON NAME</label>
-        <div className="world-directory__searchline"><input id="warrant-person-search" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Type a name, then press Enter" aria-keyshortcuts="Enter" /><button className="search-enter-submit" type="submit" tabIndex={-1} disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button></div>
+        <div className="world-directory__searchline"><input id="warrant-person-search" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Type a name, then press Enter" aria-keyshortcuts="Enter" /><button className="search-enter-submit" type="submit" disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button></div>
       </form>}
       <p className="world-directory__message" role="status" aria-live="polite">{message}</p>
       {!selected && <div className="warrant-window__results">

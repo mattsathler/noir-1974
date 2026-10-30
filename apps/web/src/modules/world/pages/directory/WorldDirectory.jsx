@@ -48,7 +48,7 @@ function displayRecordDate(value, timeZone) {
   }).format(date);
 }
 
-export default function WorldDirectory({ program, companyLocationId = "", companyId = "", facilityLocationId = "", accessAttemptId = "", cityId = "", countryName = "", serverTime = new Date(), timeZone = "Europe/Paris", onPrint, onOpenCompany, onNavigateCompanyWebsite, initialSearch = "", initialCompanies = [] }) {
+export default function WorldDirectory({ program, companyLocationId = "", companyId = "", facilityLocationId = "", accessAttemptId = "", cityId = "", countryName = "", serverTime = new Date(), timeZone = "Europe/Paris", onPrint, onOpenCompany, onBeginCompanyNavigation, onCancelCompanyNavigation, onNavigateCompanyWebsite, initialSearch = "", initialCompanies = [] }) {
   const [query, setQuery] = useState(initialSearch);
   const [people, setPeople] = useState([]);
   const [selectedPerson, setSelectedPerson] = useState(null);
@@ -58,6 +58,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
   const isCompanyPortal = program === "company-portal";
   const [message, setMessage] = useState(isStaffDirectory ? "Connecting to the company employee directory…" : isCompanyPortal ? initialCompanies.length ? "NATIONAL COMPANY LISTINGS RETRIEVED" : "Search national company websites in the connected country." : program === "interpol" ? "Enter a name to search countrywide personnel files." : "Enter a name or address to search the city records.");
   const [busy, setBusy] = useState(false);
+  const [connectingCompanyId, setConnectingCompanyId] = useState("");
   const [recordRange, setRecordRange] = useState(() => {
     const through = inputDate(serverTime, timeZone);
     return { from: dateBefore(through, 6), to: through };
@@ -186,33 +187,46 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
 
   async function openCompanyWebsite(record) {
     if (!onOpenCompany || busy) return;
+    onBeginCompanyNavigation?.();
     setBusy(true);
+    setConnectingCompanyId(record.company.id);
     setMessage(`CONNECTING TO ${record.company.name.toUpperCase()}…`);
     try {
       const site = await onOpenCompany(record);
       if (site) onNavigateCompanyWebsite?.(site, { query, companies });
+      else {
+        onCancelCompanyNavigation?.();
+        setMessage("THE COMPANY WEBSITE COULD NOT BE REACHED.");
+      }
     } catch (error) {
+      onCancelCompanyNavigation?.();
       setMessage(error.message || "THE COMPANY WEBSITE COULD NOT BE REACHED.");
     } finally {
+      setConnectingCompanyId("");
       setBusy(false);
     }
   }
 
   return (
-    <div className="world-directory">
-      <p className="computer-window__eyebrow">{isInterpol ? `CORPORATE SECURITY OFFICE · ${countryName ? `${countryName.toUpperCase()} ` : "COUNTRYWIDE "}PERSONNEL SEARCH` : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCompanyPortal ? "MERIDIAN GLOBAL · NATIONAL COMPANY PORTAL" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "MERIDIAN GLOBAL SETTLEMENT OFFICE · PRIVILEGED SESSION" : "MERIDIAN ENTERPRISES · GATE CONTROL ARCHIVE · AUTHORIZED SESSION"}</p>
-      <h1>{isInterpol ? "COUNTRYWIDE PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCompanyPortal ? "COMPANY WEBSITES" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE ACCESS LOGS"}</h1>
+    <div className={`world-directory${isInterpol ? " world-directory--person-search" : ""}${isCompanyPortal ? " world-directory--company-portal" : ""}`}>
+      {isCompanyPortal ? <header className="world-directory__portal-hero">
+        <div><p className="computer-window__eyebrow">MERIDIAN GLOBAL · NATIONAL COMPANY PORTAL</p><h1>Company websites</h1><span>Find registered businesses and visit their public company pages.</span></div>
+        <aside><small>CONNECTED COUNTRY</small><strong>{countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</strong><span>NATIONAL LISTINGS</span></aside>
+      </header> : <>
+        <p className="computer-window__eyebrow">{isInterpol ? `CORPORATE SECURITY OFFICE · ${countryName ? `${countryName.toUpperCase()} ` : "COUNTRYWIDE "}PERSONNEL SEARCH` : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "MERIDIAN GLOBAL SETTLEMENT OFFICE · PRIVILEGED SESSION" : "MERIDIAN ENTERPRISES · GATE CONTROL ARCHIVE · AUTHORIZED SESSION"}</p>
+        <h1>{isInterpol ? "COUNTRYWIDE PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE ACCESS LOGS"}</h1>
+      </>}
       {isInterpol && <p className="world-directory__scope">SEARCH JURISDICTION · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</p>}
-      {isCompanyPortal && <p className="world-directory__scope">CONNECTED COUNTRY · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"} · NATIONAL LISTINGS</p>}
-      {!isStaffDirectory && !selectedPerson && <form className="world-directory__search" onSubmit={submitSearch}>
+      {!isStaffDirectory && !selectedPerson && <form className={`world-directory__search${isCompanyPortal ? " world-directory__search--company-portal" : ""}`} onSubmit={submitSearch}>
         <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isCompanyPortal ? "COMPANY, WEBSITE OR ADDRESS" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
         <div className="world-directory__searchline">
           <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Type a name, then press Enter" : isCompanyPortal ? "Type a company, then press Enter" : isPeopleSearch ? "Type a name, then press Enter" : "Type a company, then press Enter"} aria-keyshortcuts="Enter" />
-          <button className="search-enter-submit" type="submit" tabIndex={-1} disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button>
+          <button className="search-enter-submit" type="submit" disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button>
         </div>
       </form>}
       {!selectedPerson && <p className="world-directory__message" role="status" aria-live="polite">{message}</p>}
 
+      {isInterpol && !selectedPerson && people.length > 0 && <p className="world-directory__person-count">{people.length} PERSONNEL FILE{people.length === 1 ? "" : "S"} FOUND · SELECT A FILE</p>}
       {isPeopleSearch && !selectedPerson && people.length > 0 && <div className="world-directory__person-list" aria-label="People found">
         {people.map((record) => {
           const { npc } = record;
@@ -258,7 +272,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
             <form className="world-record__activity-filter" onSubmit={(event) => loadNPCRecords(event, npc.id)}>
               <DatePicker label="FROM" value={recordRange.from} minDate={rangeStart} maxDate={rangeEnd} onChange={updateRecordFrom} />
               <DatePicker label="THROUGH" value={recordRange.to} minDate={rangeStart} maxDate={rangeEnd} onChange={updateRecordThrough} />
-              <button className="search-enter-submit" type="submit" tabIndex={-1} disabled={activityBusy} aria-label="Press Enter to search records">{activityBusy ? "READING…" : "ENTER ↵"}</button>
+              <button className="search-enter-submit" type="submit" disabled={activityBusy} aria-label="Press Enter to search records">{activityBusy ? "READING…" : "ENTER ↵"}</button>
             </form>
             {activityMessage && <p className="world-record__activity-message" role="status" aria-live="polite">{activityMessage}</p>}
             {activity.map((record) => <article className="world-record__activity-entry" key={record.id}>
@@ -294,14 +308,18 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
         </article>
       ))}
 
-      {isCompanyPortal && companies.map(({ company, address }) => (
-        <article className="world-record world-company-site" key={company.id}>
-          <p><strong><a href={`#${company.id}`} className="world-directory__company-link" onClick={(event) => { event.preventDefault(); openCompanyWebsite({ company, address }); }}>{company.name}</a></strong> · {company.websiteDescription || "PUBLIC COMPANY INFORMATION"}</p>
-          <p>WEBSITE · {company.websiteDomain || "NO DOMAIN LISTING"}</p>
-          <p>HEADQUARTERS · {address.full}</p>
-          {busy && <p role="status" aria-live="polite">CONNECTING TO {company.name.toUpperCase()}…</p>}
-        </article>
-      ))}
+      {isCompanyPortal && companies.length > 0 && <section className="world-directory__company-results" aria-label="National company listings">
+        <header><div><p>REGISTERED BUSINESSES</p><h2>Company listings</h2></div><span>{companies.length} {companies.length === 1 ? "COMPANY" : "COMPANIES"}</span></header>
+        <div>{companies.map(({ company, address }) => (
+          <article className="world-record world-company-site" key={company.id}>
+            <div className="world-company-site__heading"><span className="world-company-site__mark" aria-hidden="true">M</span><div><small>PUBLIC COMPANY INFORMATION</small><h3>{company.name}</h3></div><span className="world-company-site__status">REGISTERED</span></div>
+            <p className="world-company-site__description">{company.websiteDescription || "Public company information"}</p>
+            <dl><div><dt>WEBSITE</dt><dd>{company.websiteDomain || "NO DOMAIN LISTING"}</dd></div><div><dt>HEADQUARTERS</dt><dd>{address.full}</dd></div></dl>
+            {connectingCompanyId === company.id && <p className="world-company-site__connecting" role="status" aria-live="polite">CONNECTING TO {company.name.toUpperCase()}…</p>}
+            <footer><span>MERIDIAN BUSINESS INDEX</span><button type="button" disabled={busy} onClick={() => openCompanyWebsite({ company, address })}>{connectingCompanyId === company.id ? "CONNECTING…" : "VISIT COMPANY WEBSITE"} <span aria-hidden="true">↗</span></button></footer>
+          </article>
+        ))}</div>
+      </section>}
 
       {isStaffDirectory && staffCompanies.map(({ company, address, employees }) => (
         <article className="world-record" key={company.id}>

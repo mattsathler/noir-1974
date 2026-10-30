@@ -103,6 +103,13 @@ export async function getProxyNodes() {
   return payload.nodes ?? [];
 }
 
+export async function getHostingProviders(countryId, providerId = "") {
+  const params = new URLSearchParams({ countryId });
+  if (providerId) params.set("providerId", providerId);
+  const payload = await apiRequest(`/api/world/providers?${params}`);
+  return payload.providers ?? [];
+}
+
 export async function connectProxy(cityId) {
   return apiRequest("/api/world/proxy/connect", {
     method: "POST",

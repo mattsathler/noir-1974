@@ -75,7 +75,7 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
     <main className="legacy-site legacy-portal">
       <header className="legacy-site__masthead legacy-portal__masthead">
         <div><span className="legacy-site__brand">MERIDIAN</span><span className="legacy-site__brand-sub">NATIONAL DIRECTORY</span></div>
-        <form className="legacy-portal__search" onSubmit={submitSearch}><input type="search" aria-label="Search the National Directory" placeholder="Type a company, then press Enter" aria-keyshortcuts="Enter" value={search} onChange={(event) => setSearch(event.target.value)} /><button className="search-enter-submit" type="submit" tabIndex={-1} disabled={searching} aria-label={searching ? "Searching" : "Press Enter to search"}>{searching ? "SEARCHING…" : "ENTER ↵"}</button></form>
+        <form className="legacy-portal__search" onSubmit={submitSearch}><input type="search" aria-label="Search the National Directory" placeholder="Type a company, then press Enter" aria-keyshortcuts="Enter" value={search} onChange={(event) => setSearch(event.target.value)} /><button className="search-enter-submit" type="submit" disabled={searching} aria-label={searching ? "Searching" : "Press Enter to search"}>{searching ? "SEARCHING…" : "ENTER ↵"}</button></form>
         <div className="legacy-site__masthead-note"><strong>{countryName || "COUNTRY PORTAL"}</strong><br />{location || "RELAY REGION NOT SET"}<br />Updated Thursday, 29 October</div>
       </header>
       <nav className="legacy-site__toplinks" aria-label="Portal sections">

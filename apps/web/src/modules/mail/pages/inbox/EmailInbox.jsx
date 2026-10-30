@@ -109,7 +109,7 @@ export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe
           <label className="world-directory__label" htmlFor="mail-search-person">PERSON NAME</label>
           <div className="world-directory__searchline">
             <input id="mail-search-person" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, then press Enter" aria-keyshortcuts="Enter" />
-            <button className="search-enter-submit" type="submit" tabIndex={-1} disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button>
+            <button className="search-enter-submit" type="submit" disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button>
           </div>
         </form>}
         {!mailbox && <p className="world-directory__message" role="status" aria-live="polite">{message}</p>}
@@ -136,7 +136,7 @@ export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe
           <form className="world-record__activity-filter" onSubmit={readMailbox}>
             <DatePicker label="FROM" value={from} minDate={rangeStart} maxDate={throughToday} onChange={updateFrom} />
             <DatePicker label="THROUGH" value={through} minDate={rangeStart} maxDate={throughToday} onChange={updateThrough} />
-            <button className="search-enter-submit" type="submit" tabIndex={-1} disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search mail"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button>
+            <button className="search-enter-submit" type="submit" disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search mail"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button>
           </form>
           {messages.map((item) => (
             <details className="email-message" key={item.id}>

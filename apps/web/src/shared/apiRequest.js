@@ -1,25 +1,13 @@
 const inFlightGETs = new Map();
 let activeCursorRequests = 0;
-let pendingRequestSequence = 0;
-
-function notifyWindowRequest(windowId, requestId, pending) {
-  if (!windowId || typeof CustomEvent === "undefined") return;
-  document.dispatchEvent(new CustomEvent("noir:api-request-state", { detail: { windowId, requestId, pending } }));
-}
 
 function trackPendingCursor(promise, enabled) {
   if (!enabled || typeof document === "undefined") return promise;
-  const requestId = ++pendingRequestSequence;
-  const windowId = document.activeElement?.closest?.(".computer-window")?.dataset.windowId
-    || document.documentElement.dataset.noirActiveComputerWindow
-    || "";
   activeCursorRequests += 1;
   document.documentElement.classList.add("noir-api-pending");
-  notifyWindowRequest(windowId, requestId, true);
   const finish = () => {
     activeCursorRequests = Math.max(0, activeCursorRequests - 1);
     if (activeCursorRequests === 0) document.documentElement.classList.remove("noir-api-pending");
-    notifyWindowRequest(windowId, requestId, false);
   };
   promise.then(finish, finish);
   return promise;

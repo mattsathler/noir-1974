@@ -93,6 +93,10 @@ type companyWebsiteReader interface {
 	CompanyWebsite(context.Context, string, string, string) (world.CompanyWebsite, error)
 }
 
+type companySiteIndexReader interface {
+	CompanySitesInCountry(context.Context, string, string) ([]world.CompanyPortalRecord, error)
+}
+
 type cityNPCReader interface {
 	NPCBelongsToCity(context.Context, string, string, string) (bool, error)
 }
@@ -258,6 +262,7 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("GET /api/world/locations", handler.searchLocations)
 		mux.HandleFunc("GET /api/world/transit", handler.transitDistricts)
 		mux.HandleFunc("GET /api/world/gate/destinations", handler.gateDestinations)
+		mux.HandleFunc("GET /api/world/providers", handler.networkProviders)
 		mux.HandleFunc("POST /api/world/gate/travel", handler.gateTravel)
 		mux.HandleFunc("GET /api/world/proxy/nodes", handler.proxyNodes)
 		mux.HandleFunc("POST /api/world/proxy/connect", handler.proxyConnect)
@@ -1869,6 +1874,54 @@ func (h *Handler) proxyNodes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"catalogVersion": world.GeographyCatalogVersion,
 		"nodes":          world.Cities(),
+	})
+}
+
+func (h *Handler) networkProviders(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
+		return
+	}
+	countryID := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("countryId")))
+	providers, exists := world.HostingProviders(countryID)
+	if !exists {
+		h.writeAPIError(w, r, http.StatusBadRequest, "UNKNOWN_PROVIDER_COUNTRY", "The selected provider country is not available.", nil)
+		return
+	}
+	if r.URL.Query().Get("providerId") == "northstar" {
+		reader, ok := h.worldReader.(companySiteIndexReader)
+		if !ok {
+			h.writeAPIError(w, r, http.StatusServiceUnavailable, "PROVIDER_INDEX_UNAVAILABLE", "The company provider directory is temporarily unavailable.", nil)
+			return
+		}
+		state := h.worldFor(r.Context(), current.ID)
+		city, cityExists := world.CityByID(state.CityID)
+		if !cityExists || city.CountryID != countryID {
+			h.writeAPIError(w, r, http.StatusConflict, "PROXY_JURISDICTION_UNAVAILABLE", "Connect a proxy in this country before opening its provider directory.", nil)
+			return
+		}
+		hospitalDirectory := &providers[1].Directories[0]
+		citySlug := strings.TrimPrefix(city.ID, countryID+"/")
+		hospitalDirectory.SiteName = city.Name + " Hospital"
+		hospitalDirectory.SiteAddress = hospitalDirectory.Address + "hospital/" + citySlug
+		hospitalDirectory.Files = []world.ProviderFile{{ID: "patient-search", Name: "patient_search_app.exe", Kind: "patient-search"}}
+		companies, err := reader.CompanySitesInCountry(r.Context(), h.worldServerID, countryID)
+		if err != nil {
+			h.writeAPIError(w, r, http.StatusInternalServerError, "PROVIDER_INDEX_FAILED", "The company provider directory could not be loaded.", err)
+			return
+		}
+		for _, company := range companies {
+			ip := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(company.SiteAddress, "merid//"), "northstar."), ":4000/")
+			providers[1].Directories = append(providers[1].Directories, world.ProviderDirectory{
+				ID: ip, Name: ip, IP: ip, Address: company.SiteAddress, SiteName: company.Company.Name,
+				Company: &company.Company, CompanyAddress: &company.Address,
+				Files: []world.ProviderFile{{ID: "employee-directory", Name: "employee_directory_app.exe", Kind: "employee-directory"}},
+			})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"countryId": countryID,
+		"providers": providers,
 	})
 }
 

@@ -122,7 +122,7 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
         <div className="world-record__activity-filter">
           <DatePicker label="FROM" value={fromDate} maxDate={toDate} onChange={setFromDate} />
           <DatePicker label="TO" value={toDate} minDate={fromDate} maxDate={issueDay || todayKey()} onChange={setToDate} />
-          <button className="search-enter-submit" type="submit" tabIndex={-1} aria-label="Press Enter to search open cases">ENTER ↵</button>
+          <button className="search-enter-submit" type="submit" aria-label="Press Enter to search open cases">ENTER ↵</button>
         </div>
       </form>
       {rangeError && <p className="case-files__range-error" role="alert">{rangeError}</p>}

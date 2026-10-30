@@ -17,6 +17,7 @@ type CompanyWebsite struct {
 	Company     Company               `json:"company"`
 	Address     Address               `json:"address"`
 	Domain      string                `json:"domain"`
+	SiteAddress string                `json:"siteAddress"`
 	Template    string                `json:"template"`
 	Theme       CompanyWebsiteTheme   `json:"theme"`
 	Advertising string                `json:"advertising"`

@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 
 const LOCAL_ADS = [
   { name: "LECLERC TYPEWRITER CO.", headline: "A clean ribbon makes every letter count.", detail: "Fresh ribbons, repairs and office supplies." },
@@ -47,8 +47,7 @@ function normalizedSite(site) {
   };
 }
 
-export default function CompanyWebsite({ site: sourceSite, pageId = "home", onNavigate, onOpenStaff, children }) {
-  const [notice, setNotice] = useState("");
+export default function CompanyWebsite({ site: sourceSite, pageId = "home", onNavigate, children }) {
   const site = normalizedSite(sourceSite);
   if (!site) return <p role="status">The company website could not be loaded.</p>;
 
@@ -84,13 +83,7 @@ export default function CompanyWebsite({ site: sourceSite, pageId = "home", onNa
           aria-current={item.id === page?.id ? "page" : undefined}
           onClick={(event) => { event.preventDefault(); onNavigate?.(item.id); }}
         >{item.title}</a>)}
-        {isStaffPage
-          ? <span className="company-website__staff-link" aria-current="page">EMPLOYEE DIRECTORY</span>
-          : <button type="button" className="company-website__staff-link" onClick={async () => {
-            setNotice("CONNECTING TO EMPLOYEE DIRECTORY…");
-            try { await onOpenStaff?.(sourceSite); }
-            catch (error) { setNotice(error?.message || "THE EMPLOYEE DIRECTORY IS UNAVAILABLE."); }
-          }}>EMPLOYEE DIRECTORY »</button>}
+        {isStaffPage && <span className="company-website__staff-link" aria-current="page">EMPLOYEE DIRECTORY</span>}
       </nav>
       {(advertising === "standard" || advertising === "crowded") && ads[0] && <Advertisement ad={ads[0]} format="banner" />}
       {isStaffPage
@@ -116,7 +109,6 @@ export default function CompanyWebsite({ site: sourceSite, pageId = "home", onNa
       {gridAds.length > 0 && <section className={`company-website__ad-grid company-website__ad-grid--${advertising}`} aria-label="Sponsored local offers">
         {gridAds.map((ad, index) => <Advertisement key={`${ad.name}-${index}`} ad={ad} />)}
       </section>}
-      {!isStaffPage && notice && <p className="company-website__notice" role="status" aria-live="polite">{notice}</p>}
       <footer className="company-website__footer"><span>{companyName} · {site.address?.full}</span><span>{site.domain} · Best viewed with Meridian Web Browser 4.1</span></footer>
     </main>
   );

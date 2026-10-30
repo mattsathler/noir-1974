@@ -208,6 +208,7 @@ type CompanyPortalRecord struct {
 	Address            Address `json:"address"`
 	WebsiteDomain      string  `json:"websiteDomain"`
 	WebsiteDescription string  `json:"websiteDescription"`
+	SiteAddress        string  `json:"siteAddress"`
 }
 
 type CompanyEmployee struct {
@@ -1665,6 +1666,10 @@ func (store *PostgresStore) countryCompanyIndex(ctx context.Context, serverID, c
 				}
 			}
 		}
+		sort.Slice(companies, func(i, j int) bool { return companies[i].Company.ID < companies[j].Company.ID })
+		for index := range companies {
+			companies[index].SiteAddress = CompanySiteAddress(seed, countryID, index)
+		}
 		store.countryWorldCacheMu.Lock()
 		if store.countryCompanyCache == nil {
 			store.countryCompanyCache = make(map[string]countryCompanyCacheEntry)
@@ -1729,6 +1734,22 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 	return results, nil
 }
 
+// CompanySitesInCountry returns the lightweight seeded site index for a country's provider directory.
+func (store *PostgresStore) CompanySitesInCountry(ctx context.Context, serverID, countryID string) ([]CompanyPortalRecord, error) {
+	entry, err := store.countryCompanyIndex(ctx, serverID, countryID)
+	if err != nil {
+		return nil, err
+	}
+	companies := append([]CompanyPortalRecord(nil), entry.companies...)
+	sort.Slice(companies, func(i, j int) bool {
+		if companies[i].Company.Name == companies[j].Company.Name {
+			return companies[i].Company.ID < companies[j].Company.ID
+		}
+		return companies[i].Company.Name < companies[j].Company.Name
+	})
+	return companies, nil
+}
+
 // CompanyWebsite returns the deterministic public site for one company in the active country.
 func (store *PostgresStore) CompanyWebsite(ctx context.Context, serverID, countryID, companyID string) (CompanyWebsite, error) {
 	entry, err := store.countryCompanyIndex(ctx, serverID, countryID)
@@ -1737,7 +1758,9 @@ func (store *PostgresStore) CompanyWebsite(ctx context.Context, serverID, countr
 	}
 	for _, company := range entry.companies {
 		if company.Company.ID == companyID {
-			return GenerateCompanyWebsite(entry.seed, entry.version, company), nil
+			site := GenerateCompanyWebsite(entry.seed, entry.version, company)
+			site.SiteAddress = company.SiteAddress
+			return site, nil
 		}
 	}
 	return CompanyWebsite{}, ErrEntityNotFound
@@ -1877,9 +1900,35 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 				continue
 			}
 			store.observeCache("company_directory_index", true)
-			employees, err := store.employeesOfCompany(ctx, serverID, companyID, entry.seed, entry.version)
+			cityVersion, err := store.cityGeneratorVersion(ctx, serverID, city.ID, entry.version)
 			if err != nil {
 				return nil, err
+			}
+			persistedEmployees, err := store.employeesOfCompany(ctx, serverID, companyID, entry.seed, cityVersion)
+			if err != nil {
+				return nil, err
+			}
+			generatedEmployees, err := generatedCompanyEmployees(entry.seed, cityVersion, company.Company)
+			if err != nil {
+				return nil, err
+			}
+			persistedByID := make(map[string]CompanyEmployee, len(persistedEmployees))
+			for _, employee := range persistedEmployees {
+				persistedByID[employee.ID] = employee
+			}
+			employees := make([]CompanyEmployee, 0, len(generatedEmployees)+len(persistedEmployees))
+			for _, employee := range generatedEmployees {
+				if persisted, ok := persistedByID[employee.ID]; ok {
+					employees = append(employees, persisted)
+					delete(persistedByID, employee.ID)
+				} else {
+					employees = append(employees, employee)
+				}
+			}
+			for _, employee := range persistedEmployees {
+				if _, alreadyIncluded := persistedByID[employee.ID]; alreadyIncluded {
+					employees = append(employees, employee)
+				}
 			}
 			return []CompanyRecord{{Company: company.Company, Address: company.Address, Employees: employees}}, nil
 		}

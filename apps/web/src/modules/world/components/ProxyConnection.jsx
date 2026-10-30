@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Folder } from "pixelarticons/react/Folder";
+import { Globe } from "pixelarticons/react/Globe";
 import { connectProxy, getProxyNodes } from "../api.js";
 import APIErrorNotice from "../../../shared/APIErrorNotice.jsx";
 
@@ -20,7 +22,6 @@ export default function ProxyConnection({ world, onConnected, hasOpenBrowser = f
       if (!active) return;
       setNodes(items);
       const current = items.find(({ id }) => id === world?.cityId);
-      setCountryId(current?.countryId ?? items[0]?.countryId ?? "");
       setCityId(current?.id ?? items[0]?.id ?? "");
     }).catch((requestError) => {
       if (active) setError({ cause: requestError, retry: () => setRetry((value) => value + 1) });
@@ -76,21 +77,25 @@ export default function ProxyConnection({ world, onConnected, hasOpenBrowser = f
         <span className="proxy-interface__status"><i aria-hidden="true" /> {world?.city?.toUpperCase() ?? "NODE OFFLINE"} · CURRENT EXIT</span>
       </header>
       <div className="proxy-interface__body">
-        <section aria-labelledby="proxy-countries-title">
-          <header><span id="proxy-countries-title">RESOLVER REGIONS</span><small>{loading ? "SCANNING" : `${countries.length} REGIONS`}</small></header>
-          {loading ? <p className="proxy-interface__loading" role="status">Loading proxy nodes…</p> : <nav aria-label="Countries">
-            {countries.map((country) => <button key={country.id} type="button" aria-pressed={country.id === countryId} disabled={busy} onClick={() => { setCountryId(country.id); setCityId(""); }}>
-              <span>{country.name}</span><small>{country.cities.length} CITY NODES</small>
+        <section className="proxy-interface__folder-view" aria-labelledby="proxy-countries-title">
+          <header>
+            <span id="proxy-countries-title">{selectedCountry ? "EXIT NODES" : "RESOLVER REGIONS"}</span>
+            <small>{loading ? "SCANNING" : selectedCountry ? selectedCountry.name.toUpperCase() : `${countries.length} COUNTRIES`}</small>
+          </header>
+          {loading ? <p className="proxy-interface__loading" role="status">Loading proxy nodes…</p> : selectedCountry ? <>
+            <nav className="proxy-interface__breadcrumb" aria-label="Folder path">
+              <button type="button" disabled={busy} onClick={() => setCountryId("")}>RESOLVER REGIONS</button><span aria-hidden="true">/</span><span aria-current="page">{selectedCountry.name.toUpperCase()}</span>
+            </nav>
+            <nav className="proxy-interface__nodes" aria-label={`Proxy nodes in ${selectedCountry.name}`}>
+            {selectedCountry.cities.map((node) => <button key={node.id} type="button" aria-pressed={node.id === cityId} disabled={busy} onClick={() => setCityId(node.id)}>
+              <span className="proxy-interface__node-icon" aria-hidden="true"><Globe /></span><span className="proxy-interface__node-name">{node.name}</span><small>{node.id === world?.cityId ? "ACTIVE · " : ""}{node.id.toUpperCase()} · {node.timeZone}</small>
+            </button>)}
+            </nav>
+          </> : <nav className="proxy-interface__folders" aria-label="Resolver country folders">
+            {countries.map((country) => <button key={country.id} type="button" disabled={busy} onClick={() => setCountryId(country.id)}>
+              <Folder aria-hidden="true" /><span>{country.name}</span><small>{country.cities.length} EXIT NODES</small>
             </button>)}
           </nav>}
-        </section>
-        <section aria-labelledby="proxy-cities-title">
-          <header><span id="proxy-cities-title">EXIT NODES</span><small>{selectedCountry?.name.toUpperCase() ?? "SELECT A REGION"}</small></header>
-          {selectedCountry ? <nav aria-label={`Proxy nodes in ${selectedCountry.name}`}>
-            {selectedCountry.cities.map((node) => <button key={node.id} type="button" aria-pressed={node.id === cityId} disabled={busy} onClick={() => setCityId(node.id)}>
-              <span>{node.name}</span><small>{node.id === world?.cityId ? "ACTIVE EXIT NODE" : node.timeZone}</small>
-            </button>)}
-          </nav> : <p className="proxy-interface__empty">Choose a country to view its city nodes.</p>}
         </section>
       </div>
       {error && <APIErrorNotice error={error.cause ?? error} onRetry={error.retry} retrying={loading} retryLabel="RETRY NODE CATALOG" className="proxy-interface__error" />}
@@ -104,7 +109,7 @@ export default function ProxyConnection({ world, onConnected, hasOpenBrowser = f
         <section className="proxy-route-confirm" role="alertdialog" aria-modal="true" aria-labelledby="proxy-route-confirm-title" aria-describedby="proxy-route-confirm-message" onKeyDown={(event) => { if (event.key === "Escape" && !busy) setPendingNode(null); }}>
           <p className="proxy-route-confirm__eyebrow">UNLISTED ROUTE CHANGE</p>
           <h3 id="proxy-route-confirm-title">Switch exit node?</h3>
-          <p id="proxy-route-confirm-message">Route traffic through {pendingNode.name}, {pendingNode.country}? {hasOpenBrowser ? "All open browser windows will close when the switch completes." : "The active city node will change when the switch completes."}</p>
+          <p id="proxy-route-confirm-message">Route traffic through {pendingNode.name}, {pendingNode.country}? {hasOpenBrowser ? "Open websites, newspapers and provider sessions will close when the switch completes." : "The active city node will change when the switch completes."}</p>
           <footer>
             <button type="button" autoFocus disabled={busy} onClick={() => setPendingNode(null)}>CANCEL</button>
             <button type="button" disabled={busy} onClick={() => { void applyRoute(pendingNode); }}>{busy ? "SWITCHING…" : "SWITCH ROUTE"}</button>
