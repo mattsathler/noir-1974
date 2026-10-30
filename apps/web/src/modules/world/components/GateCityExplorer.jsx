@@ -9,6 +9,7 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
   const [cityId, setCityId] = useState("");
   const [districtId, setDistrictId] = useState("");
   const [districtSearch, setDistrictSearch] = useState("");
+  const [appliedDistrictSearch, setAppliedDistrictSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [error, setError] = useState(null);
@@ -71,9 +72,9 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
   const selectedCity = cities.find((city) => city.id === cityId);
   const selectedDistrict = districts.find((district) => district.id === districtId);
   const filteredDistricts = useMemo(() => {
-    const query = districtSearch.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
+    const query = appliedDistrictSearch.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
     return query ? districts.filter(({ name }) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().includes(query)) : districts;
-  }, [districts, districtSearch]);
+  }, [districts, appliedDistrictSearch]);
 
   async function selectCity(city) {
     const request = ++districtRequest.current;
@@ -139,7 +140,7 @@ export default function GateCityExplorer({ world, onTravel, onClose }) {
             <div className="gate-interface__section-heading"><span id="gate-neighborhoods-heading">03 / NEIGHBORHOOD</span><small>{loadingDistricts ? "LOADING" : selectedCity ? `${districts.length} AVAILABLE` : "SELECT A CITY"}</small></div>
             {error && <APIErrorNotice error={error.cause ?? error} onRetry={error.retry} retrying={loading || loadingDistricts} retryLabel="RETRY GATE REQUEST" className="gate-interface__error" />}
             {loadingDistricts ? <p className="gate-interface__loading" role="status">Loading neighborhoods<span>…</span></p> : selectedCity ? <>
-              <label className="gate-interface__search"><span>SEARCH NEIGHBORHOODS</span><input type="search" value={districtSearch} onChange={(event) => setDistrictSearch(event.target.value)} placeholder="Filter neighborhoods" /></label>
+              <label className="gate-interface__search"><span>SEARCH NEIGHBORHOODS · PRESS ENTER</span><input type="search" value={districtSearch} onChange={(event) => setDistrictSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); setAppliedDistrictSearch(districtSearch); } }} placeholder="Type, then press Enter" aria-keyshortcuts="Enter" /></label>
               {filteredDistricts.length ? <nav className="gate-interface__districts" aria-label={`Neighborhoods in ${selectedCity.name}`}>
               {filteredDistricts.map((district) => <button className="gate-interface__district" key={district.id} type="button" aria-pressed={district.id === districtId} disabled={busy} onClick={() => setDistrictId(district.id)}>
                 <span>{district.name}</span><small>{district.id.endsWith("/district/central") ? "PUBLIC SERVICES" : "NEIGHBORHOOD"}</small>

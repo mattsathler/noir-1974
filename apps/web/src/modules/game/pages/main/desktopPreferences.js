@@ -3,6 +3,22 @@ export const DESKTOP_WALLPAPERS = [
   { id: "relay-blue", label: "Relay blue", image: "/images/desktop-wallpapers/relay-blue.svg" },
   { id: "olive-grid", label: "Olive grid", image: "/images/desktop-wallpapers/olive-grid.svg" },
   { id: "paper", label: "Warm paper", image: "/images/desktop-wallpapers/paper.svg" },
+  { id: "amber-circuit", label: "Amber circuit", image: "/images/desktop-wallpapers/amber-circuit.svg" },
+  { id: "atlantic-fog", label: "Atlantic fog", image: "/images/desktop-wallpapers/atlantic-fog.svg" },
+  { id: "copper-dusk", label: "Copper dusk", image: "/images/desktop-wallpapers/copper-dusk.svg" },
+  { id: "desert-signal", label: "Desert signal", image: "/images/desktop-wallpapers/desert-signal.svg" },
+  { id: "forest-relay", label: "Forest relay", image: "/images/desktop-wallpapers/forest-relay.svg" },
+  { id: "violet-frequency", label: "Violet frequency", image: "/images/desktop-wallpapers/violet-frequency.svg" },
+  { id: "redline", label: "Redline", image: "/images/desktop-wallpapers/redline.svg" },
+  { id: "glacier", label: "Glacier", image: "/images/desktop-wallpapers/glacier.svg" },
+  { id: "midnight-orbit", label: "Midnight orbit", image: "/images/desktop-wallpapers/midnight-orbit.svg" },
+  { id: "golden-hour", label: "Golden hour", image: "/images/desktop-wallpapers/golden-hour.svg" },
+  { id: "monochrome", label: "Monochrome", image: "/images/desktop-wallpapers/monochrome.svg" },
+  { id: "jade-current", label: "Jade current", image: "/images/desktop-wallpapers/jade-current.svg" },
+  { id: "rose-terminal", label: "Rose terminal", image: "/images/desktop-wallpapers/rose-terminal.svg" },
+  { id: "silver-grid", label: "Silver grid", image: "/images/desktop-wallpapers/silver-grid.svg" },
+  { id: "sahara-lines", label: "Sahara lines", image: "/images/desktop-wallpapers/sahara-lines.svg" },
+  { id: "polar-night", label: "Polar night", image: "/images/desktop-wallpapers/polar-night.svg" },
 ];
 
 export const DEFAULT_DESKTOP_PREFERENCES = { wallpaper: "meridian-night", theme: "dark" };

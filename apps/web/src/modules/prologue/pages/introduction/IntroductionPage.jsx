@@ -24,7 +24,6 @@ export default function IntroductionPage({ onComplete }) {
 
 export function LocationIntroductionPage({ world: initialWorld = null, onComplete }) {
   const [world, setWorld] = useState(initialWorld);
-  const [showTime, setShowTime] = useState(false);
   const [error, setError] = useState("");
   const completed = useRef(false);
 
@@ -42,31 +41,17 @@ export function LocationIntroductionPage({ world: initialWorld = null, onComplet
     return () => { active = false; };
   }, [world]);
 
-  function completeArrival() {
-    if (completed.current) return;
-    completed.current = true;
-    onComplete?.(world);
-  }
-
-  const timeZone = world?.timeZone ?? "Europe/Paris";
-  const serverTime = world ? new Date(world.serverTime) : null;
-  const location = world ? `${world.city}, ${world.country}` : "";
-  const formattedTime = serverTime && !Number.isNaN(serverTime.getTime())
-    ? new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit", hour12: true }).format(serverTime)
-    : "";
+  useEffect(() => {
+    if (world?.serverTime && !completed.current) {
+      completed.current = true;
+      onComplete?.(world);
+    }
+  }, [onComplete, world]);
 
   return (
     <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-deep text-primary" aria-label="Introduction to current location" aria-live="polite" aria-atomic="true">
-      <section className="pos-relative w-full max-w-2xl text-center">
-        <p className="text-xs tracking-widest uppercase text-success m-0">CURRENT LOCATION</p>
-        <h1 className="text-display tracking-widest leading-tight shadow-glow m-0 mt-4">
-          {location ? <Typewriter text={location} speed={105} onComplete={() => setShowTime(true)} /> : "Locating player"}
-        </h1>
-        {showTime && formattedTime && (
-          <p className="min-h-line mt-4 text-sm tracking-widest uppercase m-0">
-            LOCAL TIME · <Typewriter text={formattedTime} speed={90} onComplete={completeArrival} />
-          </p>
-        )}
+      <section className="pos-relative w-full max-w-2xl text-center" aria-busy={!world && !error}>
+        {!world && <p className="text-xs tracking-widest uppercase text-success m-0">CONNECTING TO CURRENT LOCATION…</p>}
         {error && <p className="text-sm text-danger mt-4" role="alert">{error}</p>}
       </section>
     </main>

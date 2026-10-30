@@ -16,6 +16,8 @@ export default function HospitalPatientSearch({ accessAttemptId, timeZone, onPri
     if (!query.trim() || busy) return;
     setBusy(true);
     setError("");
+    setPatients([]);
+    setHasSearched(false);
     setSelectedPatient(null);
     try {
       setPatients(await searchHospitalPatients(query.trim(), accessAttemptId));
@@ -44,8 +46,8 @@ export default function HospitalPatientSearch({ accessAttemptId, timeZone, onPri
       <form className="hospital-search__form" onSubmit={submit}>
         <label htmlFor="hospital-patient-query">PATIENT NAME</label>
         <div className="hospital-search__searchline">
-          <input id="hospital-patient-query" autoComplete="off" maxLength={80} value={query} onChange={(event) => { setQuery(event.target.value); setHasSearched(false); setPatients([]); setSelectedPatient(null); setError(""); }} placeholder="Enter a full or partial name" />
-          <button type="submit" disabled={busy || !query.trim()}>{busy ? "SEARCHING…" : "SEARCH"}</button>
+          <input id="hospital-patient-query" autoComplete="off" maxLength={80} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, then press Enter" aria-keyshortcuts="Enter" />
+          <button className="search-enter-submit" type="submit" tabIndex={-1} disabled={busy || !query.trim()} aria-label={busy ? "Searching" : "Press Enter to search"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button>
         </div>
       </form>
       {error && <p className="hospital-search__error" role="alert">{error}</p>}

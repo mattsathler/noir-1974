@@ -5,6 +5,7 @@ const PORTAL_INTRO = "NATIONAL DIRECTORY · MERIDIAN RELAY";
 
 export default function LegacyCountryPortal({ countryName, location, cityId = "", programs, navigate, onOpenCompany, onNavigateCompanyWebsite, initialSearch = "", initialCompanies = [] }) {
   const [search, setSearch] = useState(initialSearch);
+  const [appliedSearch, setAppliedSearch] = useState(initialSearch);
   const [companyResults, setCompanyResults] = useState(initialCompanies);
   const [searchMessage, setSearchMessage] = useState(initialCompanies.length ? "COMPANY LISTINGS RESTORED" : "");
   const [searching, setSearching] = useState(false);
@@ -32,11 +33,12 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
   const emailSite = { ...emailProgram, label: "MERIDIAN EMAIL", available: true };
   const directorySites = [hospitalSite, policeSite, enterpriseSite, emailSite];
   const openSite = (site) => navigate(site);
-  const visibleDirectorySites = directorySites.filter((site) => `${site.label} ${portalDescription(site.id)}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const visibleDirectorySites = directorySites.filter((site) => `${site.label} ${portalDescription(site.id)}`.toLocaleLowerCase().includes(appliedSearch.trim().toLocaleLowerCase()));
 
   async function submitSearch(event) {
     event.preventDefault();
     const term = search.trim();
+    setAppliedSearch(term);
     if (!term) {
       setCompanyResults([]);
       setSearchMessage("ENTER A COMPANY, WEBSITE, SERVICE OR ADDRESS TO SEARCH.");
@@ -62,7 +64,7 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
     setSearchMessage(`CONNECTING TO ${record.company.name.toUpperCase()}…`);
     try {
       const site = await onOpenCompany(record);
-      if (site) onNavigateCompanyWebsite?.(site, { query: search, companies: companyResults });
+      if (site) onNavigateCompanyWebsite?.(site, { query: appliedSearch, companies: companyResults });
     } catch (error) {
       setSearchMessage(error?.message || "THE COMPANY WEBSITE COULD NOT BE REACHED.");
     } finally {
@@ -73,7 +75,7 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
     <main className="legacy-site legacy-portal">
       <header className="legacy-site__masthead legacy-portal__masthead">
         <div><span className="legacy-site__brand">MERIDIAN</span><span className="legacy-site__brand-sub">NATIONAL DIRECTORY</span></div>
-        <form className="legacy-portal__search" onSubmit={submitSearch}><input type="search" aria-label="Search the National Directory" placeholder="Search companies, websites and services" value={search} onChange={(event) => setSearch(event.target.value)} /><button type="submit" disabled={searching}>{searching ? "SEARCHING…" : "SEARCH"}</button></form>
+        <form className="legacy-portal__search" onSubmit={submitSearch}><input type="search" aria-label="Search the National Directory" placeholder="Type a company, then press Enter" aria-keyshortcuts="Enter" value={search} onChange={(event) => setSearch(event.target.value)} /><button className="search-enter-submit" type="submit" tabIndex={-1} disabled={searching} aria-label={searching ? "Searching" : "Press Enter to search"}>{searching ? "SEARCHING…" : "ENTER ↵"}</button></form>
         <div className="legacy-site__masthead-note"><strong>{countryName || "COUNTRY PORTAL"}</strong><br />{location || "RELAY REGION NOT SET"}<br />Updated Thursday, 29 October</div>
       </header>
       <nav className="legacy-site__toplinks" aria-label="Portal sections">
@@ -102,7 +104,7 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
                 {openingCompanyId === record.company.id && <small role="status">CONNECTING…</small>}
               </article>)}
             </div>}
-            {!searching && search.trim() && !companyResults.length && !visibleDirectorySites.length && searchMessage.startsWith("NO MATCHING") && <p className="legacy-portal__no-results">No directory listings match “{search}”.</p>}
+            {!searching && appliedSearch.trim() && !companyResults.length && !visibleDirectorySites.length && searchMessage.startsWith("NO MATCHING") && <p className="legacy-portal__no-results">No directory listings match “{appliedSearch}”.</p>}
           </section>
           <div className="legacy-site__columns">
             <section id="notices" className="legacy-site__notice"><h2>Bulletin board</h2><ul><li><b>29 Oct</b> — Regional relay maintenance is scheduled after midnight.</li><li><b>28 Oct</b> — Municipal offices will observe the Armistice Day schedule.</li><li><b>24 Oct</b> — Police department publishes updated public records guidance.</li></ul><button type="button" onClick={() => policeSite && openSite(policeSite)}>Read department announcements »</button></section>

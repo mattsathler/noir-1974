@@ -69,6 +69,18 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
     setVisibleMonth(dateKey(next.getUTCFullYear(), next.getUTCMonth() + 1, 1));
   }
 
+  function chooseDate(candidate) {
+    onChange(candidate);
+    setOpen(false);
+    const form = triggerRef.current?.closest("form");
+    const pickers = form ? [...form.querySelectorAll(".world-record__date-trigger")] : [];
+    const index = pickers.indexOf(triggerRef.current);
+    const target = index >= 0 && index < pickers.length - 1
+      ? pickers[index + 1]
+      : form?.querySelector(".search-enter-submit");
+    window.setTimeout(() => (target || triggerRef.current)?.focus(), 0);
+  }
+
   const calendar = open && position && modal ? createPortal(
     <section ref={calendarRef} className="world-calendar" style={position} aria-label={`Choose ${label} date`}>
       <header className="world-calendar__header">
@@ -81,7 +93,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
         {days.map((day, index) => {
           if (day === null) return <span className="world-calendar__blank" key={`blank-${index}`} />;
           const candidate = dateKey(year, month + 1, day);
-          return <button key={candidate} type="button" aria-label={`${monthLabel(month + 1)} ${day}`} aria-pressed={candidate === value} disabled={candidate < minDate || candidate > maxDate} className={candidate === value ? "world-calendar__day world-calendar__day--selected" : "world-calendar__day"} onClick={() => { onChange(candidate); setOpen(false); }}>{day}</button>;
+          return <button key={candidate} type="button" aria-label={`${monthLabel(month + 1)} ${day}`} aria-pressed={candidate === value} disabled={candidate < minDate || candidate > maxDate} className={candidate === value ? "world-calendar__day world-calendar__day--selected" : "world-calendar__day"} onClick={() => chooseDate(candidate)}>{day}</button>;
         })}
       </div>
     </section>, modal,

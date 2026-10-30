@@ -32,6 +32,7 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
   const [missing, setMissing] = useState([]);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState(initialSearch);
+  const [appliedSearch, setAppliedSearch] = useState(initialSearch);
   const [fromDate, setFromDate] = useState(dateDaysBefore(initialTo, 30));
   const [toDate, setToDate] = useState(initialTo);
   const [appliedRange, setAppliedRange] = useState({ from: dateDaysBefore(initialTo, 30), to: initialTo });
@@ -67,7 +68,7 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
     return () => { active = false; };
   }, [cityId, appliedRange, retryCount]);
 
-  const needle = search.trim().toLocaleLowerCase();
+  const needle = appliedSearch.trim().toLocaleLowerCase();
   const visibleCases = useMemo(() => cases.filter((record) => !needle || (record.victimName ?? "").toLocaleLowerCase().includes(needle)), [cases, needle]);
   const visibleMissing = useMemo(() => missing.filter((person) => !needle || person.name.toLocaleLowerCase().includes(needle)), [missing, needle]);
   const missingIds = useMemo(() => new Set(missing.map((person) => person.npcId)), [missing]);
@@ -76,6 +77,8 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
 
   function searchDateRange(event) {
     event.preventDefault();
+    setAppliedSearch(search);
+    if (document.activeElement?.type === "search") return;
     if (!fromDate || !toDate) { setRangeError("SELECT BOTH DATES TO SEARCH THE CITY REGISTER."); return; }
     if (fromDate > toDate) { setRangeError("THE START DATE MUST COME BEFORE THE END DATE."); return; }
     setRangeError("");
@@ -114,12 +117,12 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
       <form className="case-files__filters" onSubmit={searchDateRange}>
         <label className="case-files__name-search">
           <span>SEARCH VICTIM OR MISSING PERSON</span>
-          <input type="search" maxLength="80" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="TYPE A NAME" />
+          <input type="search" maxLength="80" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="TYPE A NAME · PRESS ENTER" aria-keyshortcuts="Enter" />
         </label>
         <div className="world-record__activity-filter">
           <DatePicker label="FROM" value={fromDate} maxDate={toDate} onChange={setFromDate} />
           <DatePicker label="TO" value={toDate} minDate={fromDate} maxDate={issueDay || todayKey()} onChange={setToDate} />
-          <button type="submit">SEARCH OPEN CASES</button>
+          <button className="search-enter-submit" type="submit" tabIndex={-1} aria-label="Press Enter to search open cases">ENTER ↵</button>
         </div>
       </form>
       {rangeError && <p className="case-files__range-error" role="alert">{rangeError}</p>}

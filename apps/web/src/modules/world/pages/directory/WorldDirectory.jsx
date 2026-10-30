@@ -207,8 +207,8 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
       {!isStaffDirectory && !selectedPerson && <form className="world-directory__search" onSubmit={submitSearch}>
         <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isCompanyPortal ? "COMPANY, WEBSITE OR ADDRESS" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
         <div className="world-directory__searchline">
-          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Search a company directory" : isCompanyPortal ? "Search company, website, service, or address" : isPeopleSearch ? "Search personnel files" : "Search companies and locations"} />
-          <button type="submit" disabled={busy}>{busy ? "SEARCHING…" : "SEARCH"}</button>
+          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Type a name, then press Enter" : isCompanyPortal ? "Type a company, then press Enter" : isPeopleSearch ? "Type a name, then press Enter" : "Type a company, then press Enter"} aria-keyshortcuts="Enter" />
+          <button className="search-enter-submit" type="submit" tabIndex={-1} disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button>
         </div>
       </form>}
       {!selectedPerson && <p className="world-directory__message" role="status" aria-live="polite">{message}</p>}
@@ -258,7 +258,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
             <form className="world-record__activity-filter" onSubmit={(event) => loadNPCRecords(event, npc.id)}>
               <DatePicker label="FROM" value={recordRange.from} minDate={rangeStart} maxDate={rangeEnd} onChange={updateRecordFrom} />
               <DatePicker label="THROUGH" value={recordRange.to} minDate={rangeStart} maxDate={rangeEnd} onChange={updateRecordThrough} />
-              <button type="submit" disabled={activityBusy}>{activityBusy ? "READING…" : isBankRecords ? "READ FINANCIAL RECORDS" : "READ GATE LOGS"}</button>
+              <button className="search-enter-submit" type="submit" tabIndex={-1} disabled={activityBusy} aria-label="Press Enter to search records">{activityBusy ? "READING…" : "ENTER ↵"}</button>
             </form>
             {activityMessage && <p className="world-record__activity-message" role="status" aria-live="polite">{activityMessage}</p>}
             {activity.map((record) => <article className="world-record__activity-entry" key={record.id}>

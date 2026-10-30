@@ -37,23 +37,36 @@ import CharacterAppearanceEditor from "../../../identity/components/CharacterApp
 import { DEFAULT_DESKTOP_PREFERENCES, DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
 
 const BOOT_LINES = [
-  "MERID_OS PERSONAL COMPUTER · PRIVATE SESSION",
-  "CHECKING RELAY CONNECTION…",
-  "ACTIVE PROXY NODE FOUND",
-  "PRIVATE SYSTEM READY",
+  "PhoenixBIOS Meridian Systems 4.1 Release",
+  "Copyright 1974-1984 Meridian Enterprises",
+  "All Rights Reserved",
+  "BIOS version 4.1.74",
+  "System ID = M_OS-00250850",
+  "Build Time: 10/18/74 09:09:52",
+  "CPU: Meridian 16-bit Processor 1066 MHz",
+  "640K System RAM Passed",
+  "254M Extended RAM Passed",
+  "512K Cache SRAM Passed",
+  "System BIOS shadowed",
+  "Video BIOS shadowed",
+  "Detecting primary IDE controller… OK",
+  "Checking local file system… OK",
+  "Initializing Meridian network stack…",
+  "Private relay connection established",
+  "Loading Meridian OS workstation services…",
+  "System startup complete.",
 ];
-const PERSONAL_BOOT_STORAGE_KEY = "noir:computer:personal-booted";
+const LOGIN_BOOT_STORAGE_KEY = "noir:computer:booted-this-login";
 
-function hasPersonalComputerBooted() {
-  try { return sessionStorage.getItem(PERSONAL_BOOT_STORAGE_KEY) === "true"; }
+function hasBootedThisLogin() {
+  try { return sessionStorage.getItem(LOGIN_BOOT_STORAGE_KEY) === "true"; }
   catch { return false; }
 }
 
-function markPersonalComputerBooted() {
-  try { sessionStorage.setItem(PERSONAL_BOOT_STORAGE_KEY, "true"); }
-  catch { /* Keep the boot sequence available when browser storage is disabled. */ }
+function markBootedThisLogin() {
+  try { sessionStorage.setItem(LOGIN_BOOT_STORAGE_KEY, "true"); }
+  catch { /* Boot remains available when browser storage is disabled. */ }
 }
-
 const PERSONAL_PROGRAMS = [
   { id: "web-browser", label: "MERIDIAN WEB", Icon: Wifi, state: "ONLINE", available: true },
   { id: "police-website", label: "MERIDIAN POLICE", Icon: Files, state: "ONLINE", available: true },
@@ -169,7 +182,6 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
   const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
   const startMenuPrograms = persistent ? PERSONAL_START_MENU_PROGRAMS : programs;
-  const bootLines = isCompanyComputer ? [`${facilityContext.label} WORKSTATION`, "MERIDIAN AUTHENTICATION SERVICE…", "LOCAL SESSION READY"] : BOOT_LINES;
   const facilityAccessGranted = !isCompanyComputer || initialFacilityAccessGranted;
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const [proxyBoot, setProxyBoot] = useState({ active: false, target: "" });
@@ -192,7 +204,10 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
         : restored;
     } catch { return []; }
   });
-  const [booting, setBooting] = useState(() => isCompanyComputer || !hasPersonalComputerBooted());
+  const [booting, setBooting] = useState(() => !hasBootedThisLogin());
+  const [bootLinesVisible, setBootLinesVisible] = useState(0);
+  const [showMeridianLogo, setShowMeridianLogo] = useState(false);
+  const [pendingWindowRequests, setPendingWindowRequests] = useState([]);
   const [printDialog, setPrintDialog] = useState(null);
   const printDialogRef = useRef(printDialog);
   const modalRef = useRef(null);
@@ -208,6 +223,59 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
 
   useEffect(() => {
     return () => window.clearTimeout(bootTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!booting) return undefined;
+    markBootedThisLogin();
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) {
+      setBootLinesVisible(BOOT_LINES.length);
+      setShowMeridianLogo(true);
+      bootTimerRef.current = window.setTimeout(finishBoot, 4300);
+      return () => window.clearTimeout(bootTimerRef.current);
+    }
+    let line = 0;
+    const reveal = () => {
+      line += 1;
+      setBootLinesVisible(line);
+      if (line < BOOT_LINES.length) {
+        bootTimerRef.current = window.setTimeout(reveal, 190);
+      } else {
+        bootTimerRef.current = window.setTimeout(() => {
+          setShowMeridianLogo(true);
+          bootTimerRef.current = window.setTimeout(finishBoot, 4300);
+        }, 450);
+      }
+    };
+    bootTimerRef.current = window.setTimeout(reveal, 150);
+    return () => window.clearTimeout(bootTimerRef.current);
+  }, [booting]);
+
+  useEffect(() => {
+    const timers = windows.filter((item) => item.loading).map((item) => window.setTimeout(() => {
+      setWindows((previous) => previous.map((current) => current.id === item.id ? { ...current, loading: false } : current));
+    }, 700));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [windows]);
+
+  useLayoutEffect(() => {
+    const topWindow = [...windows].sort((left, right) => right.zIndex - left.zIndex)[0];
+    if (topWindow) document.documentElement.dataset.noirActiveComputerWindow = topWindow.id;
+    else delete document.documentElement.dataset.noirActiveComputerWindow;
+    return () => { delete document.documentElement.dataset.noirActiveComputerWindow; };
+  }, [windows]);
+
+  useLayoutEffect(() => {
+    function handleWindowRequest(event) {
+      const { windowId, requestId, pending } = event.detail || {};
+      if (!windowId || !requestId) return;
+      setPendingWindowRequests((previous) => pending
+        ? [...previous.filter((request) => request.requestId !== requestId), { windowId, requestId }]
+        : previous.filter((request) => request.requestId !== requestId));
+    }
+    document.addEventListener("noir:api-request-state", handleWindowRequest);
+    return () => document.removeEventListener("noir:api-request-state", handleWindowRequest);
   }, []);
 
   useEffect(() => {
@@ -272,10 +340,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   }, [windows]);
 
   function finishBoot() {
-    bootTimerRef.current = window.setTimeout(() => {
-      setBooting(false);
-      if (!isCompanyComputer) markPersonalComputerBooted();
-    }, 650);
+    setBooting(false);
   }
 
   function persistWindows() {
@@ -365,6 +430,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
 
   function focusWindow(windowId) {
     const zIndex = nextZIndexRef.current++;
+    document.documentElement.dataset.noirActiveComputerWindow = windowId;
     setWindows((previous) => previous.map((item) => item.id === windowId ? { ...item, zIndex } : item));
   }
 
@@ -375,7 +441,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
         const existingApp = windows.find((item) => item.program.id === program.id);
         if (existingApp) { focusWindow(existingApp.id); return; }
         const zIndex = nextZIndexRef.current++;
-        setWindows((previous) => [...previous, { id: `${program.id}:${zIndex}`, program, zIndex, position: null }]);
+        const id = `${program.id}:${zIndex}`;
+        document.documentElement.dataset.noirActiveComputerWindow = id;
+        setWindows((previous) => [...previous, { id, program, zIndex, position: null }]);
         return;
       }
       const browserWindow = sourceWindowId
@@ -383,8 +451,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
         : program.id === "web-browser" ? null : windows.find((item) => item.id.startsWith("noir-browser:"));
       if (browserWindow) {
         const zIndex = nextZIndexRef.current++;
+        document.documentElement.dataset.noirActiveComputerWindow = browserWindow.id;
         setWindows((previous) => previous.map((item) => item.id === browserWindow.id
-          ? { ...item, program, zIndex, history: program.id === "web-browser" ? [] : [...(item.history || []), sourceState ? { ...item.program, ...sourceState } : item.program] }
+          ? { ...item, program, zIndex, loading: program.id !== "web-browser", history: program.id === "web-browser" ? [] : [...(item.history || []), sourceState ? { ...item.program, ...sourceState } : item.program] }
           : item));
         return;
       }
@@ -395,7 +464,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
         left: Math.min(compact ? 8 + offset * 10 : 40 + offset * 28, compact ? 32 : 140),
         top: Math.min(compact ? 8 + offset * 10 : 32 + offset * 24, compact ? 32 : 120),
       };
-      setWindows((previous) => [...previous, { id: `noir-browser:${zIndex}`, program, zIndex, position, history: [] }]);
+      const id = `noir-browser:${zIndex}`;
+      document.documentElement.dataset.noirActiveComputerWindow = id;
+      setWindows((previous) => [...previous, { id, program, zIndex, position, history: [], loading: program.id !== "web-browser" }]);
       return;
     }
     const existing = windows.find((item) => item.program.id === program.id);
@@ -408,6 +479,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       left: Math.min(compact ? 8 + offset * 10 : 40 + offset * 28, compact ? 32 : 140),
       top: Math.min(compact ? 8 + offset * 10 : 32 + offset * 24, compact ? 32 : 120),
     };
+    document.documentElement.dataset.noirActiveComputerWindow = id;
     setWindows((previous) => [...previous, { id, program, zIndex, position }]);
   }
 
@@ -499,8 +571,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
           if (startMenuOpen && !event.target.closest(".computer-start-menu") && !event.target.closest(".computer-start")) setStartMenuOpen(false);
         }}>
           <div className="computer-screen__glass texture-scanlines" aria-hidden="true" />
-          {booting && <div className="computer-sequence computer-sequence--boot" role="status">
-            <Typewriter className="computer-sequence__typewriter" texts={bootLines} speed={26} lineDelay={220} onComplete={finishBoot} />
+          {booting && <div className={`computer-sequence computer-sequence--boot${showMeridianLogo ? " computer-sequence--logo" : ""}`} role="status" aria-live="polite">
+            {showMeridianLogo ? <strong className="computer-sequence__brand" aria-label="Meridian OS"><span>M</span><span>OS</span></strong> : <div className="computer-sequence__bios">{BOOT_LINES.slice(0, bootLinesVisible).map((line, index) => <span key={`${line}-${index}`}>{line}</span>)}</div>}
           </div>}
           <header className={`computer-menubar${persistent ? " computer-menubar--desktop-hidden" : ""}`}>
             <p className="computer-brand"><span className="computer-brand__mark">M</span> MERID_OS <span className="computer-brand__divider">/</span> MERIDIAN ENTERPRISES</p>
@@ -547,6 +619,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
 
             {windows.map((desktopWindow) => {
               const { id, program, position, zIndex } = desktopWindow;
+              const requestPending = pendingWindowRequests.some((request) => request.windowId === id);
               const companySiteName = program.id === "company-website"
                 ? program.website?.company?.name || program.website?.Company?.name || program.label
                 : program.label;
@@ -556,7 +629,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 data-site-variant={institutionalVariant(program.id)}
                 data-window-id={id}
                 key={id}
-                style={{ ...(position || {}), zIndex, ...(program.id === "character-appearance" ? { height: "min(48vh, 30rem)" } : {}) }}
+                style={{ ...(position || {}), zIndex, ...(requestPending ? { "--computer-window-loading-top": persistent ? (["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? "2rem" : "3.9rem") : "2.75rem" } : {}), ...(program.id === "character-appearance" ? { height: "min(48vh, 30rem)" } : {}) }}
                 aria-label={`${companySiteName} ${["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? "application" : "website"} window`}
                 onMouseDown={() => focusWindow(id)}
               >
@@ -565,7 +638,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                   <button type="button" className="computer-window__close" aria-label={`Close ${companySiteName}`} onClick={() => closeWindow(id)}>×</button>
                 </header>
                 <div className={`computer-browser-address${["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : program.id === "proxy" ? "control://rogue-dns" : browserAddress(program, countryName, facilityContext)}</span><span className="computer-browser-address__secure">{program.id === "proxy" ? "UNLISTED NETWORK" : "PRIVATE RELAY"}</span></div>
-                <div className={`computer-window__body${persistent && !["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? " computer-window__body--website" : ""}`}>
+                <div className={`computer-window__body${persistent && !["newspaper", "settings", "character-appearance", "proxy"].includes(program.id) ? " computer-window__body--website" : ""}${desktopWindow.loading ? " computer-window__body--loading" : ""}`} aria-busy={desktopWindow.loading || requestPending}>
+                  {desktopWindow.loading ? <div className="computer-browser-loading" role="status" aria-label="Loading webpage" /> : <>
                   {program.id === "settings"
                     ? <DesktopSettings preferences={desktopPreferences} accountUsername={accountUsername} character={character} characterPreviewVisual={characterPreviewVisual} location={location} onEditCharacter={() => launchProgram(CHARACTER_APPEARANCE_PROGRAM)} onChange={(patch) => onDesktopPreferencesChange?.(patch)} onLogout={onLogout} />
                     : program.id === "character-appearance"
@@ -575,7 +649,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         world={{ city: location?.split(",")[0], cityId, country: countryName }}
                         hasOpenBrowser={windows.some((item) => item.id.startsWith("noir-browser:"))}
                         onConnected={onProxyConnected}
-                        onRouteChanged={() => setWindows((previous) => previous.filter((item) => !item.id.startsWith("noir-browser:")))}
+                        onRouteChanged={() => setWindows((previous) => previous.filter((item) => ["proxy", "settings"].includes(item.program.id)))}
                         onBusyChange={(active, node) => setProxyBoot({ active, target: node ? `${node.name}, ${node.country}` : "" })}
                       />
                     : program.id === "web-browser"
@@ -656,7 +730,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                                       ? <AccusationWindow key={id} stationLocationId={facilityContext?.locationId} onClose={() => closeWindow(id)} />
                                           : <WorldDirectory key={`${id}:${program.id}`} program={program.id} companyLocationId={program.id === "staff-directory" ? program.companyLocationId : undefined} companyId={program.id === "staff-directory" ? program.companyId : undefined} facilityLocationId={facilityContext?.locationId} accessAttemptId={program.id === "staff-directory" ? program.accessAttemptId : accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} initialSearch={program.searchTerm} initialCompanies={program.searchResults} onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })} />}
                       </InstitutionalWebsiteFrame>}
+                  </>}
                 </div>
+                {requestPending && <div className="computer-window-loading-cover" role="status" aria-label={`Loading ${companySiteName}`} />}
               </section>;
             })}
             {printDialog && <section className="page-print-dialog" style={{ zIndex: Math.max(20, ...windows.map((item) => item.zIndex + 1)) }} role="dialog" aria-modal="true" aria-labelledby="page-print-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setPrintDialog(null); }}>

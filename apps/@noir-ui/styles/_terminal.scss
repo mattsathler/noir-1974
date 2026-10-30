@@ -1,11 +1,9 @@
-.noir-api-pending,
-.noir-api-pending * { cursor: wait !important; }
-
 .computer-launch-group {
   display: flex;
   align-items: center;
   gap: var(--noir-space-2);
 }
+.search-enter-submit { pointer-events: none; cursor: default !important; }
 
 .game-hud__location {
   display: flex;
@@ -516,8 +514,15 @@
   letter-spacing: 0.12em;
 }
 .computer-sequence--boot span { animation: none; }
-.computer-sequence--boot { color: var(--noir-brass-300); }
-.computer-sequence--boot .typewriter__line[data-last-line="true"] { color: var(--noir-success); }
+.computer-sequence--boot { justify-content: flex-start; gap: 0; padding: clamp(1rem, 3vw, 2rem); color: #d4d7d2; background: #050505; font-family: "Courier New", monospace; font-size: clamp(0.65rem, 1.3vw, 0.82rem); font-weight: 700; letter-spacing: 0.015em; line-height: 1.32; }
+.computer-sequence__bios { display: flex; flex-direction: column; }
+.computer-sequence--logo { align-items: center; justify-content: center; background: #f3f1e8; }
+.computer-sequence__brand { display: grid; justify-items: center; gap: 0; color: #202a30; line-height: 0.78; text-shadow: none; }
+.computer-sequence__brand span:first-child { color: #00b8d1; font: italic 400 clamp(4.6rem, 13vw, 8rem)/0.82 "Segoe Script", "URW Chancery L", "Brush Script MT", cursive; letter-spacing: -0.12em; transform: rotate(-8deg) translateX(-0.08em); }
+.computer-sequence__brand span:last-child { margin-top: 0.35rem; color: #202a30; font: 500 clamp(1.55rem, 4.5vw, 2.6rem)/1 var(--noir-font-sans); letter-spacing: -0.045em; }
+.computer-window__body--loading { background: #fff !important; }
+.computer-browser-loading { width: 100%; height: 100%; min-height: 12rem; background: #fff; cursor: progress; }
+.computer-window-loading-cover { position: absolute; z-index: 999; top: var(--computer-window-loading-top, 2.75rem); right: 0; bottom: 0; left: 0; background: #fff; cursor: wait; }
 .computer-sequence--proxy { z-index: 10002; gap: 1rem; color: #d6bd83; background: #030504; letter-spacing: 0.06em; }
 .computer-sequence--proxy__heading { margin: 0; color: #d39a43; font-size: 0.62rem; font-weight: bold; letter-spacing: 0.14em; }
 .computer-sequence--proxy .typewriter__line { display: block; min-height: 1.45em; }
@@ -1399,7 +1404,8 @@
 .desktop-settings__account-actions button:disabled { color: #777; cursor: default; }
 .desktop-settings__account-actions .desktop-settings__logout { color: #a40000; }
 .desktop-settings__account-actions .desktop-settings__logout:hover,.desktop-settings__account-actions .desktop-settings__logout:focus-visible { color: #760000; }
-.appearance-editor__windowed { width: 100%; box-sizing: border-box; padding: 1rem; color: #26343d; background: #fff; font: 0.72rem Arial, Helvetica, sans-serif; }
+.appearance-editor__windowed { display: flex; width: 100%; min-height: 100%; flex: 1 1 auto; flex-direction: column; box-sizing: border-box; padding: 1rem; color: #26343d; background: #fff; font: 0.72rem Arial, Helvetica, sans-serif; }
+.appearance-editor__windowed form { display: flex; flex: 1 1 auto; flex-direction: column; }
 .appearance-editor__windowed > header { padding-bottom: 0.65rem; border-bottom: 1px solid #d1d9de; }
 .appearance-editor__windowed > header p { margin: 0 0 0.3rem; color: #28567d !important; font: bold 0.55rem Arial, sans-serif !important; letter-spacing: 0.08em !important; }
 .appearance-editor__windowed h2 { margin: 0 0 0.8rem !important; color: #183e62 !important; font: bold 1rem Arial, sans-serif !important; letter-spacing: 0 !important; }
@@ -1409,7 +1415,7 @@
 .appearance-editor__windowed .appearance-editor__field { color: #3d4a51; font: 0.65rem Arial, sans-serif; }
 .appearance-editor__windowed .appearance-editor__field select { min-height: 2rem; padding: 0.3rem; color: #202c34; background: #fff; border: 1px solid #9eacb9; font: 0.66rem Arial, sans-serif; }
 .appearance-editor__windowed .appearance-editor__error { color: #a40000 !important; font-size: 0.68rem !important; }
-.appearance-editor__windowed footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 0.7rem; }
+.appearance-editor__windowed footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: auto; padding-top: 0.7rem; }
 .appearance-editor__windowed footer button { padding: 0; color: #0645ad; background: transparent; border: 0; cursor: pointer; font: bold 0.64rem Arial, sans-serif; text-decoration: underline; text-underline-offset: 2px; }
 .appearance-editor__windowed footer button:hover,.appearance-editor__windowed footer button:focus-visible { color: #002f78; }
 .appearance-editor__windowed footer button:disabled { color: #777; cursor: default; }

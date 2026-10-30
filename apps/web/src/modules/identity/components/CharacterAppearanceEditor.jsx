@@ -90,7 +90,7 @@ export default function CharacterAppearanceEditor({ character, onClose, onSaved,
         </fieldset>
       </div>
       {error && <p className="appearance-editor__error" role="alert">{error}</p>}
-      <footer><button type="button" disabled={saving} onClick={onClose}>CANCEL</button><button type="submit" disabled={!options || saving}>{saving ? "SAVING…" : "SAVE APPEARANCE"}</button></footer>
+      <footer><button type="submit" disabled={!options || saving}>{saving ? "SAVING…" : "SAVE APPEARANCE"}</button></footer>
     </form>
   </section>;
 
@@ -106,7 +106,7 @@ export default function CharacterAppearanceEditor({ character, onClose, onSaved,
           </fieldset>
         </div>
         {error && <p className="appearance-editor__error" role="alert">{error}</p>}
-        <footer><button type="button" disabled={saving} onClick={onClose}>CANCEL</button><button type="submit" disabled={!options || saving}>{saving ? "SAVING…" : "SAVE APPEARANCE"}</button></footer>
+        <footer><button type="submit" disabled={!options || saving}>{saving ? "SAVING…" : "SAVE APPEARANCE"}</button></footer>
       </form>
     </section>
   </div>;

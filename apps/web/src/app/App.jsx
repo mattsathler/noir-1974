@@ -98,6 +98,8 @@ export default function App() {
     let active = true;
     setIdentity(null);
     setWorld(null);
+    try { sessionStorage.removeItem("noir:computer:booted-this-login"); }
+    catch { /* Storage may be disabled by the browser. */ }
     logoutAccount().catch(() => {}).finally(() => {
       if (active) navigate("/login", "login");
     });

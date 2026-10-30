@@ -30,7 +30,7 @@ export default function PoliceWebsite({ page = "police-website", navigate, child
         <button type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}>PUBLIC NOTICES</button>
         <button type="button" onClick={() => navigate(POLICE_ABOUT_PAGE)}>ABOUT</button>
       </nav>
-      <form className="legacy-police__site-search" onSubmit={searchReports}><label htmlFor="police-site-search">SEARCH POLICE INFORMATION</label><input id="police-site-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Victim or missing person" /><button type="submit">SEARCH REPORTS</button></form>
+      <form className="legacy-police__site-search" onSubmit={searchReports}><label htmlFor="police-site-search">SEARCH POLICE INFORMATION</label><input id="police-site-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Type a name, then press Enter" aria-keyshortcuts="Enter" /><button className="search-enter-submit" type="submit" tabIndex={-1} aria-label="Press Enter to search reports">ENTER ↵</button></form>
       <div className="legacy-site__layout legacy-police__layout">
         <aside className="legacy-site__sidebar">
           <section className="legacy-police__date"><b>THURSDAY</b><strong>29</strong><span>OCTOBER</span></section>

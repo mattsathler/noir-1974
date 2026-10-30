@@ -9,6 +9,8 @@ export default function NeighborhoodExplorer({ world, onTravel, onVisit, onClose
   const [selectedDestination, setSelectedDestination] = useState(null);
   const [neighborhoodSearch, setNeighborhoodSearch] = useState("");
   const [buildingSearch, setBuildingSearch] = useState("");
+  const [appliedNeighborhoodSearch, setAppliedNeighborhoodSearch] = useState("");
+  const [appliedBuildingSearch, setAppliedBuildingSearch] = useState("");
   const closeRef = useRef(null);
 
   useEffect(() => {
@@ -80,11 +82,11 @@ export default function NeighborhoodExplorer({ world, onTravel, onVisit, onClose
     ? selectedDestination?.locations.filter(({ address }) => address.kind === "building") ?? []
     : [];
   const normalizeSearch = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
-  const neighborhoodQuery = normalizeSearch(neighborhoodSearch.trim());
+  const neighborhoodQuery = normalizeSearch(appliedNeighborhoodSearch.trim());
   const filteredDestinations = neighborhoodQuery
     ? destinations.filter(({ name }) => normalizeSearch(name).includes(neighborhoodQuery))
     : destinations;
-  const buildingQuery = normalizeSearch(buildingSearch.trim());
+  const buildingQuery = normalizeSearch(appliedBuildingSearch.trim());
   const filteredBuildings = buildingQuery
     ? buildings.filter(({ address }) => normalizeSearch(address.name).includes(buildingQuery))
     : buildings;
@@ -107,7 +109,7 @@ export default function NeighborhoodExplorer({ world, onTravel, onVisit, onClose
           <aside className="gate-interface__destinations" aria-label="Neighborhood destinations">
             <div className="gate-interface__section-heading"><span>01 / NEIGHBORHOODS</span><small>{loadingDestinations ? "SYNCING" : `${destinations.length} DISTRICTS`}</small></div>
             {loadingDestinations ? <p className="gate-interface__loading" role="status" aria-live="polite">Loading neighborhoods<span>…</span></p> : <>
-              <label className="gate-interface__search"><span>SEARCH NEIGHBORHOODS</span><input type="search" value={neighborhoodSearch} onChange={(event) => setNeighborhoodSearch(event.target.value)} placeholder="Filter neighborhoods" /></label>
+              <label className="gate-interface__search"><span>SEARCH NEIGHBORHOODS · PRESS ENTER</span><input type="search" value={neighborhoodSearch} onChange={(event) => setNeighborhoodSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); setAppliedNeighborhoodSearch(neighborhoodSearch); } }} placeholder="Type, then press Enter" aria-keyshortcuts="Enter" /></label>
               {filteredDestinations.length ? <nav className="gate-interface__districts" aria-label="Available neighborhoods">
                 {filteredDestinations.map((district) => <button className="gate-interface__district" key={district.id} type="button" aria-pressed={district.id === selectedDestination?.id} aria-current={district.id === currentDistrict?.id ? "location" : undefined} disabled={busy} onClick={() => setSelectedDestination(district)}><span>{district.name}</span><small>{district.id === currentDistrict?.id ? "CURRENT DISTRICT" : "OPEN NEIGHBORHOOD"}</small></button>)}
               </nav> : <p className="gate-interface__empty">No neighborhoods match that search.</p>}
@@ -120,7 +122,7 @@ export default function NeighborhoodExplorer({ world, onTravel, onVisit, onClose
               <h3 className="gate-interface__district-name">{selectedDestination.name}</h3>
               <p className="gate-interface__caption">BUILDINGS IN THIS NEIGHBORHOOD</p>
               {!isCurrentDistrict ? <p className="gate-interface__empty">Building records are available after opening this neighborhood.</p> : buildings.length ? <>
-                <label className="gate-interface__search"><span>SEARCH BUILDINGS</span><input type="search" value={buildingSearch} onChange={(event) => setBuildingSearch(event.target.value)} placeholder="Filter buildings" /></label>
+                <label className="gate-interface__search"><span>SEARCH BUILDINGS · PRESS ENTER</span><input type="search" value={buildingSearch} onChange={(event) => setBuildingSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); setAppliedBuildingSearch(buildingSearch); } }} placeholder="Type, then press Enter" aria-keyshortcuts="Enter" /></label>
                 {filteredBuildings.length ? <div className="gate-interface__places">
                 {filteredBuildings.map(({ address }) => <div className="gate-interface__place" key={address.locationId}>
                   <span>{address.name}</span>
