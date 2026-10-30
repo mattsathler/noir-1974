@@ -21,7 +21,7 @@ describe("AccusationWindow", () => {
       ],
     });
 
-    render(<AccusationWindow stationLocationId="police-station" onClose={vi.fn()} />);
+    render(<AccusationWindow cityId="fr/lyon" onClose={vi.fn()} />);
 
     expect(await screen.findByText(/AT LEAST ONE PIN MARKED PROOF/)).toHaveClass("is-missing");
     expect(screen.getByText(/ONE PERSON MARKED VICTIM/)).toHaveClass("is-missing");
@@ -39,7 +39,7 @@ describe("AccusationWindow", () => {
       ],
     });
 
-    render(<AccusationWindow stationLocationId="police-station" onClose={vi.fn()} />);
+    render(<AccusationWindow cityId="fr/lyon" onClose={vi.fn()} />);
 
     expect(await screen.findByText(/AT LEAST ONE PIN MARKED PROOF/)).toHaveClass("is-missing");
     expect(screen.getByRole("button", { name: "SUBMIT ACCUSATION" })).toBeDisabled();
@@ -57,10 +57,10 @@ describe("AccusationWindow", () => {
     });
     submitCaseAccusation.mockResolvedValue({ status: "pending" });
 
-    render(<AccusationWindow stationLocationId="police-station" onClose={vi.fn()} />);
+    render(<AccusationWindow cityId="fr/lyon" onClose={vi.fn()} />);
     fireEvent.click(await screen.findByRole("button", { name: "SUBMIT ACCUSATION" }));
 
-    expect(submitCaseAccusation).toHaveBeenCalledWith("board-2", "police-station");
+    expect(submitCaseAccusation).toHaveBeenCalledWith("board-2", "service:lyon/police-station");
     expect(await screen.findByText(/REVIEW IS IN PROGRESS.*ABOUT 3 MINUTES/)).toBeInTheDocument();
   });
 
@@ -81,12 +81,12 @@ describe("AccusationWindow", () => {
     }));
     submitCaseAccusation.mockResolvedValue({ status: "pending" });
 
-    render(<AccusationWindow stationLocationId="police-station" onClose={vi.fn()} />);
+    render(<AccusationWindow cityId="fr/lyon" onClose={vi.fn()} />);
     expect(await screen.findByRole("combobox", { name: "INVESTIGATION BOARD" })).toHaveValue("board-new");
     expect(screen.getByRole("option", { name: /First submission.*SUBMITTED · LOCKED/ })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "SUBMIT ACCUSATION" }));
 
-    expect(submitCaseAccusation).toHaveBeenCalledWith("board-new", "police-station");
+    expect(submitCaseAccusation).toHaveBeenCalledWith("board-new", "service:lyon/police-station");
     expect(await screen.findByText(/REVIEW IS IN PROGRESS/)).toBeInTheDocument();
   });
 });

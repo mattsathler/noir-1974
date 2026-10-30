@@ -1409,11 +1409,7 @@ func (h *Handler) submitAccusation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cityID := h.worldFor(r.Context(), current.ID).CityID
-	cityKey := cityID
-	if cityID == "fr/lyon" {
-		cityKey = "lyon"
-	}
-	if input.StationLocationID != "service:"+cityKey+"/police-station" {
+	if input.StationLocationID != expectedServiceLocationID(cityID, "police") {
 		http.Error(w, "a valid police station in the current city is required", http.StatusBadRequest)
 		return
 	}

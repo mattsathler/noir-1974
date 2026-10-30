@@ -727,7 +727,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         ? <PoliceWebsite page={program.id} navigate={(destination) => launchProgram(destination, id)} searchId={`police-site-search-${id}`}>
                             {program.id === "warrant-request"
                               ? <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} standalone onClose={() => closeWindow(id)} />
-                              : <AccusationWindow key={id} stationLocationId={facilityContext?.locationId} standalone onClose={() => closeWindow(id)} />}
+                              : <AccusationWindow key={id} cityId={cityId} standalone onClose={() => closeWindow(id)} />}
                           </PoliceWebsite>
                       : <InstitutionalWebsiteFrame
                         variant={institutionalVariant(program.id)}
@@ -762,7 +762,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                                   : program.id === "warrant-request"
                                     ? <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} onClose={() => closeWindow(id)} />
                                     : program.id === "murder-accusation"
-                                      ? <AccusationWindow key={id} stationLocationId={facilityContext?.locationId} onClose={() => closeWindow(id)} />
+                                      ? <AccusationWindow key={id} cityId={cityId} onClose={() => closeWindow(id)} />
                                           : <WorldDirectory key={`${id}:${program.id}`} program={program.id} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} onBeginCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, true) : undefined} onCancelCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, false) : undefined} initialSearch={program.searchTerm} initialCompanies={program.searchResults} onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })} />}
                     {desktopWindow.navigationPending && <div className="computer-browser-loading" role="status" aria-label="Loading webpage" />}
                       </InstitutionalWebsiteFrame>}

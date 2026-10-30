@@ -9,7 +9,7 @@ function boardReadiness(board) {
   return { hasProof, hasAccused, hasVictim, ready: hasProof && hasAccused && hasVictim };
 }
 
-export default function AccusationWindow({ stationLocationId, onClose, standalone = false }) {
+export default function AccusationWindow({ cityId, onClose, standalone = false }) {
   const [boards, setBoards] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,8 @@ export default function AccusationWindow({ stationLocationId, onClose, standalon
     setBusy(true);
     setMessage("FORWARDING ACCUSATION FOR REVIEW…");
     try {
-      const result = await submitCaseAccusation(selectedBoard.id, stationLocationId);
+      const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
+      const result = await submitCaseAccusation(selectedBoard.id, `service:${cityKey}/police-station`);
       markWhiteboardSubmitted(selectedBoard.id);
       setBoards((previous) => previous.map((board) => board.id === selectedBoard.id ? { ...board, lockedAt: new Date().toISOString() } : board));
       setSubmitted(true);
