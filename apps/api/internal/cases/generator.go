@@ -305,8 +305,8 @@ func buildConnectedCaseRecords(seed string, worldVersion int, caseID string, sel
 		reference := fmt.Sprintf("unregistered account %04d", keyIndex(key, "account-reference", 10000))
 		paidAt := crimeAt.AddDate(0, 0, -2).Add(-70 * time.Minute)
 		result = append(result,
-			records.Record{ID: caseRecordID(key, "payment-out", selected.victimID), NPCID: selected.victimID, Source: "bank", OccurredAt: paidAt, Operator: "Meridian Global Settlement Office", Description: "An anonymous remittance was sent and cleared.", Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: "extortion_payment", RelatedNPCID: selected.killerID},
-			records.Record{ID: caseRecordID(key, "payment-in", selected.killerID), NPCID: selected.killerID, Source: "bank", OccurredAt: paidAt, Operator: "Meridian Global Settlement Office", Description: "An anonymous remittance was received and cleared.", Reference: reference, Amount: amount, Direction: "incoming", CaseID: caseID, InternalRelation: "extortion_payment", RelatedNPCID: selected.victimID},
+			records.Record{ID: caseRecordID(key, "payment-out", selected.victimID), NPCID: selected.victimID, Source: "bank", OccurredAt: paidAt, Operator: "Union Mercantile Settlement Office", Description: "An anonymous remittance was sent and cleared.", Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: "extortion_payment", RelatedNPCID: selected.killerID},
+			records.Record{ID: caseRecordID(key, "payment-in", selected.killerID), NPCID: selected.killerID, Source: "bank", OccurredAt: paidAt, Operator: "Union Mercantile Settlement Office", Description: "An anonymous remittance was received and cleared.", Reference: reference, Amount: amount, Direction: "incoming", CaseID: caseID, InternalRelation: "extortion_payment", RelatedNPCID: selected.victimID},
 		)
 		result = append(result, buildTransferDecoys(key, caseID, base, selected, crimeAt)...)
 	}
@@ -358,8 +358,8 @@ func buildTransferDecoys(key, caseID string, base world.World, selected candidat
 		reference := fmt.Sprintf("unregistered account %04d", keyIndex(key, "decoy-account/"+from.ID, 10000))
 		at := crimeAt.AddDate(0, 0, -4-index/2).Add(time.Duration(9*60+keyIndex(key, "decoy-time/"+from.ID, 8*60)) * time.Minute)
 		result = append(result,
-			records.Record{ID: caseRecordID(key, "decoy-out/"+from.ID, to.ID), NPCID: from.ID, Source: "bank", OccurredAt: at, Operator: "Meridian Global Settlement Office", Description: "An anonymous remittance was sent and cleared.", Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: "unrelated_transfer", RelatedNPCID: to.ID},
-			records.Record{ID: caseRecordID(key, "decoy-in/"+to.ID, from.ID), NPCID: to.ID, Source: "bank", OccurredAt: at, Operator: "Meridian Global Settlement Office", Description: "An anonymous remittance was received and cleared.", Reference: reference, Amount: amount, Direction: "incoming", CaseID: caseID, InternalRelation: "unrelated_transfer", RelatedNPCID: from.ID},
+			records.Record{ID: caseRecordID(key, "decoy-out/"+from.ID, to.ID), NPCID: from.ID, Source: "bank", OccurredAt: at, Operator: "Union Mercantile Settlement Office", Description: "An anonymous remittance was sent and cleared.", Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: "unrelated_transfer", RelatedNPCID: to.ID},
+			records.Record{ID: caseRecordID(key, "decoy-in/"+to.ID, from.ID), NPCID: to.ID, Source: "bank", OccurredAt: at, Operator: "Union Mercantile Settlement Office", Description: "An anonymous remittance was received and cleared.", Reference: reference, Amount: amount, Direction: "incoming", CaseID: caseID, InternalRelation: "unrelated_transfer", RelatedNPCID: from.ID},
 		)
 	}
 	return result

@@ -167,6 +167,10 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 	}
 	lead := Article{ID: "city-desk-" + cityID + "-" + dateKey, Section: "CITY DESK", Headline: "A quiet day for the city police", Summary: fmt.Sprintf("There are no current homicide inquiries or new arrests in %s. Local authorities remain on duty.", city)}
 	articles := makeLightStories(local, serverID+"/"+cityID, dateKey)
+	// The political conflict is part of the city's daily atmosphere, not a
+	// one-off case event. Keep both viewpoints in every edition so the player
+	// repeatedly encounters the regime's framing and the Crow's justification.
+	articles = append(makeConflictStories(serverID+"/"+cityID, dateKey), articles...)
 	var discoveries []cases.PublicBodyDiscovery
 	if reader, ok := service.cases.(bodyDiscoveryReader); ok {
 		discoveries, err = reader.ListPublicBodyDiscoveries(ctx, serverID, cityID, serverTime)
@@ -248,6 +252,26 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 		Lead:        lead,
 		Articles:    articles,
 	}, nil
+}
+
+func makeConflictStories(key, dateKey string) []Article {
+	dayKey := key + "/" + dateKey
+	billReports := []newsTemplate{
+		{id: "bill-bouer-crow-01", headline: "Bill Bouer: The Crow's war on the system leaves ordinary residents exposed", summary: "In a broadcast carried by the state news service, investigator Bill Bouer said The Crow's attacks on corporate records put workers and residents at risk. A skull mark found on the breached terminal is being treated as the fugitive's signature. The Crow calls his campaign resistance; police say it is theft and sabotage."},
+		{id: "bill-bouer-crow-02", headline: "Bill Bouer reports new lead in the hunt for The Crow", summary: "Bouer said investigators are tracing stolen corporate files and a skull mark left at the scene. He urged residents to report suspicious access. The Crow's supporters describe the raids as a strike against institutions that answer to no one."},
+		{id: "bill-bouer-crow-03", headline: "Bouer warns that The Crow's latest raid was no harmless protest", summary: "Bill Bouer said the breach disrupted services used by the public and pointed to the skull painted near the access point. The Crow claims the target financed state surveillance; officials reject that account and promise a wider investigation."},
+	}
+	appWarnings := []newsTemplate{
+		{id: "illegal-apps-01", headline: "Police warn residents against Ghostkey and other illicit applications", summary: "Authorities say bypass tools such as Ghostkey can expose private records and bring severe penalties. The notice calls their use a threat to public order; underground users say the same tools reveal what officials hide."},
+		{id: "illegal-apps-02", headline: "Possession of unauthorized network tools may draw prosecution, ministry warns", summary: "The ministry named Ghostkey among applications used to break into protected systems. Investigators link such tools to The Crow's thefts, while the fugitive argues that locked corporate files conceal abuses."},
+		{id: "illegal-apps-03", headline: "City bulletin: report Ghostkey and unlicensed access software", summary: "The public notice warns that installing illicit applications may be treated as intent to breach state or corporate networks. Critics say the rule makes even looking for evidence a crime."},
+	}
+	selectStory := func(group []newsTemplate, slot string) Article {
+		index := int(storyRank(dayKey, slot) % uint64(len(group)))
+		item := group[index]
+		return Article{ID: item.id, Section: "STATE WATCH", Headline: item.headline, Summary: item.summary}
+	}
+	return []Article{selectStory(billReports, "bill-report"), selectStory(appWarnings, "illicit-app-warning")}
 }
 
 func bodyDiscoveryArticle(discovery cases.PublicBodyDiscovery) Article {

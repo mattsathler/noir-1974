@@ -1,6 +1,6 @@
 # I03 — Minimizar janelas do computador
 
-**Status:** Proposta  
+**Status:** Implementada  
 **Origem:** Observação de uso da interface do computador pessoal  
 **Escopo:** Curto/médio
 
@@ -22,14 +22,16 @@ Cada janela oferece um controle para minimizá-la. O aplicativo permanece aberto
 
 ## Critérios de aceite
 
-- [ ] Cada janela de aplicativo apresenta botão de minimizar com nome acessível e foco visível.
-- [ ] Minimizar oculta a janela da área de trabalho, sem encerrar o aplicativo nem descartar conteúdo, rascunhos ou estado local.
-- [ ] A barra de tarefas indica quais aplicativos estão minimizados e restaura a janela correspondente ao ser acionada.
-- [ ] Restaurar mantém posição e conteúdo e traz a janela restaurada para frente.
-- [ ] Minimizar uma janela não minimiza as demais nem interfere em diálogos modais independentes.
-- [ ] Fechar uma janela minimizada remove sua entrada da barra de tarefas e mantém a semântica atual de fechamento.
-- [ ] O fluxo funciona com teclado, ponteiro e nos viewports suportados, sem controles inacessíveis ou sobrepostos.
-- [ ] O estado minimizado é restaurado de forma consistente após recarga na mesma sessão, de acordo com a persistência de janelas existente.
+- [x] Cada janela de aplicativo apresenta botão de minimizar com nome acessível e foco visível.
+- [x] Minimizar oculta a janela da área de trabalho, sem encerrar o aplicativo nem descartar conteúdo, rascunhos ou estado local.
+- [x] A barra de tarefas indica quais aplicativos estão minimizados e restaura a janela correspondente ao ser acionada.
+- [x] Restaurar mantém posição e conteúdo e traz a janela restaurada para frente.
+- [x] Minimizar uma janela não minimiza as demais nem interfere em diálogos modais independentes.
+- [x] Fechar uma janela minimizada remove sua entrada da barra de tarefas e mantém a semântica atual de fechamento.
+- [x] O fluxo funciona com teclado, ponteiro e nos viewports suportados, sem controles inacessíveis ou sobrepostos.
+- [x] O estado minimizado é restaurado de forma consistente após recarga na mesma sessão, de acordo com a persistência de janelas existente.
+
+Implementada no computador pessoal. O estado minimizado integra a persistência de janelas da sessão e a janela permanece montada enquanto oculta, mantendo o estado local dos aplicativos.
 
 ## Fora de escopo
 

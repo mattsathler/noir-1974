@@ -221,7 +221,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
         <div><p className="computer-window__eyebrow">MERIDIAN GLOBAL · NATIONAL COMPANY PORTAL</p><h1>Company websites</h1><span>Find registered businesses and visit their public company pages.</span></div>
         <aside><small>CONNECTED COUNTRY</small><strong>{countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</strong><span>NATIONAL LISTINGS</span></aside>
       </header> : <>
-        <p className="computer-window__eyebrow">{isInterpol ? `CORPORATE SECURITY OFFICE · ${countryName ? `${countryName.toUpperCase()} ` : "COUNTRYWIDE "}PERSONNEL SEARCH` : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "MERIDIAN GLOBAL SETTLEMENT OFFICE · PRIVILEGED SESSION" : "MERIDIAN ENTERPRISES · GATE CONTROL ARCHIVE · AUTHORIZED SESSION"}</p>
+        <p className="computer-window__eyebrow">{isInterpol ? `CORPORATE SECURITY OFFICE · ${countryName ? `${countryName.toUpperCase()} ` : "COUNTRYWIDE "}PERSONNEL SEARCH` : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "UNION MERCANTILE BANK · PRIVILEGED SESSION" : "MERIDIAN ENTERPRISES · GATE CONTROL ARCHIVE · AUTHORIZED SESSION"}</p>
         <h1>{isInterpol ? "COUNTRYWIDE PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "FINANCIAL LEDGER SEARCH" : "GATE ACCESS LOGS"}</h1>
       </>}
       {isInterpol && <p className="world-directory__scope">SEARCH JURISDICTION · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</p>}

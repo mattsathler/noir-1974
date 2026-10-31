@@ -30,8 +30,15 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
     state: "ONLINE",
     available: true,
   };
+  const bankSite = {
+    id: "bank-website",
+    label: "UNION MERCANTILE BANK",
+    Icon: null,
+    state: "ONLINE",
+    available: true,
+  };
   const emailSite = { ...emailProgram, label: "MERIDIAN EMAIL", available: true };
-  const directorySites = [hospitalSite, policeSite, enterpriseSite, emailSite];
+  const directorySites = [hospitalSite, policeSite, bankSite, enterpriseSite, emailSite];
   const openSite = (site) => navigate(site);
   const visibleDirectorySites = directorySites.filter((site) => `${site.label} ${portalDescription(site.id)}`.toLocaleLowerCase().includes(appliedSearch.trim().toLocaleLowerCase()));
 
@@ -123,8 +130,8 @@ function portalDescription(id) {
     "police-website": "Department news, public safety information and access to published incident reports.",
     "personal-mail": "Private correspondence delivered to your personal account.",
     "company-portal": "Search the national register of companies and visit their public listings.",
-    "public-services": "Hospitals, municipal offices, banks and other city services.",
     "hospital-website": "Hospital information, departments, visiting hours and admissions guidance for the connected city.",
+    "bank-website": "Branch information, savings services and public notices from Union Mercantile Bank.",
     "meridian-enterprises": "Corporate information, Meridian OS services and the GATE network. Access logs are available inside the GATE section.",
   })[id] || "Public information and records available through the connected relay.";
 }

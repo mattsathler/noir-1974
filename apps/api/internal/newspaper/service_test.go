@@ -152,3 +152,25 @@ func TestIssueReturnsCaseReaderErrors(t *testing.T) {
 		t.Fatalf("buildIssue() error = %v, want %v", err, failure)
 	}
 }
+
+func TestConflictStoriesAppearEveryDayAndRotateTheirReporting(t *testing.T) {
+	var billReports, appWarnings = map[string]bool{}, map[string]bool{}
+	for day := 1; day <= 30; day++ {
+		dateKey := time.Date(1974, time.October, day, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+		stories := makeConflictStories("server/fr/lyon", dateKey)
+		if len(stories) != 2 {
+			t.Fatalf("day %s has %d conflict stories, want 2", dateKey, len(stories))
+		}
+		if stories[0].Section != "STATE WATCH" || !strings.Contains(stories[0].Headline+stories[0].Summary, "Bill Bouer") || !strings.Contains(stories[0].Headline+stories[0].Summary, "The Crow") {
+			t.Fatalf("day %s has no Bouer/Crow report: %+v", dateKey, stories[0])
+		}
+		if !strings.Contains(strings.ToLower(stories[1].Headline+stories[1].Summary), "ghostkey") {
+			t.Fatalf("day %s has no Ghostkey warning: %+v", dateKey, stories[1])
+		}
+		billReports[stories[0].ID] = true
+		appWarnings[stories[1].ID] = true
+	}
+	if len(billReports) < 2 || len(appWarnings) < 2 {
+		t.Fatalf("daily reporting did not rotate: Bouer stories=%d, app warnings=%d", len(billReports), len(appWarnings))
+	}
+}

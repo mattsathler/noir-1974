@@ -99,7 +99,7 @@ func (fakeDirectory) TransitDistrictsForCity(_ context.Context, _, cityID string
 	return []world.DistrictDestination{
 		{ID: city.ID + "/district/central", Name: "Central", Locations: []world.LocationRecord{
 			{Address: address("police-station", city.Name+" Police Station", "")},
-			{Address: address("meridian-bank", "Meridian Bank", "")},
+			{Address: address("meridian-bank", "Union Mercantile Bank", "")},
 			{Address: address("gate-station", "Central GATE Station", "")},
 			{Address: address("hospital", city.Name+" Hospital", "open")},
 		}},
@@ -292,7 +292,7 @@ func TestNPCRecordsRequiresSessionAndReturnsSelectedIntervalWithoutClassificatio
 	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid", locationID: "service:lyon/meridian-bank"}
 	reader := &fakeRecordReader{items: []records.Record{{
 		ID: "record:1", NPCID: "npc:one", Source: "bank", OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
-		Operator: "Meridian Global Settlement Office", Description: "A private remittance cleared.", CaseID: "case:hidden", InternalRelation: "extortion_payment",
+		Operator: "Union Mercantile Settlement Office", Description: "A private remittance cleared.", CaseID: "case:hidden", InternalRelation: "extortion_payment",
 	}, {
 		ID: "record:2", NPCID: "npc:one", Source: "gate", OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
 		Operator: "Meridian Global · GATE Network", Description: "A passenger entry was recorded.",

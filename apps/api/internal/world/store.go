@@ -2190,7 +2190,7 @@ func centralServiceLocations(city Region) []LocationRecord {
 	}
 	services := []struct{ id, name, status string }{
 		{"police-station", city.Name + " Police Station", ""},
-		{"meridian-bank", "Meridian Bank", ""},
+		{"meridian-bank", "Union Mercantile Bank", ""},
 		{"gate-station", "Central GATE Station", ""},
 		{"hospital", city.Name + " Hospital", "open"},
 	}

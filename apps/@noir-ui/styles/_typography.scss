@@ -17,3 +17,6 @@
 .leading-normal { line-height: 1.5; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .break-words { overflow-wrap: anywhere; }
+*,
+*::before,
+*::after { font-family: var(--noir-font-family) !important; }

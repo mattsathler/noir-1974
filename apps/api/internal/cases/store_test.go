@@ -22,6 +22,43 @@ type testCaseRow struct {
 	err    error
 }
 
+func TestBillDispatchPostscriptIsStableVariedAndFramesTheConflict(t *testing.T) {
+	first := billDispatchPostscript("mail:case-1")
+	if first != billDispatchPostscript("mail:case-1") {
+		t.Fatal("same dispatch seed produced different political context")
+	}
+	if !strings.Contains(first, "BILL BOUER") || !strings.Contains(first, "The Crow") || !strings.Contains(first, "skull") {
+		t.Fatalf("dispatch postscript omits the central conflict: %q", first)
+	}
+	variants := map[string]bool{}
+	for index := 0; index < 30; index++ {
+		variants[billDispatchPostscript(fmt.Sprintf("mail:case-%d", index))] = true
+	}
+	if len(variants) < 2 {
+		t.Fatalf("political context did not vary across messages: %d variants", len(variants))
+	}
+}
+
+func TestPoliticalInterrogationAnswersGiveResidentsDifferentPerspectives(t *testing.T) {
+	answers := politicalInterrogationAnswers("shared-seed", "npc:resident")
+	if len(answers["unusual"]) != 1 || len(answers["worries"]) != 1 {
+		t.Fatalf("political testimony should add one line to two topics: %+v", answers)
+	}
+	for _, question := range []string{"unusual", "worries"} {
+		line := answers[question][0]
+		if !strings.Contains(line, "The Crow") || !strings.Contains(strings.ToLower(line), "skull") && !strings.Contains(strings.ToLower(line), "ghostkey") {
+			t.Fatalf("%s answer lacks world context: %q", question, line)
+		}
+	}
+	variants := map[string]bool{}
+	for index := 0; index < 20; index++ {
+		variants[politicalInterrogationAnswers("shared-seed", fmt.Sprintf("npc:%d", index))["unusual"][0]] = true
+	}
+	if len(variants) < 2 {
+		t.Fatal("residents repeat the same political testimony")
+	}
+}
+
 type emptyCaseRows struct{ pgx.Rows }
 
 func (*emptyCaseRows) Close()                                       {}
@@ -450,7 +487,7 @@ func TestNPCRecordsQueryIsScopedAndOmitsBackendClassification(t *testing.T) {
 	publicRecord := records.Record{
 		ID: "record:extortion", NPCID: "npc:victim", Source: "bank",
 		OccurredAt: time.Date(1974, 11, 10, 16, 42, 0, 0, time.UTC),
-		Operator:   "Meridian Global Settlement Office", Description: "A private remittance cleared.",
+		Operator:   "Union Mercantile Settlement Office", Description: "A private remittance cleared.",
 	}
 	data, err := json.Marshal(publicRecord)
 	if err != nil {

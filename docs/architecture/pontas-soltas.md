@@ -4,6 +4,7 @@ Não tratar estes itens como decididos. Cada fechamento vira um ADR em `docs/dec
 
 ## Infra e dados
 
+- Modelo Online: identidade do personagem por servidor/instância; diferença entre seed do mundo base e escopo de mutations/casos; criação de mundos singleplayer privados e entrada/compartilhamento de mundos multiplayer. Ver [ADR 0014 — proposta](../decisions/0014-personagens-e-instancias-singleplayer-multiplayer.md).
 - Estratégia operacional de migrations para aplicar/evoluir o [schema inicial](schema-inicial.sql).
 - Cache: o que cachear.
 - Materialização: a âncora é criada quando uma identidade precisa ser referenciada; definir limiares e gatilhos concretos com o gerador.

@@ -18,8 +18,8 @@ describe("PlayerMailbox", () => {
       body: "The authorized search is complete.", attachments: [],
     }]);
     const setInterval = vi.spyOn(window, "setInterval");
-    render(<PlayerMailbox />);
-    expect(await screen.findByText("NO PERSONAL MAIL ON FILE")).toBeInTheDocument();
+    render(<PlayerMailbox serverTime={new Date("1974-10-23T12:00:00Z")} />);
+    expect(await screen.findByText("NO MESSAGES IN THIS DATE RANGE")).toBeInTheDocument();
 
     const poll = setInterval.mock.calls.find(([, delay]) => delay === 15000)?.[0];
     expect(poll).toBeTypeOf("function");
@@ -27,5 +27,19 @@ describe("PlayerMailbox", () => {
 
     expect(screen.getByText("Residential search report · Ana Costa")).toBeInTheDocument();
     expect(getPlayerEmails).toHaveBeenCalledTimes(2);
+  });
+
+  it("notifies when a new message arrives after the mailbox has loaded", async () => {
+    const message = { id: "new-mail", sentAt: "1974-10-23T23:03:00Z", subject: "A new dispatch", sender: "Bill Bouer", body: "Read this report.", attachments: [] };
+    const onMessageReceived = vi.fn();
+    getPlayerEmails.mockResolvedValueOnce([]).mockResolvedValueOnce([message]);
+    const setInterval = vi.spyOn(window, "setInterval");
+    render(<PlayerMailbox serverTime={new Date("1974-10-23T12:00:00Z")} onMessageReceived={onMessageReceived} />);
+    expect(await screen.findByText("NO MESSAGES IN THIS DATE RANGE")).toBeInTheDocument();
+    expect(onMessageReceived).not.toHaveBeenCalled();
+
+    const poll = setInterval.mock.calls.find(([, delay]) => delay === 15000)?.[0];
+    await act(async () => { poll(); });
+    expect(onMessageReceived).toHaveBeenCalledWith(message);
   });
 });

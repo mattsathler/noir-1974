@@ -17,7 +17,7 @@ A arquitetura pode ser resumida nesta frase:
 | [Casos](casos.md) | Definição vs estado; crime como consequência |
 | [Correio eletrônico](correio-eletronico.md) | Geração de mensagens, caixas consultáveis e separação de classificação interna |
 | [API conceitual](api.md) | REST, servidor autoritativo |
-| [Pontas soltas](pontas-soltas.md) | O que ainda não está fechado |
+| [Pontas soltas](pontas-soltas.md) | O que ainda não está fechado, incluindo a [proposta de instâncias singleplayer/multiplayer](../decisions/0014-personagens-e-instancias-singleplayer-multiplayer.md) |
 
 ## Diagrama
 

@@ -37,7 +37,7 @@ describe("CharacterAppearanceEditor", () => {
     fireEvent.change(hair, { target: { value: "hair_long_curly_brown" } });
     expect(screen.getByRole("img", { name: "Pixel-art portrait of Ada" })).toBeInTheDocument();
     expect(updateCharacterAppearance).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(onClose).toHaveBeenCalledOnce();
     expect(updateCharacterAppearance).not.toHaveBeenCalled();
   });
@@ -49,7 +49,7 @@ describe("CharacterAppearanceEditor", () => {
     render(<CharacterAppearanceEditor character={{ displayName: "Ada", visual }} onClose={vi.fn()} onSaved={onSaved} />);
 
     fireEvent.change(await screen.findByLabelText("Hair"), { target: { value: "hair_long_curly_brown" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save appearance" }));
+    fireEvent.click(screen.getByRole("button", { name: /Save appearance/i }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(updated));
     expect(updateCharacterAppearance).toHaveBeenCalledWith({ ...visual, hairId: "hair_long_curly_brown" });
   });

@@ -4,7 +4,7 @@ Esta pasta é a fonte de verdade escrita do projeto. Código implementa o que es
 
 | Pasta | Para quê |
 | --- | --- |
-| [`project/`](project/visao.md) | O que o jogo é: visão, loop, universo narrativo e [lore](project/lore.md) |
+| [`project/`](project/visao.md) | O que o jogo é: visão, loop, universo narrativo, [lore](project/lore.md) e [próximas milestones](project/direcao-e-proximas-milestones.md) |
 | [`architecture/`](architecture/README.md) | Arquitetura desejada (modelo híbrido, geração, API conceitual) |
 | [`decisions/`](decisions/README.md) | Decisões tomadas no desenvolvimento (ADRs) |
 | [`dev-rules/`](dev-rules/README.md) | Regras para quem escreve código neste repositório |

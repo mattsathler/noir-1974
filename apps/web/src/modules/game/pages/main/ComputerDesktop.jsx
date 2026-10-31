@@ -21,7 +21,6 @@ import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
 import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, requestFacilitySiteAccess, setWhiteboardSaveState } from "../../../world/api.js";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
-import PublicServices from "../../../world/pages/directory/PublicServices.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
 import PlayerMailbox from "../../../mail/pages/inbox/PlayerMailbox.jsx";
 import HospitalPatientSearch from "./HospitalPatientSearch.jsx";
@@ -32,6 +31,8 @@ import LegacyCountryPortal from "./LegacyCountryPortal.jsx";
 import PoliceWebsite from "./PoliceWebsite.jsx";
 import InstitutionalWebsiteFrame from "./InstitutionalWebsiteFrame.jsx";
 import HospitalWebsite from "./HospitalWebsite.jsx";
+import BankWebsite from "./BankWebsite.jsx";
+import StockExchangeApp from "./StockExchangeApp.jsx";
 import MeridianEnterprisesWebsite from "./MeridianEnterprisesWebsite.jsx";
 import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx";
 import DeepLinkWebsite from "./DeepLinkWebsite.jsx";
@@ -42,6 +43,7 @@ import GhostkeyExplorer from "./GhostkeyExplorer.jsx";
 import EmailBreakerApp from "./EmailBreakerApp.jsx";
 import TerminalApp from "./TerminalApp.jsx";
 import EmployeeDirectoryApp from "./EmployeeDirectoryApp.jsx";
+import NotificationCenter from "./NotificationCenter.jsx";
 import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
 import { DEFAULT_DESKTOP_PREFERENCES, DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
 
@@ -66,6 +68,7 @@ const BOOT_LINES = [
   "System startup complete.",
 ];
 const LOGIN_BOOT_STORAGE_KEY = "noir:computer:booted-this-login";
+const NOOP = () => {};
 
 function hasBootedThisLogin() {
   try { return sessionStorage.getItem(LOGIN_BOOT_STORAGE_KEY) === "true"; }
@@ -83,7 +86,7 @@ const PERSONAL_PROGRAMS = [
   { id: "newspaper", label: "THE EVENING COURIER", Icon: Note, state: "ONLINE", available: true },
   { id: "personal-mail", label: "PERSONAL MAIL", Icon: Mail, state: "ONLINE", available: true },
   { id: "company-portal", label: "COMPANY PORTAL", Icon: MapIcon, state: "ONLINE", available: true },
-  { id: "public-services", label: "CITY SERVICES DIRECTORY", Icon: Cross, state: "ONLINE", available: true },
+  { id: "stock-exchange", label: "STOCK EXCHANGE", Icon: Dollar, state: "ONLINE", available: true },
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
 ];
 const WEB_BROWSER_PROGRAM = PERSONAL_PROGRAMS[0];
@@ -103,7 +106,7 @@ function localServiceLocationId(cityId, service) {
   const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
   return `service:${cityKey}/${service}`;
 }
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request"];
+const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -119,7 +122,7 @@ const START_MENU_DESCRIPTIONS = {
   newspaper: "Local news and city reports",
   "personal-mail": "Private correspondence",
   "company-portal": "National business directory",
-  "public-services": "Hospitals and civic offices",
+  "stock-exchange": "Trade national company shares and manage your portfolio",
   "city-records": "People and places index",
   settings: "Desktop and account settings",
   "interpol": "Personnel search",
@@ -162,9 +165,10 @@ function institutionalVariant(programId) {
   if (programId === "patient-search") return "hospital";
   if (programId === "hospital-patient-record") return "hospital";
   if (programId === "hospital-website") return "hospital";
+  if (programId === "bank-website") return "bank";
   if (programId === "bank-records") return "bank";
   if (programId === "gate-records") return "gate";
-  if (["public-services", "city-records"].includes(programId)) return "civic";
+  if (programId === "city-records") return "civic";
   if (programId === "personal-mail") return "mail";
   return "company";
 }
@@ -217,10 +221,11 @@ function browserAddress(program, facilityContext, cityId) {
   return networkSiteAddress(program, countryId, program.id);
 }
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onPrepareProxy, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenTelephone, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onPrepareProxy, onNotification, notifications = [], notificationsOpen = false, onToggleNotifications = () => {}, onCloseNotifications = () => {}, snackbar, onDismissSnackbar = () => {}, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenTelephone, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, playerProgression = null, onProgressionChange = NOOP, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
+  const notifyNewPlayerMessage = useCallback((message) => onNotification?.({ type: "EMAIL", title: message.subject || "New email received", message: `From ${message.sender || "unknown sender"}.` }), [onNotification]);
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
-  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PROXY_PROGRAM, TERMINAL_PROGRAM, PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
+  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PROXY_PROGRAM, TERMINAL_PROGRAM, ...(!isCompanyComputer ? [PERSONAL_PROGRAMS.find((program) => program.id === "stock-exchange")] : []), PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
   const startMenuPrograms = persistent ? PERSONAL_START_MENU_PROGRAMS : programs;
   const facilityAccessGranted = !isCompanyComputer || initialFacilityAccessGranted;
   const [startMenuOpen, setStartMenuOpen] = useState(false);
@@ -244,7 +249,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               : item.programId === PERSON_SEARCH_PROGRAM.id && persistent
                 ? PERSON_SEARCH_PROGRAM
             : programs.find((entry) => entry.id === item.programId);
-        return program?.available ? [{ ...item, program }] : [];
+        return program?.available ? [{ ...item, program, minimized: Boolean(item.minimized) }] : [];
       });
       return persistent
         ? restored.map((item) => ({ ...item, id: item.program.id === "newspaper" ? `newspaper:${item.zIndex}` : item.id.startsWith("noir-browser:") ? item.id : `noir-browser:${item.zIndex}` }))
@@ -306,7 +311,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   }, [windows]);
 
   useLayoutEffect(() => {
-    const topWindow = [...windows].sort((left, right) => right.zIndex - left.zIndex)[0];
+    const topWindow = windows.filter((item) => !item.minimized).sort((left, right) => right.zIndex - left.zIndex)[0];
     if (topWindow) document.documentElement.dataset.noirActiveComputerWindow = topWindow.id;
     else delete document.documentElement.dataset.noirActiveComputerWindow;
     return () => { delete document.documentElement.dataset.noirActiveComputerWindow; };
@@ -326,7 +331,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     routedFacilityAccessRef.current = accessKey;
     const zIndex = nextZIndexRef.current++;
     setWindows((previous) => previous.map((item) => item.id === browserWindow.id
-      ? { ...item, program: destination, zIndex, history: [...(item.history || []), item.program] }
+      ? { ...item, program: destination, zIndex, minimized: false, history: [...(item.history || []), item.program] }
       : item));
   }, [facilityContext?.companyId, facilityContext?.kind, facilityContext?.locationId, initialAccessAttemptId, initialFacilityAccessGranted, isCompanyComputer, persistent, programs]);
 
@@ -338,7 +343,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     try {
       sessionStorage.setItem("noir:computer:windows", JSON.stringify({
         savedAt: Date.now(),
-        windows: windows.map(({ id, program, zIndex, position }) => ({ id, programId: program.id, zIndex, position })),
+        windows: windows.map(({ id, program, zIndex, position, minimized }) => ({ id, programId: program.id, zIndex, position, minimized: Boolean(minimized) })),
       }));
     } catch { /* Storage may be disabled by the browser. */ }
   }, [windows]);
@@ -350,7 +355,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       windows.forEach((item) => {
         const element = windowRefs.current.get(item.id);
         const parent = element?.parentElement;
-        if (!element || !parent) return;
+        if (!element || !parent || item.minimized) return;
         element.style.maxHeight = `${Math.max(0, parent.clientHeight - 32)}px`;
         const parentBounds = parent.getBoundingClientRect();
         const bounds = element.getBoundingClientRect();
@@ -381,7 +386,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     try {
       sessionStorage.setItem("noir:computer:windows", JSON.stringify({
         savedAt: Date.now(),
-        windows: windowsStateRef.current.map(({ id, program, zIndex, position }) => ({ id, programId: program.id, zIndex, position })),
+        windows: windowsStateRef.current.map(({ id, program, zIndex, position, minimized }) => ({ id, programId: program.id, zIndex, position, minimized: Boolean(minimized) })),
       }));
     } catch { /* Storage may be disabled by the browser. */ }
   }
@@ -436,7 +441,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     function handleModalKeys(event) {
       if (event.key === "Escape") {
         if (printDialogRef.current) { setPrintDialog(null); return; }
-        const topWindow = [...windowsStateRef.current].sort((a, b) => b.zIndex - a.zIndex)[0];
+        const topWindow = windowsStateRef.current.filter((item) => !item.minimized).sort((a, b) => b.zIndex - a.zIndex)[0];
         if (topWindow) closeWindow(topWindow.id);
         else exitComputer();
         return;
@@ -462,10 +467,22 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     };
   }, [onClose, persistent]);
 
-  function focusWindow(windowId) {
+  function focusWindow(windowId, focusContainer = true) {
     const zIndex = nextZIndexRef.current++;
     document.documentElement.dataset.noirActiveComputerWindow = windowId;
-    setWindows((previous) => previous.map((item) => item.id === windowId ? { ...item, zIndex } : item));
+    setWindows((previous) => previous.map((item) => item.id === windowId ? { ...item, zIndex, minimized: false } : item));
+    if (focusContainer) window.requestAnimationFrame(() => windowRefs.current.get(windowId)?.focus({ preventScroll: true }));
+  }
+
+  function minimizeWindow(windowId) {
+    const nextActive = windowsStateRef.current.filter((item) => item.id !== windowId && !item.minimized).sort((left, right) => right.zIndex - left.zIndex)[0];
+    setWindows((previous) => previous.map((item) => item.id === windowId ? { ...item, minimized: true } : item));
+    if (nextActive) document.documentElement.dataset.noirActiveComputerWindow = nextActive.id;
+    else delete document.documentElement.dataset.noirActiveComputerWindow;
+    window.requestAnimationFrame(() => {
+      [...(modalRef.current?.querySelectorAll(".computer-taskbar__active") ?? [])]
+        .find((button) => button.dataset.windowId === windowId)?.focus({ preventScroll: true });
+    });
   }
 
   function setWebsiteNavigationPending(windowId, navigationPending) {
@@ -526,7 +543,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
           if (program.id === "gate-records" && program.accessAttemptId) {
             const zIndex = nextZIndexRef.current++;
             document.documentElement.dataset.noirActiveComputerWindow = existingApp.id;
-            setWindows((previous) => previous.map((item) => item.id === existingApp.id ? { ...item, program, zIndex } : item));
+            setWindows((previous) => previous.map((item) => item.id === existingApp.id ? { ...item, program, zIndex, minimized: false } : item));
           } else focusWindow(existingApp.id);
           return;
         }
@@ -661,6 +678,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
           if (startMenuOpen && !event.target.closest(".computer-start-menu") && !event.target.closest(".computer-start")) setStartMenuOpen(false);
         }}>
           <div className="computer-screen__glass texture-scanlines" aria-hidden="true" />
+          <NotificationCenter notifications={notifications} open={notificationsOpen} onToggle={onToggleNotifications} onClose={onCloseNotifications} snackbar={snackbar} onDismissSnackbar={onDismissSnackbar} />
           {booting && <div className={`computer-sequence computer-sequence--boot${showMeridianLogo ? " computer-sequence--logo" : ""}`} role="status" aria-live="polite">
             {showMeridianLogo ? <strong className="computer-sequence__brand" aria-label="Meridian OS"><span>M</span><span>OS</span></strong> : <div className="computer-sequence__bios">{BOOT_LINES.slice(0, bootLinesVisible).map((line, index) => <span key={`${line}-${index}`}>{line}</span>)}</div>}
           </div>}
@@ -714,14 +732,17 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 : program.label;
               return <section
                 ref={(element) => { if (element) windowRefs.current.set(id, element); else windowRefs.current.delete(id); }}
-                className={`computer-window${position ? " computer-window--positioned" : ""}${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window--website" : ""}${persistent && DESKTOP_APP_IDS.includes(program.id) ? " computer-window--app" : ""}${program.id === "ghostkey" ? " computer-window--ghostkey" : ""}${program.id === "terminal" ? " computer-window--terminal" : ""}${program.accessedViaGhost ? " computer-window--ghost-compromised" : ""}${program.id === "settings" ? " computer-window--settings" : ""}${program.id === "character-appearance" ? " computer-window--character-appearance" : ""}${program.id === "proxy" ? " computer-window--proxy" : ""}`}
+                className={`computer-window${desktopWindow.minimized ? " computer-window--minimized" : ""}${position ? " computer-window--positioned" : ""}${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window--website" : ""}${persistent && DESKTOP_APP_IDS.includes(program.id) ? " computer-window--app" : ""}${program.id === "ghostkey" ? " computer-window--ghostkey" : ""}${program.id === "terminal" ? " computer-window--terminal" : ""}${program.accessedViaGhost ? " computer-window--ghost-compromised" : ""}${program.id === "settings" ? " computer-window--settings" : ""}${program.id === "character-appearance" ? " computer-window--character-appearance" : ""}${program.id === "proxy" ? " computer-window--proxy" : ""}`}
                 data-site-variant={institutionalVariant(program.id)}
                 data-window-id={id}
                 key={id}
+                hidden={desktopWindow.minimized}
+                tabIndex={-1}
                 style={{ ...(position || {}), zIndex, ...(program.id === "character-appearance" ? { height: "min(48vh, 30rem)" } : {}) }}
                 aria-label={`${companySiteName} ${DESKTOP_APP_IDS.includes(program.id) ? "application" : "website"} window`}
-                onMouseDown={() => {
-                  focusWindow(id);
+                onMouseDown={(event) => {
+                  const clickedControl = event.target.closest("input, textarea, select, button, a, label, [contenteditable='true']");
+                  focusWindow(id, !clickedControl);
                   if (program.id === "terminal") window.requestAnimationFrame(() => windowRefs.current.get(id)?.querySelector(".terminal-app__prompt input")?.focus({ preventScroll: true }));
                 }}
                 onClickCapture={() => {
@@ -730,13 +751,16 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               >
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
                   <span>{persistent && !["web-browser", ...DESKTOP_APP_IDS].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "WEB BROWSER" : program.id === "settings" ? "MERID_OS SETTINGS" : program.id === "proxy" ? "ROGUE DNS" : companySiteName}</span>
-                  <button type="button" className="computer-window__close" aria-label={`Close ${companySiteName}`} onClick={() => closeWindow(id)}>×</button>
+                  <span className="computer-window__titlebar-actions">
+                    <button type="button" className="computer-window__minimize" aria-label={`Minimize ${companySiteName}`} title={`Minimize ${companySiteName}`} onClick={() => minimizeWindow(id)}>−</button>
+                    <button type="button" className="computer-window__close" aria-label={`Close ${companySiteName}`} onClick={() => closeWindow(id)}>×</button>
+                  </span>
                 </header>
-                <div className={`computer-browser-address${DESKTOP_APP_IDS.includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : program.id === "proxy" ? "control://rogue-dns" : program.id === "ghostkey" ? "control://ghostkey" : program.id === "terminal" ? "control://terminal" : browserAddress(program, facilityContext, cityId)}</span><span className="computer-browser-address__secure">{program.id === "proxy" ? "UNLISTED NETWORK" : "PRIVATE RELAY"}</span></div>
+                <div className={`computer-browser-address${DESKTOP_APP_IDS.includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : program.id === "proxy" ? "control://rogue-dns" : program.id === "ghostkey" ? "control://ghostkey" : program.id === "terminal" ? "control://terminal" : program.id === "stock-exchange" ? "control://stock-exchange" : browserAddress(program, facilityContext, cityId)}</span><span className="computer-browser-address__secure">{program.id === "proxy" ? "UNLISTED NETWORK" : "PRIVATE RELAY"}</span></div>
                 <div className={`computer-window__body${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window__body--website" : ""}${desktopWindow.loading || desktopWindow.navigationPending ? " computer-window__body--loading" : ""}`} aria-busy={desktopWindow.loading || desktopWindow.navigationPending}>
                   {desktopWindow.loading ? <div className="computer-browser-loading" role="status" aria-label="Loading webpage" /> : <>
                   {program.id === "settings"
-                    ? <DesktopSettings preferences={desktopPreferences} accountUsername={accountUsername} character={character} characterPreviewVisual={characterPreviewVisual} location={location} onEditCharacter={() => launchProgram(CHARACTER_APPEARANCE_PROGRAM)} onChange={(patch) => onDesktopPreferencesChange?.(patch)} onLogout={onLogout} />
+                    ? <DesktopSettings preferences={desktopPreferences} accountUsername={accountUsername} character={character} characterPreviewVisual={characterPreviewVisual} location={location} progression={playerProgression} onEditCharacter={() => launchProgram(CHARACTER_APPEARANCE_PROGRAM)} onChange={(patch) => onDesktopPreferencesChange?.(patch)} onLogout={onLogout} />
                     : program.id === "character-appearance"
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
                     : program.id === "terminal"
@@ -749,6 +773,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         ? <PoliceWebsite page="person-search" navigate={(destination) => launchProgram(destination, id)} searchId={`police-site-search-${id}`}><WorldDirectory key={`${id}:person-search`} program="interpol" countryName={countryName} cityId={cityId} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} /></PoliceWebsite>
                       : program.id === "employee-directory"
                         ? <EmployeeDirectoryApp companyRecord={program.companyRecord} onOpenCompanyStaff={onOpenCompanyStaff} onPrint={requestPrint} />
+                    : program.id === "stock-exchange"
+                      ? <StockExchangeApp countryId={cityId?.split("/")[0] || ""} onProgressionChange={onProgressionChange} />
                     : program.id === "proxy"
                     ? <ProxyConnection
                         world={{ city: location?.split(",")[0], cityId, country: countryName }}
@@ -779,6 +805,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         ? <MeridianEnterprisesWebsite location={location} countryName={countryName} />
                       : program.id === "hospital-website"
                         ? <HospitalWebsite service={program.service} onConnect={onOpenService} />
+                      : program.id === "bank-website"
+                        ? <BankWebsite countryId={cityId?.split("/")[0] || ""} onOpenStockExchange={() => launchProgram(PERSONAL_PROGRAMS.find((item) => item.id === "stock-exchange"), id)} />
                       : program.id === "company-website"
                         ? <CompanyWebsite
                             site={program.website}
@@ -816,10 +844,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                             : program.id === "emails"
                               ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} cityId={cityId} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} onPrint={requestPrint} />
                               : program.id === "personal-mail"
-                                ? <PlayerMailbox key={id} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} hackedAccount={program.hackedAccount} />
-                                : program.id === "public-services"
-                                  ? <PublicServices key={id} cityId={cityId} countryName={countryName} onOpenService={onOpenService} onOpenHospitalWebsite={(service) => launchProgram({ id: "hospital-website", label: service.address.name, Icon: Cross, state: "ONLINE", available: true, service }, id)} />
-                                  : program.id === "warrant-request"
+                                ? <PlayerMailbox key={id} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onMessageReceived={notifyNewPlayerMessage} hackedAccount={program.hackedAccount} />
+                                : program.id === "warrant-request"
                                     ? <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} onClose={() => closeWindow(id)} />
                                     : <WorldDirectory key={`${id}:${program.id}`} program={program.id} facilityLocationId={program.facilityLocationId || facilityContext?.locationId} accessAttemptId={program.accessAttemptId || accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} onBeginCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, true) : undefined} onCancelCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, false) : undefined} initialSearch={program.searchTerm} initialCompanies={program.searchResults} onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })} />}
                     {desktopWindow.navigationPending && <div className="computer-browser-loading" role="status" aria-label="Loading webpage" />}
@@ -872,9 +898,15 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             <div className="computer-taskbar__left">
               {persistent && <button type="button" className="computer-start" aria-expanded={startMenuOpen} onClick={() => setStartMenuOpen((open) => !open)}><span className="computer-brand__mark">M</span> START</button>}
               {!persistent && <span className="computer-taskbar__system"><span className="computer-brand__mark">M</span> {isCompanyComputer ? "WORKSTATION SESSION" : "PERSONAL SESSION"}</span>}
-              {windows.map((item) => <button key={item.id} className={`computer-taskbar__active${item.zIndex === Math.max(...windows.map((windowItem) => windowItem.zIndex)) ? " computer-taskbar__active--focused" : ""}`} type="button" onClick={() => focusWindow(item.id)}>{item.program.label}</button>)}
+              {windows.map((item) => {
+                const focused = !item.minimized && item.zIndex === Math.max(...windows.filter((windowItem) => !windowItem.minimized).map((windowItem) => windowItem.zIndex));
+                return <span key={item.id} className={`computer-taskbar__window${item.minimized ? " computer-taskbar__window--minimized" : ""}`}>
+                  <button data-window-id={item.id} className={`computer-taskbar__active${focused ? " computer-taskbar__active--focused" : ""}${item.minimized ? " computer-taskbar__active--minimized" : ""}`} type="button" aria-label={item.minimized ? `Restore ${item.program.label}, minimized` : `Focus ${item.program.label}`} aria-pressed={focused} onClick={() => focusWindow(item.id)}>{item.minimized && <span className="computer-taskbar__minimized-indicator" aria-hidden="true">▁</span>}{item.program.label}</button>
+                </span>;
+              })}
             </div>
             {persistent ? <div className="computer-taskbar__tray" role="group" aria-label="System status">
+              {playerProgression && <span className="computer-taskbar__economy" title={`Credits ${(playerProgression.creditsCents / 100).toFixed(2)}`}><b>CR {(playerProgression.creditsCents / 100).toFixed(2)}</b></span>}
               <span className="computer-taskbar__status-icon" role="img" aria-label="Wi-Fi connected" title="Wi-Fi connected"><Wifi aria-hidden="true" /></span>
               <span className="computer-taskbar__status-icon" role="img" aria-label="Microphone available" title="Microphone available"><Mic aria-hidden="true" /></span>
               <span className="computer-taskbar__status-icon" role="img" aria-label="Battery 92 percent" title="Battery 92%"><BatteryFull aria-hidden="true" /></span>

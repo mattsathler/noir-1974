@@ -21,7 +21,7 @@ function dateBefore(value, days) {
   return date.toISOString().slice(0, 10);
 }
 
-export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPrint, hackedAccount = null, from: initialFrom = "", through: initialThrough = "", onExit }) {
+export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPrint, onMessageReceived, hackedAccount = null, from: initialFrom = "", through: initialThrough = "", onExit }) {
   const throughToday = new Date(serverTime).toISOString().slice(0, 10);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("OPENING MAILBOX…");
@@ -29,6 +29,7 @@ export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPri
   const [through, setThrough] = useState(() => initialThrough || throughToday);
   const deletedIDs = useRef(new Set());
   const pendingDeleteIDs = useRef(new Set());
+  const previousMessageIDs = useRef(null);
 
   useEffect(() => {
     if (!hackedAccount) return undefined;
@@ -50,6 +51,11 @@ export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPri
     const refresh = () => getPlayerEmails().then((items) => {
       if (!active) return;
       loaded = true;
+      const currentIDs = new Set(items.map((item) => item.id));
+      if (previousMessageIDs.current) {
+        items.filter((item) => !previousMessageIDs.current.has(item.id)).forEach((item) => onMessageReceived?.(item));
+      }
+      previousMessageIDs.current = currentIDs;
       const visible = items.filter((item) => !deletedIDs.current.has(item.id) && !pendingDeleteIDs.current.has(item.id));
       setMessages(visible);
       setStatus("MAILBOX_LOADED");
@@ -57,7 +63,7 @@ export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPri
     refresh();
     const interval = window.setInterval(refresh, 15000);
     return () => { active = false; window.clearInterval(interval); };
-  }, [hackedAccount]);
+  }, [hackedAccount, onMessageReceived]);
 
   function updateFrom(nextFrom) {
     setFrom(nextFrom);

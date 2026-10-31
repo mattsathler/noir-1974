@@ -26,7 +26,7 @@ A classificação das pistas e suas relações com a solução são internas ao 
 
 Crime Reports combina inquéritos abertos com vítimas cujo corpo ainda não foi encontrado. Esse estado é derivado no backend a partir do caso e do evento de descoberta; o perfil público comunica “missing” até o evento. Casos em cenas públicas recebem horário determinístico de descoberta automática; uma busca na residência da vítima pode registrar uma descoberta anterior. A atualização do estado e da notícia é idempotente.
 
-Nos geradores v4 e v5, o arquivo inicial contém o briefing e os registros formais do caso; as mensagens e atividades ligadas ficam nas caixas de email, no Meridian Bank e no GATE dos NPCs. Assim, ler o arquivo não substitui comparar as fontes investigativas. Casos v3 preservam a apresentação anterior.
+Nos geradores v4 e v5, o arquivo inicial contém o briefing e os registros formais do caso; as mensagens e atividades ligadas ficam nas caixas de email, no Union Mercantile Bank e no GATE dos NPCs. Assim, ler o arquivo não substitui comparar as fontes investigativas. Casos v3 preservam a apresentação anterior.
 
 ### Interrogatórios
 

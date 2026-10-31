@@ -114,6 +114,17 @@ type PlayerMailMessage struct {
 	Attachments []PlayerMailAttachment `json:"attachments"`
 }
 
+func billDispatchPostscript(seed string) string {
+	bulletins := [...]string{
+		"BILL BOUER, CITY POLICE: The Crow left his skull mark on another breached terminal. He calls the intrusion resistance; this office continues to treat it as theft. His capture remains an active priority.",
+		"BILL BOUER, CITY POLICE: Investigators are tracing the skull mark linked to The Crow. His messages claim the stolen files expose corporate surveillance. That claim does not make an unauthorized breach lawful.",
+		"BILL BOUER, CITY POLICE: A skull painted beside the latest breach has been attributed to The Crow. His broadcasts call this a fight against the system. The department is still working to bring him in.",
+	}
+	digest := sha256.Sum256([]byte("noir-m17-bill-dispatch/" + seed))
+	index := binary.LittleEndian.Uint64(digest[:8]) % uint64(len(bulletins))
+	return "\n\n" + bulletins[index]
+}
+
 type WarrantRequest struct {
 	WarrantID string             `json:"warrantId"`
 	Status    string             `json:"status"`
@@ -404,6 +415,29 @@ func (dialogue interrogationDialogue) answers() InterrogationAnswers {
 	}
 }
 
+func politicalInterrogationAnswers(seed, npcID string) InterrogationAnswers {
+	statements := InterrogationAnswers{
+		"unusual": {
+			"The papers say Bill Bouer has a new lead on The Crow. At the tram stop, no one will say whether the skull on the station door was painted or printed.",
+			"I heard The Crow says the skull is a warning, not a signature. The police radio called it evidence. I do not know which story to trust.",
+			"The ministry says Ghostkey is a criminal tool. A friend says it showed them that a company had changed their file, and officials say The Crow uses it to steal records.",
+			"Bill Bouer was on the radio again, promising The Crow will be caught. The announcer skipped the part about what The Crow says he stole.",
+			"People say The Crow leaves a skull where a system has been opened. I think the frightening part is how quickly the police arrive.",
+		},
+		"worries": {
+			"I keep hearing the state's warning about Ghostkey. The Crow calls it a key to locked files. It sounds less like a warning when they say everyone who uses it will be watched.",
+			"Bouer says The Crow's thefts endanger residents. The Crow says the companies endanger us first. I worry both sides can make that sound true.",
+			"They painted over The Crow's skull on the public terminal by morning. By evening someone had drawn it again. I worry the next visit will be from the police.",
+			"I worry that if The Crow is caught, the ministry will say the quiet proves it was right all along.",
+			"A neighbor says The Crow's skull means someone opened a locked file. The paper says it means a criminal was here. Neither explanation makes me feel safer.",
+		},
+	}
+	return InterrogationAnswers{
+		"unusual": selectInterrogationLines(statements["unusual"], 1, "politics/"+seed+"/"+npcID+"/unusual"),
+		"worries": selectInterrogationLines(statements["worries"], 1, "politics/"+seed+"/"+npcID+"/worries"),
+	}
+}
+
 // InterrogationAnswersForNPC returns authored dialogue for open cases connected to this NPC.
 // The response contains only spoken lines; internal case roles and culprit IDs stay server-side.
 func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serverID, cityID, npcID string) (InterrogationAnswers, error) {
@@ -563,6 +597,7 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 			mergeInterrogationAnswers(answers, profile, profileTokens, 1, npcID+"/profile/"+fmt.Sprint(index))
 		}
 	}
+	mergeInterrogationAnswers(answers, politicalInterrogationAnswers(seed, npcID), nil, 1, "politics/"+seed+"/"+npcID)
 	return answers, nil
 }
 
@@ -1044,6 +1079,7 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 		subject = "Body found · " + person.Name
 		bodyText = "The search team located the missing resident at the reported address. The body was secured and transferred for examination. The city newspaper will report the discovery."
 	}
+	bodyText += billDispatchPostscript(warrantID)
 	message := PlayerMailMessage{ID: warrantID + ":mail", SentAt: stamp, Subject: subject, Body: bodyText, Attachments: items}
 	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages (server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
 		VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8::jsonb)
@@ -2289,7 +2325,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 	if request.CaseID == "" {
 		messageID := "accusation:" + requestID
 		if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
-			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, messageID, now.UTC(), genericFailure); err != nil {
+			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, messageID, now.UTC(), genericFailure+billDispatchPostscript(requestID)); err != nil {
 			return AccusationResult{}, err
 		}
 		if err := unlockBoard(); err != nil {
@@ -2310,7 +2346,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		result := AccusationResult{Accepted: prior, Status: "completed"}
 		if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
 			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`,
-			serverID, accountID, "accusation:"+requestID, now.UTC(), "The corporate review confirms the prior arrest. The case remains resolved."); err != nil {
+			serverID, accountID, "accusation:"+requestID, now.UTC(), "The corporate review confirms the prior arrest. The case remains resolved."+billDispatchPostscript(requestID)); err != nil {
 			return AccusationResult{}, err
 		}
 		if err := unlockBoard(); err != nil {
@@ -2334,7 +2370,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 			return AccusationResult{}, err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
-			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, "accusation:"+requestID, now.UTC(), genericFailure); err != nil {
+			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, "accusation:"+requestID, now.UTC(), genericFailure+billDispatchPostscript(requestID)); err != nil {
 			return AccusationResult{}, err
 		}
 		if err := unlockBoard(); err != nil {
@@ -2404,6 +2440,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		outcome = "arrested"
 		body = "The corporate review has authorized the arrest. The accused has been taken into custody, and the city police have been notified."
 	}
+	body += billDispatchPostscript(requestID)
 	if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,board_id,accepted,outcome,created_at) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7)
 		ON CONFLICT(server_id,account_id,case_id) DO UPDATE SET board_id=EXCLUDED.board_id,accepted=EXCLUDED.accepted,outcome=EXCLUDED.outcome,created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, request.BoardID, accepted, outcome, now.UTC()); err != nil {
 		return AccusationResult{}, err

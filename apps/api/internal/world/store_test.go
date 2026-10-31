@@ -418,11 +418,11 @@ func TestCentralServicePointsAreStableAcrossWorldSeedsAndSearchIsDistrictScoped(
 		}
 	}
 
-	central, err := firstStore.SearchLocations(context.Background(), "server-a", firstCentral.ID, "meridian bank")
+	central, err := firstStore.SearchLocations(context.Background(), "server-a", firstCentral.ID, "union mercantile bank")
 	if err != nil || len(central) != 1 || central[0].Address.LocationID != "service:lyon/meridian-bank" {
 		t.Fatalf("central location search = %+v, error = %v", central, err)
 	}
-	remote, err := firstStore.SearchLocations(context.Background(), "server-a", "fr/lyon/district/bellecour", "meridian bank")
+	remote, err := firstStore.SearchLocations(context.Background(), "server-a", "fr/lyon/district/bellecour", "union mercantile bank")
 	if err != nil || len(remote) != 0 {
 		t.Fatalf("remote district exposed central bank: results=%+v error=%v", remote, err)
 	}

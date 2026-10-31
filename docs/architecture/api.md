@@ -17,6 +17,9 @@ GET /api/world/npcs/:npcID/records?from=YYYY-MM-DD&to=YYYY-MM-DD
 GET /api/world/npcs/:npcID/emails?from=YYYY-MM-DD&to=YYYY-MM-DD
 GET /api/world/companies?q=<name-or-address>
 GET /api/world/companies/national?q=<name-or-address>
+GET /api/market?page=<page>
+GET /api/player/stock-portfolio
+POST /api/player/stock-orders
 GET /api/world/locations?q=<name-or-address>
 GET /api/world/transit
 GET /api/world/gate/destinations
@@ -43,6 +46,8 @@ O frontend pede “NPC #23”. O servidor verifica o servidor do jogador, recupe
 
 `GET /api/character-visuals` retorna os IDs aceitos nas categorias `accessories`, `beard`, `eyes`, `face`, `hair` e `skin`. `POST /api/characters` recebe `{ "displayName": "Ada", "visual": { "hairId": "hair_short_brown", "skinId": "skin_white", "eyesId": "eyes_green", "faceId": "face_scar_short", "beardId": "beard_moustache_brown", "accessoryIds": ["accessories_glasses_round_tortoise"] } }`. Face, barba e um acessório são opcionais. `PUT /api/characters/appearance` aceita `{ "visual": { ... } }` e atualiza somente o personagem da conta autenticada; a validação e a gravação são atômicas. `GET /api/me` retorna a aparência persistida. Identidades no formato anterior são adaptadas ao serem lidas. NPCs das versões 4 a 8 retornam IDs em `npc.visual`; a versão 8 acrescenta perfis regionais sintéticos e detalhes faciais. O frontend compõe imagens PNG e SVG; o backend não envia arquivos de arte.
 
+`GET /api/market?page=1` lista 25 empresas nacionais da jurisdição Proxy atual e calcula cotações fixas de 50,00 a 1.000,00 Credits no backend. `GET /api/player/stock-portfolio` retorna fama, saldo em centavos e posições do personagem atual. `POST /api/player/stock-orders` recebe `{ "clientOrderId": "...", "companyId": "...", "side": "buy|sell", "shares": 1 }`; a empresa, país e preço são resolvidos pelo servidor a partir do Proxy ativo. Saldo, ordem e posição são atualizados numa transação, com bloqueio por conta e idempotência por `clientOrderId`. O saldo inicial é 1.000,00 Credits; fama começa em zero e não muda até que sua regra de progressão seja definida. As posições e saldo são isolados pelo servidor e pela conta que possui o personagem.
+
 ## Jurisdição, Proxy e buscas
 
 As rotas de busca exigem sessão autenticada e consultam o servidor compartilhado configurado pela API. O estado persistido em `player_locations.location_id` representa a jurisdição Proxy ativa; não representa presença física. `GET /api/world/proxy/nodes` lista cidades disponíveis. `POST /api/world/proxy/connect` recebe `{ "cityId": "fr/paris" }`, valida o ID canônico, prepara os dados da cidade quando necessário e só então atualiza a jurisdição da conta. Uma falha de preparação ou persistência não confirma a troca.
@@ -57,9 +62,9 @@ As rotas de busca exigem sessão autenticada e consultam o servidor compartilhad
 
 `GET /api/world/npcs/:npcID/records` retorna registros do NPC no intervalo inclusivo informado. O alvo precisa pertencer à cidade Proxy ativa. `source=bank` seleciona o ledger bancário e `source=gate` seleciona o histórico GATE; ambos recebem o endereço canônico do serviço e `accessAttemptId`, que o backend valida antes da consulta. O filtro de fonte é aplicado na geração cotidiana e na consulta SQL, que usa índice por servidor, NPC, fonte e data; não carrega nem serializa eventos do outro serviço. Sem filtro, ambos os serviços são incluídos. As datas usam `YYYY-MM-DD` e aceitam no máximo sete dias de calendário inclusivos. Os resultados são ordenados por horário e ID. O JSON público não contém `caseId` nem a classificação interna.
 
-O Meridian Bank e os GATE Access Logs são sites institucionais. Os registros são páginas desses sites e consultam somente suas próprias fontes. O acesso é validado pela tentativa server-side, não por credenciais digitadas no cliente.
+O Union Mercantile Bank e os GATE Access Logs são sites institucionais. Os registros são páginas desses sites e consultam somente suas próprias fontes. O acesso é validado pela tentativa server-side, não por credenciais digitadas no cliente.
 
-O serviço bancário é operado pelo Meridian Global Settlement Office e a infraestrutura GATE pela Meridian Global. A classificação e a relação dos registros de caso ficam em `case_activity_records`; a API expõe os eventos sem revelar essa relação. A versão do gerador de registros é independente da versão da seed do mundo e ambas participam da derivação determinística.
+O serviço bancário é operado pelo Union Mercantile Settlement Office e a infraestrutura GATE pela Meridian Global. A classificação e a relação dos registros de caso ficam em `case_activity_records`; a API expõe os eventos sem revelar essa relação. A versão do gerador de registros é independente da versão da seed do mundo e ambas participam da derivação determinística.
 
 `GET /api/hospital/patients?q=...&accessAttemptId=...` consulta pacientes da cidade Proxy ativa. A rota exige uma tentativa concedida para o hospital daquela cidade. Relatórios post-mortem são apresentados como uma página interna do site do hospital; descobertas retornadas pela busca podem ser registradas no whiteboard da conta.
 

@@ -27,7 +27,7 @@ describe("HospitalPatientSearch", () => {
 
     render(<HospitalPatientSearch accessAttemptId="71" timeZone="Europe/Paris" onPrint={onPrint} />);
     fireEvent.change(screen.getByLabelText("PATIENT NAME"), { target: { value: "Pascal" } });
-    fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));
+    fireEvent.click(screen.getByRole("button", { name: "Press Enter to search" }));
 
     fireEvent.click(await screen.findByRole("button", { name: /Pascal Poulin.*FINGERPRINT AB12345/ }));
     expect(searchHospitalPatients).toHaveBeenCalledWith("Pascal", "71");
@@ -50,7 +50,7 @@ describe("HospitalPatientSearch", () => {
     searchHospitalPatients.mockResolvedValue([{ id: "npc:lyon:one", name: "Ana Morel", status: "alive", fingerprintCode: "CD67890" }]);
     render(<HospitalPatientSearch accessAttemptId="71" timeZone="Europe/Paris" />);
     fireEvent.change(screen.getByLabelText("PATIENT NAME"), { target: { value: "Ana" } });
-    fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));
+    fireEvent.click(screen.getByRole("button", { name: "Press Enter to search" }));
     fireEvent.click(await screen.findByRole("button", { name: /Ana Morel/ }));
 
     expect(screen.getByText("CD67890")).toBeInTheDocument();

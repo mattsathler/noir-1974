@@ -19,7 +19,7 @@ describe("ResidentialSearchWindow", () => {
 
     render(<ResidentialSearchWindow cityId="br/rio-de-janeiro" stationLocationId="service:br/rio-de-janeiro/police-station" onClose={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ana" } });
-    fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));
+    fireEvent.click(screen.getByRole("button", { name: "Press Enter to search" }));
     fireEvent.click(await screen.findByRole("button", { name: /Ana Costa/ }));
     fireEvent.click(screen.getByRole("button", { name: "REQUEST SEARCH" }));
 

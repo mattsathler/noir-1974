@@ -24,8 +24,10 @@
   --noir-warning: #d1aa46;
   --noir-modal-backdrop: color-mix(in srgb, var(--noir-ink-950) 30%, transparent);
 
-  --noir-font-sans: Arial, Helvetica, sans-serif;
-  --noir-font-mono: "Courier New", Courier, monospace;
+  --noir-font-family: "Courier New", Courier, monospace;
+  --noir-font-sans: var(--noir-font-family);
+  --noir-font-mono: var(--noir-font-family);
+  --noir-font-serif: var(--noir-font-family);
 
   --noir-space-0: 0;
   --noir-space-1: 0.25rem;

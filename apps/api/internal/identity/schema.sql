@@ -26,6 +26,45 @@ CREATE TABLE IF NOT EXISTS player_characters (
     visual_identity jsonb NOT NULL DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS player_economy (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    fame bigint NOT NULL DEFAULT 0 CHECK (fame >= 0),
+    credits_cents bigint NOT NULL DEFAULT 100000 CHECK (credits_cents >= 0),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id)
+);
+
+CREATE TABLE IF NOT EXISTS player_stock_positions (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL,
+    company_id text NOT NULL CHECK (company_id <> ''),
+    country_id text NOT NULL CHECK (country_id <> ''),
+    company_name text NOT NULL CHECK (company_name <> ''),
+    city_name text NOT NULL DEFAULT '',
+    shares bigint NOT NULL CHECK (shares > 0),
+    average_cost_cents bigint NOT NULL CHECK (average_cost_cents > 0),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, company_id),
+    FOREIGN KEY (server_id, account_id)
+        REFERENCES player_economy(server_id, account_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS player_stock_orders (
+    order_id bigserial PRIMARY KEY,
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    client_order_id text NOT NULL CHECK (client_order_id <> ''),
+    company_id text NOT NULL CHECK (company_id <> ''),
+    side text NOT NULL CHECK (side IN ('buy', 'sell')),
+    shares bigint NOT NULL CHECK (shares > 0),
+    price_cents bigint NOT NULL CHECK (price_cents > 0),
+    total_cents bigint NOT NULL CHECK (total_cents > 0),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (server_id, account_id, client_order_id)
+);
 ALTER TABLE player_characters ADD COLUMN IF NOT EXISTS visual_identity jsonb NOT NULL DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
 ALTER TABLE player_characters ALTER COLUMN visual_identity SET DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
 

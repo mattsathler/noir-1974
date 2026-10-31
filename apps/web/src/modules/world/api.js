@@ -66,6 +66,22 @@ export function clearWorldLocationCache() {
 export const searchPeople = (query, cityId = "") => search("/api/world/npcs", query, cityId);
 export const searchCompanies = (query, cityId) => search("/api/world/companies", query, cityId);
 export const searchNationalCompanies = (query) => search("/api/world/companies/national", query);
+export async function getStockMarket(page = 1, query = "") {
+	const params = new URLSearchParams({ page: String(page) });
+	if (query.trim()) params.set("q", query.trim());
+	const payload = await apiRequest(`/api/market?${params}`);
+  return payload;
+}
+export async function getStockPortfolio() {
+  return apiRequest("/api/player/stock-portfolio");
+}
+export async function placeStockOrder(order) {
+  return apiRequest("/api/player/stock-orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(order),
+  });
+}
 export async function getCompanyWebsite(companyId) {
   const payload = await apiRequest(`/api/world/companies/${encodeURIComponent(companyId)}/website`);
   return payload.website;

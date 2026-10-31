@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-const GeneratorVersion = 4
+const GeneratorVersion = 5
 const MaxRangeDays = 7
 
 var (
@@ -144,6 +144,9 @@ func Generate(seed string, worldVersion int, npcID string, context Context, from
 				MailboxNPCID: npcID,
 			})
 		}
+		if bulletin, ok := civicBulletin(seed, worldVersion, npcID, context.NPCName, date); ok {
+			result = append(result, bulletin)
+		}
 		for _, correspondent := range context.Personal {
 			if message, ok := correspondence(seed, worldVersion, npcID, context.NPCName, context.EmploymentRole, correspondent, date, "personal", templates); ok {
 				if beforeDeathDeadline(message.SentAt, correspondent.DeathAt) {
@@ -170,6 +173,28 @@ func Generate(seed string, worldVersion int, npcID string, context Context, from
 	}
 	SortMessages(result)
 	return result, nil
+}
+
+func civicBulletin(seed string, worldVersion int, npcID, recipient string, date time.Time) (Message, bool) {
+	rng := newStream(seed, worldVersion, npcID+"/civic-bulletin", date)
+	if rng.pick(3) != 0 {
+		return Message{}, false
+	}
+	bulletins := [...]messageTemplate{
+		{Subject: "Public notice · Ghostkey and unauthorized access", Body: "Residents are reminded that Ghostkey and similar tools can expose private records. Bill Bouer says The Crow's skull mark links recent breaches to his hunt for the system. The fugitive calls the stolen files evidence of corporate surveillance."},
+		{Subject: "City circular · Report the skull mark", Body: "The Office of Civic Order asks residents to report the skull painted beside compromised terminals. Investigator Bill Bouer says the mark is part of the search for The Crow. Underground broadcasts describe the same breaches as resistance to state and corporate control."},
+		{Subject: "Security bulletin · Unlicensed network tools", Body: "The ministry names Ghostkey among tools forbidden by the network access law. Bill Bouer's office connects its use to The Crow and the skull marked on breached terminals; the fugitive says locked company records hide abuses. The bulletin warns that possession alone may bring questioning."},
+		{Subject: "Meridian staff circular · Network access is monitored", Body: "Company security reports that a skull emblem appeared on another terminal after a data breach. Police investigator Bill Bouer says the trail may lead to The Crow. His messages call the campaign a fight against institutions that watch their workers."},
+	}
+	item := bulletins[rng.pick(len(bulletins))]
+	return Message{
+		ID:        stableID(seed, worldVersion, npcID, date) + ":civic-bulletin",
+		SentAt:    date.Add(time.Duration(8*60+rng.pick(9*60)) * time.Minute),
+		Service:   "Meridian Global Correspondence Exchange",
+		Sender:    []string{"Office of Civic Order", "City Information Desk", "Meridian Security Office", "Public Notices"}[rng.pick(4)],
+		Recipient: recipient, Subject: item.Subject, Body: item.Body,
+		MailboxNPCID: npcID,
+	}, true
 }
 
 func beforeDeathDeadline(sentAt, deathAt time.Time) bool {

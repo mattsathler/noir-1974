@@ -24,6 +24,40 @@ func TestRoleCluesAreOccasionalAndDoNotStateTheTitle(t *testing.T) {
 	}
 }
 
+func TestGenerateIncludesStableRotatingCivicBulletins(t *testing.T) {
+	from := time.Date(1974, time.November, 1, 0, 0, 0, 0, time.UTC)
+	found, variants := 0, map[string]bool{}
+	for offset := 0; offset < 42; offset += MaxRangeDays {
+		start := from.AddDate(0, 0, offset)
+		messages, err := Generate("public-world", 1, "npc:archive-test", Context{NPCName: "Mara Vale"}, start, start.AddDate(0, 0, MaxRangeDays-1))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, message := range messages {
+			if !strings.HasSuffix(message.ID, ":civic-bulletin") {
+				continue
+			}
+			found++
+			if !strings.Contains(message.Body, "Bill Bouer") || !strings.Contains(message.Body, "The Crow") || !strings.Contains(strings.ToLower(message.Body), "skull") {
+				t.Fatalf("bulletin omits the central conflict: %+v", message)
+			}
+			variants[message.Subject] = true
+			again, err := Generate("public-world", 1, "npc:archive-test", Context{NPCName: "Mara Vale"}, start, start.AddDate(0, 0, MaxRangeDays-1))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, repeated := range again {
+				if repeated.ID == message.ID && (repeated.Subject != message.Subject || repeated.Body != message.Body || !repeated.SentAt.Equal(message.SentAt)) {
+					t.Fatalf("bulletin changed for the same mailbox and date: first=%+v again=%+v", message, repeated)
+				}
+			}
+		}
+	}
+	if found == 0 || len(variants) < 2 {
+		t.Fatalf("civic bulletins = %d with %d variants; want recurring, varied bulletins", found, len(variants))
+	}
+}
+
 func TestTemplateCatalogContainsFourHundredNewTemplatesPerType(t *testing.T) {
 	catalog, err := loadTemplateCatalog()
 	if err != nil {

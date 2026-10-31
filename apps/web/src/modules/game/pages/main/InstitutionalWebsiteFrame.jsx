@@ -1,7 +1,7 @@
 const SITE_IDENTITIES = {
   police: { title: "Meridian Police Service", short: "POLICE SERVICE", subtitle: "PUBLIC SAFETY · RECORDS · COMMUNITY", symbol: "M", status: "PUBLIC INFORMATION OFFICE" },
   hospital: { title: "Hôpital Sainte-Claire", short: "HOSPITAL", subtitle: "PATIENT SERVICES · MEDICAL RECORDS", symbol: "+", status: "CITY MEDICAL NETWORK" },
-  bank: { title: "Meridian Savings & Exchange", short: "BANK", subtitle: "ACCOUNTS · SETTLEMENTS · CUSTOMER SERVICE", symbol: "M", status: "NATIONAL BANKING NETWORK" },
+  bank: { title: "Union Mercantile Bank", short: "UNION MERCANTILE", subtitle: "ACCOUNTS · SETTLEMENTS · CUSTOMER SERVICE", symbol: "U", status: "NATIONAL BANKING NETWORK" },
   gate: { title: "Meridian Enterprises", short: "MERIDIAN ENTERPRISES", subtitle: "GLOBAL SYSTEMS · TRANSIT · COMPUTING", symbol: "ME", status: "NATIONAL TECHNOLOGY NETWORK" },
   civic: { title: "Office of Civic Services", short: "CITY SERVICES", subtitle: "RESIDENT INFORMATION · MUNICIPAL OFFICES", symbol: "C", status: "MUNICIPAL INFORMATION EXCHANGE" },
   company: { title: "Meridian Global", short: "CORPORATE DIRECTORY", subtitle: "COMPANY INFORMATION · EMPLOYMENT", symbol: "MG", status: "NATIONAL BUSINESS NETWORK" },

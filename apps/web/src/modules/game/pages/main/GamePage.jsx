@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { currentIdentity } from "../../../identity/api.js";
 import ComputerDesktop from "./ComputerDesktop.jsx";
 import { connectProxy, getCompanyWebsite, getCurrentWorld, requestFacilitySiteAccess } from "../../../world/api.js";
 import Telephone from "./Telephone.jsx";
+import CharacterConversation from "./CharacterConversation.jsx";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
 import { readDesktopPreferences, saveDesktopPreferences } from "./desktopPreferences.js";
 
@@ -51,12 +52,41 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [identityAttempt, setIdentityAttempt] = useState(0);
   const [accountUsername, setAccountUsername] = useState("");
   const [playerCharacter, setPlayerCharacter] = useState(null);
+  const [playerProgression, setPlayerProgression] = useState(null);
   const [desktopPreferences, setDesktopPreferences] = useState(readDesktopPreferences);
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerContext, setComputerContext] = useState(null);
   const [companyAccessAttemptId, setCompanyAccessAttemptId] = useState("");
   const [telephoneOpen, setTelephoneOpen] = useState(false);
+  const [conversationCharacter, setConversationCharacter] = useState("");
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState(null);
+  const notificationSequence = useRef(0);
+  const snackbarTimer = useRef(null);
   const closeComputer = useCallback(() => { setComputerOpen(false); setComputerContext(null); }, []);
+  const closeConversation = useCallback(() => setConversationCharacter(""), []);
+  const closeNotifications = useCallback(() => setNotificationsOpen(false), []);
+  const toggleNotifications = useCallback(() => setNotificationsOpen((open) => !open), []);
+  const notify = useCallback((notification) => {
+    const id = `${Date.now()}-${notificationSequence.current++}`;
+    const item = { ...notification, id, time: new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date()) };
+    setNotifications((current) => [item, ...current].slice(0, 40));
+    setSnackbar(item);
+    window.clearTimeout(snackbarTimer.current);
+    snackbarTimer.current = window.setTimeout(() => setSnackbar(null), 6000);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(snackbarTimer.current), []);
+
+  useEffect(() => {
+    function handleFixedNPCContact(event) {
+      const characterId = event.detail?.characterId;
+      if (characterId === "bill" || characterId === "crow") setConversationCharacter(characterId);
+    }
+    window.addEventListener("noir:fixed-npc-contact", handleFixedNPCContact);
+    return () => window.removeEventListener("noir:fixed-npc-contact", handleFixedNPCContact);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -64,6 +94,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
       if (!active) return;
       setAccountUsername(identity.account?.username || "");
       setPlayerCharacter(identity.character ?? null);
+      setPlayerProgression(identity.progression ?? null);
     }).catch(() => {});
     return () => { active = false; };
   }, []);
@@ -165,17 +196,27 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           persistent
           onProxyConnected={connectToProxy}
           onPrepareProxy={() => setTelephoneOpen(false)}
+          onNotification={notify}
+          notifications={notifications}
+          notificationsOpen={notificationsOpen}
+          onToggleNotifications={toggleNotifications}
+          onCloseNotifications={closeNotifications}
+          snackbar={snackbar}
+          onDismissSnackbar={() => setSnackbar(null)}
           onOpenTelephone={() => setTelephoneOpen(true)}
           onOpenWhiteboard={() => window.open("/whiteboard", "_blank", "noopener,noreferrer")}
           accountUsername={accountUsername}
           character={playerCharacter}
           onCharacterSaved={setPlayerCharacter}
+          playerProgression={playerProgression}
+          onProgressionChange={setPlayerProgression}
           desktopPreferences={desktopPreferences}
           onDesktopPreferencesChange={updateDesktopPreferences}
           onLogout={onLogout}
         />
       )}
-      {telephoneOpen && <Telephone onClose={() => setTelephoneOpen(false)} />}
+      {telephoneOpen && <Telephone onClose={() => setTelephoneOpen(false)} onNotification={notify} />}
+      {conversationCharacter && <CharacterConversation characterId={conversationCharacter} onClose={closeConversation} />}
     </main>
   );
 }

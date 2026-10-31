@@ -12,7 +12,7 @@ const central = {
   name: "Central",
   locations: [
     { address: { locationId: "service:lyon/police-station", name: "Lyon Police Station", kind: "building" } },
-    { address: { locationId: "service:lyon/meridian-bank", name: "Meridian Bank", kind: "building" } },
+    { address: { locationId: "service:lyon/meridian-bank", name: "Union Mercantile Bank", kind: "building" } },
     { address: { locationId: "service:lyon/gate-station", name: "Central GATE Station", kind: "building" } },
   ],
 };
@@ -38,7 +38,7 @@ describe("NeighborhoodExplorer", () => {
     expect(screen.queryByText("Bellecour Office")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Central/ }));
-    const bankRow = screen.getByText("Meridian Bank").closest(".gate-interface__place");
+    const bankRow = screen.getByText("Union Mercantile Bank").closest(".gate-interface__place");
     fireEvent.click(within(bankRow).getByRole("button", { name: "ENTER" }));
     await waitFor(() => expect(onVisit).toHaveBeenCalledWith(central.locations[1].address));
   });
@@ -47,7 +47,7 @@ describe("NeighborhoodExplorer", () => {
     const onVisit = vi.fn().mockResolvedValue(undefined);
     getNeighborhoodDestinations.mockResolvedValue([central, bellecour]);
     render(<NeighborhoodExplorer
-      world={{ districtId: central.id, district: "Central", locationId: "service:lyon/meridian-bank", placeName: "Meridian Bank" }}
+      world={{ districtId: central.id, district: "Central", locationId: "service:lyon/meridian-bank", placeName: "Union Mercantile Bank" }}
       onVisit={onVisit}
       onTravel={vi.fn()}
       onClose={vi.fn()}

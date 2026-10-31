@@ -22,7 +22,7 @@ function formatNumber(value) {
   return `${digits.slice(0, 3)}-${digits.slice(3)}`;
 }
 
-export default function Telephone({ onClose }) {
+export default function Telephone({ onClose, onNotification }) {
   const [number, setNumber] = useState("");
   const [callState, setCallState] = useState("idle");
   const [contact, setContact] = useState(null);
@@ -36,6 +36,10 @@ export default function Telephone({ onClose }) {
   const callRequest = useRef(0);
 
   useEffect(() => () => window.clearTimeout(callTimer.current), []);
+
+  useEffect(() => {
+    if (callState === "connected" && contact) onNotification?.({ type: "CALL", title: `Connected to ${contact.name}`, message: "Outgoing line is open." });
+  }, [callState, contact, onNotification]);
 
   useEffect(() => {
     if (callState !== "connected" || !contact) return undefined;

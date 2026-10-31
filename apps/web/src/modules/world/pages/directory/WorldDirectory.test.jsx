@@ -20,18 +20,18 @@ describe("WorldDirectory activity records", () => {
       maritalStatus: "married",
     }]);
     getNPCRecords.mockResolvedValue([
-      { id: "record:other", source: "bank", occurredAt: "1974-11-10T16:42:00.000Z", operator: "Meridian Global Settlement Office", description: "A private remittance cleared.", amount: 68, direction: "outgoing" },
+      { id: "record:other", source: "bank", occurredAt: "1974-11-10T16:42:00.000Z", operator: "Union Mercantile Settlement Office", description: "A private remittance cleared.", amount: 68, direction: "outgoing" },
     ]);
     render(<div className="computer-window"><WorldDirectory program="bank-records" serverTime={new Date("1974-11-12T20:15:00Z")} runHack={(action) => action()} /></div>);
     await screen.findByLabelText("PERSON NAME");
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ada" } });
-    fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));
+    fireEvent.click(screen.getByRole("button", { name: "Press Enter to search" }));
     await screen.findByText("Ada Morel");
     expect(screen.queryByText(/WORKPLACE|MARITAL STATUS|41 YEARS|dark hair/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Ada Morel.*ACCOUNT HOLDER/ }));
     fireEvent.click(screen.getByRole("button", { name: "Select date FROM" }));
     fireEvent.click(screen.getByRole("button", { name: "Nov 8" }));
-    fireEvent.click(screen.getByRole("button", { name: "READ FINANCIAL RECORDS" }));
+    fireEvent.click(screen.getByRole("button", { name: "Press Enter to search records" }));
 
     expect(await screen.findByText("A private remittance cleared.")).toBeInTheDocument();
     expect(getNPCRecords).toHaveBeenCalledWith("npc:ada", "1974-11-08", "1974-11-12", "bank", "", "");
@@ -57,10 +57,10 @@ describe("WorldDirectory activity records", () => {
     render(<div className="computer-window"><WorldDirectory program="gate-records" serverTime={new Date("1974-11-12T20:15:00Z")} runHack={(action) => action()} onPrint={onPrint} /></div>);
     await screen.findByLabelText("PERSON NAME");
     fireEvent.change(screen.getByLabelText("PERSON NAME"), { target: { value: "Ada" } });
-    fireEvent.click(screen.getByRole("button", { name: "SEARCH" }));
+    fireEvent.click(screen.getByRole("button", { name: "Press Enter to search" }));
     await screen.findByText("Ada Morel");
     fireEvent.click(screen.getByRole("button", { name: /Ada Morel.*TRAVEL SUBJECT/ }));
-    fireEvent.click(screen.getByRole("button", { name: "READ GATE LOGS" }));
+    fireEvent.click(screen.getByRole("button", { name: "Press Enter to search records" }));
 
     await screen.findByText("A public terminal session ended.");
     expect(getNPCRecords).toHaveBeenCalledWith("npc:ada", "1974-11-06", "1974-11-12", "gate", "", "");

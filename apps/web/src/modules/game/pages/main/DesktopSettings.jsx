@@ -2,7 +2,7 @@ import { useState } from "react";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 import { DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
 
-export default function DesktopSettings({ preferences, onChange, accountUsername = "SYSTEM USER", character, characterPreviewVisual, location = "MERIDIAN CITY", onEditCharacter, onLogout }) {
+export default function DesktopSettings({ preferences, onChange, accountUsername = "SYSTEM USER", character, characterPreviewVisual, location = "MERIDIAN CITY", progression = null, onEditCharacter, onLogout }) {
   const [activeTab, setActiveTab] = useState("desktop");
   const username = accountUsername || "SYSTEM USER";
   const characterName = character?.displayName || "NO USER PROFILE SELECTED";
@@ -83,6 +83,7 @@ export default function DesktopSettings({ preferences, onChange, accountUsername
             <p>MERIDIAN SYSTEM USER</p>
             <h2 id="desktop-account-title">{username}</h2>
             <span>USER PROFILE · {characterName}</span>
+            <span>ONLINE FAME · {progression?.fame ?? "—"}</span>
           </div>
         </div>
         <section className="desktop-settings__system" aria-labelledby="desktop-system-title">

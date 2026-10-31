@@ -123,7 +123,7 @@ func GenerateForSource(seed string, worldVersion int, npcID string, context Cont
 			}
 			if slot == 0 {
 				record.Source = "bank"
-				record.Operator = "Meridian Global Settlement Office"
+				record.Operator = "Union Mercantile Settlement Office"
 				record.Description = bankActivities[rng.pick(len(bankActivities))]
 				record.Reference = context.Employer
 				record.Amount = 2 + rng.pick(94)
@@ -169,7 +169,7 @@ func ExtortionEvents(seed string, worldVersion int, caseID, killerID, victimID, 
 		{
 			ID: transferID, NPCID: victimID, Source: "bank",
 			OccurredAt:  caseDate.AddDate(0, 0, -3+intFromKey(key, "transfer-day", 2)).Add(time.Duration(transferMinute) * time.Minute),
-			Operator:    "Meridian Global Settlement Office",
+			Operator:    "Union Mercantile Settlement Office",
 			Description: "A private remittance cleared to a personal account.",
 			Reference:   "private account transfer", Amount: 45 + intFromKey(key, "transfer-amount", 46), Direction: "outgoing",
 			CaseID: caseID, InternalRelation: "extortion_payment", RelatedNPCID: killerID,

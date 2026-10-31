@@ -1030,6 +1030,7 @@
   box-shadow: 4px 4px 0 var(--noir-ink-950);
   transform: translate(-50%, -42%);
 }
+.computer-window[hidden] { display: none !important; }
 
 .computer-window__titlebar {
   display: flex;
@@ -1049,7 +1050,12 @@
 
 .computer-window__titlebar > span { display: flex; align-items: center; gap: var(--noir-space-2); }
 .computer-window__titlebar .computer-status-light { background: var(--noir-ink-900); }
-.computer-window__close { padding: 0; color: var(--noir-ink-950); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 1.2rem; }
+.computer-window__titlebar-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 0.15rem; }
+.computer-window__minimize,.computer-window__close { display: grid; width: 2rem; height: 2rem; place-items: center; color: var(--noir-ink-950); background: transparent; border: 1px solid transparent; cursor: pointer; font: 700 1rem/1 var(--noir-font-mono); }
+.computer-window__minimize:hover,.computer-window__close:hover { background: rgb(0 0 0 / 9%); border-color: rgb(0 0 0 / 20%); }
+.computer-window__minimize:focus-visible,.computer-window__close:focus-visible { outline: 2px solid var(--noir-ink-950); outline-offset: 1px; }
+.computer-frame--persistent .computer-window__minimize { width: 1.35rem; height: 1.35rem; padding: 0; color: #292b26; background: linear-gradient(#f3f4ef, #d4d7d0); border: 1px solid #858a7f; box-shadow: inset 1px 1px #fff; font: 0.9rem/1 Arial, sans-serif; }
+.computer-frame--persistent .computer-window__minimize:hover { background: #d7dfd0; border-color: #66775f; }
 .computer-window--positioned { transform: none; }
 
 .computer-window__body {
@@ -1066,6 +1072,44 @@
 .computer-window__cursor { color: var(--noir-brass-300); animation: computer-cursor 1s steps(2, end) infinite; }
 
 .telephone-overlay { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(4 6 5 / 78%); }
+.character-conversation { position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(4 6 5 / 84%); }
+.character-conversation__dialog { display: flex; width: min(54rem, 100%); max-height: min(48rem, calc(100svh - 2rem)); flex-direction: column; align-items: center; padding: clamp(0.75rem, 3vw, 1.5rem); overflow-y: auto; color: var(--noir-paper-200); background: #111511; border: 2px solid var(--noir-ink-500); box-shadow: 8px 8px 0 #050605, inset 0 0 0 2px #242a24; text-align: center; }
+.character-conversation__header { display: flex; width: 100%; min-height: 2rem; align-items: center; justify-content: space-between; color: var(--noir-brass-300); font: 0.58rem var(--noir-font-mono); letter-spacing: 0.1em; }
+.character-conversation__header button { width: 2rem; height: 2rem; color: var(--noir-paper-200); background: transparent; border: 1px solid var(--noir-ink-500); cursor: pointer; font: 1.2rem var(--noir-font-mono); }
+.character-conversation__portrait { position: relative; display: grid; width: 12rem; height: 12rem; flex: 0 0 auto; place-items: center; margin: clamp(0.5rem, 3vh, 1.5rem) 0 0.5rem; background: #080b09; border: 2px solid var(--noir-brass-500); box-shadow: 4px 4px 0 #050605; }
+.character-conversation__portrait .modular-face { width: 100%; }
+.character-conversation__portrait--crow { border-color: #c5c2b2; box-shadow: 4px 4px 0 #050605, inset 0 0 0 3px #2b302b; }
+.character-conversation__skull-mark { position: absolute; right: -0.55rem; bottom: -0.55rem; width: 3rem; height: 3rem; padding: 0.35rem; color: #ddd9c8; background: #111511; border: 1px solid #868473; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 #050605); }
+.character-conversation__dialog h1 { margin: 0.45rem 0 0.15rem; color: var(--noir-brass-300); font-size: 1.25rem; }
+.character-conversation__role { margin: 0; color: var(--noir-paper-400); font: 0.55rem var(--noir-font-mono); letter-spacing: 0.08em; }
+.character-conversation__speech { display: grid; width: min(42rem, 100%); min-height: 6rem; align-content: center; margin-top: auto; padding: 1rem; color: var(--noir-paper-200); background: #080b09; border: 1px solid var(--noir-ink-600); box-shadow: inset 0 0 0 2px #111713; font: 0.78rem/1.65 var(--noir-font-mono); text-align: left; }
+.character-conversation__replies { display: grid; width: min(42rem, 100%); grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; margin-top: 0.55rem; }
+.character-conversation__replies button { min-height: 3.25rem; padding: 0.6rem; color: var(--noir-paper-200); background: var(--noir-ink-800); border: 1px solid var(--noir-ink-600); cursor: pointer; font: 0.68rem/1.45 var(--noir-font-mono); text-align: left; }
+.character-conversation__replies button:hover,.character-conversation__replies button:focus-visible { color: var(--noir-brass-300); background: var(--noir-ink-900); border-color: var(--noir-brass-500); outline: 2px solid transparent; }
+.character-conversation__dialog footer { width: 100%; margin-top: 0.8rem; color: var(--noir-paper-500); font: 0.5rem var(--noir-font-mono); letter-spacing: 0.1em; text-align: right; }
+.notification-center__toggle { position: absolute; z-index: 9997; top: 0.8rem; right: 1rem; display: grid; width: 2.5rem; height: 2.5rem; place-items: center; padding: 0; color: #33443e; background: transparent; border: 0; box-shadow: none; cursor: pointer; }
+.notification-center__toggle svg { width: 1.15rem; height: 1.15rem; fill: currentColor; shape-rendering: crispEdges; }
+.notification-center__toggle span { position: absolute; top: -0.3rem; right: -0.3rem; display: grid; min-width: 1.05rem; height: 1.05rem; place-items: center; padding-inline: 0.15rem; color: var(--noir-ink-950); background: var(--noir-brass-300); border: 1px solid var(--noir-ink-950); font: 700 0.52rem var(--noir-font-mono); }
+.notification-center__toggle:hover,.notification-center__toggle:focus-visible { color: #173d34; outline: 1px dotted #607b6d; outline-offset: 2px; }
+.notification-center__toggle span { color: #fff; background: #8b4b3e; border-color: #f0eee3; }
+.computer-frame--persistent .computer-screen .notification-center__window { position: absolute; z-index: 9997; top: 4rem; right: 1rem; left: auto; display: flex; width: min(25rem, calc(100% - 2rem)); height: auto; max-height: min(64vh, 38rem); flex-direction: column; overflow: hidden; color: #343a35; background: #e6e8df; border: 1px solid #858b7d; box-shadow: 3px 3px 0 rgb(0 0 0 / 48%); text-align: left; transform: none; }
+.computer-frame--persistent .computer-screen .notification-center__content { display: flex; min-height: 0; flex-direction: column; padding: 0; overflow-y: auto; color: #343a35; background: #e6e8df !important; text-align: left; }
+.computer-frame--persistent .computer-screen .notification-center__content,
+.computer-frame--persistent .computer-screen .notification-center__content :is(h2, p, small, strong, span, li) { color: #343a35 !important; }
+.notification-center__heading { padding: 0.65rem 0.8rem; background: #e6e8df; border-bottom: 1px solid #c2c7bc; text-align: left; }
+.notification-center__heading > span { color: #46665a; font: 0.52rem var(--noir-font-mono); letter-spacing: 0.1em; }
+.notification-center__heading h2 { margin: 0.2rem 0 0; color: #35443c; font-size: 1rem; }
+.notification-center__content ol { display: grid; gap: 0.4rem; margin: 0; padding: 0.6rem; overflow-y: auto; list-style: none; }
+.notification-center__content li { display: grid; gap: 0.25rem; padding: 0.65rem; background: #e6e8df; border: 1px solid #c9c9bb; text-align: left; }
+.notification-center__content li small { color: #527467; font: 0.5rem var(--noir-font-mono); letter-spacing: 0.06em; }
+.notification-center__content li strong { color: #303832; font-size: 0.72rem; }
+.notification-center__content li p,.notification-center__empty { margin: 0; color: #545a53; font: 0.62rem/1.5 var(--noir-font-mono); }
+.notification-center__empty { padding: 1rem; text-align: left; }
+.notification-center__snackbar { position: fixed; z-index: 2147483002; top: 1rem; left: 50%; display: flex; width: min(28rem, calc(100vw - 2rem)); align-items: flex-start; justify-content: space-between; gap: 0.75rem; padding: 0.65rem 0.75rem; color: #343a35; background: #eeefe8; border: 1px solid #858b7d; box-shadow: 3px 3px 0 rgb(0 0 0 / 48%); transform: translateX(-50%); }
+.notification-center__snackbar > span { display: grid; gap: 0.25rem; }
+.notification-center__snackbar strong { color: #40594c; font: 700 0.62rem var(--noir-font-mono); }
+.notification-center__snackbar small { color: #545a53; font: 0.62rem/1.45 var(--noir-font-mono); }
+.notification-center__snackbar button { width: 2rem; min-width: 2rem; height: 2rem; color: #3e4942; background: #e3e8e2; border: 1px solid #9ba092; cursor: pointer; font: 1.2rem var(--noir-font-mono); }
 .telephone-device { position: relative; display: flex; width: min(34rem, 100%); height: min(40rem, calc(100svh - 2rem)); flex-direction: column; padding: 0.45rem; overflow: hidden; color: var(--noir-paper-200); background: #252a25; border: 2px solid var(--noir-ink-500); border-radius: 1.1rem; box-shadow: 8px 8px 0 #050605, inset 0 0 0 2px #383e37; }
 .telephone-device__header { display: flex; min-height: 3rem; align-items: center; justify-content: space-between; padding: 0 0.8rem; color: var(--noir-brass-300); font: 0.8rem var(--noir-font-mono); letter-spacing: 0.14em; }
 .telephone-device__header button { width: 2rem; height: 2rem; color: var(--noir-paper-200); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 1.1rem; }
@@ -1422,9 +1466,15 @@
 
 .computer-taskbar__system { display: inline-flex; align-items: center; gap: var(--noir-space-2); color: var(--noir-brass-300); }
 .computer-taskbar__system .computer-brand__mark { width: 1.15rem; height: 1.15rem; }
+.computer-taskbar__window { display: inline-flex; min-width: 0; flex: 0 0 auto; align-items: center; }
 .computer-taskbar__active { margin-left: var(--noir-space-3); padding: 0 0 0 var(--noir-space-3); color: var(--noir-paper-300); background: transparent; border: 0; border-left: 1px solid var(--noir-ink-600); cursor: pointer; font: inherit; letter-spacing: 0.08em; }
 .computer-taskbar__active--focused,
 .computer-taskbar__active:hover { color: var(--noir-brass-300); }
+.computer-taskbar__active--minimized { border-bottom: 1px dashed currentColor; opacity: 0.78; }
+.computer-taskbar__minimized-indicator { display: inline-block; margin-right: 0.35rem; color: var(--noir-brass-300); font-size: 0.85rem; line-height: 0.7; }
+.computer-taskbar__active:focus-visible { outline: 2px solid var(--noir-brass-300); outline-offset: 2px; }
+.computer-taskbar__close-minimized { display: grid; width: 1.5rem; height: 1.65rem; flex: 0 0 auto; place-items: center; margin-left: 0.15rem; padding: 0; color: var(--noir-paper-400); background: transparent; border: 1px solid transparent; cursor: pointer; font: 0.9rem/1 var(--noir-font-mono); }
+.computer-taskbar__close-minimized:hover,.computer-taskbar__close-minimized:focus-visible { color: var(--noir-danger); border-color: currentColor; outline: 1px solid transparent; }
 .page-print-button { display: grid; width: 2rem; height: 2rem; flex: 0 0 auto; margin-left: auto; place-items: center; padding: 0; color: var(--noir-success); background: var(--noir-ink-950); border: 1px solid var(--noir-ink-600); cursor: pointer; }
 .page-print-button svg { width: 16px; height: 16px; fill: currentColor; shape-rendering: crispEdges; }
 .page-print-button:hover { color: var(--noir-success); border-color: var(--noir-success); }
@@ -1754,12 +1804,16 @@
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-window__titlebar { color: #e3e9df; background: linear-gradient(#34483d, #1b2a23); border-bottom-color: #101b16; text-shadow: none; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-window__titlebar .computer-status-light { background: #80ba78; border-color: #a3d596; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-window__close { color: #e3e9df; background: linear-gradient(#42544a, #26372e); border-color: #718174; box-shadow: inset 1px 1px #68776d; }
+.computer-frame--persistent[data-desktop-theme="dark"] .computer-window__minimize { color: #e3e9df; background: linear-gradient(#42544a, #26372e); border-color: #718174; box-shadow: inset 1px 1px #68776d; }
+.computer-frame--persistent[data-desktop-theme="dark"] .computer-window__minimize:hover { background: #4b6048; border-color: #9eb69d; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-browser-address { color: #dbe4d9; background: #26362e; border-bottom-color: #526257; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-browser-address__secure { color: #86c7ac; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-taskbar--desktop { color: #e0e5dc; background: linear-gradient(#35463d, #202e27); border-top-color: #637166; box-shadow: inset 0 1px #526258; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-start { color: #e2e7dc; background: linear-gradient(#566858, #34463a); border-color: #718173; box-shadow: inset 1px 1px #859382, 1px 1px #152019; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-taskbar__active { color: #dbe4d9; background: linear-gradient(#34483d, #26362e); border: 1px solid #718174; box-shadow: inset 1px 1px #526358; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-taskbar__active--focused { color: #ffe77a; background: linear-gradient(#4b6048, #344a38); border-color: #c3ad51; box-shadow: inset 1px 1px #718567; }
+.computer-frame--persistent[data-desktop-theme="dark"] .computer-taskbar__active--minimized { color: #b0b9aa; border-bottom-color: #b0b9aa; }
+.computer-frame--persistent[data-desktop-theme="dark"] .computer-taskbar__close-minimized { color: #c0cbbb; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-taskbar__active:hover { color: #ffe77a; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-taskbar__clock { color: #dbe4d9; border-color: #718174; box-shadow: inset 1px 1px #536358; }
 .computer-frame--persistent[data-desktop-theme="dark"] .computer-start-menu { background: linear-gradient(90deg, #23382d 2.2rem, #d6dacf 2.2rem); }
@@ -2282,6 +2336,201 @@
 .institutional-site__notice b { color: var(--institutional-primary, #184d78); }
 .institutional-site__notice a { margin-left: auto; color: var(--institutional-link, #003399); }
 .institutional-site__content { min-height: 12rem; flex: 1 0 auto; padding: 0.65rem; background: #fff; border-bottom: 3px solid var(--institutional-accent, #d6b74b); }
+.institutional-site--bank { --institutional-primary: #244734; --institutional-accent: #bc9b4b; --institutional-nav: #e6e8de; --institutional-link: #28533a; }
+.institutional-site--bank .institutional-site__notice { background: #edf0e8; }
+.bank-website { --bank-ink: #26372d; --bank-paper: #f4f2e8; display: grid; min-height: 100%; align-content: start; color: var(--bank-ink); background: var(--bank-paper); font-size: 0.72rem; line-height: 1.5; }
+.bank-website button { color: inherit; font: inherit; }
+.bank-website__masthead { display: flex; min-height: 4.5rem; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.55rem 1rem; color: #f5f0df; background: linear-gradient(110deg, #18392d, #315d46 72%, #446f4f); border-bottom: 3px solid #bc9b4b; }
+.bank-website__brand { display: flex; min-width: 0; align-items: center; gap: 0.65rem; }
+.bank-website__brand > span:last-child { display: grid; gap: 0.08rem; }
+.bank-website__brand strong { font-size: clamp(0.75rem, 1.8vw, 1.15rem); letter-spacing: 0.08em; }
+.bank-website__brand small,.bank-website__masthead-note { color: #e0d9c4; font-size: 0.52rem; letter-spacing: 0.08em; }
+.bank-website__seal { display: grid; width: 2.65rem; height: 2.65rem; flex: 0 0 auto; place-items: center; color: #f7f0d7; border: 3px double #d0b66f; border-radius: 50%; box-shadow: inset 0 0 0 3px #284735; font-size: 1.3rem; font-weight: 700; }
+.bank-website__masthead-note { display: grid; text-align: right; }
+.bank-website__masthead-note b { color: #f0d991; }
+.bank-website__nav { display: flex; min-height: 2rem; align-items: center; overflow-x: auto; background: #e5e7dc; border-bottom: 1px solid #b7bdad; white-space: nowrap; }
+.bank-website__nav button { min-height: 2rem; padding: 0.35rem 0.7rem; color: #23523d; background: transparent; border: 0; border-right: 1px solid #c5cbbd; cursor: pointer; font-size: 0.58rem; font-weight: 700; }
+.bank-website__nav button:hover,.bank-website__nav button[aria-current="page"] { color: #fff; background: #36634a; }
+.bank-website__nav > span { margin-left: auto; padding-inline: 0.7rem; color: #687263; font-size: 0.48rem; }
+.bank-website__ticker { display: flex; min-height: 1.6rem; align-items: center; gap: 0.7rem; overflow: hidden; padding: 0.25rem 0.65rem; color: #e9e2cc; background: #202b25; font-size: 0.58rem; white-space: nowrap; }
+.bank-website__ticker > strong { flex: 0 0 auto; color: #e3c36e; letter-spacing: 0.1em; }
+.bank-website__ticker > div { min-width: 0; flex: 1 1 auto; overflow: hidden; }
+.bank-website__ticker-track { display: flex; width: max-content; animation: bank-market-ticker 48s linear infinite; }
+.bank-website__ticker-group { display: flex; flex: 0 0 auto; gap: 1.25rem; padding-right: 1.25rem; }
+.bank-website__ticker:hover .bank-website__ticker-track { animation-play-state: paused; }
+@keyframes bank-market-ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.bank-website__ticker b { color: #fff4d0; }
+.bank-website__ticker i { margin-left: 0.15rem; font-style: normal; }
+.bank-website .is-up { color: #33764a; }
+.bank-website .is-down { color: #9a443b; }
+.bank-website__ticker .is-up { color: #9bc28b; }
+.bank-website__ticker .is-down { color: #e1957c; }
+.bank-website__hero { display: grid; min-height: 12rem; grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.32fr); align-items: center; gap: 1rem; padding: clamp(1rem, 3vw, 2rem); background: radial-gradient(ellipse at 82% 50%, #ddcf9f 0, #e9e3ce 24%, transparent 25%), linear-gradient(100deg, #f2eedf, #e1e6d8); border-bottom: 1px solid #c9c4b2; }
+.bank-website__hero h1,.bank-website__subpage h1 { margin: 0.25rem 0 0.45rem; color: #284b38; font-size: clamp(1.3rem, 3vw, 2.2rem); font-weight: 500; line-height: 1.08; }
+.bank-website__hero p:not(.bank-website__eyebrow),.bank-website__subpage-intro { max-width: 42rem; margin: 0; color: #4e594c; }
+.bank-website__eyebrow { margin: 0; color: #8b6b2f; font-size: 0.52rem; font-weight: 700; letter-spacing: 0.13em; }
+.bank-website__hero-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem; }
+.bank-website__hero-actions button,.bank-website__service-grid button,.bank-website__section-heading > button,.bank-website__ad button,.bank-website__sidebar-card button,.bank-website__back { padding: 0.4rem 0.55rem; color: #fff8e5; background: #315a42; border: 1px solid #264833; cursor: pointer; font-size: 0.53rem; font-weight: 700; }
+.bank-website__hero-actions .is-secondary { color: #315a42; background: transparent; }
+.bank-website__hero-seal { display: grid; width: 8rem; height: 8rem; place-content: center; justify-self: center; color: #67542c; border: 3px double #a48a4f; border-radius: 50%; text-align: center; transform: rotate(-8deg); }
+.bank-website__hero-seal span,.bank-website__hero-seal small { font-size: 0.48rem; letter-spacing: 0.12em; }
+.bank-website__hero-seal strong { font-size: 2rem; line-height: 1.1; }
+.bank-website__home-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(12rem, 0.75fr); gap: 0.75rem; padding: 0.8rem; }
+.bank-website__main,.bank-website__sidebar { min-width: 0; }
+.bank-website__section,.bank-website__sidebar-card { margin-bottom: 0.7rem; padding: 0.7rem; background: #fbfaf5; border: 1px solid #d4d0c1; }
+.bank-website__section-heading { display: flex; align-items: end; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.55rem; }
+.bank-website__section h2,.bank-website__sidebar-card h2 { margin: 0.08rem 0 0; color: #30543f; font-size: 1rem; font-weight: 600; }
+.bank-website__section-heading > button { flex: 0 0 auto; color: #315a42; background: transparent; }
+.bank-website__service-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; }
+.bank-website__service-grid article { min-width: 0; padding: 0.55rem; background: #f0f1e9; border-top: 2px solid #719077; }
+.bank-website__service-mark { color: #a18440; font-size: 0.52rem; font-weight: 700; }
+.bank-website__service-grid h3,.bank-website__sidebar-card h3 { margin: 0.12rem 0 0.25rem; color: #2c4937; font-size: 0.75rem; }
+.bank-website__service-grid p,.bank-website__sidebar-card p { margin: 0 0 0.45rem; color: #555b50; font-size: 0.62rem; }
+.bank-website__service-grid button { padding: 0; color: #315a42; background: transparent; border: 0; text-align: left; text-decoration: underline; }
+.bank-website__muted { margin: 0 0 0.35rem; color: #777568; font-size: 0.55rem; }
+.bank-website__market-table { width: 100%; border-collapse: collapse; font-size: 0.6rem; text-align: left; }
+.bank-website__market-table th { padding: 0.35rem; color: #f6f0dc; background: #3f614b; font-size: 0.5rem; }
+.bank-website__market-table td { padding: 0.38rem; border-bottom: 1px solid #dbd8cb; }
+.bank-website__market-table td:nth-child(n+2),.bank-website__market-table th:nth-child(n+2) { text-align: right; }
+.bank-website__sidebar { display: grid; align-content: start; gap: 0.1rem; }
+.bank-website__sidebar-card h2 { padding-bottom: 0.35rem; border-bottom: 1px solid #c9c4b2; font-size: 0.7rem; letter-spacing: 0.05em; }
+.bank-website__rates p { display: flex; justify-content: space-between; gap: 0.35rem; margin: 0; padding: 0.35rem 0; border-bottom: 1px dotted #d0cbbd; font-size: 0.56rem; }
+.bank-website__rates p b { color: #315a42; text-align: right; }
+.bank-website__rates p small,.bank-website__rates > small { color: #74766a; font-size: 0.48rem; }
+.bank-website__rates > small { display: block; margin-top: 0.35rem; }
+.bank-website__sidebar-card article { padding-top: 0.4rem; }
+.bank-website__sidebar-card article + article { margin-top: 0.45rem; border-top: 1px solid #d4d0c1; }
+.bank-website__sidebar-card time { color: #8b6b2f; font-size: 0.48rem; font-weight: 700; }
+.bank-website__sidebar-card button { padding: 0; color: #315a42; background: transparent; border: 0; text-decoration: underline; }
+.bank-website__ad { position: relative; display: grid; align-content: center; gap: 0.25rem; overflow: hidden; padding: 0.7rem; color: #f3ecd8; background: linear-gradient(135deg, #354b3b, #192c23); border: 1px solid #9e874d; }
+.bank-website__ad small { color: #d8bf78; font-size: 0.46rem; letter-spacing: 0.1em; }
+.bank-website__ad h2,.bank-website__ad b { margin: 0; color: #fff1c7; font-size: 0.92rem; line-height: 1.2; }
+.bank-website__ad p,.bank-website__ad span { margin: 0; color: #e2dbc8; font-size: 0.57rem; }
+.bank-website__ad button { justify-self: start; margin-top: 0.25rem; color: #25392b; background: #ddc678; border-color: #efdfa7; }
+.bank-website__ad--wide { min-height: 6rem; grid-template-columns: minmax(0, 1fr) 4rem; align-items: center; padding-inline: 1rem; background: repeating-linear-gradient(135deg, #263d30 0 12px, #304b39 12px 24px); }
+.bank-website__ad-coin { display: grid; width: 3.4rem; height: 3.4rem; place-items: center; color: #5a4720 !important; background: radial-gradient(circle, #f2dda0 0 48%, #b59245 50% 65%, #e7cb79 68%); border: 2px solid #826b36; border-radius: 50%; font-size: 1.6rem !important; font-weight: 700; }
+.bank-website__ad--vertical { min-height: 8rem; text-align: center; }
+.bank-website__ad--vertical button { justify-self: center; }
+.bank-website__trust { display: grid; gap: 0.2rem; padding: 0.65rem; color: #e8e2cd; background: #59694c; border-left: 3px solid #c7a958; }
+.bank-website__trust strong { color: #f2dda0; font-size: 0.52rem; letter-spacing: 0.08em; }
+.bank-website__trust span { font-size: 0.56rem; }
+.bank-website__footer { display: grid; gap: 0.15rem; padding: 0.55rem 0.8rem; color: #dce2d5; background: #26382e; font-size: 0.48rem; }
+.bank-website__subpage { min-height: 25rem; padding: 1rem; background: linear-gradient(#f8f7f1, #eceadd); }
+.bank-website__subpage-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(11rem, 0.34fr); gap: 0.8rem; }
+.bank-website__subpage-layout > main { min-width: 0; }
+.bank-website__subpage h1 { font-size: clamp(1.3rem, 2.6vw, 2rem); }
+.bank-website__subpage-intro { margin-bottom: 0.7rem; }
+.bank-website__subpage-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; margin-top: 0.75rem; }
+.bank-website__subpage-sections article { padding: 0.7rem; background: #fbfaf5; border: 1px solid #d4d0c1; border-top: 2px solid #719077; }
+.bank-website__subpage-sections h2 { margin: 0 0 0.3rem; color: #30543f; font-size: 0.8rem; }
+.bank-website__subpage-sections p { margin: 0; color: #555b50; font-size: 0.65rem; }
+.bank-website__back { margin-top: 0.8rem; }
+.bank-website__side-link { padding: 0.65rem; color: #315a42; background: #e5e7dc; border: 1px solid #c5cbbd; cursor: pointer; text-align: left; }
+@media (max-width: 700px) {
+  .bank-website__masthead-note { display: none; }
+  .bank-website__hero { grid-template-columns: minmax(0, 1fr) 5rem; }
+  .bank-website__hero-seal { width: 4.8rem; height: 4.8rem; }
+  .bank-website__hero-seal strong { font-size: 1.3rem; }
+  .bank-website__home-grid,.bank-website__subpage-layout { grid-template-columns: 1fr; }
+  .bank-website__sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bank-website__service-grid { grid-template-columns: 1fr; }
+  .bank-website__nav > span { display: none; }
+}
+.bank-website button { padding: 0; color: #28533a; background: transparent !important; border: 0 !important; box-shadow: none !important; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.bank-website__nav button { min-height: 2rem; padding: 0.35rem 0.7rem; border-right: 1px solid #c5cbbd !important; text-decoration: none; }
+.bank-website__nav button:hover,.bank-website__nav button[aria-current="page"] { color: #18392d; background: transparent !important; box-shadow: inset 0 -2px #9c7a35 !important; }
+.bank-website__hero-actions { gap: 0.9rem; }
+.bank-website__hero-actions button,.bank-website__hero-actions .is-secondary { padding: 0.2rem 0; color: #28533a; background: transparent !important; border: 0 !important; }
+.bank-website__section-heading > button,.bank-website__service-grid button,.bank-website__sidebar-card button,.bank-website__back,.bank-website__side-link { padding: 0; color: #28533a; background: transparent !important; border: 0 !important; text-align: left; }
+.bank-website__market-pages { display: flex; justify-content: flex-end; align-items: center; gap: 0.8rem; margin-top: 0.45rem; color: #787769; font-size: 0.53rem; }
+.bank-website__market-pages button { color: #315a42; text-decoration: underline; }
+.bank-website__market-pages button:disabled { color: #9b9b8d; text-decoration: none; }
+.bank-website__exchange-link { margin-top: 0.5rem; padding: 0; color: #28533a; background: transparent; border: 0; cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.stock-exchange { position: relative; isolation: isolate; display: flex; min-width: 0; min-height: 100%; flex-direction: column; padding: clamp(0.8rem, 2vw, 1.4rem); color: #30352f; background: #f5f5ef; font: 0.9rem/1.55 var(--noir-font-mono); }
+.stock-exchange > .bank-website__masthead { margin: calc(0px - clamp(0.8rem, 2vw, 1.4rem)) calc(0px - clamp(0.8rem, 2vw, 1.4rem)) 1rem; }
+.stock-exchange__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #c7ccbf; }
+.stock-exchange__eyebrow { color: #667768; font-size: 0.68rem; letter-spacing: 0.1em; }
+.stock-exchange__header h1 { margin: 0.2rem 0; color: #273d31; font-size: clamp(1.35rem, 2.8vw, 1.9rem); letter-spacing: 0.04em; }
+.stock-exchange__header p { margin: 0; color: #687267; font-size: 0.75rem; }
+.stock-exchange__status { display: flex; align-items: center; gap: 0.4rem; color: #41634d; font-size: 0.68rem; }
+.stock-exchange__status i { width: 0.5rem; height: 0.5rem; background: #688b63; border-radius: 50%; }
+.stock-exchange__account-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-block: 0.9rem; border-block: 1px solid #c7ccbf; }
+.stock-exchange__account-strip > div { display: grid; gap: 0.2rem; padding: 0.65rem 0.8rem; border-right: 1px solid #d2d5cb; }
+.stock-exchange__account-strip > div:last-child { border: 0; }
+.stock-exchange__account-strip span { color: #657165; font-size: 0.64rem; letter-spacing: 0.06em; }
+.stock-exchange__account-strip strong { color: #294e37; font-size: 1.12rem; font-weight: 600; }
+.stock-exchange__tabs { display: flex; gap: 1.25rem; border-bottom: 1px solid #c7ccbf; }
+.stock-exchange__tabs button,.stock-exchange__pagination button,.stock-exchange__actions button { padding: 0.55rem 0; color: #536353; background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 0.72rem; letter-spacing: 0.04em; }
+.stock-exchange__tabs button[aria-current="page"] { color: #264d35; box-shadow: inset 0 -2px #788858; }
+.stock-exchange__orders { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; padding: 0.8rem 0; color: #626d62; font-size: 0.68rem; }
+.stock-exchange__orders label { letter-spacing: 0.04em; }
+.stock-exchange__orders input { width: 4.5rem; padding: 0.3rem 0.4rem; color: #27352b; background: #fff; border: 1px solid #adb6a9; font: inherit; }
+.stock-exchange__orders span { color: #747d72; }
+.stock-exchange__search-form { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+.stock-exchange__search-form label { color: #626d62; }
+.stock-exchange__orders .stock-exchange__search { width: min(17rem, 32vw); }
+.stock-exchange__search-form button { padding: 0; color: #315a3d; background: transparent; border: 0; cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.stock-exchange__message { margin: 0.4rem 0; padding: 0.4rem 0; font-size: 0.72rem; }
+.stock-exchange__message--error { color: #9c3d2c; }
+.stock-exchange__message--success { color: #376746; }
+.stock-exchange__loading,.stock-exchange__empty { margin: 1rem 0; color: #667267; font-size: 0.78rem; }
+.stock-exchange__table-wrap { min-width: 0; overflow: auto; }
+.stock-exchange__table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.8rem; text-align: left; }
+.stock-exchange__table th { padding: 0.55rem 0.5rem; color: #59695b; background: #e8ebe3; border-bottom: 1px solid #b9c2b4; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap; }
+.stock-exchange__table th:first-child { width: 39%; }
+.stock-exchange__table--market th:nth-child(2) { width: 18%; }
+.stock-exchange__table--market th:nth-child(3) { width: 16%; }
+.stock-exchange__table--market th:nth-child(4) { width: 10%; }
+.stock-exchange__table--market th:nth-child(5) { width: 17%; }
+.stock-exchange__table td { padding: 0.65rem 0.5rem; color: #39433b; border-bottom: 1px solid #d6dacf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stock-exchange__table tbody tr:nth-child(even) { background: #eef0e9; }
+.stock-exchange__table td strong,.stock-exchange__table td small { display: block; }
+.stock-exchange__table td strong { color: #31553b; font-size: 0.92rem; font-weight: 700; }
+.stock-exchange__table td small { color: #687267; font-size: 0.72rem; }
+.stock-exchange__table td .stock-exchange__symbol { letter-spacing: 0.06em; }
+.stock-exchange__table td .stock-exchange__company-name { color: #4d584d; }
+.stock-exchange__actions { white-space: nowrap !important; }
+.stock-exchange__actions button { padding: 0; color: #315a3d; }
+.stock-exchange__actions button + button { margin-left: 0.55rem; }
+.stock-exchange__actions button + button { color: #687267; }
+.stock-exchange button:hover:not(:disabled),.stock-exchange button:focus-visible { color: #172f20; text-decoration: underline; text-underline-offset: 2px; }
+.stock-exchange button:disabled { color: #a2a79f; cursor: not-allowed; }
+.stock-exchange__pagination { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin-top: auto; padding-top: 0.75rem; color: #697369; font-size: 0.68rem; }
+.stock-exchange__pagination > div { display: flex; gap: 0.8rem; }
+.stock-exchange__pagination button { padding: 0; }
+.stock-exchange__footnote { margin-top: 0.65rem; padding-top: 0.55rem; color: #737c72; border-top: 1px solid #cfd4ca; font-size: 0.64rem; }
+.stock-exchange__modal-backdrop { position: absolute; z-index: 5; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(245 245 239 / 84%); }
+.stock-exchange__order-modal { width: min(29rem, 100%); padding: 1.25rem; color: #30352f; background: #f5f5ef; border: 1px solid #aab5a7; border-top: 3px solid #71835e; box-shadow: 3px 3px 0 rgb(48 57 47 / 16%); font: 0.82rem/1.5 var(--noir-font-mono); }
+.stock-exchange__order-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 0.8rem; border-bottom: 1px solid #c7ccbf; }
+.stock-exchange__order-modal > header span { color: #667768; font-size: 0.64rem; letter-spacing: 0.08em; }
+.stock-exchange__order-modal h2 { margin: 0.2rem 0 0; color: #273d31; font-size: 1.25rem; }
+.stock-exchange__order-modal > header button { padding: 0; color: #445448; background: transparent; border: 0; cursor: pointer; font: 1.4rem/1 var(--noir-font-mono); }
+.stock-exchange__modal-company { display: grid; gap: 0.1rem; margin: 0.9rem 0; }
+.stock-exchange__modal-company strong { color: #31553b; font-size: 1.05rem; }
+.stock-exchange__modal-company span { color: #596459; }
+.stock-exchange__modal-quantity { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: 0.7rem; color: #596459; border-block: 1px solid #d1d6cc; font-size: 0.7rem; }
+.stock-exchange__modal-quantity input { width: 7rem; padding: 0.4rem; color: #27352b; background: white; border: 1px solid #adb6a9; font: inherit; font-size: 0.85rem; }
+.stock-exchange__order-modal dl { display: grid; gap: 0.35rem; margin: 0.8rem 0; }
+.stock-exchange__order-modal dl > div { display: flex; justify-content: space-between; gap: 1rem; }
+.stock-exchange__order-modal dt { color: #657165; }
+.stock-exchange__order-modal dd { margin: 0; color: #294e37; font-weight: 700; }
+.stock-exchange__order-modal > footer { display: flex; justify-content: flex-end; gap: 1rem; padding-top: 0.8rem; border-top: 1px solid #c7ccbf; }
+.stock-exchange__order-modal > footer button { padding: 0; color: #315a3d; background: transparent; border: 0; cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.stock-exchange__order-modal > footer .stock-exchange__cancel,.stock-exchange__order-modal > footer .stock-exchange__cancel:hover,.stock-exchange__order-modal > footer .stock-exchange__cancel:focus-visible { text-decoration: none; }
+.stock-exchange__order-modal > footer button:last-child { color: #24452f; font-weight: 700; }
+.computer-taskbar__economy { display: flex; align-items: center; gap: 0.65rem; margin-right: 0.55rem; padding-inline: 0.55rem; color: #465448; border-left: 1px solid #aaae9f; font: 0.47rem var(--noir-font-mono); white-space: nowrap; }
+.computer-taskbar__economy b { font-weight: 500; }
+@media (max-width: 650px) {
+  .stock-exchange__account-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stock-exchange__account-strip > div:nth-child(2) { border-right: 0; }
+  .stock-exchange__table { min-width: 36rem; }
+  .stock-exchange__pagination { align-items: flex-start; flex-direction: column; }
+  .stock-exchange__search-form { width: 100%; margin-left: 0; }
+  .stock-exchange__orders .stock-exchange__search { width: auto; min-width: 0; flex: 1; }
+  .computer-taskbar__economy { display: none; }
+}
+.bank-website__ad button { justify-self: start; padding: 0; color: #f0d991; background: transparent !important; border: 0 !important; }
+.bank-website__ad--vertical button { justify-self: center; }
 .institutional-site__content > .world-directory > h1,
 .institutional-site__content > .legacy-site h1 { color: var(--institutional-primary, #184d78); }
 .institutional-site__footer { margin-top: auto; padding: 0.3rem 0.55rem; color: #686c70; background: #f2f3f3; font: 0.53rem Arial, sans-serif; }
@@ -2492,6 +2741,8 @@
 .computer-start .computer-brand__mark { width: 1.15rem; height: 1.15rem; }
 .computer-frame--persistent .computer-taskbar__active { min-width: 7rem; max-width: 13rem; height: 1.85rem; margin: 0; padding: 0.2rem 0.55rem; overflow: hidden; color: #33372e; background: linear-gradient(#e4e7df, #c9cec4); border: 1px solid #91968a; box-shadow: 1px 1px #f4f3e8 inset; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .computer-frame--persistent .computer-taskbar__active--focused { background: #b8beb3; box-shadow: inset 1px 1px #81867b; }
+.computer-frame--persistent .computer-taskbar__active--minimized { color: #62665b; border-bottom: 1px dashed #62665b; }
+.computer-frame--persistent .computer-taskbar__close-minimized { height: 1.85rem; color: #555c51; }
 .computer-taskbar__clock { padding: 0.45rem 0.65rem; color: #33372e; border: 1px solid #92978a; box-shadow: inset 1px 1px #eef0e8; font: 0.62rem var(--noir-font-mono); white-space: nowrap; }
 .computer-taskbar__tray { display: flex; flex: 0 0 auto; align-items: center; gap: 0.55rem; margin-left: auto; }
 .computer-taskbar__status-icon { display: grid; width: 1rem; height: 1rem; place-items: center; color: #3c6657; }

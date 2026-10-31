@@ -268,6 +268,11 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 	mux.HandleFunc("GET /api/character-visuals", handler.characterVisuals)
 	mux.HandleFunc("GET /api/world", handler.world)
 	if reader != nil {
+		if _, ok := reader.(companySiteIndexReader); ok {
+			mux.HandleFunc("GET /api/market", handler.stockMarket)
+			mux.HandleFunc("GET /api/player/stock-portfolio", handler.stockPortfolio)
+			mux.HandleFunc("POST /api/player/stock-orders", handler.stockOrder)
+		}
 		mux.HandleFunc("GET /api/world/npcs", handler.searchNPCs)
 		mux.HandleFunc("GET /api/world/companies", handler.searchCompanies)
 		mux.HandleFunc("GET /api/world/companies/national", handler.searchCompaniesInCountry)
@@ -2306,9 +2311,10 @@ type characterRequest struct {
 }
 
 type identityResponse struct {
-	Account   account       `json:"account"`
-	Character *character    `json:"character"`
-	World     worldResponse `json:"world"`
+	Account     account            `json:"account"`
+	Character   *character         `json:"character"`
+	World       worldResponse      `json:"world"`
+	Progression *playerProgression `json:"progression,omitempty"`
 }
 
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
@@ -2372,9 +2378,10 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, identityResponse{
-		Account:   publicAccount(found),
-		Character: found.Character,
-		World:     h.worldFor(r.Context(), found.ID),
+		Account:     publicAccount(found),
+		Character:   found.Character,
+		World:       h.worldFor(r.Context(), found.ID),
+		Progression: h.playerProgression(r.Context(), found.ID),
 	})
 }
 
@@ -2389,7 +2396,7 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	writeJSON(w, http.StatusOK, identityResponse{Account: publicAccount(current), Character: character, World: h.worldFor(r.Context(), current.ID)})
+	writeJSON(w, http.StatusOK, identityResponse{Account: publicAccount(current), Character: character, World: h.worldFor(r.Context(), current.ID), Progression: h.playerProgression(r.Context(), current.ID)})
 }
 
 type worldResponse struct {
@@ -2514,7 +2521,7 @@ func (h *Handler) createCharacter(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not create character", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusCreated, identityResponse{Account: publicAccount(current), Character: &created})
+	writeJSON(w, http.StatusCreated, identityResponse{Account: publicAccount(current), Character: &created, Progression: h.playerProgression(r.Context(), current.ID)})
 }
 
 func (h *Handler) updateCharacterAppearance(w http.ResponseWriter, r *http.Request) {
