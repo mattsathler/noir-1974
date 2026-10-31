@@ -42,7 +42,7 @@ export default function LoginPage({ onRegister, onAuthenticated }) {
       <div className="pd-backdrop pos-absolute inset-0" aria-hidden="true" />
       <div className="texture-scanlines pos-absolute inset-0 pointer-events-none opacity-10" aria-hidden="true" />
       <div className="pos-relative w-full max-w-sm">
-        <span className="brand-mark" role="img" aria-label="NOIR">NOIR</span>
+        <img className="brand-mark" src="/images/logo.png" alt="NOIR 1974" />
         <section className="w-full p-6 surface shadow-panel" aria-labelledby="login-title">
           <p className="text-xs tracking-wide uppercase text-success m-0 mb-3">INTERPOL · LYON</p>
           <h1 id="login-title" className="text-2xl m-0 mb-4">Access the files</h1>

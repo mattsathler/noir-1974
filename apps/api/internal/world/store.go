@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -214,10 +216,45 @@ type CompanyPortalRecord struct {
 type CompanyEmployee struct {
 	ID              string          `json:"id"`
 	Name            string          `json:"name"`
+	Email           string          `json:"email"`
 	Role            string          `json:"role"`
 	Status          string          `json:"status"`
 	StatusChangedAt time.Time       `json:"-"`
 	Visual          *VisualIdentity `json:"visual,omitempty"`
+}
+
+// EmailAddressForNPC produces a stable directory address without storing it.
+func EmailAddressForNPC(id, name string) string {
+	slug := employeeEmailNameSlug(name)
+	return fmt.Sprintf("%s.%s@meridian-mail.net", slug, emailAddressIDHash(id))
+}
+
+func legacyEmailAddressForNPC(id, name string) string {
+	slug := employeeEmailNameSlug(name)
+	hash := sha256.Sum256([]byte(id))
+	return fmt.Sprintf("%s.%x@meridian-mail.net", slug, hash[:3])
+}
+
+func employeeEmailNameSlug(name string) string {
+	name = strings.ToLower(name)
+	replacer := strings.NewReplacer("é", "e", "è", "e", "ê", "e", "ë", "e", "à", "a", "â", "a", "ä", "a", "î", "i", "ï", "i", "ô", "o", "ö", "o", "ù", "u", "û", "u", "ü", "u", "ç", "c", "œ", "oe", "'", "", "-", " ")
+	parts := strings.Fields(replacer.Replace(name))
+	slug := strings.Join(parts, ".")
+	slug = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' {
+			return r
+		}
+		return -1
+	}, slug)
+	if slug == "" {
+		slug = "employee"
+	}
+	return slug
+}
+
+func emailAddressIDHash(id string) string {
+	hash := sha256.Sum256([]byte(id))
+	return hex.EncodeToString(hash[:6])
 }
 
 type PhoneContact struct {
@@ -1930,6 +1967,9 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 					employees = append(employees, employee)
 				}
 			}
+			if err := store.indexStaffEmailAddresses(ctx, serverID, employees); err != nil {
+				return nil, fmt.Errorf("index company staff email addresses: %w", err)
+			}
 			return []CompanyRecord{{Company: company.Company, Address: company.Address, Employees: employees}}, nil
 		}
 		store.observeCache("company_directory_index", false)
@@ -1947,6 +1987,9 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 			return nil, err
 		}
 		record.Employees = employees
+		if err := store.indexStaffEmailAddresses(ctx, serverID, employees); err != nil {
+			return nil, fmt.Errorf("index company staff email addresses: %w", err)
+		}
 		return []CompanyRecord{record}, nil
 	}
 	return []CompanyRecord{}, nil
@@ -2871,12 +2914,121 @@ func (store *PostgresStore) employeesOfCompany(ctx context.Context, serverID, co
 		if err != nil {
 			return nil, err
 		}
-		employees = append(employees, CompanyEmployee{ID: employeeID, Name: npc.Name, Role: role, Status: status, Visual: npc.Visual})
+		employees = append(employees, CompanyEmployee{ID: employeeID, Name: npc.Name, Email: EmailAddressForNPC(employeeID, npc.Name), Role: role, Status: status, Visual: npc.Visual})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return employees, nil
+}
+
+// EmployeeByEmail resolves only addresses published in company staff directories.
+func (store *PostgresStore) EmployeeByEmail(ctx context.Context, serverID, address string) (CompanyEmployee, error) {
+	var employee CompanyEmployee
+	err := store.db.QueryRow(ctx, `SELECT npc_id,name,email,role,status FROM world_staff_email_directory
+	 WHERE server_id=$1::uuid AND email=$2`, serverID, strings.ToLower(strings.TrimSpace(address))).
+		Scan(&employee.ID, &employee.Name, &employee.Email, &employee.Role, &employee.Status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	return employee, err
+}
+
+func (store *PostgresStore) indexStaffEmailAddresses(ctx context.Context, serverID string, employees []CompanyEmployee) error {
+	if len(employees) == 0 {
+		return nil
+	}
+	values := make([]string, 0, len(employees))
+	args := make([]any, 0, 6*len(employees))
+	for _, employee := range employees {
+		if employee.ID == "" || employee.Email == "" || employee.Name == "" {
+			continue
+		}
+		first := len(args) + 1
+		values = append(values, fmt.Sprintf("($%d::uuid,$%d,$%d,$%d,$%d,$%d)", first, first+1, first+2, first+3, first+4, first+5))
+		args = append(args, serverID, strings.ToLower(employee.Email), employee.ID, employee.Name, employee.Role, employee.Status)
+		first = len(args) + 1
+		values = append(values, fmt.Sprintf("($%d::uuid,$%d,$%d,$%d,$%d,$%d)", first, first+1, first+2, first+3, first+4, first+5))
+		args = append(args, serverID, strings.ToLower(legacyEmailAddressForNPC(employee.ID, employee.Name)), employee.ID, employee.Name, employee.Role, employee.Status)
+	}
+	if len(values) == 0 {
+		return nil
+	}
+	_, err := store.db.Exec(ctx, `INSERT INTO world_staff_email_directory(server_id,email,npc_id,name,role,status) VALUES `+strings.Join(values, ",")+
+		` ON CONFLICT(server_id,email) DO UPDATE SET npc_id=EXCLUDED.npc_id,name=EXCLUDED.name,role=EXCLUDED.role,status=EXCLUDED.status`, args...)
+	return err
+}
+
+// EmployeeByNPCID validates the result selected from an email-address search.
+func (store *PostgresStore) EmployeeByNPCID(ctx context.Context, serverID, npcID, address string) (CompanyEmployee, error) {
+	if !strings.HasPrefix(npcID, "npc:") {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	seed, worldVersion, err := store.WorldConfig(ctx, serverID)
+	if err != nil {
+		return CompanyEmployee{}, err
+	}
+	var key, role, status string
+	err = store.db.QueryRow(ctx, `SELECT e.generation_key,r.role,
+	 COALESCE((SELECT value #>> '{}' FROM world_mutations m WHERE m.server_id=e.server_id AND m.entity_id=e.entity_id AND m.field_key='status' ORDER BY m.mutation_order DESC LIMIT 1),'alive')
+	 FROM world_entities e JOIN employment_relationships r ON r.server_id=e.server_id AND r.employee_npc_id=e.entity_id
+	 WHERE e.server_id=$1::uuid AND e.entity_id=$2 ORDER BY r.relationship_id LIMIT 1`, serverID, npcID).
+		Scan(&key, &role, &status)
+	if err == nil {
+		npc, err := GenerateNPCFromKey(seed, worldVersion, key)
+		if err != nil {
+			return CompanyEmployee{}, err
+		}
+		if !employeeEmailMatches(npcID, npc.Name, address) {
+			return CompanyEmployee{}, ErrEntityNotFound
+		}
+		return CompanyEmployee{ID: npcID, Name: npc.Name, Email: EmailAddressForNPC(npcID, npc.Name), Role: role, Status: status, Visual: npc.Visual}, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return CompanyEmployee{}, err
+	}
+	key = strings.TrimPrefix(npcID, "npc:")
+	parts := strings.Split(key, "/")
+	if len(parts) != 10 || parts[2] != "people" || parts[4] != "district" || parts[6] != "company" || parts[8] != "person" {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	cityID := parts[0] + "/" + parts[1]
+	city, ok := CityByID(cityID)
+	if !ok {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	companyIndex, err := strconv.Atoi(parts[7])
+	if err != nil || companyIndex < 1 || companyIndex > 36 {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	slot, err := strconv.Atoi(parts[9])
+	if err != nil || slot < 1 {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	citySeed := CitySeed(seed, city.ID)
+	generationVersion := 0
+	for candidate := LatestGeneratorVersion; candidate >= GeneratorVersion7; candidate-- {
+		if parts[3] == seedFingerprint(citySeed, candidate) {
+			generationVersion = candidate
+			break
+		}
+	}
+	if generationVersion == 0 || slot > employeeCount(citySeed, generationVersion, companyIndex) {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	npc, err := GenerateNPC(seed, generationVersion, key)
+	if err != nil {
+		return CompanyEmployee{}, err
+	}
+	if !employeeEmailMatches(npcID, npc.Name, address) {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	return CompanyEmployee{ID: npcID, Name: npc.Name, Email: EmailAddressForNPC(npcID, npc.Name), Role: employmentRoles[(slot-1)%len(employmentRoles)], Status: npc.Status, Visual: npc.Visual}, nil
+}
+
+func employeeEmailMatches(id, name, address string) bool {
+	address = strings.TrimSpace(address)
+	return strings.EqualFold(EmailAddressForNPC(id, name), address) || strings.EqualFold(legacyEmailAddressForNPC(id, name), address)
 }
 
 // EmployeesOfCompanies loads staff for several employers in one query, reusing the caller's world config.
@@ -2914,7 +3066,7 @@ func (store *PostgresStore) EmployeesOfCompanies(ctx context.Context, serverID, 
 		if err != nil {
 			return nil, err
 		}
-		employee := CompanyEmployee{ID: employeeID, Name: npc.Name, Role: role, Status: status, Visual: npc.Visual}
+		employee := CompanyEmployee{ID: employeeID, Name: npc.Name, Email: EmailAddressForNPC(employeeID, npc.Name), Role: role, Status: status, Visual: npc.Visual}
 		if statusChangedAt.Valid {
 			employee.StatusChangedAt = statusChangedAt.Time
 		}

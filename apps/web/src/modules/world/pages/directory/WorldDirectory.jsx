@@ -331,7 +331,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               <figure className="world-record__staff-portrait">
                 <ModularFace visual={employee.visual ?? FALLBACK_NPC_VISUAL} name={employee.name} />
               </figure>
-              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span><small>TELEPHONE · {phoneNumberForNPC(employee.id)}</small></div>
+              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span><small>TELEPHONE · {phoneNumberForNPC(employee.id)}</small><small>EMAIL · {employee.email}</small></div>
             </article>)}
           </div>
         </article>

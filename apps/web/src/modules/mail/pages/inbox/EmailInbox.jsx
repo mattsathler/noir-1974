@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Printer } from "pixelarticons/react/Printer";
 import { getNPCEmails, searchPeople } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
@@ -131,7 +131,7 @@ export default function EmailInbox({ serverTime = new Date(), timeZone = "Europe
           <header className="world-person-file__toolbar"><button type="button" onClick={() => { requestId.current++; setBusy(false); setMailbox(null); setMessages([]); setMessage("Select a correspondence file."); }}>← BACK TO RESULTS</button><span>CORRESPONDENCE FILE</span></header>
           <div className="world-person-file__identity email-inbox__person-file">
             <figure className="world-directory__person-portrait"><ModularFace visual={mailbox.visual ?? FALLBACK_NPC_VISUAL} name={mailbox.name} /></figure>
-            <div><h2>{mailbox.name}</h2><p>{mailbox.status?.toUpperCase() || "STATUS UNKNOWN"} · PRIVATE ACCOUNT</p></div>
+            <div><h2>{mailbox.name}</h2><p>{mailbox.email || mailbox.status?.toUpperCase() || "PRIVATE ACCOUNT"} · PRIVATE ACCOUNT</p></div>
           </div>
           <form className="world-record__activity-filter" onSubmit={readMailbox}>
             <DatePicker label="FROM" value={from} minDate={rangeStart} maxDate={throughToday} onChange={updateFrom} />

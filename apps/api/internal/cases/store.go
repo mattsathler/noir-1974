@@ -122,6 +122,60 @@ type WarrantRequest struct {
 	BodyFound bool               `json:"bodyFound,omitempty"`
 }
 
+type EmailBreakerAccess struct {
+	RequestID string    `json:"requestId"`
+	NPCID     string    `json:"npcId"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	From      string    `json:"from"`
+	Through   string    `json:"through"`
+	Status    string    `json:"status"`
+	ReadyAt   time.Time `json:"readyAt"`
+}
+
+func (store *PostgresStore) RequestEmailBreaker(ctx context.Context, serverID, accountID string, employee world.CompanyEmployee, from, through, requestID string) (EmailBreakerAccess, error) {
+	_, err := store.db.Exec(ctx, `INSERT INTO player_email_breaker_access(server_id,account_id,request_id,target_npc_id,target_name,target_email,from_date,through_date,ready_at)
+	 VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7::date,$8::date,now()) ON CONFLICT(server_id,account_id,request_id) DO NOTHING`, serverID, accountID, requestID, employee.ID, employee.Name, employee.Email, from, through)
+	if err != nil {
+		return EmailBreakerAccess{}, err
+	}
+	return store.EmailBreakerRequest(ctx, serverID, accountID, requestID)
+}
+
+func (store *PostgresStore) EmailBreakerRequest(ctx context.Context, serverID, accountID, requestID string) (EmailBreakerAccess, error) {
+	var result EmailBreakerAccess
+	err := store.db.QueryRow(ctx, `SELECT request_id,target_npc_id,target_name,target_email,from_date::text,through_date::text,
+	 CASE WHEN ready_at<=now() THEN 'ready' ELSE 'pending' END,ready_at
+	 FROM player_email_breaker_access WHERE server_id=$1::uuid AND account_id=$2::uuid AND request_id=$3`, serverID, accountID, requestID).
+		Scan(&result.RequestID, &result.NPCID, &result.Name, &result.Email, &result.From, &result.Through, &result.Status, &result.ReadyAt)
+	return result, err
+}
+
+func (store *PostgresStore) ListEmailBreakerAccess(ctx context.Context, serverID, accountID string) ([]EmailBreakerAccess, error) {
+	rows, err := store.db.Query(ctx, `SELECT request_id,target_npc_id,target_name,target_email,from_date::text,through_date::text,
+	 CASE WHEN ready_at<=now() THEN 'ready' ELSE 'pending' END,ready_at
+	 FROM player_email_breaker_access WHERE server_id=$1::uuid AND account_id=$2::uuid ORDER BY created_at DESC`, serverID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([]EmailBreakerAccess, 0)
+	for rows.Next() {
+		var item EmailBreakerAccess
+		if err := rows.Scan(&item.RequestID, &item.NPCID, &item.Name, &item.Email, &item.From, &item.Through, &item.Status, &item.ReadyAt); err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	return results, rows.Err()
+}
+
+func (store *PostgresStore) HasEmailBreakerAccess(ctx context.Context, serverID, accountID, npcID string) (bool, error) {
+	var allowed bool
+	err := store.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM player_email_breaker_access WHERE server_id=$1::uuid AND account_id=$2::uuid AND target_npc_id=$3 AND ready_at<=now())`, serverID, accountID, npcID).Scan(&allowed)
+	return allowed, err
+}
+
 type persistedCaseIdentity struct {
 	Seed             string
 	CityID           string

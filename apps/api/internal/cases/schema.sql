@@ -200,6 +200,23 @@ CREATE TABLE IF NOT EXISTS player_async_requests (
     PRIMARY KEY (server_id, request_id),
     UNIQUE (server_id, account_id, request_type, request_key)
 );
+
+CREATE TABLE IF NOT EXISTS player_email_breaker_access (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    request_id text NOT NULL CHECK (request_id <> ''),
+    target_npc_id text NOT NULL CHECK (target_npc_id <> ''),
+    target_name text NOT NULL CHECK (target_name <> ''),
+    target_email text NOT NULL CHECK (target_email <> ''),
+    from_date date NOT NULL,
+    through_date date NOT NULL,
+    ready_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, request_id),
+    CHECK (through_date >= from_date)
+);
+CREATE INDEX IF NOT EXISTS player_email_breaker_access_by_player_idx
+    ON player_email_breaker_access(server_id, account_id, ready_at DESC);
 CREATE INDEX IF NOT EXISTS player_async_requests_due_idx
     ON player_async_requests(server_id, available_at, created_at)
     WHERE status IN ('pending', 'processing');

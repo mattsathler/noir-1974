@@ -38,7 +38,7 @@ async function rebuildAndRestart() {
     const result = spawnSync('go', ['build', '-o', `${binaryPath}.next`, './cmd/server'], {
       cwd: apiDir,
       stdio: 'inherit',
-      env: { ...process.env, CGO_ENABLED: '0' },
+      env: { ...process.env, CGO_ENABLED: '0', GOCACHE: path.join(tempDir, 'go-cache') },
     });
 
     if (result.status !== 0) {

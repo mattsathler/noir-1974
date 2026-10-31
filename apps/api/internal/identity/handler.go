@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -17,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 	"noir-1974/apps/api/internal/cases"
 	correspondence "noir-1974/apps/api/internal/mail"
@@ -192,6 +195,18 @@ type EmailsAPIReader interface {
 	NPCEmails(context.Context, string, string, time.Time, time.Time) ([]correspondence.Message, error)
 }
 
+type employeeEmailReader interface {
+	EmployeeByEmail(context.Context, string, string) (world.CompanyEmployee, error)
+	EmployeeByNPCID(context.Context, string, string, string) (world.CompanyEmployee, error)
+}
+
+type EmailBreakerReader interface {
+	RequestEmailBreaker(context.Context, string, string, world.CompanyEmployee, string, string, string) (cases.EmailBreakerAccess, error)
+	EmailBreakerRequest(context.Context, string, string, string) (cases.EmailBreakerAccess, error)
+	ListEmailBreakerAccess(context.Context, string, string) ([]cases.EmailBreakerAccess, error)
+	HasEmailBreakerAccess(context.Context, string, string, string) (bool, error)
+}
+
 type WhiteboardAPIReader interface {
 	RecordDiscoveredItems(context.Context, string, string, []cases.DiscoveredItem) error
 	ListWhiteboards(context.Context, string, string) ([]cases.Whiteboard, error)
@@ -269,6 +284,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		if _, ok := reader.(phoneDirectoryReader); ok && caseReader != nil {
 			mux.HandleFunc("GET /api/world/phone/{number}", handler.lookupPhoneContact)
 		}
+		if _, ok := reader.(employeeEmailReader); ok && caseReader != nil {
+			mux.HandleFunc("GET /api/world/npcs/email", handler.lookupNPCByEmail)
+		}
 	}
 	if recordsReader != nil {
 		mux.HandleFunc("GET /api/world/npcs/{npcID}/records", handler.npcRecords)
@@ -295,6 +313,11 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		if _, ok := caseReader.(ResidentialSearchReader); ok {
 			mux.HandleFunc("POST /api/police/warrants", handler.requestResidentialSearch)
 			mux.HandleFunc("GET /api/player/emails", handler.playerEmails)
+		}
+		if _, ok := caseReader.(EmailBreakerReader); ok {
+			mux.HandleFunc("POST /api/email-breaker", handler.requestEmailBreaker)
+			mux.HandleFunc("GET /api/email-breaker", handler.listEmailBreakerAccess)
+			mux.HandleFunc("GET /api/email-breaker/{requestID}", handler.getEmailBreakerRequest)
 		}
 		if _, ok := caseReader.(PlayerMailDeleteReader); ok {
 			mux.HandleFunc("DELETE /api/player/emails/{messageID}", handler.deletePlayerEmail)
@@ -739,18 +762,7 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cityID := h.worldFor(r.Context(), current.ID).CityID
-	if !h.validateNPCInCity(w, r, cityID, r.PathValue("npcID")) {
-		return
-	}
 	locationID := strings.TrimSpace(r.URL.Query().Get("locationId"))
-	_, canValidateCity := h.worldReader.(cityNPCReader)
-	if (locationID == "" && canValidateCity) || (locationID != "" && locationID != expectedServiceLocationID(cityID, "police")) {
-		h.writeAPIError(w, r, http.StatusBadRequest, "CORRESPONDENCE_LOCATION_REQUIRED", "select the local police station to retrieve correspondence", nil)
-		return
-	}
-	if locationID != "" && !h.requireLocalAccessAttemptInCity(w, r, current.ID, cityID, "police", locationID, "") {
-		return
-	}
 	from, err := time.Parse("2006-01-02", r.URL.Query().Get("from"))
 	if err != nil {
 		http.Error(w, "from must be a date in YYYY-MM-DD format", http.StatusBadRequest)
@@ -765,10 +777,37 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "date range must be valid and no longer than 7 calendar days", http.StatusBadRequest)
 		return
 	}
+	if locationID == "" {
+		reader, ok := h.caseReader.(EmailBreakerReader)
+		if !ok {
+			http.Error(w, "a completed email force breach is required", http.StatusForbidden)
+			return
+		}
+		allowed, err := reader.HasEmailBreakerAccess(r.Context(), h.worldServerID, current.ID, r.PathValue("npcID"))
+		if err != nil {
+			h.writeAPIError(w, r, http.StatusInternalServerError, "EMAIL_BREAKER_ACCESS_FAILED", "could not validate captured correspondence", err)
+			return
+		}
+		if !allowed {
+			h.writeAPIError(w, r, http.StatusForbidden, "EMAIL_BREAKER_ACCESS_REQUIRED", "force a breach of this person's account for the selected period first", nil)
+			return
+		}
+	} else {
+		if locationID != expectedServiceLocationID(cityID, "police") {
+			h.writeAPIError(w, r, http.StatusBadRequest, "CORRESPONDENCE_LOCATION_REQUIRED", "select the local police station to retrieve correspondence", nil)
+			return
+		}
+		if !h.validateNPCInCity(w, r, cityID, r.PathValue("npcID")) {
+			return
+		}
+		if !h.requireLocalAccessAttemptInCity(w, r, current.ID, cityID, "police", locationID, "") {
+			return
+		}
+	}
 	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
 	results, err := h.emailsReader.NPCEmails(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through)
 	if errors.Is(err, world.ErrEntityNotFound) {
-		h.writeAPIError(w, r, http.StatusNotFound, "NPC_EMAIL_PROFILE_NOT_FOUND", "the selected person has no correspondence profile in this city", err)
+		h.writeAPIError(w, r, http.StatusNotFound, "NPC_EMAIL_PROFILE_NOT_FOUND", "the selected person has no correspondence profile", err)
 		return
 	}
 	if errors.Is(err, correspondence.ErrInvalidQuery) || errors.Is(err, correspondence.ErrRangeTooLarge) {
@@ -802,6 +841,139 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (h *Handler) lookupNPCByEmail(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.caseAccount(w, r); !ok {
+		return
+	}
+	reader, ok := h.worldReader.(employeeEmailReader)
+	if !ok {
+		http.Error(w, "email directory unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	address := strings.TrimSpace(r.URL.Query().Get("email"))
+	if address == "" {
+		http.Error(w, "email is required", http.StatusBadRequest)
+		return
+	}
+	employee, err := reader.EmployeeByEmail(r.Context(), h.worldServerID, address)
+	if errors.Is(err, world.ErrEntityNotFound) {
+		writeJSON(w, http.StatusOK, map[string]any{"results": []world.CompanyEmployee{}})
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "EMAIL_TARGET_LOOKUP_FAILED", "could not verify the target address", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": []world.CompanyEmployee{employee}})
+}
+
+type emailBreakerRequestBody struct {
+	NPCID   string `json:"npcId"`
+	Email   string `json:"email"`
+	From    string `json:"from"`
+	Through string `json:"through"`
+}
+
+func (h *Handler) requestEmailBreaker(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input emailBreakerRequestBody
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	now := h.worldFor(r.Context(), current.ID).ServerTime.UTC()
+	if strings.TrimSpace(input.Email) == "" {
+		http.Error(w, "a valid staff email is required", http.StatusBadRequest)
+		return
+	}
+	if input.From == "" && input.Through == "" {
+		input.From = now.Format("2006-01-02")
+		input.Through = input.From
+	}
+	from, err := time.Parse("2006-01-02", input.From)
+	if err != nil {
+		http.Error(w, "from must be a date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+	through, err := time.Parse("2006-01-02", input.Through)
+	if err != nil {
+		http.Error(w, "through must be a date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+	if through.Before(from) || through.Sub(from) > 6*24*time.Hour || through.After(now) {
+		http.Error(w, "select a valid email account", http.StatusBadRequest)
+		return
+	}
+	worldReader, ok := h.worldReader.(employeeEmailReader)
+	if !ok {
+		http.Error(w, "email directory unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	employee, err := worldReader.EmployeeByNPCID(r.Context(), h.worldServerID, input.NPCID, input.Email)
+	if errors.Is(err, world.ErrEntityNotFound) {
+		h.writeAPIError(w, r, http.StatusNotFound, "EMAIL_TARGET_NOT_FOUND", "the selected person does not match that staff email", nil)
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "EMAIL_TARGET_LOOKUP_FAILED", "could not verify the target address", err)
+		return
+	}
+	reader, ok := h.caseReader.(EmailBreakerReader)
+	if !ok {
+		http.Error(w, "email breaker unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	key := sha256.Sum256([]byte(current.ID + "|" + strings.ToLower(employee.Email)))
+	result, err := reader.RequestEmailBreaker(r.Context(), h.worldServerID, current.ID, employee, input.From, input.Through, hex.EncodeToString(key[:16]))
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "EMAIL_BREAKER_FAILED", "could not force the account breach", err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"request": result})
+}
+
+func (h *Handler) listEmailBreakerAccess(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.caseReader.(EmailBreakerReader)
+	if !ok {
+		http.Error(w, "email breaker unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	items, err := reader.ListEmailBreakerAccess(r.Context(), h.worldServerID, current.ID)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "EMAIL_BREAKER_LIST_FAILED", "could not retrieve compromised mailbox access records", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": items})
+}
+
+func (h *Handler) getEmailBreakerRequest(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.caseReader.(EmailBreakerReader)
+	if !ok {
+		http.Error(w, "email breaker unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	item, err := reader.EmailBreakerRequest(r.Context(), h.worldServerID, current.ID, r.PathValue("requestID"))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		h.writeAPIError(w, r, http.StatusInternalServerError, "EMAIL_BREAKER_STATUS_FAILED", "could not check compromised mailbox access", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"request": item})
 }
 
 type caseDetailResponse struct {

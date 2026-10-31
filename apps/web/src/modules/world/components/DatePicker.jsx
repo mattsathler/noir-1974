@@ -22,7 +22,9 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
   const monthDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const offset = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7;
   const days = [...Array(offset).fill(null), ...Array.from({ length: monthDays }, (_, index) => index + 1)];
-  const modal = triggerRef.current?.closest(".computer-window");
+  const parentWindow = triggerRef.current?.closest(".computer-window");
+  const siteVariant = parentWindow?.dataset.siteVariant;
+  const calendarClassName = `world-calendar${parentWindow?.classList.contains("computer-window--website") ? " world-calendar--website" : ""}`;
 
   useEffect(() => setVisibleMonth(`${value.slice(0, 7)}-01`), [value]);
 
@@ -49,17 +51,15 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
       return;
     }
     const trigger = triggerRef.current;
-    const parent = trigger?.closest(".computer-window");
-    if (trigger && parent) {
+    if (trigger) {
       const triggerRect = trigger.getBoundingClientRect();
-      const parentRect = parent.getBoundingClientRect();
-      const popupWidth = Math.min(256, parent.clientWidth - 16);
+      const popupWidth = Math.min(256, window.innerWidth - 16);
       const popupHeight = 260;
-      const below = triggerRect.bottom - parentRect.top;
-      const above = triggerRect.top - parentRect.top - popupHeight;
-      const top = below + popupHeight <= parent.clientHeight ? below : Math.max(0, above);
-      const left = Math.max(8, Math.min(parent.clientWidth - popupWidth - 8, triggerRect.left - parentRect.left));
-      setPosition({ left, top, width: popupWidth });
+      const below = triggerRect.bottom + 4;
+      const above = triggerRect.top - popupHeight - 4;
+      const top = below + popupHeight <= window.innerHeight - 8 ? below : Math.max(8, above);
+      const left = Math.max(8, Math.min(window.innerWidth - popupWidth - 8, triggerRect.left));
+      setPosition({ position: "fixed", left, top, width: popupWidth });
     }
     setOpen(true);
   }
@@ -77,12 +77,12 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
     const index = pickers.indexOf(triggerRef.current);
     const target = index >= 0 && index < pickers.length - 1
       ? pickers[index + 1]
-      : form?.querySelector(".search-enter-submit");
+      : form?.querySelector(".search-enter-submit, .email-breaker__deeplink");
     window.setTimeout(() => (target || triggerRef.current)?.focus(), 0);
   }
 
-  const calendar = open && position && modal ? createPortal(
-    <section ref={calendarRef} className="world-calendar" style={position} aria-label={`Choose ${label} date`}>
+  const calendar = open && position ? createPortal(
+    <section ref={calendarRef} className={calendarClassName} data-site-variant={siteVariant} style={position} aria-label={`Choose ${label} date`}>
       <header className="world-calendar__header">
         <button type="button" aria-label="Previous month" onClick={() => moveMonth(-1)}>‹</button>
         <strong>{monthLabel(month + 1)}</strong>
@@ -96,7 +96,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate })
           return <button key={candidate} type="button" aria-label={`${monthLabel(month + 1)} ${day}`} aria-pressed={candidate === value} disabled={candidate < minDate || candidate > maxDate} className={candidate === value ? "world-calendar__day world-calendar__day--selected" : "world-calendar__day"} onClick={() => chooseDate(candidate)}>{day}</button>;
         })}
       </div>
-    </section>, modal,
+    </section>, document.body,
   ) : null;
 
   return (

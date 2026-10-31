@@ -16,6 +16,7 @@ import { Bug } from "pixelarticons/react/Bug";
 import { Target } from "pixelarticons/react/Target";
 import { Mic } from "pixelarticons/react/Mic";
 import { BatteryFull } from "pixelarticons/react/BatteryFull";
+import { Terminal } from "pixelarticons/react/Terminal";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
 import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, setWhiteboardSaveState } from "../../../world/api.js";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
@@ -38,6 +39,8 @@ import CompanyWebsite from "./CompanyWebsite.jsx";
 import DesktopSettings from "./DesktopSettings.jsx";
 import ProxyConnection from "../../../world/components/ProxyConnection.jsx";
 import GhostkeyExplorer from "./GhostkeyExplorer.jsx";
+import EmailBreakerApp from "./EmailBreakerApp.jsx";
+import TerminalApp from "./TerminalApp.jsx";
 import EmployeeDirectoryApp from "./EmployeeDirectoryApp.jsx";
 import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
 import { DEFAULT_DESKTOP_PREFERENCES, DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
@@ -75,7 +78,7 @@ function markBootedThisLogin() {
 }
 const PERSONAL_PROGRAMS = [
   { id: "web-browser", label: "WEB BROWSER", Icon: Target, state: "ONLINE", available: true },
-  { id: "ghostkey", label: "GHOSTKEY.EXE", Icon: Bug, state: "READY", available: true },
+  { id: "terminal", label: "TERMINAL", Icon: Terminal, state: "READY", available: true },
   { id: "police-website", label: "MERIDIAN POLICE", Icon: Files, state: "ONLINE", available: true },
   { id: "newspaper", label: "THE EVENING COURIER", Icon: Note, state: "ONLINE", available: true },
   { id: "personal-mail", label: "PERSONAL MAIL", Icon: Mail, state: "ONLINE", available: true },
@@ -84,16 +87,18 @@ const PERSONAL_PROGRAMS = [
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
 ];
 const WEB_BROWSER_PROGRAM = PERSONAL_PROGRAMS[0];
+const TERMINAL_PROGRAM = PERSONAL_PROGRAMS.find((program) => program.id === "terminal");
 const SETTINGS_PROGRAM = { id: "settings", label: "SETTINGS", Icon: Brush, state: "READY", available: true };
 const PROXY_PROGRAM = { id: "proxy", label: "ROGUE DNS", Icon: Wifi, state: "UNLISTED", available: true };
 const GHOSTKEY_PROGRAM = { id: "ghostkey", label: "GHOSTKEY.EXE", Icon: Bug, state: "READY", available: true };
+const EMAIL_BREAKER_PROGRAM = { id: "email-breaker", label: "EMAIL_BREAKER.EXE", Icon: Mail, state: "UNSIGNED", available: true };
 const PERSON_SEARCH_PROGRAM = { id: "person-search", label: "PERSON_SEARCH_APP.EXE", Icon: User, state: "PRIVILEGED", available: true };
 const PATIENT_SEARCH_PROGRAM = { id: "patient-search", label: "PATIENT_SEARCH_APP.EXE", Icon: Cross, state: "PRIVILEGED", available: true };
 const GATE_RECORDS_PROGRAM = { id: "gate-records", label: "GATE_ACCESS_LOG_APP.EXE", Icon: MapIcon, state: "PRIVILEGED", available: true };
 const EMPLOYEE_DIRECTORY_PROGRAM = { id: "employee-directory", label: "EMPLOYEE_DIRECTORY_APP.EXE", Icon: Users, state: "PRIVILEGED", available: true };
 const RESIDENTIAL_SEARCH_PROGRAM = { id: "warrant-request", label: "SEARCH_WARRANT.EXE", Icon: Files, state: "PRIVILEGED", available: true };
 const ARREST_WARRANT_PROGRAM = { id: "murder-accusation", label: "ARREST_WARRANT_APP.EXE", Icon: Files, state: "PRIVILEGED", available: true };
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "ghostkey", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "murder-accusation"];
+const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "murder-accusation"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -104,7 +109,7 @@ const CHARACTER_APPEARANCE_PROGRAM = { id: "character-appearance", label: "USER 
 const MERIDIAN_ENTERPRISES_PROGRAM = { id: "meridian-enterprises", label: "MERIDIAN ENTERPRISES", Icon: MapIcon, state: "ONLINE", available: true };
 const START_MENU_DESCRIPTIONS = {
   "web-browser": "Browse connected websites",
-  ghostkey: "Inspect provider directories",
+  terminal: "Run installed programs with commands",
   "police-website": "Public records and notices",
   newspaper: "Local news and city reports",
   "personal-mail": "Private correspondence",
@@ -211,7 +216,7 @@ function browserAddress(program, facilityContext, cityId) {
 export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onPrepareProxy, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenTelephone, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
-  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PROXY_PROGRAM, GHOSTKEY_PROGRAM, PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
+  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PROXY_PROGRAM, TERMINAL_PROGRAM, PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
   const startMenuPrograms = persistent ? PERSONAL_START_MENU_PROGRAMS : programs;
   const facilityAccessGranted = !isCompanyComputer || initialFacilityAccessGranted;
   const [startMenuOpen, setStartMenuOpen] = useState(false);
@@ -225,7 +230,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       const saved = JSON.parse(sessionStorage.getItem("noir:computer:windows") || "null");
       if (!saved || Date.now() - saved.savedAt > 5 * 60 * 1000) return [];
       const restored = saved.windows.flatMap((item) => {
-        if (persistent && [GHOSTKEY_PROGRAM.id, PATIENT_SEARCH_PROGRAM.id].includes(item.programId)) return [];
+        if (persistent && [GHOSTKEY_PROGRAM.id, "email-breaker", PATIENT_SEARCH_PROGRAM.id].includes(item.programId)) return [];
         const program = item.programId === SETTINGS_PROGRAM.id && persistent
           ? SETTINGS_PROGRAM
           : item.programId === PROXY_PROGRAM.id && persistent
@@ -467,9 +472,29 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     setWindows((previous) => previous.map((item) => item.id === windowId ? { ...item, navigationPending } : item));
   }
 
+  function openHackedMailbox(account) {
+    const zIndex = nextZIndexRef.current++;
+    const offset = windows.length;
+    const compact = window.matchMedia("(max-width: 42rem)").matches;
+    const position = offset === 0 ? null : {
+      left: Math.min(compact ? 8 + offset * 10 : 40 + offset * 28, compact ? 32 : 140),
+      top: Math.min(compact ? 8 + offset * 10 : 32 + offset * 24, compact ? 32 : 120),
+    };
+    const id = `${persistent ? "noir-browser" : "personal-mail"}:${zIndex}`;
+    const program = {
+      ...PERSONAL_PROGRAMS.find((item) => item.id === "personal-mail"),
+      label: `PERSONAL MAIL · ${account.name.toUpperCase()}`,
+      state: "BREACHED",
+      accessedViaGhost: true,
+      hackedAccount: { id: account.id, name: account.name, email: account.email },
+    };
+    document.documentElement.dataset.noirActiveComputerWindow = id;
+    setWindows((previous) => [...previous, { id, program, zIndex, position, history: [], loading: false }]);
+  }
+
   function launchProgram(program, sourceWindowId = null, sourceState = null, skipGhostkeyWarning = false) {
     if (!program?.available) return;
-    if (["ghostkey", "proxy"].includes(program.id) && !skipGhostkeyWarning && !windows.some((item) => item.program.id === program.id)) {
+    if (["ghostkey", "proxy", "email-breaker"].includes(program.id) && !skipGhostkeyWarning && !windows.some((item) => item.program.id === program.id)) {
       setSecurityWarningProgram(program);
       setGhostkeyWarningOpen(true);
       return;
@@ -662,27 +687,37 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 : program.label;
               return <section
                 ref={(element) => { if (element) windowRefs.current.set(id, element); else windowRefs.current.delete(id); }}
-                className={`computer-window${position ? " computer-window--positioned" : ""}${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window--website" : ""}${persistent && DESKTOP_APP_IDS.includes(program.id) ? " computer-window--app" : ""}${program.id === "ghostkey" ? " computer-window--ghostkey" : ""}${program.accessedViaGhost ? " computer-window--ghost-compromised" : ""}${program.id === "settings" ? " computer-window--settings" : ""}${program.id === "character-appearance" ? " computer-window--character-appearance" : ""}${program.id === "proxy" ? " computer-window--proxy" : ""}`}
+                className={`computer-window${position ? " computer-window--positioned" : ""}${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window--website" : ""}${persistent && DESKTOP_APP_IDS.includes(program.id) ? " computer-window--app" : ""}${program.id === "ghostkey" ? " computer-window--ghostkey" : ""}${program.id === "terminal" ? " computer-window--terminal" : ""}${program.accessedViaGhost ? " computer-window--ghost-compromised" : ""}${program.id === "settings" ? " computer-window--settings" : ""}${program.id === "character-appearance" ? " computer-window--character-appearance" : ""}${program.id === "proxy" ? " computer-window--proxy" : ""}`}
                 data-site-variant={institutionalVariant(program.id)}
                 data-window-id={id}
                 key={id}
                 style={{ ...(position || {}), zIndex, ...(program.id === "character-appearance" ? { height: "min(48vh, 30rem)" } : {}) }}
                 aria-label={`${companySiteName} ${DESKTOP_APP_IDS.includes(program.id) ? "application" : "website"} window`}
-                onMouseDown={() => focusWindow(id)}
+                onMouseDown={() => {
+                  focusWindow(id);
+                  if (program.id === "terminal") window.requestAnimationFrame(() => windowRefs.current.get(id)?.querySelector(".terminal-app__prompt input")?.focus({ preventScroll: true }));
+                }}
+                onClickCapture={() => {
+                  if (program.id === "terminal") window.requestAnimationFrame(() => windowRefs.current.get(id)?.querySelector(".terminal-app__prompt input")?.focus({ preventScroll: true }));
+                }}
               >
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
                   <span>{persistent && !["web-browser", ...DESKTOP_APP_IDS].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "WEB BROWSER" : program.id === "settings" ? "MERID_OS SETTINGS" : program.id === "proxy" ? "ROGUE DNS" : companySiteName}</span>
                   <button type="button" className="computer-window__close" aria-label={`Close ${companySiteName}`} onClick={() => closeWindow(id)}>×</button>
                 </header>
-                <div className={`computer-browser-address${DESKTOP_APP_IDS.includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : program.id === "proxy" ? "control://rogue-dns" : program.id === "ghostkey" ? "control://ghostkey" : browserAddress(program, facilityContext, cityId)}</span><span className="computer-browser-address__secure">{program.id === "proxy" ? "UNLISTED NETWORK" : "PRIVATE RELAY"}</span></div>
+                <div className={`computer-browser-address${DESKTOP_APP_IDS.includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : program.id === "proxy" ? "control://rogue-dns" : program.id === "ghostkey" ? "control://ghostkey" : program.id === "terminal" ? "control://terminal" : browserAddress(program, facilityContext, cityId)}</span><span className="computer-browser-address__secure">{program.id === "proxy" ? "UNLISTED NETWORK" : "PRIVATE RELAY"}</span></div>
                 <div className={`computer-window__body${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window__body--website" : ""}${desktopWindow.loading || desktopWindow.navigationPending ? " computer-window__body--loading" : ""}`} aria-busy={desktopWindow.loading || desktopWindow.navigationPending}>
                   {desktopWindow.loading ? <div className="computer-browser-loading" role="status" aria-label="Loading webpage" /> : <>
                   {program.id === "settings"
                     ? <DesktopSettings preferences={desktopPreferences} accountUsername={accountUsername} character={character} characterPreviewVisual={characterPreviewVisual} location={location} onEditCharacter={() => launchProgram(CHARACTER_APPEARANCE_PROGRAM)} onChange={(patch) => onDesktopPreferencesChange?.(patch)} onLogout={onLogout} />
                     : program.id === "character-appearance"
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
+                    : program.id === "terminal"
+                      ? <TerminalApp onRun={(programId) => launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : EMAIL_BREAKER_PROGRAM)} />
                     : program.id === "ghostkey"
                       ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => launchProgram({ ...PATIENT_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenGateRecords={(siteAddress) => launchProgram({ ...GATE_RECORDS_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenArrestWarrant={(siteAddress) => launchProgram({ ...ARREST_WARRANT_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
+                      : program.id === "email-breaker"
+                        ? <EmailBreakerApp serverTime={serverTime} onOpenHackedMailbox={openHackedMailbox} />
                       : program.id === "person-search"
                         ? <PoliceWebsite page="person-search" navigate={(destination) => launchProgram(destination, id)} searchId={`police-site-search-${id}`}><WorldDirectory key={`${id}:person-search`} program="interpol" countryName={countryName} cityId={cityId} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} /></PoliceWebsite>
                       : program.id === "employee-directory"
@@ -756,7 +791,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                             : program.id === "emails"
                               ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} cityId={cityId} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} onPrint={requestPrint} />
                               : program.id === "personal-mail"
-                                ? <PlayerMailbox key={id} timeZone={timeZone} onPrint={requestPrint} />
+                                ? <PlayerMailbox key={id} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} hackedAccount={program.hackedAccount} />
                                 : program.id === "public-services"
                                   ? <PublicServices key={id} cityId={cityId} countryName={countryName} onOpenService={onOpenService} onOpenHospitalWebsite={(service) => launchProgram({ id: "hospital-website", label: service.address.name, Icon: Cross, state: "ONLINE", available: true, service }, id)} />
                                   : program.id === "warrant-request"

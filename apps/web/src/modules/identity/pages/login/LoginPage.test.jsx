@@ -14,7 +14,7 @@ afterEach(() => {
 describe("LoginPage", () => {
   it("renders required credentials and prevents form navigation", () => {
     render(<LoginPage onRegister={vi.fn()} />);
-    expect(screen.getByRole("img", { name: "NOIR" })).toHaveTextContent("NOIR");
+    expect(screen.getByRole("img", { name: "NOIR 1974" })).toHaveAttribute("src", "/images/logo.png");
     expect(screen.getByLabelText("Email")).toBeRequired();
     expect(screen.getByLabelText("Password")).toBeRequired();
 

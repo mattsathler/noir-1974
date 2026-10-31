@@ -138,6 +138,25 @@ export async function getNPCEmails(npcId, from, to, locationId = "", accessAttem
   return payload.results ?? [];
 }
 
+export async function findNPCByEmail(email) {
+  const params = new URLSearchParams({ email });
+  const payload = await apiRequest(`/api/world/npcs/email?${params}`);
+  return payload.results ?? [];
+}
+
+export async function requestEmailBreaker(npcId, email) {
+  const payload = await requestCase("/api/email-breaker", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ npcId, email }),
+  });
+  return payload.request;
+}
+
+export async function getEmailBreakerAccess() {
+  const payload = await requestCase("/api/email-breaker");
+  return payload.results ?? [];
+}
+
 export async function getNPCRecords(npcId, from, to, source, locationId = "", accessAttemptId = "") {
   const params = new URLSearchParams({ from, to });
   if (source) params.set("source", source);

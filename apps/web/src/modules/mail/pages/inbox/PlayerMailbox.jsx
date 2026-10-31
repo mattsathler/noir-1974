@@ -4,7 +4,8 @@ import { Files } from "pixelarticons/react/Files";
 import { Note } from "pixelarticons/react/Note";
 import { Box } from "pixelarticons/react/Box";
 import { Trash } from "pixelarticons/react/Trash";
-import { deletePlayerEmail, getPlayerEmails } from "../../../world/api.js";
+import { deletePlayerEmail, getNPCEmails, getPlayerEmails } from "../../../world/api.js";
+import DatePicker from "../../../world/components/DatePicker.jsx";
 
 const ATTACHMENT_ICONS = { document: Files, paper: Note, object: Box };
 
@@ -14,13 +15,36 @@ function displayDate(value, timeZone) {
   return new Intl.DateTimeFormat("en-US", { timeZone: timeZone || "Europe/Paris", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }
 
-export default function PlayerMailbox({ timeZone, onPrint }) {
+function dateBefore(value, days) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPrint, hackedAccount = null, from: initialFrom = "", through: initialThrough = "", onExit }) {
+  const throughToday = new Date(serverTime).toISOString().slice(0, 10);
   const [messages, setMessages] = useState([]);
-  const [status, setStatus] = useState("OPENING PRIVATE MAILBOX…");
+  const [status, setStatus] = useState("OPENING MAILBOX…");
+  const [from, setFrom] = useState(() => initialFrom || dateBefore(throughToday, 6));
+  const [through, setThrough] = useState(() => initialThrough || throughToday);
   const deletedIDs = useRef(new Set());
   const pendingDeleteIDs = useRef(new Set());
 
   useEffect(() => {
+    if (!hackedAccount) return undefined;
+    let active = true;
+    setMessages([]);
+    setStatus("OPENING MAILBOX…");
+    getNPCEmails(hackedAccount.id, from, through).then((items) => {
+      if (!active) return;
+      setMessages(items);
+      setStatus(items.length ? `${items.length} MESSAGE${items.length === 1 ? "" : "S"} ON FILE` : "NO MESSAGES IN THIS DATE RANGE");
+    }).catch((error) => { if (active) setStatus(error.message || "MAILBOX UNAVAILABLE"); });
+    return () => { active = false; };
+  }, [hackedAccount?.id, from, through]);
+
+  useEffect(() => {
+    if (hackedAccount) return undefined;
     let active = true;
     let loaded = false;
     const refresh = () => getPlayerEmails().then((items) => {
@@ -28,19 +52,41 @@ export default function PlayerMailbox({ timeZone, onPrint }) {
       loaded = true;
       const visible = items.filter((item) => !deletedIDs.current.has(item.id) && !pendingDeleteIDs.current.has(item.id));
       setMessages(visible);
-      setStatus(visible.length ? `${visible.length} MESSAGE${visible.length === 1 ? "" : "S"} ON FILE` : "NO PERSONAL MAIL ON FILE");
+      setStatus("MAILBOX_LOADED");
     }).catch((error) => { if (active && !loaded) setStatus(error.message || "MAILBOX UNAVAILABLE"); });
     refresh();
     const interval = window.setInterval(refresh, 15000);
     return () => { active = false; window.clearInterval(interval); };
-  }, []);
+  }, [hackedAccount]);
+
+  function updateFrom(nextFrom) {
+    setFrom(nextFrom);
+    const latestThrough = dateBefore(nextFrom, -6);
+    if (through < nextFrom) setThrough(nextFrom);
+    else if (through > latestThrough) setThrough(latestThrough);
+  }
+
+  function updateThrough(nextThrough) {
+    setThrough(nextThrough);
+    const earliestFrom = dateBefore(nextThrough, 6);
+    if (from > nextThrough) setFrom(nextThrough);
+    else if (from < earliestFrom) setFrom(earliestFrom);
+  }
+
+  const visibleMessages = messages.filter((item) => {
+    const sentDate = item.sentAt?.slice(0, 10);
+    return sentDate >= from && sentDate <= through;
+  });
+  const displayStatus = !hackedAccount && status === "MAILBOX_LOADED"
+    ? visibleMessages.length ? `${visibleMessages.length} MESSAGE${visibleMessages.length === 1 ? "" : "S"} ON FILE` : "NO MESSAGES IN THIS DATE RANGE"
+    : status;
 
   async function deleteMessage(message) {
     const originalIndex = messages.findIndex((item) => item.id === message.id);
     pendingDeleteIDs.current.add(message.id);
     const remaining = messages.filter((item) => item.id !== message.id);
     setMessages(remaining);
-    setStatus(remaining.length ? `${remaining.length} MESSAGE${remaining.length === 1 ? "" : "S"} ON FILE` : "NO PERSONAL MAIL ON FILE");
+    setStatus("MAILBOX_LOADED");
     try {
       await deletePlayerEmail(message.id);
       deletedIDs.current.add(message.id);
@@ -57,15 +103,33 @@ export default function PlayerMailbox({ timeZone, onPrint }) {
     }
   }
 
-  return <div className="email-inbox">
+  function printMessage(message) {
+    onPrint?.({
+      id: message.id,
+      source: "email",
+      title: message.subject || "EMAIL MESSAGE",
+      content: `FROM: ${message.sender || "UNKNOWN"}\nTO: ${message.recipient || (hackedAccount ? hackedAccount.email : "PERSONAL ACCOUNT")}\nDATE: ${displayDate(message.sentAt, timeZone)}\nSUBJECT: ${message.subject || "NO SUBJECT"}\n\n${message.body}`,
+      metadata: message,
+    });
+  }
+
+  return <div className={`email-inbox${hackedAccount ? " email-inbox--hacked" : ""}`}>
+    {hackedAccount && onExit && <button className="email-inbox__hacked-back" type="button" onClick={onExit}>← RETURN TO EMAIL_BREAKER</button>}
     <p className="computer-window__eyebrow">PRIVATE LINE · PERSONAL ACCOUNT</p>
     <h1>PERSONAL MAILBOX</h1>
-    <p className="world-directory__message" role="status" aria-live="polite">{status}</p>
-    {!messages.length && status === "NO PERSONAL MAIL ON FILE" && <p className="email-inbox__empty">Case notices and official reports will be delivered here.</p>}
-    {messages.map((message) => <div className="email-message-row" key={message.id}>
+    <section className="player-mail__date-range" aria-label="Email date range">
+      <span className="world-record__date-label">DATE RANGE</span>
+      <div className="world-record__activity-filter">
+        <DatePicker label="FROM" value={from} minDate="1974-01-01" maxDate={throughToday} onChange={updateFrom} />
+        <DatePicker label="THROUGH" value={through} minDate="1974-01-01" maxDate={throughToday} onChange={updateThrough} />
+      </div>
+    </section>
+    <p className="world-directory__message" role="status" aria-live="polite">{displayStatus}</p>
+    {!visibleMessages.length && displayStatus === "NO MESSAGES IN THIS DATE RANGE" && <p className="email-inbox__empty">No messages are available for this date range.</p>}
+    {visibleMessages.map((message) => <div className="email-message-row" key={message.id}>
       <details className={`email-message${message.category === "spam" ? " email-message--spam" : ""}`}>
         <summary className="email-message__summary">
-          <span>{message.sender || "BILL BOUER"} → PERSONAL ACCOUNT {message.category === "spam" ? "· SPAM" : ""}</span>
+          <span>{message.sender || "BILL BOUER"} → {hackedAccount ? message.recipient || hackedAccount.email : "PERSONAL ACCOUNT"} {message.category === "spam" ? "· SPAM" : ""}</span>
           <span>{message.subject}</span>
           <time dateTime={message.sentAt}>{displayDate(message.sentAt, timeZone)}</time>
         </summary>
@@ -88,7 +152,10 @@ export default function PlayerMailbox({ timeZone, onPrint }) {
           </section>}
         </div>
       </details>
-      <button className="email-message__delete" type="button" aria-label={`Delete email: ${message.subject}`} title="Delete email" onClick={() => deleteMessage(message)}><Trash aria-hidden="true" /></button>
+      {hackedAccount && <button className="email-message__print page-print-button" type="button" aria-label={`Add email to whiteboard: ${message.subject}`} title="Add email to a whiteboard" onClick={() => printMessage(message)}><Printer aria-hidden="true" /></button>}
+      {hackedAccount
+        ? <button className="email-message__delete" type="button" disabled aria-label={`Cannot delete email: ${message.subject}`} title="Mailbox is read-only"><Trash aria-hidden="true" /></button>
+        : <button className="email-message__delete" type="button" aria-label={`Delete email: ${message.subject}`} title="Delete email" onClick={() => deleteMessage(message)}><Trash aria-hidden="true" /></button>}
     </div>)}
   </div>;
 }

@@ -74,6 +74,17 @@ CREATE INDEX IF NOT EXISTS employment_by_employee_idx
 CREATE INDEX IF NOT EXISTS employment_by_company_idx
     ON employment_relationships(server_id, employer_company_id);
 
+CREATE TABLE IF NOT EXISTS world_staff_email_directory (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    email text NOT NULL CHECK (email <> ''),
+    npc_id text NOT NULL CHECK (npc_id <> ''),
+    name text NOT NULL CHECK (name <> ''),
+    role text NOT NULL DEFAULT '',
+    status text NOT NULL DEFAULT 'alive',
+    PRIMARY KEY (server_id, email),
+    UNIQUE (server_id, npc_id, email)
+);
+
 CREATE TABLE IF NOT EXISTS personal_relationships (
     server_id uuid NOT NULL,
     relationship_id text NOT NULL CHECK (relationship_id <> ''),
