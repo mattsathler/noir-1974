@@ -9,13 +9,13 @@ function boardReadiness(board) {
   return { hasProof, hasAccused, hasVictim, ready: hasProof && hasAccused && hasVictim };
 }
 
-export default function AccusationWindow({ cityId, onClose, standalone = false }) {
+export default function AccusationWindow({ cityId, onClose, standalone = false, publicSubmission = false }) {
   const [boards, setBoards] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [message, setMessage] = useState("SELECT AN INVESTIGATION BOARD TO SUBMIT TO CORPORATE REVIEW.");
+  const [message, setMessage] = useState(publicSubmission ? "SELECT AN INVESTIGATION BOARD TO FILE A POLICE REPORT." : "SELECT AN INVESTIGATION BOARD TO SUBMIT TO CORPORATE REVIEW.");
   const selectedBoard = boards.find((board) => board.id === selectedId);
   const readiness = useMemo(() => boardReadiness(selectedBoard), [selectedBoard]);
 
@@ -29,7 +29,7 @@ export default function AccusationWindow({ cityId, onClose, standalone = false }
       if (!active) return;
       setBoards(loaded);
       setSelectedId(loaded.find((board) => !board.lockedAt)?.id ?? loaded[0]?.id ?? "");
-      setMessage(loaded.length ? "SELECT A BOARD FOR THE ACCUSATION REPORT." : "NO INVESTIGATION BOARDS ARE AVAILABLE.");
+      setMessage(loaded.length ? publicSubmission ? "SELECT A BOARD FOR YOUR POLICE REPORT." : "SELECT A BOARD FOR THE ACCUSATION REPORT." : "NO INVESTIGATION BOARDS ARE AVAILABLE.");
     }).catch((error) => { if (active) setMessage(error.message || "INVESTIGATION BOARDS COULD NOT BE LOADED."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -49,7 +49,7 @@ export default function AccusationWindow({ cityId, onClose, standalone = false }
         const selected = latest.find((board) => board.id === selectedId);
         if (selected && !selected.lockedAt) {
           setSubmitted(false);
-          setMessage("REVIEW COMPLETE. THIS BOARD IS UNLOCKED AND READY FOR ANOTHER REVIEW.");
+          setMessage(publicSubmission ? "POLICE REVIEW COMPLETE. THIS BOARD IS READY FOR ANOTHER REPORT." : "REVIEW COMPLETE. THIS BOARD IS UNLOCKED AND READY FOR ANOTHER REVIEW.");
         }
       } catch { /* Keep the submitted state while the API is temporarily unavailable. */ }
     };
@@ -58,13 +58,13 @@ export default function AccusationWindow({ cityId, onClose, standalone = false }
       active = false;
       window.clearInterval(interval);
     };
-  }, [submitted, selectedId]);
+  }, [submitted, selectedId, publicSubmission]);
 
   async function submit(event) {
     event.preventDefault();
     if (!selectedBoard || !readiness.ready || busy || submitted) return;
     setBusy(true);
-    setMessage("FORWARDING ACCUSATION FOR REVIEW…");
+    setMessage(publicSubmission ? "FORWARDING REPORT TO THE POLICE SERVICE…" : "FORWARDING ACCUSATION FOR REVIEW…");
     try {
       const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
       const result = await submitCaseAccusation(selectedBoard.id, `service:${cityKey}/police-station`);
@@ -73,15 +73,15 @@ export default function AccusationWindow({ cityId, onClose, standalone = false }
       setSubmitted(true);
       setMessage(result.status === "completed"
         ? "THIS BOARD WAS ALREADY REVIEWED. NO NEW REVIEW OR EMAIL WAS CREATED. CHECK PERSONAL MAIL FOR THE SAVED DECISION; USE A NEW BOARD FOR ANOTHER REVIEW."
-        : "ACCUSED BOARD RECEIVED. REVIEW IS IN PROGRESS. THE DECISION WILL ARRIVE BY PERSONAL MAIL IN ABOUT 3 MINUTES.");
+        : publicSubmission ? "REPORT RECEIVED. POLICE REVIEW IS IN PROGRESS. THE DECISION WILL ARRIVE BY PERSONAL MAIL IN ABOUT 3 MINUTES." : "ACCUSED BOARD RECEIVED. REVIEW IS IN PROGRESS. THE DECISION WILL ARRIVE BY PERSONAL MAIL IN ABOUT 3 MINUTES.");
     } catch (error) {
       setMessage(error.message || "THE ACCUSATION COULD NOT BE SUBMITTED.");
     } finally { setBusy(false); }
   }
 
   const panel = <section className={`warrant-window__panel accusation-window__panel${standalone ? " police-restricted-app__panel" : ""}`}>
-      <header className="warrant-window__header"><div><p className="computer-window__eyebrow">CORPORATE SECURITY OFFICE · FORM 74-C</p><h1 id="accusation-title">MURDER ACCUSATION</h1></div><button type="button" aria-label="Close accusation form" onClick={onClose}>×</button></header>
-      <p className="warrant-window__copy">Submit an investigation board naming the accused person, the victim, and supporting proof. The review decision will be delivered to personal mail.</p>
+      <header className="warrant-window__header"><div><p className="computer-window__eyebrow">{publicSubmission ? "MERIDIAN POLICE SERVICE · PUBLIC REPORT FORM" : "CORPORATE SECURITY OFFICE · FORM 74-C"}</p><h1 id="accusation-title">{publicSubmission ? "FILE A POLICE REPORT" : "MURDER ACCUSATION"}</h1></div>{onClose && <button type="button" aria-label="Close accusation form" onClick={onClose}>×</button>}</header>
+      <p className="warrant-window__copy">{publicSubmission ? "Submit an investigation board identifying the accused person, the victim, and supporting evidence. The police service will review the report and send its decision to personal mail." : "Submit an investigation board naming the accused person, the victim, and supporting proof. The review decision will be delivered to personal mail."}</p>
       <form className="accusation-window__form" onSubmit={submit}>
         <label className="world-directory__label" htmlFor="accusation-board">INVESTIGATION BOARD</label>
         <select id="accusation-board" value={selectedId} disabled={loading || busy || submitted || boards.length === 0} onChange={(event) => setSelectedId(event.target.value)}>
@@ -98,10 +98,10 @@ export default function AccusationWindow({ cityId, onClose, standalone = false }
         {selectedBoard && !readiness.ready && <p className="accusation-window__warning" role="alert">This board is missing required pins. Complete all three items above before submitting.</p>}
         {selectedBoard?.lockedAt && <p className="accusation-window__warning" role="alert">This board is locked while its review is in progress. It will unlock when the decision is delivered.</p>}
         <p className="world-directory__message" role="status" aria-live="polite">{loading ? "LOADING INVESTIGATION BOARDS…" : message}</p>
-        <footer className="warrant-window__actions"><button type="submit" disabled={loading || busy || submitted || selectedBoard?.lockedAt || !readiness.ready}>{busy ? "SUBMITTING…" : submitted ? "SUBMITTED" : "SUBMIT ACCUSATION"}</button></footer>
+        <footer className="warrant-window__actions"><button type="submit" disabled={loading || busy || submitted || selectedBoard?.lockedAt || !readiness.ready}>{busy ? "SUBMITTING…" : submitted ? "SUBMITTED" : publicSubmission ? "SUBMIT REPORT" : "SUBMIT ACCUSATION"}</button></footer>
       </form>
     </section>;
   return standalone
-    ? <section className="police-restricted-app">{panel}</section>
+    ? <section className={`police-restricted-app${publicSubmission ? " legacy-police__complaint-form" : ""}`}>{panel}</section>
     : <div className="warrant-window" role="dialog" aria-modal="true" aria-labelledby="accusation-title">{panel}</div>;
 }

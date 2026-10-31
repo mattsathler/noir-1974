@@ -2101,6 +2101,14 @@
 .legacy-police__wide-ad b { font-size: 1rem; }
 .legacy-police__wide-ad a { grid-column: 2; grid-row: 2 / 4; font-size: 0.65rem; }
 .legacy-police__article { padding: 0.6rem; border: 1px solid #c5cdd5; }
+.legacy-police__complaint-form { display: block; width: 100%; margin-top: 0.75rem; }
+.legacy-police__complaint-form .warrant-window__panel { box-sizing: border-box; width: 100%; max-width: none; max-height: none; min-height: 0; padding: 0.65rem 0.7rem; color: #263542; background: #fff; border: 1px solid #c5cdd5; box-shadow: none; }
+.legacy-police__complaint-form .warrant-window__header { padding-bottom: 0.45rem; }
+.legacy-police__complaint-form .warrant-window__copy { max-width: none; }
+.legacy-police__complaint-form .accusation-window__form { gap: 0.55rem; margin: 0; }
+.legacy-police__complaint-form .accusation-window__form > select { box-sizing: border-box; width: 100%; min-height: 2rem; }
+.legacy-police__complaint-form .world-directory__message { margin: 0; }
+.legacy-police__complaint-form .warrant-window__actions { min-height: 2rem; margin-top: 0; padding-top: 0.45rem; }
 .legacy-police__article h2 { margin-top: 0.9rem; }
 .legacy-police__notice-list { display: grid; gap: 0.5rem; margin: 0.75rem 0; padding: 0; list-style: none; }
 .legacy-police__notice-list li { display: grid; gap: 0.2rem; padding: 0.5rem; background: #f5f7f9; border-left: 3px solid #426b91; }
@@ -2369,12 +2377,19 @@
 .institutional-site--gate .world-record__date-trigger { color: #006f7e; background: #fff; border-color: #bac5bf; font: 0.62rem Arial, sans-serif; }
 .institutional-site--gate .world-record__activity-filter > button { padding: 0.4rem 0.55rem; color: #fff; background: #006f7e; font: 700 0.58rem Arial, sans-serif; }
 .institutional-site--gate .world-record__activity-message { color: #426449 !important; font: 0.6rem Arial, sans-serif !important; }
-.institutional-site--gate .world-record__activity-entry { padding: 0.6rem 0; background: #fff; border: 0; border-top: 1px solid #d2d8d3; }
-.institutional-site--gate .world-record__activity-entry header { color: #006f7e; font: 700 0.58rem Arial, sans-serif; }
-.institutional-site--gate .world-record__activity-entry p { color: #3c4741; font: 0.68rem/1.5 Arial, sans-serif; }
-.institutional-site--gate .world-record__route { background: #eff8f9; border-color: #c1dce0; }
-.institutional-site--gate .world-record__route > span { color: #006f7e; font: 700 0.55rem Arial, sans-serif; }
-.institutional-site--gate .world-record__route strong { color: #293331; font: 700 0.7rem Arial, sans-serif; }
+.institutional-site--gate .world-record__activity { margin-top: 0.8rem; padding-top: 0.75rem; border-color: #cbd4cf; }
+.institutional-site--gate .world-person-file .world-record__activity h3 { margin: 0 0 0.65rem; color: #006f7e; font: 700 0.66rem Arial, sans-serif; letter-spacing: 0.08em; }
+.institutional-site--gate .world-record__activity-entry { display: grid; grid-template-columns: minmax(0, 1fr) 2.25rem; grid-template-areas: "heading print" "description print" "operator print" "route route"; align-items: center; gap: 0.4rem 0.75rem; margin: 0.55rem 0 0; padding: 0.7rem; color: #293331; background: #f7f9f7; border: 1px solid #d7dfda; border-left: 3px solid #16808a; }
+.institutional-site--gate .world-record__activity-entry header { grid-area: heading; display: flex; align-items: baseline; justify-content: space-between; gap: 0.7rem; color: #006f7e; font: 700 0.58rem Arial, sans-serif; }
+.institutional-site--gate .world-record__activity-entry p:first-of-type { grid-area: description; margin: 0; color: #35413b; font: 0.68rem/1.45 Arial, sans-serif; }
+.institutional-site--gate .world-record__activity-entry p:nth-of-type(2) { grid-area: operator; margin: 0; color: #6b756f; font: 0.59rem/1.4 Arial, sans-serif; }
+.institutional-site--gate .world-record__activity-entry .world-record__route { grid-area: route; margin: 0; padding: 0.55rem 0.65rem; background: #edf5f4; border: 1px solid #cededb; }
+.institutional-site--gate .world-record__activity-entry .world-record__route > span { color: #39757b; font: 700 0.52rem Arial, sans-serif; letter-spacing: 0.08em; }
+.institutional-site--gate .world-record__activity-entry .world-record__route > div { margin-top: 0.35rem; }
+.institutional-site--gate .world-record__activity-entry .world-record__route strong { color: #293331; font: 700 0.68rem Arial, sans-serif; }
+.institutional-site--gate .world-record__activity-entry .world-record__route b { color: #9a874e; font-size: 1rem; }
+.institutional-site--gate .world-record__activity-entry .page-print-button { grid-area: print; align-self: center; justify-self: end; width: 2rem; height: 2rem; margin: 0; color: #006f7e; background: transparent; border-color: #b9cfcc; }
+.institutional-site--gate .world-record__activity-entry .page-print-button:hover { color: #004f5a; background: #eaf3f2; border-color: #16808a; }
 .world-calendar[data-site-variant="gate"] { color: #293331; background: #f7fbfb; border-color: #006f7e; box-shadow: 3px 3px 0 rgb(0 90 105 / 18%); }
 .world-calendar[data-site-variant="gate"] .world-calendar__header { color: #006f7e; }
 .world-calendar[data-site-variant="gate"] .world-calendar__header button { color: #006f7e; background: #e6f6f7; border-color: #b9d9dc; }

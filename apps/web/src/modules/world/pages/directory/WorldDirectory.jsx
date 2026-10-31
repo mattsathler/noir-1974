@@ -48,6 +48,13 @@ function displayRecordDate(value, timeZone) {
   }).format(date);
 }
 
+function recordsServiceLocationId(cityId, source) {
+  if (!cityId) return "";
+  const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
+  const serviceId = source === "gate" ? "gate-station" : source === "bank" ? "meridian-bank" : "";
+  return serviceId ? `service:${cityKey}/${serviceId}` : "";
+}
+
 export default function WorldDirectory({ program, companyLocationId = "", companyId = "", facilityLocationId = "", accessAttemptId = "", cityId = "", countryName = "", serverTime = new Date(), timeZone = "Europe/Paris", onPrint, onOpenCompany, onBeginCompanyNavigation, onCancelCompanyNavigation, onNavigateCompanyWebsite, initialSearch = "", initialCompanies = [] }) {
   const [query, setQuery] = useState(initialSearch);
   const [people, setPeople] = useState([]);
@@ -131,7 +138,8 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
     setActivityBusy(true);
     try {
       const source = isBankRecords ? "bank" : "gate";
-      const loadRecords = () => getNPCRecords(npcID, recordRange.from, recordRange.to, source, facilityLocationId, accessAttemptId);
+      const locationId = recordsServiceLocationId(cityId, source) || facilityLocationId;
+      const loadRecords = () => getNPCRecords(npcID, recordRange.from, recordRange.to, source, locationId, accessAttemptId);
       const results = await loadRecords();
       if (request !== activityRequestId.current) return;
       setActivity(results);

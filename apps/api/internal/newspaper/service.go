@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -218,10 +219,22 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 		}
 	}
 	filteredArticles := articles[:0]
+	bodyStories := 0
+	bodyStoryLimit := 3
+	if strings.HasPrefix(lead.ID, "body-found-") {
+		bodyStoryLimit--
+	}
 	for _, article := range articles {
-		if article.ID != lead.ID {
-			filteredArticles = append(filteredArticles, article)
+		if article.ID == lead.ID {
+			continue
 		}
+		if strings.HasPrefix(article.ID, "body-found-") {
+			if bodyStories >= bodyStoryLimit {
+				continue
+			}
+			bodyStories++
+		}
+		filteredArticles = append(filteredArticles, article)
 	}
 	articles = filteredArticles
 	if len(articles) > 6 {

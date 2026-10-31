@@ -120,7 +120,7 @@ function ProviderIPSearch({ onSearch }) {
   );
 }
 
-export default function GhostkeyExplorer({ countryId, countryName, onOpenPersonSearch, onOpenPatientSearch, onOpenGateRecords, onOpenEmployeeDirectory, onOpenWarrantRequest, onOpenArrestWarrant }) {
+export default function GhostkeyExplorer({ countryId, countryName, onOpenPersonSearch, onOpenPatientSearch, onOpenGateRecords, onOpenEmployeeDirectory, onOpenWarrantRequest }) {
   const [appView, setAppView] = useState("boot");
   const [providers, setProviders] = useState([]);
   const [providerId, setProviderId] = useState("");
@@ -246,7 +246,8 @@ export default function GhostkeyExplorer({ countryId, countryName, onOpenPersonS
       return;
     }
     if (entry.kind === "gate-records") {
-      onOpenGateRecords?.(selectedDirectory.siteAddress || selectedDirectory.address);
+      Promise.resolve(onOpenGateRecords?.(selectedDirectory.siteAddress || selectedDirectory.address))
+        .catch((cause) => setError(cause.message || "THE GATE ACCESS LOG APPLICATION COULD NOT BE OPENED."));
       return;
     }
     if (entry.kind === "employee-directory") {
@@ -255,10 +256,6 @@ export default function GhostkeyExplorer({ countryId, countryName, onOpenPersonS
     }
     if (entry.kind === "warrant-request") {
       onOpenWarrantRequest?.(selectedDirectory.siteAddress || selectedDirectory.address);
-      return;
-    }
-    if (entry.kind === "murder-accusation") {
-      onOpenArrestWarrant?.(selectedDirectory.siteAddress || selectedDirectory.address);
       return;
     }
     if (entry.kind === "unsupported") {
@@ -322,8 +319,8 @@ export default function GhostkeyExplorer({ countryId, countryName, onOpenPersonS
             <div className="ghostkey__entries ghostkey__entries--icons" role="list" aria-label="Remote folders and files">
               {entries.map((entry) => entry.kind === "folder" ? <button className="ghostkey__entry ghostkey__entry--icon" type="button" role="listitem" key={entry.id} onClick={() => openEntry(entry)}>
                 <Folder className="ghostkey__folder-icon" aria-hidden="true" /><span className="ghostkey__entry-copy"><strong>{entry.name}</strong><small>{entry.fileCount} FILES · {entry.exeCount} EXES</small></span>
-              </button> : <button className={`ghostkey__entry ghostkey__entry--icon${["person-search", "warrant-request", "murder-accusation"].includes(entry.kind) ? " ghostkey__entry--executable" : " ghostkey__entry--file"}`} type="button" role="listitem" key={entry.id} onClick={() => openEntry(entry)}>
-                {entry.kind === "person-search" ? <User className="ghostkey__file-icon ghostkey__file-icon--person" aria-hidden="true" /> : entry.kind === "patient-search" ? <Cross className="ghostkey__file-icon ghostkey__file-icon--person" aria-hidden="true" /> : entry.kind === "gate-records" ? <MapIcon className="ghostkey__file-icon" aria-hidden="true" /> : entry.kind === "employee-directory" ? <Users className="ghostkey__file-icon ghostkey__file-icon--person" aria-hidden="true" /> : entry.kind === "warrant-request" || entry.kind === "murder-accusation" ? <Note className="ghostkey__file-icon" aria-hidden="true" /> : <Note className="ghostkey__file-icon" aria-hidden="true" />}<span className="ghostkey__entry-copy"><strong>{entry.name}</strong><small>{entry.kind === "person-search" ? "POLICE RECORDS APPLICATION" : entry.kind === "patient-search" ? "HOSPITAL PATIENT RECORDS APPLICATION" : entry.kind === "gate-records" ? "GATE TRANSIT ACCESS LOG APPLICATION" : entry.kind === "employee-directory" ? "CORPORATE APPLICATION" : entry.kind === "warrant-request" ? "RESIDENTIAL SEARCH" : entry.kind === "murder-accusation" ? "ARREST WARRANT APPLICATION" : "DATA FILE"}</small></span>
+              </button> : <button className={`ghostkey__entry ghostkey__entry--icon${["person-search", "warrant-request"].includes(entry.kind) ? " ghostkey__entry--executable" : " ghostkey__entry--file"}`} type="button" role="listitem" key={entry.id} onClick={() => openEntry(entry)}>
+                {entry.kind === "person-search" ? <User className="ghostkey__file-icon ghostkey__file-icon--person" aria-hidden="true" /> : entry.kind === "patient-search" ? <Cross className="ghostkey__file-icon ghostkey__file-icon--person" aria-hidden="true" /> : entry.kind === "gate-records" ? <MapIcon className="ghostkey__file-icon" aria-hidden="true" /> : entry.kind === "employee-directory" ? <Users className="ghostkey__file-icon ghostkey__file-icon--person" aria-hidden="true" /> : <Note className="ghostkey__file-icon" aria-hidden="true" />}<span className="ghostkey__entry-copy"><strong>{entry.name}</strong><small>{entry.kind === "person-search" ? "POLICE RECORDS APPLICATION" : entry.kind === "patient-search" ? "HOSPITAL PATIENT RECORDS APPLICATION" : entry.kind === "gate-records" ? "GATE TRANSIT ACCESS LOG APPLICATION" : entry.kind === "employee-directory" ? "CORPORATE APPLICATION" : entry.kind === "warrant-request" ? "RESIDENTIAL SEARCH" : "DATA FILE"}</small></span>
               </button>)}
             </div>
             {unsupportedMessage && <div className="ghostkey__error-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setUnsupportedMessage(""); }}>

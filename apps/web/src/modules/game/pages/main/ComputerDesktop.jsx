@@ -18,7 +18,7 @@ import { Mic } from "pixelarticons/react/Mic";
 import { BatteryFull } from "pixelarticons/react/BatteryFull";
 import { Terminal } from "pixelarticons/react/Terminal";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
-import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, setWhiteboardSaveState } from "../../../world/api.js";
+import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, requestFacilitySiteAccess, setWhiteboardSaveState } from "../../../world/api.js";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import PublicServices from "../../../world/pages/directory/PublicServices.jsx";
@@ -97,8 +97,13 @@ const PATIENT_SEARCH_PROGRAM = { id: "patient-search", label: "PATIENT_SEARCH_AP
 const GATE_RECORDS_PROGRAM = { id: "gate-records", label: "GATE_ACCESS_LOG_APP.EXE", Icon: MapIcon, state: "PRIVILEGED", available: true };
 const EMPLOYEE_DIRECTORY_PROGRAM = { id: "employee-directory", label: "EMPLOYEE_DIRECTORY_APP.EXE", Icon: Users, state: "PRIVILEGED", available: true };
 const RESIDENTIAL_SEARCH_PROGRAM = { id: "warrant-request", label: "SEARCH_WARRANT.EXE", Icon: Files, state: "PRIVILEGED", available: true };
-const ARREST_WARRANT_PROGRAM = { id: "murder-accusation", label: "ARREST_WARRANT_APP.EXE", Icon: Files, state: "PRIVILEGED", available: true };
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "murder-accusation"];
+
+function localServiceLocationId(cityId, service) {
+  if (!cityId) return "";
+  const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
+  return `service:${cityKey}/${service}`;
+}
+const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -137,7 +142,6 @@ function programsFor(facilityContext) {
     { id: "interpol", label: "PERSONNEL SEARCH", Icon: User, state: "ONLINE", available: true },
     { id: "emails", label: "EMAIL ARCHIVE", Icon: Mail, state: "ONLINE", available: true },
     { id: "warrant-request", label: "WARRANT REQUEST", Icon: Files, state: "ONLINE", available: true },
-    { id: "murder-accusation", label: "MURDER ACCUSATION", Icon: Note, state: "ONLINE", available: true },
     ...offlinePrograms,
   ];
   if (facilityContext.kind === "hospital") return [
@@ -154,7 +158,7 @@ function programsFor(facilityContext) {
 function institutionalVariant(programId) {
   if (programId === "person-search") return "police";
   if (programId === "meridian-enterprises") return "gate";
-  if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "crime-reports", "interpol", "emails", "warrant-request", "murder-accusation"].includes(programId)) return "police";
+  if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports", "interpol", "emails", "warrant-request"].includes(programId)) return "police";
   if (programId === "patient-search") return "hospital";
   if (programId === "hospital-patient-record") return "hospital";
   if (programId === "hospital-website") return "hospital";
@@ -166,7 +170,7 @@ function institutionalVariant(programId) {
 }
 
 function siteProviderIndex(programId) {
-  if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "crime-reports", "interpol", "person-search", "warrant-request", "murder-accusation"].includes(programId)) return 0;
+  if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports", "interpol", "person-search", "warrant-request"].includes(programId)) return 0;
   if (["newspaper", "personal-mail", "emails", "hospital-website", "patient-search", "hospital-patient-record"].includes(programId)) return 1;
   if (["meridian-enterprises", "gate-records", "bank-records"].includes(programId)) return 2;
   return [...programId].reduce((total, character) => total + character.charCodeAt(0), 0) % 3;
@@ -205,8 +209,8 @@ function browserAddress(program, facilityContext, cityId) {
     return networkSiteAddress(program, countryId, `hospital/${slug}${recordPath}`);
   }
   if (program.id === "company-website") return networkSiteAddress(program, countryId, `${program.website?.domain || "company"}${program.pageId && program.pageId !== "home" ? `/${program.pageId}` : ""}`);
-  if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "crime-reports"].includes(program.id)) {
-    const paths = { "police-notices": "/notices", "police-about": "/about", "police-bureaus": "/district-bureaus", "police-policies": "/records-policy", "police-contact": "/contact", "crime-reports": "/public-records/crime-reports" };
+  if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports"].includes(program.id)) {
+    const paths = { "police-notices": "/notices", "police-about": "/about", "police-bureaus": "/district-bureaus", "police-policies": "/records-policy", "police-contact": "/contact", "police-complaints": "/public-reports", "crime-reports": "/public-records/crime-reports" };
     return networkSiteAddress(program, countryId, paths[program.id] || "");
   }
   if (program.id === "personal-mail") return networkSiteAddress(program, countryId);
@@ -492,6 +496,22 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     setWindows((previous) => [...previous, { id, program, zIndex, position, history: [], loading: false }]);
   }
 
+  async function openGateRecordsFromGhost(siteAddress, sourceWindowId) {
+    const locationId = localServiceLocationId(cityId, "gate-station");
+    if (!locationId) throw new Error("THE LOCAL GATE SERVICE IS NOT AVAILABLE.");
+    const attempt = await requestFacilitySiteAccess({ kind: "gate", locationId });
+    if (attempt.status !== "granted") throw new Error("GATE SITE ACCESS WAS DENIED.");
+    const accessId = String(attempt.attemptId);
+    setAccessAttemptId(accessId);
+    launchProgram({
+      ...GATE_RECORDS_PROGRAM,
+      siteAddress,
+      accessedViaGhost: true,
+      facilityLocationId: locationId,
+      accessAttemptId: accessId,
+    }, sourceWindowId);
+  }
+
   function launchProgram(program, sourceWindowId = null, sourceState = null, skipGhostkeyWarning = false) {
     if (!program?.available) return;
     if (["ghostkey", "proxy", "email-breaker"].includes(program.id) && !skipGhostkeyWarning && !windows.some((item) => item.program.id === program.id)) {
@@ -502,7 +522,14 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     if (persistent) {
       if (DESKTOP_APP_IDS.includes(program.id)) {
         const existingApp = windows.find((item) => item.program.id === program.id && (program.id !== "employee-directory" || item.program.companyRecord?.company?.id === program.companyRecord?.company?.id));
-        if (existingApp) { focusWindow(existingApp.id); return; }
+        if (existingApp) {
+          if (program.id === "gate-records" && program.accessAttemptId) {
+            const zIndex = nextZIndexRef.current++;
+            document.documentElement.dataset.noirActiveComputerWindow = existingApp.id;
+            setWindows((previous) => previous.map((item) => item.id === existingApp.id ? { ...item, program, zIndex } : item));
+          } else focusWindow(existingApp.id);
+          return;
+        }
         const zIndex = nextZIndexRef.current++;
         const id = `${program.id}:${zIndex}`;
         document.documentElement.dataset.noirActiveComputerWindow = id;
@@ -715,7 +742,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "terminal"
                       ? <TerminalApp onRun={(programId) => launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : EMAIL_BREAKER_PROGRAM)} />
                     : program.id === "ghostkey"
-                      ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => launchProgram({ ...PATIENT_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenGateRecords={(siteAddress) => launchProgram({ ...GATE_RECORDS_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenArrestWarrant={(siteAddress) => launchProgram({ ...ARREST_WARRANT_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
+                      ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => launchProgram({ ...PATIENT_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenGateRecords={(siteAddress) => openGateRecordsFromGhost(siteAddress, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
                       : program.id === "email-breaker"
                         ? <EmailBreakerApp serverTime={serverTime} onOpenHackedMailbox={openHackedMailbox} />
                       : program.id === "person-search"
@@ -742,8 +769,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         initialCompanies={program.searchResults}
                         onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })}
                       />
-                    : ["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "crime-reports"].includes(program.id)
-                      ? <PoliceWebsite page={program.id} navigate={(destination) => launchProgram(destination, id)}>{program.id === "crime-reports" && <CaseFiles key={`${id}:crime-reports:${program.searchTerm || ""}`} initialSearch={program.searchTerm} cityId={cityId} issueDay={issueDay} timeZone={timeZone} />}</PoliceWebsite>
+                    : ["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports"].includes(program.id)
+                      ? <PoliceWebsite page={program.id} navigate={(destination) => launchProgram(destination, id)}>{program.id === "crime-reports" ? <CaseFiles key={`${id}:crime-reports:${program.searchTerm || ""}`} initialSearch={program.searchTerm} cityId={cityId} issueDay={issueDay} timeZone={timeZone} /> : program.id === "police-complaints" ? <AccusationWindow key={id} cityId={cityId} standalone publicSubmission /> : null}</PoliceWebsite>
                       : program.id === "deep-link"
                         ? <InstitutionalWebsiteFrame variant="civic" organizationName={program.label}><DeepLinkWebsite linkId={program.linkId} /></InstitutionalWebsiteFrame>
                       : program.id === "newspaper"
@@ -758,11 +785,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                             pageId={program.pageId}
                             onNavigate={(pageId) => launchProgram({ ...program, pageId, label: `${program.website.company.name} · ${pageId.toUpperCase()}` }, id)}
                           />
-                      : ["warrant-request", "murder-accusation"].includes(program.id)
+                      : program.id === "warrant-request"
                         ? <PoliceWebsite page={program.id} navigate={(destination) => launchProgram(destination, id)} searchId={`police-site-search-${id}`}>
-                            {program.id === "warrant-request"
-                              ? <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} standalone onClose={() => closeWindow(id)} />
-                              : <AccusationWindow key={id} cityId={cityId} standalone onClose={() => closeWindow(id)} />}
+                            <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} standalone onClose={() => closeWindow(id)} />
                           </PoliceWebsite>
                       : <InstitutionalWebsiteFrame
                         variant={institutionalVariant(program.id)}
@@ -796,9 +821,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                                   ? <PublicServices key={id} cityId={cityId} countryName={countryName} onOpenService={onOpenService} onOpenHospitalWebsite={(service) => launchProgram({ id: "hospital-website", label: service.address.name, Icon: Cross, state: "ONLINE", available: true, service }, id)} />
                                   : program.id === "warrant-request"
                                     ? <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} onClose={() => closeWindow(id)} />
-                                    : program.id === "murder-accusation"
-                                      ? <AccusationWindow key={id} cityId={cityId} onClose={() => closeWindow(id)} />
-                                          : <WorldDirectory key={`${id}:${program.id}`} program={program.id} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} onBeginCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, true) : undefined} onCancelCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, false) : undefined} initialSearch={program.searchTerm} initialCompanies={program.searchResults} onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })} />}
+                                    : <WorldDirectory key={`${id}:${program.id}`} program={program.id} facilityLocationId={program.facilityLocationId || facilityContext?.locationId} accessAttemptId={program.accessAttemptId || accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} onBeginCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, true) : undefined} onCancelCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, false) : undefined} initialSearch={program.searchTerm} initialCompanies={program.searchResults} onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })} />}
                     {desktopWindow.navigationPending && <div className="computer-browser-loading" role="status" aria-label="Loading webpage" />}
                       </InstitutionalWebsiteFrame>}
                   </>}
