@@ -99,17 +99,6 @@ var personalities = []string{
 	"outgoing but easily distracted",
 }
 
-var companyNames = []string{
-	"Aurore Industries",
-	"Cendre Group",
-	"Delacroix Holdings",
-	"Étoile Conglomerate",
-	"Fournier & Fils",
-	"Lumière Corporation",
-	"Montclair Industries",
-	"Rhône Commercial Group",
-}
-
 var employmentRoles = []string{
 	"accountant", "clerk", "driver", "manager", "messenger", "receptionist", "secretary", "typist",
 }
@@ -370,6 +359,7 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 	if strings.TrimSpace(seed) == "" {
 		return Company{}, errors.New("world seed is required")
 	}
+	worldSeed := seed
 	if !SupportsSocietyVersion(version) {
 		return Company{}, fmt.Errorf("%w: %d", ErrUnsupportedGeneratorVersion, version)
 	}
@@ -462,19 +452,22 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 	if districtIndex < 0 {
 		return Company{}, ErrInvalidGenerationKey
 	}
-	names := shuffledCopy(companyNamesForVersion(version), newStream(seed, version, "company/names"))
-	if districtIndex >= len(names) {
-		return Company{}, ErrInvalidGenerationKey
-	}
-	companyName := names[districtIndex]
+	companyOrdinal := districtIndex + 1
 	if version >= GeneratorVersion7 {
 		building, e1 := strconv.Atoi(parts[7])
 		companyNo, e2 := strconv.Atoi(parts[9])
 		if e1 != nil || e2 != nil || building < 1 || building > 6 || companyNo < 1 || companyNo > 6 {
 			return Company{}, ErrInvalidGenerationKey
 		}
-		ordinal := districtIndex*36 + (building-1)*6 + companyNo
-		companyName = expandedCompanyNames[(ordinal-1)%len(expandedCompanyNames)] + " " + strconv.Itoa(ordinal)
+		companyOrdinal = districtIndex*36 + (building-1)*6 + companyNo
+	}
+	companyNameIndex, ok := companyNationalIndex(city, companyOrdinal)
+	if !ok {
+		return Company{}, ErrInvalidGenerationKey
+	}
+	companyName, ok := companyNameForNationalIndex(worldSeed, city.CountryID, companyNameIndex)
+	if !ok {
+		return Company{}, fmt.Errorf("company name catalog has no entry for national index %d", companyNameIndex)
 	}
 	return Company{
 		ID:            "company:" + generationKey,
@@ -1157,29 +1150,6 @@ func selectedDistricts(seed string, version int) []namedPlace {
 	districts := shuffledCopy(lyonDistricts, newStream(seed, version, "city/districts"))[:3]
 	sort.Slice(districts, func(i, j int) bool { return districts[i].slug < districts[j].slug })
 	return districts
-}
-
-var expandedCompanyNames = []string{
-	"Aurore Industries", "Cendre Group", "Delacroix Holdings", "Étoile Conglomerate", "Fournier & Fils",
-	"Lumière Corporation", "Montclair Industries", "Rhône Commercial Group", "Bastion Mutual", "Civic Assurance",
-	"Continental Relay Company", "Dargent Shipping", "Eastbank Provisions", "Fallow & March", "Garnier Foundry",
-	"Hearthstone Exchange", "Imperial Ledger Company", "Juno Telegraph Works", "Kingswell Security", "Lanterne Properties",
-	"Maison Arnaud", "Bureau Saint-Clair", "Compagnie des Quais", "Ateliers du Rhône", "Comptoir Bellecour",
-	"Société des Transports", "Fonderies Montbrun", "Éditions du Marché", "Mutuelle des Artisans", "Manufacture Vignal",
-	"Domaine Fournier", "Grands Magasins Perrin", "Maison des Métaux", "Services Lafayette", "Coopérative des Tisserands",
-	"Compagnie du Levant", "Établissements Moreau", "Crédit des Provinces", "Réseau Continental", "Bureau des Messageries",
-	"Société du Progrès", "Verreries Saint-Paul", "Négociants Réunis", "Maison du Courrier", "Ateliers de la Gare",
-	"Union Commerciale", "Compagnie des Halles", "Mécaniques Durand", "Comptoir National", "Dépôts de France",
-	"Groupe des Cèdres", "Bureau Rhône-Alpes", "Maison des Étoffes", "Papeteries Bernard", "Société Montaigne",
-	"Compagnie du Midi", "Services du Centre", "Ateliers Lumière", "Fournitures Générales", "Établissements Rivière",
-	"Maison des Machines", "Mutuelle Centrale", "Entrepôts du Nord", "Comptoir des Voyageurs", "Société de la Place",
-}
-
-func companyNamesForVersion(version int) []string {
-	if version >= GeneratorVersion5 {
-		return expandedCompanyNames
-	}
-	return companyNames
 }
 
 func seedFingerprint(seed string, version int) string {

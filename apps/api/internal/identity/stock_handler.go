@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -134,6 +135,34 @@ func (h *Handler) stockPortfolio(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "STOCK_PORTFOLIO_FAILED", "Your stock portfolio could not be loaded.", err)
 		return
+	}
+	if index, available := h.worldReader.(companySiteIndexReader); available {
+		countries := make(map[string]struct{})
+		for _, position := range positions {
+			countries[position.CountryID] = struct{}{}
+		}
+		companyNames := make(map[string]string, len(positions))
+		for countryID := range countries {
+			companies, loadErr := index.CompanySitesInCountry(r.Context(), h.worldServerID, countryID)
+			if loadErr != nil {
+				h.writeAPIError(w, r, http.StatusInternalServerError, "STOCK_PORTFOLIO_FAILED", "Company names for your portfolio could not be loaded.", loadErr)
+				return
+			}
+			for _, company := range companies {
+				companyNames[company.Company.ID] = company.Company.Name
+			}
+		}
+		for positionIndex := range positions {
+			if name := companyNames[positions[positionIndex].CompanyID]; name != "" {
+				positions[positionIndex].CompanyName = name
+			}
+		}
+		sort.Slice(positions, func(i, j int) bool {
+			if positions[i].CompanyName == positions[j].CompanyName {
+				return positions[i].CompanyID < positions[j].CompanyID
+			}
+			return positions[i].CompanyName < positions[j].CompanyName
+		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"progression": progression, "positions": positions})
 }

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const CompanyWebsiteProfileVersion = 3
+const CompanyWebsiteProfileVersion = 4
 
 // CompanyWebsite is the deterministic public website profile generated for one company.
 // Staff records are deliberately excluded and remain behind the existing access flow.
