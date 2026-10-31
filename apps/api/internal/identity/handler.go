@@ -270,6 +270,7 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 	if reader != nil {
 		if _, ok := reader.(companySiteIndexReader); ok {
 			mux.HandleFunc("GET /api/market", handler.stockMarket)
+			mux.HandleFunc("GET /api/market/{companyID}/history", handler.stockMarketHistory)
 			mux.HandleFunc("GET /api/player/stock-portfolio", handler.stockPortfolio)
 			mux.HandleFunc("POST /api/player/stock-orders", handler.stockOrder)
 		}

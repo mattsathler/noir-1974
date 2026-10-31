@@ -36,6 +36,9 @@ type stockListing struct {
 	CountryID   string `json:"countryId"`
 	CityName    string `json:"cityName"`
 	PriceCents  int64  `json:"priceCents"`
+	MarketScore int    `json:"marketScore"`
+	ChangeBps   int64  `json:"changeBps"`
+	LastEventAt string `json:"lastEventAt,omitempty"`
 }
 
 type stockPosition struct {
@@ -47,6 +50,23 @@ type stockPosition struct {
 	AverageCostCents int64  `json:"averageCostCents"`
 	PriceCents       int64  `json:"priceCents"`
 	MarketValueCents int64  `json:"marketValueCents"`
+	MarketScore      int    `json:"marketScore"`
+	ChangeBps        int64  `json:"changeBps"`
+	LastEventAt      string `json:"lastEventAt,omitempty"`
+}
+
+type companyMarketSnapshot struct {
+	Score       int
+	ChangeBps   int64
+	LastEventAt string
+}
+
+type companyMarketEvent struct {
+	EventType   string `json:"eventType"`
+	ScoreBefore int    `json:"scoreBefore"`
+	ScoreAfter  int    `json:"scoreAfter"`
+	ChangeBps   int64  `json:"changeBps"`
+	OccurredAt  string `json:"occurredAt"`
 }
 
 type stockOrderInput struct {
@@ -56,9 +76,75 @@ type stockOrderInput struct {
 	Shares        int64  `json:"shares"`
 }
 
-func stockQuoteCents(countryID, companyID string) int64 {
+func stockQuoteCents(countryID, companyID string, marketScore int) int64 {
 	digest := sha256.Sum256([]byte("noir-stock-quote-v1\x00" + countryID + "\x00" + companyID))
-	return 5000 + int64(binary.BigEndian.Uint64(digest[:8])%95001)
+	base := 5000 + int64(binary.BigEndian.Uint64(digest[:8])%95001)
+	if marketScore < 500 {
+		marketScore = 500
+	}
+	if marketScore > 1500 {
+		marketScore = 1500
+	}
+	return (base*int64(marketScore) + 500) / 1000
+}
+
+func (s *postgresStore) companyMarketSnapshots(ctx context.Context, serverID string, companyIDs []string) (map[string]companyMarketSnapshot, error) {
+	queryer, ok := s.db.(interface {
+		Query(context.Context, string, ...any) (pgx.Rows, error)
+	})
+	if !ok {
+		return nil, errors.New("market quote queries are unavailable")
+	}
+	rows, err := queryer.Query(ctx, `SELECT company.company_id,
+		CASE WHEN COALESCE(score.score,1000) < 1000 THEN LEAST(1000, score.score + FLOOR(EXTRACT(EPOCH FROM (now()-score.updated_at))/86400)::integer) ELSE COALESCE(score.score,1000) END,
+		COALESCE(ROUND((event.score_after-event.score_before)*10000.0/NULLIF(event.score_before,0)),0)::bigint,
+		COALESCE(to_char(event.occurred_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),'')
+		FROM unnest($2::text[]) AS company(company_id)
+		LEFT JOIN company_market_scores score ON score.server_id=$1::uuid AND score.company_id=company.company_id
+		LEFT JOIN LATERAL (SELECT score_before,score_after,occurred_at FROM company_market_events
+			WHERE server_id=$1::uuid AND company_id=company.company_id ORDER BY recorded_at DESC,event_id DESC LIMIT 1) event ON true`, serverID, companyIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string]companyMarketSnapshot, len(companyIDs))
+	for rows.Next() {
+		var companyID string
+		var snapshot companyMarketSnapshot
+		if err := rows.Scan(&companyID, &snapshot.Score, &snapshot.ChangeBps, &snapshot.LastEventAt); err != nil {
+			return nil, err
+		}
+		result[companyID] = snapshot
+	}
+	return result, rows.Err()
+}
+
+func (s *postgresStore) companyMarketHistory(ctx context.Context, serverID, companyID string, offset, limit int) ([]companyMarketEvent, error) {
+	queryer, ok := s.db.(interface {
+		Query(context.Context, string, ...any) (pgx.Rows, error)
+	})
+	if !ok {
+		return nil, errors.New("market history queries are unavailable")
+	}
+	rows, err := queryer.Query(ctx, `SELECT score_before,score_after,
+		COALESCE(ROUND((score_after-score_before)*10000.0/NULLIF(score_before,0)),0)::bigint,
+		to_char(occurred_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"')
+		FROM company_market_events WHERE server_id=$1::uuid AND company_id=$2
+		ORDER BY recorded_at DESC,event_id DESC LIMIT $3 OFFSET $4`, serverID, companyID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]companyMarketEvent, 0)
+	for rows.Next() {
+		var event companyMarketEvent
+		event.EventType = "Company incident"
+		if err := rows.Scan(&event.ScoreBefore, &event.ScoreAfter, &event.ChangeBps, &event.OccurredAt); err != nil {
+			return nil, err
+		}
+		result = append(result, event)
+	}
+	return result, rows.Err()
 }
 
 func (s *postgresStore) playerStockPortfolio(ctx context.Context, accountID, serverID string) (playerProgression, []stockPosition, error) {
@@ -82,8 +168,15 @@ func (s *postgresStore) playerStockPortfolio(ctx context.Context, accountID, ser
 	if !ok {
 		return playerProgression{}, nil, errors.New("stock portfolio queries are unavailable")
 	}
-	rows, err := queryer.Query(ctx, `SELECT company_id, company_name, country_id, city_name, shares, average_cost_cents
-		FROM player_stock_positions WHERE server_id=$1::uuid AND account_id=$2::uuid ORDER BY company_name, company_id`, serverID, accountID)
+	rows, err := queryer.Query(ctx, `SELECT position.company_id, position.company_name, position.country_id, position.city_name, position.shares, position.average_cost_cents,
+		CASE WHEN COALESCE(score.score,1000) < 1000 THEN LEAST(1000, score.score + FLOOR(EXTRACT(EPOCH FROM (now()-score.updated_at))/86400)::integer) ELSE COALESCE(score.score,1000) END,
+		COALESCE(ROUND((event.score_after-event.score_before)*10000.0/NULLIF(event.score_before,0)),0)::bigint,
+		COALESCE(to_char(event.occurred_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),'')
+		FROM player_stock_positions position
+		LEFT JOIN company_market_scores score ON score.server_id=position.server_id AND score.company_id=position.company_id
+		LEFT JOIN LATERAL (SELECT score_before,score_after,occurred_at FROM company_market_events
+			WHERE server_id=position.server_id AND company_id=position.company_id ORDER BY recorded_at DESC,event_id DESC LIMIT 1) event ON true
+		WHERE position.server_id=$1::uuid AND position.account_id=$2::uuid ORDER BY position.company_name, position.company_id`, serverID, accountID)
 	if err != nil {
 		return playerProgression{}, nil, err
 	}
@@ -91,10 +184,10 @@ func (s *postgresStore) playerStockPortfolio(ctx context.Context, accountID, ser
 	positions := make([]stockPosition, 0)
 	for rows.Next() {
 		var position stockPosition
-		if err := rows.Scan(&position.CompanyID, &position.CompanyName, &position.CountryID, &position.CityName, &position.Shares, &position.AverageCostCents); err != nil {
+		if err := rows.Scan(&position.CompanyID, &position.CompanyName, &position.CountryID, &position.CityName, &position.Shares, &position.AverageCostCents, &position.MarketScore, &position.ChangeBps, &position.LastEventAt); err != nil {
 			return playerProgression{}, nil, err
 		}
-		position.PriceCents = stockQuoteCents(position.CountryID, position.CompanyID)
+		position.PriceCents = stockQuoteCents(position.CountryID, position.CompanyID, position.MarketScore)
 		if position.Shares > math.MaxInt64/position.PriceCents {
 			return playerProgression{}, nil, errors.New("stock position value overflow")
 		}
@@ -108,14 +201,10 @@ type stockTradeStore interface {
 	Begin(context.Context) (pgx.Tx, error)
 }
 
-func (s *postgresStore) executeStockOrder(ctx context.Context, accountID, serverID string, listing stockListing, input stockOrderInput) (int64, error) {
-	if input.ClientOrderID == "" || len(input.ClientOrderID) > 80 || input.CompanyID != listing.CompanyID || input.Shares < 1 || input.Shares > stockOrderMaxShares || (input.Side != "buy" && input.Side != "sell") {
+func (s *postgresStore) executeStockOrder(ctx context.Context, accountID, serverID string, listing *stockListing, input stockOrderInput) (int64, error) {
+	if listing == nil || input.ClientOrderID == "" || len(input.ClientOrderID) > 80 || input.CompanyID != listing.CompanyID || input.Shares < 1 || input.Shares > stockOrderMaxShares || (input.Side != "buy" && input.Side != "sell") {
 		return 0, ErrInvalidStockOrder
 	}
-	if input.Shares > math.MaxInt64/listing.PriceCents {
-		return 0, errors.New("stock order value is too large")
-	}
-	total := input.Shares * listing.PriceCents
 	beginner, ok := s.db.(stockTradeStore)
 	if !ok {
 		return 0, errors.New("atomic stock orders are unavailable")
@@ -139,6 +228,28 @@ func (s *postgresStore) executeStockOrder(ctx context.Context, accountID, server
 	if err != nil {
 		return 0, err
 	}
+	if _, err := tx.Exec(ctx, `INSERT INTO company_market_scores(server_id, company_id) VALUES($1::uuid, $2) ON CONFLICT DO NOTHING`, serverID, listing.CompanyID); err != nil {
+		return 0, err
+	}
+	if err := tx.QueryRow(ctx, `SELECT CASE WHEN score < 1000 THEN LEAST(1000, score + FLOOR(EXTRACT(EPOCH FROM (now()-updated_at))/86400)::integer) ELSE score END
+		FROM company_market_scores WHERE server_id=$1::uuid AND company_id=$2 FOR SHARE`, serverID, listing.CompanyID).Scan(&listing.MarketScore); err != nil {
+		return 0, err
+	}
+	listing.PriceCents = stockQuoteCents(listing.CountryID, listing.CompanyID, listing.MarketScore)
+	var eventAt string
+	err = tx.QueryRow(ctx, `SELECT score_before,score_after,
+		COALESCE(ROUND((score_after-score_before)*10000.0/NULLIF(score_before,0)),0)::bigint,
+		to_char(occurred_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"')
+		FROM company_market_events WHERE server_id=$1::uuid AND company_id=$2
+		ORDER BY recorded_at DESC,event_id DESC LIMIT 1`, serverID, listing.CompanyID).Scan(new(int), new(int), &listing.ChangeBps, &eventAt)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return 0, err
+	}
+	listing.LastEventAt = eventAt
+	if input.Shares > math.MaxInt64/listing.PriceCents {
+		return 0, errors.New("stock order value is too large")
+	}
+	total := input.Shares * listing.PriceCents
 	_, err = tx.Exec(ctx, `INSERT INTO player_stock_orders (server_id, account_id, client_order_id, company_id, side, shares, price_cents, total_cents)
 		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8)`, serverID, accountID, input.ClientOrderID, listing.CompanyID, input.Side, input.Shares, listing.PriceCents, total)
 	if err != nil {

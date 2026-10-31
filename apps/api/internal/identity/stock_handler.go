@@ -17,7 +17,15 @@ type stockPortfolioReader interface {
 }
 
 type stockOrderWriter interface {
-	executeStockOrder(context.Context, string, string, stockListing, stockOrderInput) (int64, error)
+	executeStockOrder(context.Context, string, string, *stockListing, stockOrderInput) (int64, error)
+}
+
+type marketSnapshotReader interface {
+	companyMarketSnapshots(context.Context, string, []string) (map[string]companyMarketSnapshot, error)
+}
+
+type marketHistoryReader interface {
+	companyMarketHistory(context.Context, string, string, int, int) ([]companyMarketEvent, error)
 }
 
 func (h *Handler) playerProgression(ctx context.Context, accountID string) *playerProgression {
@@ -73,12 +81,30 @@ func (h *Handler) stockMarket(w http.ResponseWriter, r *http.Request) {
 		start = (page - 1) * stockPageSize
 	}
 	end := min(start+stockPageSize, len(companies))
-	listings := make([]stockListing, 0, end-start)
-	for _, record := range companies[start:end] {
+	pageCompanies := companies[start:end]
+	companyIDs := make([]string, 0, len(pageCompanies))
+	for _, record := range pageCompanies {
+		companyIDs = append(companyIDs, record.Company.ID)
+	}
+	snapshots := map[string]companyMarketSnapshot{}
+	if marketReader, ok := h.store.(marketSnapshotReader); ok {
+		snapshots, err = marketReader.companyMarketSnapshots(r.Context(), h.worldServerID, companyIDs)
+		if err != nil {
+			h.writeAPIError(w, r, http.StatusInternalServerError, "MARKET_QUOTE_FAILED", "Current market quotations could not be loaded.", err)
+			return
+		}
+	}
+	listings := make([]stockListing, 0, len(pageCompanies))
+	for _, record := range pageCompanies {
+		snapshot := snapshots[record.Company.ID]
+		if snapshot.Score == 0 {
+			snapshot.Score = 1000
+		}
 		listings = append(listings, stockListing{
 			CompanyID: record.Company.ID, CompanyName: record.Company.Name,
 			CountryID: city.CountryID, CityName: record.Address.City,
-			PriceCents: stockQuoteCents(city.CountryID, record.Company.ID),
+			PriceCents:  stockQuoteCents(city.CountryID, record.Company.ID, snapshot.Score),
+			MarketScore: snapshot.Score, ChangeBps: snapshot.ChangeBps, LastEventAt: snapshot.LastEventAt,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -86,6 +112,71 @@ func (h *Handler) stockMarket(w http.ResponseWriter, r *http.Request) {
 		"page": page, "pageSize": stockPageSize, "total": len(companies),
 		"listings": listings,
 	})
+}
+
+func (h *Handler) stockMarketHistory(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.authorizedPlayer(w, r)
+	if !ok {
+		return
+	}
+	companyID := strings.TrimSpace(r.PathValue("companyID"))
+	city, exists := world.CityByID(h.worldFor(r.Context(), current.ID).CityID)
+	if !exists {
+		h.writeAPIError(w, r, http.StatusConflict, "PROXY_JURISDICTION_UNAVAILABLE", "Connect a Proxy in the company's country before reading its market history.", nil)
+		return
+	}
+	index, ok := h.worldReader.(companySiteIndexReader)
+	if !ok {
+		h.writeAPIError(w, r, http.StatusServiceUnavailable, "MARKET_LIST_UNAVAILABLE", "National company listings are temporarily unavailable.", nil)
+		return
+	}
+	companies, err := index.CompanySitesInCountry(r.Context(), h.worldServerID, city.CountryID)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "MARKET_LIST_FAILED", "National company listings could not be loaded.", err)
+		return
+	}
+	listed := false
+	for _, record := range companies {
+		if record.Company.ID == companyID {
+			listed = true
+			break
+		}
+	}
+	if !listed {
+		h.writeAPIError(w, r, http.StatusNotFound, "COMPANY_NOT_IN_ACTIVE_MARKET", "The company is not listed in the country of your active Proxy.", nil)
+		return
+	}
+	reader, ok := h.store.(marketHistoryReader)
+	if !ok {
+		h.writeAPIError(w, r, http.StatusServiceUnavailable, "MARKET_HISTORY_UNAVAILABLE", "Company market history is temporarily unavailable.", nil)
+		return
+	}
+	offset := 0
+	if value := strings.TrimSpace(r.URL.Query().Get("offset")); value != "" {
+		offset, err = strconv.Atoi(value)
+		if err != nil || offset < 0 || offset > 1000000 {
+			h.writeAPIError(w, r, http.StatusBadRequest, "INVALID_MARKET_HISTORY_OFFSET", "Market history offset must be a non-negative number.", nil)
+			return
+		}
+	}
+	limit := 50
+	if value := strings.TrimSpace(r.URL.Query().Get("limit")); value != "" {
+		limit, err = strconv.Atoi(value)
+		if err != nil || limit < 1 || limit > 100 {
+			h.writeAPIError(w, r, http.StatusBadRequest, "INVALID_MARKET_HISTORY_LIMIT", "Market history limit must be between 1 and 100.", nil)
+			return
+		}
+	}
+	events, err := reader.companyMarketHistory(r.Context(), h.worldServerID, companyID, offset, limit)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "MARKET_HISTORY_FAILED", "Company market history could not be loaded.", err)
+		return
+	}
+	var nextOffset any
+	if len(events) == limit {
+		nextOffset = offset + len(events)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"companyId": companyID, "events": events, "nextOffset": nextOffset})
 }
 
 func stockSymbol(name string) string {
@@ -197,7 +288,7 @@ func (h *Handler) stockOrder(w http.ResponseWriter, r *http.Request) {
 	var listing stockListing
 	for _, record := range companies {
 		if record.Company.ID == input.CompanyID {
-			listing = stockListing{CompanyID: record.Company.ID, CompanyName: record.Company.Name, CountryID: city.CountryID, CityName: record.Address.City, PriceCents: stockQuoteCents(city.CountryID, record.Company.ID)}
+			listing = stockListing{CompanyID: record.Company.ID, CompanyName: record.Company.Name, CountryID: city.CountryID, CityName: record.Address.City}
 			break
 		}
 	}
@@ -205,12 +296,28 @@ func (h *Handler) stockOrder(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusNotFound, "COMPANY_NOT_IN_ACTIVE_MARKET", "The company is not listed in the country of your active Proxy.", nil)
 		return
 	}
+	marketReader, ok := h.store.(marketSnapshotReader)
+	if !ok {
+		h.writeAPIError(w, r, http.StatusServiceUnavailable, "MARKET_QUOTE_UNAVAILABLE", "Current market quotations are temporarily unavailable.", nil)
+		return
+	}
+	snapshots, err := marketReader.companyMarketSnapshots(r.Context(), h.worldServerID, []string{listing.CompanyID})
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "MARKET_QUOTE_FAILED", "The latest company quotation could not be loaded.", err)
+		return
+	}
+	snapshot := snapshots[listing.CompanyID]
+	if snapshot.Score == 0 {
+		snapshot.Score = 1000
+	}
+	listing.MarketScore, listing.ChangeBps, listing.LastEventAt = snapshot.Score, snapshot.ChangeBps, snapshot.LastEventAt
+	listing.PriceCents = stockQuoteCents(city.CountryID, listing.CompanyID, snapshot.Score)
 	writer, ok := h.store.(stockOrderWriter)
 	if !ok {
 		h.writeAPIError(w, r, http.StatusServiceUnavailable, "STOCK_TRADING_UNAVAILABLE", "Stock trading is temporarily unavailable.", nil)
 		return
 	}
-	creditsCents, err := writer.executeStockOrder(r.Context(), current.ID, h.worldServerID, listing, input)
+	creditsCents, err := writer.executeStockOrder(r.Context(), current.ID, h.worldServerID, &listing, input)
 	switch {
 	case errors.Is(err, ErrNoCharacter):
 		h.writeAPIError(w, r, http.StatusConflict, "PLAYER_CHARACTER_REQUIRED", "Create a character before using the stock exchange.", nil)
@@ -231,5 +338,11 @@ func (h *Handler) stockOrder(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "STOCK_ORDER_FAILED", "The stock order could not be completed.", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"creditsCents": creditsCents, "order": map[string]any{"companyId": listing.CompanyID, "side": input.Side, "shares": input.Shares, "priceCents": listing.PriceCents, "totalCents": listing.PriceCents * input.Shares}})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"creditsCents": creditsCents,
+		"marketScore":  listing.MarketScore,
+		"changeBps":    listing.ChangeBps,
+		"lastEventAt":  listing.LastEventAt,
+		"order":        map[string]any{"companyId": listing.CompanyID, "side": input.Side, "shares": input.Shares, "priceCents": listing.PriceCents, "totalCents": listing.PriceCents * input.Shares},
+	})
 }

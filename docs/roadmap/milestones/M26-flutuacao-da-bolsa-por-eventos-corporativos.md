@@ -1,7 +1,7 @@
 # M26 — Flutuação da bolsa por eventos corporativos
 
-**Status:** Proposta  
-**Trilha:** Independente; não altera o cálculo do fluxo criminal  
+**Status:** Implementada
+**Trilha:** Independente; não altera o cálculo do fluxo criminal
 **Depende de:** M25 — bolsa de valores e progressão do jogador
 
 ## Objetivo
@@ -31,27 +31,28 @@ Esta milestone trata somente do estado de mercado das empresas, da associação 
 
 ## Critérios de aceite
 
-- [ ] Cada empresa negociável tem uma pontuação de mercado e cotação determinadas pelo servidor.
-- [ ] Um evento corporativo elegível altera somente a empresa a que está explicitamente vinculado.
-- [ ] Homicídios ligados a conflito no trabalho e extorsão financeira afetam a pontuação da empresa associada ao caso.
-- [ ] Homicídios sem vínculo verificável com uma empresa, casos de outras categorias e acontecimentos sem vínculo corporativo não alteram pontuação de empresa.
-- [ ] O impacto do mesmo evento é aplicado uma única vez, inclusive em retry, reinício ou processamento concorrente.
-- [ ] A cotação atual da bolsa reflete a pontuação atual e é a cotação usada nas compras, vendas e valorização da carteira.
-- [ ] A valorização/desvalorização atualiza o valor de mercado da carteira sem alterar o saldo em Credits enquanto o jogador não vender ações.
-- [ ] Personagens no mesmo servidor veem cotações iguais para as mesmas empresas; servidores distintos mantêm estados isolados.
-- [ ] A API não aceita do cliente a pontuação nem a cotação como valores de escrita autoritativos.
-- [ ] A interface comunica pontuação, cotação atual e variação de forma compreensível, sem expor campos internos do caso.
-- [ ] Histórico do mercado permite reconstruir e inspecionar as alterações aplicadas a uma empresa.
-- [ ] Atualizações de mercado não concedem fama ou Credits e não alteram geração, provas, resultado de acusação ou progressão de casos.
+- [x] Cada empresa sem eventos usa o índice-base 1.000; empresas afetadas persistem pontuação específica por servidor e cotação calculada pelo backend.
+- [x] Um evento corporativo elegível altera somente a empresa identificada pelo vínculo de emprego persistido no caso.
+- [x] Homicídios ligados a conflito no trabalho e extorsão financeira afetam a pontuação da empresa associada ao caso.
+- [x] Homicídios sem vínculo verificável com uma empresa, casos de outras categorias e acontecimentos sem vínculo corporativo não alteram pontuação de empresa.
+- [x] A gravação do caso, seu evento de mercado e a alteração da pontuação ocorrem na mesma transação; a chave do caso garante idempotência em retry e concorrência.
+- [x] A cotação da listagem, da carteira e das ordens usa a pontuação atual do servidor.
+- [x] Mudanças de cotação recalculam o valor de mercado da carteira sem alterar Credits até uma negociação.
+- [x] A pontuação é compartilhada dentro do servidor e isolada entre servidores.
+- [x] O cliente não envia pontuação nem cotação para gravação; o backend resolve ambos.
+- [x] Bolsa e site do banco apresentam índice, variação e cotação. O histórico público usa rótulos genéricos e omite IDs e campos internos do caso.
+- [x] Eventos são persistidos com pontuações antes/depois e podem ser consultados pelo endpoint de histórico da empresa.
+- [x] Impactos não concedem fama ou Credits e não alteram provas, acusação, prisão ou progressão de casos.
 
-## Decisões necessárias antes do aceite
+## Decisões aplicadas nesta implementação
 
-- Quando o mercado reage: na ocorrência do evento, quando o caso é reportado ou quando uma descoberta se torna pública.
-- Como determinar direção e magnitude do impacto para cada tipo de evento; se há um escore de risco/estabilidade limitado por piso e teto.
-- Como a cotação se recupera ou se estabiliza após um impacto: sem recuperação automática, recuperação temporal ou por novos eventos.
-- Qual é a granularidade e retenção do histórico de alterações.
-- Se outros eventos corporativos além de homicídio/extorsão entram nesta etapa ou ficam para expansões futuras.
-- Como impedir que a cotação revele prematuramente conteúdo reservado de um caso. A reação deve preservar a classificação de provas e a informação interna do Crime Generator.
+- O mercado reage quando um caso novo entra no mundo compartilhado. A alteração é atômica à criação do caso.
+- Conflito no trabalho reduz 25 pontos (2,5% do índice neutro); extorsão financeira reduz 75 pontos (7,5%). O índice fica entre 500 e 1.500.
+- Após eventos negativos, o índice recupera 1 ponto por cada 24 horas do relógio do servidor, até o neutro 1.000. Empresas acima do neutro não sofrem ajuste automático.
+- A recuperação é calculada ao consultar ou negociar, sem criar registros artificiais no histórico. Um novo evento parte do índice recuperado naquele momento.
+- O histórico é retido sem expiração e armazena índice anterior, índice posterior, magnitude e horários de ocorrência/registro.
+- Apenas `workplace_conflict` e `financial_extortion` participam desta etapa.
+- A interface do mercado não apresenta tipo de arquétipo nem ID do caso; a linha pública de histórico usa “Company incident”.
 
 ## Fora de escopo
 

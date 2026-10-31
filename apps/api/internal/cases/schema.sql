@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS cases (
     generator_version integer NOT NULL CHECK (generator_version > 0),
     case_type text NOT NULL CHECK (case_type = 'homicide'),
     archetype_id text NOT NULL DEFAULT 'workplace_conflict' CHECK (archetype_id <> ''),
+    company_id text,
     motive text NOT NULL DEFAULT 'Legacy workplace homicide.' CHECK (motive <> ''),
     victim_entity_id text NOT NULL,
     killer_entity_id text NOT NULL,
@@ -25,6 +26,7 @@ CREATE INDEX IF NOT EXISTS cases_by_server_created_idx
     ON cases(server_id, created_at);
 
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS archetype_id text NOT NULL DEFAULT 'workplace_conflict';
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS company_id text;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS motive text NOT NULL DEFAULT 'Legacy workplace homicide.';
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS city_id text NOT NULL DEFAULT 'fr/lyon';
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS crime_at timestamptz;
@@ -402,3 +404,59 @@ CREATE TABLE IF NOT EXISTS case_generation_schedule (
     next_run_at timestamptz NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Older case rows recover their company only through the case's explicit employment links.
+UPDATE cases c SET company_id = (
+    SELECT employment.employer_company_id
+    FROM case_relationships relation
+    JOIN employment_relationships employment
+      ON employment.server_id = relation.server_id AND employment.relationship_id = relation.relationship_id
+    WHERE relation.server_id = c.server_id AND relation.case_id = c.case_id
+      AND relation.relationship_type = 'employment' AND relation.relationship_role = 'killer_employment'
+    LIMIT 1
+)
+WHERE c.company_id IS NULL AND c.case_type = 'homicide'
+  AND c.archetype_id IN ('workplace_conflict', 'financial_extortion');
+
+INSERT INTO company_market_scores (server_id, company_id, score)
+SELECT DISTINCT server_id, company_id, 1000 FROM cases
+WHERE company_id IS NOT NULL AND archetype_id IN ('workplace_conflict', 'financial_extortion')
+ON CONFLICT (server_id, company_id) DO NOTHING;
+
+WITH impacts AS (
+    SELECT server_id, case_id AS event_id, company_id,
+           archetype_id AS event_type,
+           CASE archetype_id WHEN 'financial_extortion' THEN -75 ELSE -25 END AS score_delta,
+           COALESCE(crime_at, created_at) AS occurred_at,
+           created_at AS recorded_at
+    FROM cases
+    WHERE company_id IS NOT NULL AND case_type = 'homicide'
+      AND archetype_id IN ('workplace_conflict', 'financial_extortion')
+), cumulative AS (
+    SELECT impacts.*,
+           GREATEST(500, 1000 + COALESCE(SUM(score_delta) OVER (
+               PARTITION BY server_id, company_id ORDER BY recorded_at, event_id
+               ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+           ),0))::integer AS score_before,
+           GREATEST(500, 1000 + SUM(score_delta) OVER (
+               PARTITION BY server_id, company_id ORDER BY recorded_at, event_id
+               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+           ))::integer AS score_after
+    FROM impacts
+)
+INSERT INTO company_market_events (server_id, event_id, company_id, event_type, score_delta, score_before, score_after, occurred_at, recorded_at)
+SELECT server_id, event_id, company_id, event_type, score_delta,
+       score_before, score_after, occurred_at, recorded_at
+FROM cumulative
+ON CONFLICT (server_id, event_id) DO UPDATE SET
+    company_id = EXCLUDED.company_id, event_type = EXCLUDED.event_type,
+    score_delta = EXCLUDED.score_delta, score_before = EXCLUDED.score_before,
+    score_after = EXCLUDED.score_after, occurred_at = EXCLUDED.occurred_at,
+    recorded_at = EXCLUDED.recorded_at;
+
+UPDATE company_market_scores score SET score = latest.score_after, updated_at = latest.recorded_at
+FROM (
+    SELECT DISTINCT ON (server_id, company_id) server_id, company_id, score_after, recorded_at
+    FROM company_market_events ORDER BY server_id, company_id, recorded_at DESC, event_id DESC
+) latest
+WHERE score.server_id = latest.server_id AND score.company_id = latest.company_id;

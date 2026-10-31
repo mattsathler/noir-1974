@@ -2454,6 +2454,8 @@
 .stock-exchange__header p { margin: 0; color: #687267; font-size: 0.75rem; }
 .stock-exchange__status { display: flex; align-items: center; gap: 0.4rem; color: #41634d; font-size: 0.68rem; }
 .stock-exchange__status i { width: 0.5rem; height: 0.5rem; background: #688b63; border-radius: 50%; }
+.stock-exchange__market-status { display: grid; justify-items: end; gap: 0.35rem; }
+.stock-exchange__market-status button { padding: 0; color: #315a3d; background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 0.64rem; }
 .stock-exchange__account-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-block: 0.9rem; border-block: 1px solid #c7ccbf; }
 .stock-exchange__account-strip > div { display: grid; gap: 0.2rem; padding: 0.65rem 0.8rem; border-right: 1px solid #d2d5cb; }
 .stock-exchange__account-strip > div:last-child { border: 0; }
@@ -2477,11 +2479,13 @@
 .stock-exchange__table-wrap { min-width: 0; overflow: auto; }
 .stock-exchange__table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.8rem; text-align: left; }
 .stock-exchange__table th { padding: 0.55rem 0.5rem; color: #59695b; background: #e8ebe3; border-bottom: 1px solid #b9c2b4; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap; }
-.stock-exchange__table th:first-child { width: 39%; }
-.stock-exchange__table--market th:nth-child(2) { width: 18%; }
-.stock-exchange__table--market th:nth-child(3) { width: 16%; }
-.stock-exchange__table--market th:nth-child(4) { width: 10%; }
-.stock-exchange__table--market th:nth-child(5) { width: 17%; }
+.stock-exchange__table--market th:first-child { width: 28%; }
+.stock-exchange__table--market th:nth-child(2) { width: 14%; }
+.stock-exchange__table--market th:nth-child(3) { width: 9%; }
+.stock-exchange__table--market th:nth-child(4) { width: 9%; }
+.stock-exchange__table--market th:nth-child(5) { width: 14%; }
+.stock-exchange__table--market th:nth-child(6) { width: 8%; }
+.stock-exchange__table--market th:nth-child(7) { width: 18%; }
 .stock-exchange__table td { padding: 0.65rem 0.5rem; color: #39433b; border-bottom: 1px solid #d6dacf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stock-exchange__table tbody tr:nth-child(even) { background: #eef0e9; }
 .stock-exchange__table td strong,.stock-exchange__table td small { display: block; }
@@ -2489,9 +2493,12 @@
 .stock-exchange__table td small { color: #687267; font-size: 0.72rem; }
 .stock-exchange__table td .stock-exchange__symbol { letter-spacing: 0.06em; }
 .stock-exchange__table td .stock-exchange__company-name { color: #4d584d; }
+.stock-exchange__change { color: #687267 !important; }
+.stock-exchange__change--down { color: #974b3b !important; }
+.stock-exchange__change--up { color: #315f3c !important; }
 .stock-exchange__actions { white-space: nowrap !important; }
+.stock-exchange__action-links { display: flex; align-items: center; gap: 0.5rem; }
 .stock-exchange__actions button { padding: 0; color: #315a3d; }
-.stock-exchange__actions button + button { margin-left: 0.55rem; }
 .stock-exchange__actions button + button { color: #687267; }
 .stock-exchange button:hover:not(:disabled),.stock-exchange button:focus-visible { color: #172f20; text-decoration: underline; text-underline-offset: 2px; }
 .stock-exchange button:disabled { color: #a2a79f; cursor: not-allowed; }
@@ -2499,6 +2506,17 @@
 .stock-exchange__pagination > div { display: flex; gap: 0.8rem; }
 .stock-exchange__pagination button { padding: 0; }
 .stock-exchange__footnote { margin-top: 0.65rem; padding-top: 0.55rem; color: #737c72; border-top: 1px solid #cfd4ca; font-size: 0.64rem; }
+.stock-exchange__history { margin-top: 0.8rem; padding: 0.7rem 0.8rem; color: #455047; background: #edf0e9; border: 1px solid #cbd2c7; border-left: 3px solid #71835e; }
+.stock-exchange__history > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 0.45rem; border-bottom: 1px solid #cbd2c7; }
+.stock-exchange__history > header span { color: #687267; font-size: 0.62rem; letter-spacing: 0.07em; }
+.stock-exchange__history h2 { margin: 0.15rem 0; color: #294e37; font-size: 0.9rem; }
+.stock-exchange__history > header button { padding: 0; color: #315a3d; background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 0.68rem; }
+.stock-exchange__history ol { display: grid; gap: 0.35rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
+.stock-exchange__history li { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(8rem, 1fr) auto; gap: 0.6rem; align-items: center; padding-top: 0.35rem; border-top: 1px solid #d8ddd3; font-size: 0.72rem; }
+.stock-exchange__history time { color: #687267; }
+.stock-exchange__history li b { color: #31553b; }
+.stock-exchange__history > p { margin: 0.5rem 0 0; color: #687267; font-size: 0.72rem; }
+.stock-exchange__history-more { margin-top: 0.55rem; padding: 0; color: #315a3d; background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 0.68rem; }
 .stock-exchange__modal-backdrop { position: absolute; z-index: 5; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(245 245 239 / 84%); }
 .stock-exchange__order-modal { width: min(29rem, 100%); padding: 1.25rem; color: #30352f; background: #f5f5ef; border: 1px solid #aab5a7; border-top: 3px solid #71835e; box-shadow: 3px 3px 0 rgb(48 57 47 / 16%); font: 0.82rem/1.5 var(--noir-font-mono); }
 .stock-exchange__order-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 0.8rem; border-bottom: 1px solid #c7ccbf; }
@@ -2524,9 +2542,13 @@
   .stock-exchange__account-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stock-exchange__account-strip > div:nth-child(2) { border-right: 0; }
   .stock-exchange__table { min-width: 36rem; }
+  .stock-exchange__table--market { min-width: 54rem; }
   .stock-exchange__pagination { align-items: flex-start; flex-direction: column; }
   .stock-exchange__search-form { width: 100%; margin-left: 0; }
   .stock-exchange__orders .stock-exchange__search { width: auto; min-width: 0; flex: 1; }
+  .stock-exchange__history li { grid-template-columns: minmax(0, 1fr) auto; }
+  .stock-exchange__history li span { grid-column: 1; grid-row: 2; }
+  .stock-exchange__history li b { grid-column: 2; grid-row: 1 / span 2; }
   .computer-taskbar__economy { display: none; }
 }
 .bank-website__ad button { justify-self: start; padding: 0; color: #f0d991; background: transparent !important; border: 0 !important; }

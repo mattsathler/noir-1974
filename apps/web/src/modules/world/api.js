@@ -72,6 +72,10 @@ export async function getStockMarket(page = 1, query = "") {
 	const payload = await apiRequest(`/api/market?${params}`);
   return payload;
 }
+export async function getStockMarketHistory(companyId, offset = 0, limit = 50) {
+	const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+	return apiRequest(`/api/market/${encodeURIComponent(companyId)}/history?${params}`);
+}
 export async function getStockPortfolio() {
   return apiRequest("/api/player/stock-portfolio");
 }

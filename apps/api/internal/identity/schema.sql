@@ -65,6 +65,31 @@ CREATE TABLE IF NOT EXISTS player_stock_orders (
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (server_id, account_id, client_order_id)
 );
+
+CREATE TABLE IF NOT EXISTS company_market_scores (
+    server_id uuid NOT NULL,
+    company_id text NOT NULL CHECK (company_id <> ''),
+    score integer NOT NULL DEFAULT 1000 CHECK (score BETWEEN 500 AND 1500),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, company_id)
+);
+
+CREATE TABLE IF NOT EXISTS company_market_events (
+    server_id uuid NOT NULL,
+    event_id text NOT NULL CHECK (event_id <> ''),
+    company_id text NOT NULL CHECK (company_id <> ''),
+    event_type text NOT NULL CHECK (event_type IN ('workplace_conflict', 'financial_extortion')),
+    score_delta integer NOT NULL,
+    score_before integer NOT NULL CHECK (score_before BETWEEN 500 AND 1500),
+    score_after integer NOT NULL CHECK (score_after BETWEEN 500 AND 1500),
+    occurred_at timestamptz NOT NULL,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, event_id),
+    FOREIGN KEY (server_id, company_id)
+        REFERENCES company_market_scores(server_id, company_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS company_market_events_history_idx
+    ON company_market_events(server_id, company_id, recorded_at DESC, event_id);
 ALTER TABLE player_characters ADD COLUMN IF NOT EXISTS visual_identity jsonb NOT NULL DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
 ALTER TABLE player_characters ALTER COLUMN visual_identity SET DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
 

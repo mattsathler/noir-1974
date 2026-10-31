@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getStockMarket, getStockPortfolio, placeStockOrder } from "../../../world/api.js";
+import { getStockMarket, getStockMarketHistory, getStockPortfolio, placeStockOrder } from "../../../world/api.js";
 import { BankMasthead } from "./BankWebsite.jsx";
 
 const NOOP = () => {};
@@ -10,6 +10,7 @@ function stockSymbol(name = "") {
   const letters = words.filter((word) => !/^\d+$/.test(word));
   return `${letters.slice(0, 3).map((word) => word[0]).join("") || "CO"}${suffix || ""}`;
 }
+function changePercent(bps = 0) { return `${bps > 0 ? "+" : ""}${(Number(bps) / 100).toFixed(2)}%`; }
 function readableError(error) {
   const messages = {
     INSUFFICIENT_CREDITS: "INSUFFICIENT CREDITS FOR THIS ORDER.",
@@ -30,7 +31,13 @@ export default function StockExchangeApp({ countryId = "", onProgressionChange =
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [orderDraft, setOrderDraft] = useState(null);
+  const [historyCompany, setHistoryCompany] = useState(null);
+  const [marketHistory, setMarketHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyNextOffset, setHistoryNextOffset] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -66,10 +73,56 @@ export default function StockExchangeApp({ countryId = "", onProgressionChange =
 
   useEffect(() => setPage(1), [countryId]);
 
+  async function refreshExchange() {
+    setRefreshing(true);
+    setError("");
+    try {
+      const [marketResult, portfolioResult] = await Promise.all([getStockMarket(page, search), getStockPortfolio()]);
+      setMarket(marketResult);
+      setProgression(portfolioResult.progression);
+      setPositions(portfolioResult.positions || []);
+      onProgressionChange(portfolioResult.progression);
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   function openOrder(listing, side) {
     setQuantity("1");
     setOrderDraft({ listing, side });
     setError("");
+  }
+
+  async function openHistory(listing) {
+    setHistoryCompany(listing);
+    setMarketHistory([]);
+    setHistoryNextOffset(null);
+    setHistoryLoading(true);
+    try {
+      const result = await getStockMarketHistory(listing.companyId);
+      setMarketHistory(result.events || []);
+      setHistoryNextOffset(result.nextOffset ?? null);
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function loadMoreHistory() {
+    if (!historyCompany || historyNextOffset == null || historyLoadingMore) return;
+    setHistoryLoadingMore(true);
+    try {
+      const result = await getStockMarketHistory(historyCompany.companyId, historyNextOffset);
+      setMarketHistory((previous) => [...previous, ...(result.events || [])]);
+      setHistoryNextOffset(result.nextOffset ?? null);
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setHistoryLoadingMore(false);
+    }
   }
 
   async function submitOrder() {
@@ -86,22 +139,24 @@ export default function StockExchangeApp({ countryId = "", onProgressionChange =
       const clientOrderId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const { listing, side } = orderDraft;
       const result = await placeStockOrder({ clientOrderId, companyId: listing.companyId, side, shares });
+      const executionPrice = result.order.priceCents;
       const prior = positionByCompany.get(listing.companyId);
       const updatedPositions = side === "buy"
         ? (() => {
             const nextShares = (prior?.shares || 0) + shares;
-            const nextAverage = prior ? Math.round(((prior.shares * prior.averageCostCents) + (shares * listing.priceCents)) / nextShares) : listing.priceCents;
-            const position = { ...listing, shares: nextShares, averageCostCents: nextAverage, marketValueCents: nextShares * listing.priceCents };
+            const nextAverage = prior ? Math.round(((prior.shares * prior.averageCostCents) + (shares * executionPrice)) / nextShares) : executionPrice;
+            const position = { ...listing, priceCents: executionPrice, marketScore: result.marketScore, changeBps: result.changeBps, lastEventAt: result.lastEventAt, shares: nextShares, averageCostCents: nextAverage, marketValueCents: nextShares * executionPrice };
             return prior ? positions.map((item) => item.companyId === listing.companyId ? position : item) : [...positions, position];
           })()
         : positions.flatMap((item) => {
             if (item.companyId !== listing.companyId) return [item];
             const remaining = item.shares - shares;
-            return remaining > 0 ? [{ ...item, shares: remaining, marketValueCents: remaining * item.priceCents }] : [];
+            return remaining > 0 ? [{ ...item, priceCents: executionPrice, marketScore: result.marketScore, changeBps: result.changeBps, lastEventAt: result.lastEventAt, shares: remaining, marketValueCents: remaining * executionPrice }] : [];
           });
       const updatedProgression = { ...(progression || {}), creditsCents: result.creditsCents };
       setProgression(updatedProgression);
       setPositions(updatedPositions);
+      setMarket((previous) => ({ ...previous, listings: previous.listings.map((item) => item.companyId === listing.companyId ? { ...item, priceCents: executionPrice, marketScore: result.marketScore, changeBps: result.changeBps, lastEventAt: result.lastEventAt } : item) }));
       onProgressionChange(updatedProgression);
       setNotice(`${side.toUpperCase()} ORDER FILLED · ${shares} SHARE${shares === 1 ? "" : "S"} · ${credits(result.order.totalCents)}`);
       setOrderDraft(null);
@@ -115,7 +170,7 @@ export default function StockExchangeApp({ countryId = "", onProgressionChange =
 
   return <main className="stock-exchange" aria-label="Stock exchange application">
     <BankMasthead />
-    <header className="stock-exchange__header"><div><span className="stock-exchange__eyebrow">UNION MERCANTILE · PUBLIC EXCHANGE</span><h1>STOCK EXCHANGE</h1><p>NATIONAL LISTINGS · {market.countryName || countryId.toUpperCase() || "PROXY COUNTRY"}</p></div><span className="stock-exchange__status"><i /> MARKET OPEN</span></header>
+    <header className="stock-exchange__header"><div><span className="stock-exchange__eyebrow">UNION MERCANTILE · PUBLIC EXCHANGE</span><h1>STOCK EXCHANGE</h1><p>NATIONAL LISTINGS · {market.countryName || countryId.toUpperCase() || "PROXY COUNTRY"}</p></div><div className="stock-exchange__market-status"><span className="stock-exchange__status"><i /> MARKET OPEN</span><button type="button" disabled={refreshing || busy} onClick={refreshExchange}>{refreshing ? "UPDATING…" : "REFRESH QUOTES ↻"}</button></div></header>
     <section className="stock-exchange__account-strip" aria-label="Player progression">
       <div><span>AVAILABLE CREDITS</span><strong>{progression ? credits(progression.creditsCents) : "—"}</strong></div>
       <div><span>PORTFOLIO VALUE</span><strong>{credits(portfolioValue)}</strong></div>
@@ -126,9 +181,10 @@ export default function StockExchangeApp({ countryId = "", onProgressionChange =
     {error && <p className="stock-exchange__message stock-exchange__message--error" role="alert">{error}</p>}
     {notice && <p className="stock-exchange__message stock-exchange__message--success" role="status">{notice}</p>}
     {loading ? <p className="stock-exchange__loading" role="status">READING NATIONAL EXCHANGE…</p> : tab === "market" ? <>
-      <div className="stock-exchange__table-wrap"><table className="stock-exchange__table stock-exchange__table--market"><thead><tr><th>COMPANY</th><th>HEAD OFFICE</th><th>PRICE</th><th>OWNED</th><th>ORDER</th></tr></thead><tbody>
-        {market.listings.map((listing) => { const position = positionByCompany.get(listing.companyId); return <tr key={listing.companyId}><td><strong className="stock-exchange__symbol">{stockSymbol(listing.companyName)}</strong><small className="stock-exchange__company-name">{listing.companyName}</small></td><td>{listing.cityName}</td><td>{credits(listing.priceCents)}</td><td>{position?.shares || 0}</td><td className="stock-exchange__actions"><button type="button" disabled={busy} onClick={() => openOrder(listing, "buy")}>BUY ↗</button><button type="button" disabled={busy || !position} onClick={() => openOrder(listing, "sell")}>SELL ↘</button></td></tr>; })}
+      <div className="stock-exchange__table-wrap"><table className="stock-exchange__table stock-exchange__table--market"><thead><tr><th>COMPANY</th><th>HEAD OFFICE</th><th>INDEX</th><th>CHANGE</th><th>PRICE</th><th>OWNED</th><th>ORDER</th></tr></thead><tbody>
+        {market.listings.map((listing) => { const position = positionByCompany.get(listing.companyId); return <tr key={listing.companyId}><td><strong className="stock-exchange__symbol">{stockSymbol(listing.companyName)}</strong><small className="stock-exchange__company-name">{listing.companyName}</small></td><td>{listing.cityName}</td><td>{listing.marketScore ?? 1000}</td><td className={listing.changeBps < 0 ? "stock-exchange__change stock-exchange__change--down" : listing.changeBps > 0 ? "stock-exchange__change stock-exchange__change--up" : "stock-exchange__change"}>{changePercent(listing.changeBps)}</td><td>{credits(listing.priceCents)}</td><td>{position?.shares || 0}</td><td className="stock-exchange__actions"><div className="stock-exchange__action-links"><button type="button" disabled={busy} onClick={() => openOrder(listing, "buy")}>BUY ↗</button><button type="button" disabled={busy || !position} onClick={() => openOrder(listing, "sell")}>SELL ↘</button><button type="button" onClick={() => openHistory(listing)}>HISTORY</button></div></td></tr>; })}
       </tbody></table>{market.listings.length === 0 && <p className="stock-exchange__empty">NO COMPANIES ARE LISTED IN THIS COUNTRY.</p>}</div>
+      {historyCompany && <section className="stock-exchange__history" aria-label={`Market history for ${historyCompany.companyName}`}><header><div><span>UNION EXCHANGE · COMPANY RECORD</span><h2>{stockSymbol(historyCompany.companyName)} · {historyCompany.companyName}</h2></div><button type="button" onClick={() => setHistoryCompany(null)}>CLOSE</button></header>{historyLoading ? <p>READING MARKET RECORD…</p> : marketHistory.length ? <><ol>{marketHistory.map((event, index) => <li key={`${event.occurredAt}-${index}`}><time>{event.occurredAt}</time><span>{event.eventType}</span><b>{event.scoreBefore} → {event.scoreAfter} · {changePercent(event.changeBps)}</b></li>)}</ol>{historyNextOffset != null && <button className="stock-exchange__history-more" type="button" disabled={historyLoadingMore} onClick={loadMoreHistory}>{historyLoadingMore ? "READING…" : "OLDER MARKET ENTRIES →"}</button>}</> : <p>No market changes have been recorded for this company.</p>}</section>}
       <footer className="stock-exchange__pagination"><span>{market.total} NATIONAL LISTINGS · PAGE {market.page} OF {pageCount}</span><div><button type="button" disabled={busy || page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>← PREVIOUS</button><button type="button" disabled={busy || page >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>NEXT →</button></div></footer>
     </> : <div className="stock-exchange__table-wrap"><table className="stock-exchange__table stock-exchange__table--portfolio"><thead><tr><th>COMPANY</th><th>SHARES</th><th>AVG. COST</th><th>MARKET PRICE</th><th>POSITION VALUE</th><th>ORDER</th></tr></thead><tbody>
       {positions.map((position) => <tr key={position.companyId}><td><strong>{stockSymbol(position.companyName)}</strong><small>{position.companyName} · {position.cityName} · {position.countryId.toUpperCase()}</small></td><td>{position.shares}</td><td>{credits(position.averageCostCents)}</td><td>{credits(position.priceCents)}</td><td>{credits(position.marketValueCents)}</td><td className="stock-exchange__actions">{position.countryId === market.countryId ? <><button type="button" disabled={busy} onClick={() => openOrder(position, "buy")}>BUY ↗</button><button type="button" disabled={busy} onClick={() => openOrder(position, "sell")}>SELL ↘</button></> : <small>CHANGE PROXY TO TRADE</small>}</td></tr>)}

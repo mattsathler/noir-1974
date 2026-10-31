@@ -193,6 +193,7 @@ type persistedCaseIdentity struct {
 	GeneratorVersion int
 	CaseType         string
 	ArchetypeID      string
+	CompanyID        string
 	Motive           string
 	VictimID         string
 	KillerID         string
@@ -200,7 +201,7 @@ type persistedCaseIdentity struct {
 }
 
 func (identity persistedCaseIdentity) matches(definition Definition) bool {
-	return identity.Seed == definition.Seed && identity.CityID == definition.CityID && identity.GeneratorVersion == definition.GeneratorVersion && identity.CaseType == definition.CaseType && identity.ArchetypeID == definition.ArchetypeID && identity.Motive == definition.Motive && identity.VictimID == definition.VictimID && identity.KillerID == definition.KillerID && identity.LocationID == definition.LocationID
+	return identity.Seed == definition.Seed && identity.CityID == definition.CityID && identity.GeneratorVersion == definition.GeneratorVersion && identity.CaseType == definition.CaseType && identity.ArchetypeID == definition.ArchetypeID && identity.CompanyID == definition.CompanyID && identity.Motive == definition.Motive && identity.VictimID == definition.VictimID && identity.KillerID == definition.KillerID && identity.LocationID == definition.LocationID
 }
 
 type asyncRequest struct {
@@ -1267,9 +1268,9 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 		bodyFoundAt, bodyFoundMethod = foundAfter.Add(time.Duration(delay)*time.Minute), "automatic"
 	}
 	err = tx.QueryRow(ctx,
-		`SELECT case_seed, city_id, generator_version, case_type, archetype_id, motive, victim_entity_id, killer_entity_id, location_entity_id
+		`SELECT case_seed, city_id, generator_version, case_type, archetype_id, COALESCE(company_id,''), motive, victim_entity_id, killer_entity_id, location_entity_id
 		 FROM cases WHERE server_id = $1::uuid AND case_id = $2 FOR UPDATE`, serverID, definition.ID,
-	).Scan(&existing.Seed, &existing.CityID, &existing.GeneratorVersion, &existing.CaseType, &existing.ArchetypeID, &existing.Motive, &existing.VictimID, &existing.KillerID, &existing.LocationID)
+	).Scan(&existing.Seed, &existing.CityID, &existing.GeneratorVersion, &existing.CaseType, &existing.ArchetypeID, &existing.CompanyID, &existing.Motive, &existing.VictimID, &existing.KillerID, &existing.LocationID)
 	if err == nil {
 		if !existing.matches(definition) {
 			return ErrPersistedConflict
@@ -1335,13 +1336,16 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 	}
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO cases (server_id, case_id, case_seed, city_id, generator_version, case_type, archetype_id, motive,
+		`INSERT INTO cases (server_id, case_id, case_seed, city_id, generator_version, case_type, archetype_id, company_id, motive,
 		 victim_entity_id, killer_entity_id, location_entity_id, crime_at)
-		 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-		serverID, definition.ID, definition.Seed, definition.CityID, definition.GeneratorVersion, definition.CaseType, definition.ArchetypeID, definition.Motive,
+		 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, NULLIF($8,''), $9, $10, $11, $12, $13)`,
+		serverID, definition.ID, definition.Seed, definition.CityID, definition.GeneratorVersion, definition.CaseType, definition.ArchetypeID, definition.CompanyID, definition.Motive,
 		definition.VictimID, definition.KillerID, definition.LocationID, crimeAt,
 	); err != nil {
 		return fmt.Errorf("persist case definition: %w", err)
+	}
+	if err := applyCorporateMarketImpact(ctx, tx, serverID, definition); err != nil {
+		return fmt.Errorf("apply corporate market impact: %w", err)
 	}
 	for _, relation := range definition.Relationships {
 		if _, err := tx.Exec(ctx,
@@ -1406,6 +1410,46 @@ func caseSceneIsResidential(base world.World, locationID string) bool {
 		}
 	}
 	return false
+}
+
+func applyCorporateMarketImpact(ctx context.Context, tx pgx.Tx, serverID string, definition Definition) error {
+	delta := 0
+	switch definition.ArchetypeID {
+	case "workplace_conflict":
+		delta = -25
+	case "financial_extortion":
+		delta = -75
+	default:
+		return nil
+	}
+	if definition.CompanyID == "" {
+		return nil
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO company_market_scores(server_id, company_id) VALUES($1::uuid, $2) ON CONFLICT DO NOTHING`, serverID, definition.CompanyID); err != nil {
+		return err
+	}
+	var scoreBefore int
+	if err := tx.QueryRow(ctx, `SELECT CASE WHEN score < 1000 THEN LEAST(1000, score + FLOOR(EXTRACT(EPOCH FROM (now()-updated_at))/86400)::integer) ELSE score END
+		FROM company_market_scores WHERE server_id=$1::uuid AND company_id=$2 FOR UPDATE`, serverID, definition.CompanyID).Scan(&scoreBefore); err != nil {
+		return err
+	}
+	scoreAfter := max(500, scoreBefore+delta)
+	occurredAt := definition.CrimeAt
+	if occurredAt.IsZero() {
+		occurredAt = time.Now().UTC()
+	}
+	result, err := tx.Exec(ctx, `INSERT INTO company_market_events
+		(server_id, event_id, company_id, event_type, score_delta, score_before, score_after, occurred_at)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (server_id, event_id) DO NOTHING`,
+		serverID, definition.ID, definition.CompanyID, definition.ArchetypeID, delta, scoreBefore, scoreAfter, occurredAt.UTC())
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return nil
+	}
+	_, err = tx.Exec(ctx, `UPDATE company_market_scores SET score=$3, updated_at=now() WHERE server_id=$1::uuid AND company_id=$2`, serverID, definition.CompanyID, scoreAfter)
+	return err
 }
 
 func persistCaseEmails(ctx context.Context, tx pgx.Tx, serverID string, definition Definition) error {

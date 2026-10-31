@@ -36,6 +36,7 @@ type Definition struct {
 	GeneratorVersion int                     `json:"generatorVersion"`
 	CaseType         string                  `json:"caseType"`
 	ArchetypeID      string                  `json:"archetypeId"`
+	CompanyID        string                  `json:"-"`
 	Motive           string                  `json:"motive"`
 	VictimID         string                  `json:"victimId"`
 	KillerID         string                  `json:"killerId"`
@@ -71,6 +72,7 @@ type employmentLink struct {
 
 type candidate struct {
 	archetypeID   string
+	companyID     string
 	motive        string
 	relationships []RelationshipReference
 	evidence      []evidencePlan
@@ -167,6 +169,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 		GeneratorVersion: version,
 		CaseType:         "homicide",
 		ArchetypeID:      selected.archetypeID,
+		CompanyID:        selected.companyID,
 		Motive:           selected.motive,
 		VictimID:         selected.victimID,
 		KillerID:         selected.killerID,
@@ -479,6 +482,11 @@ func Validate(definition Definition, base world.World) error {
 	if definition.KillerID == definition.VictimID {
 		return ErrInvalidDefinition
 	}
+	if definition.ArchetypeID == "workplace_conflict" || definition.ArchetypeID == "financial_extortion" {
+		if strings.TrimSpace(definition.CompanyID) == "" {
+			return ErrInvalidDefinition
+		}
+	}
 	entities := make(map[string]string, len(base.Entities))
 	for _, entity := range base.Entities {
 		entities[entity.ID] = entity.EntityType
@@ -578,8 +586,8 @@ func workplaceCandidates(base world.World) []candidate {
 		for i := 0; i < len(links); i++ {
 			for j := i + 1; j < len(links); j++ {
 				result = append(result,
-					workplaceCandidate(links[i].employee, links[j].employee, locationID, links[i].id, links[j].id),
-					workplaceCandidate(links[j].employee, links[i].employee, locationID, links[j].id, links[i].id),
+					workplaceCandidate(companyID, links[i].employee, links[j].employee, locationID, links[i].id, links[j].id),
+					workplaceCandidate(companyID, links[j].employee, links[i].employee, locationID, links[j].id, links[i].id),
 				)
 			}
 		}
@@ -587,9 +595,10 @@ func workplaceCandidates(base world.World) []candidate {
 	return result
 }
 
-func workplaceCandidate(killerID, victimID, locationID, killerLinkID, victimLinkID string) candidate {
+func workplaceCandidate(companyID, killerID, victimID, locationID, killerLinkID, victimLinkID string) candidate {
 	return candidate{
 		archetypeID: "workplace_conflict",
+		companyID:   companyID,
 		motive:      "A long-running dispute over status and routine office decisions.",
 		killerID:    killerID,
 		victimID:    victimID,
@@ -853,7 +862,7 @@ func validateWorkplaceConflict(definition Definition, base world.World) bool {
 			}
 		}
 	}
-	return killerLink != nil && victimLink != nil && killerLink.EmployerCompanyID == victimLink.EmployerCompanyID && hasHeadquarters(base.CompanyLocations, killerLink.EmployerCompanyID, definition.LocationID)
+	return killerLink != nil && victimLink != nil && killerLink.EmployerCompanyID == victimLink.EmployerCompanyID && killerLink.EmployerCompanyID == definition.CompanyID && hasHeadquarters(base.CompanyLocations, killerLink.EmployerCompanyID, definition.LocationID)
 }
 
 func validateJealousy(definition Definition, base world.World) bool {

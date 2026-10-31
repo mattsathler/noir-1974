@@ -13,6 +13,7 @@ Cada melhoria deve explicar o problema observável, o resultado esperado, o esco
 | I01 | Compatibilidade da aparência procedural de NPCs | M15 — identidade visual procedural | Curto/médio |
 | I02 | Introdução visual após viagem confirmada pelo GATE (substituída) | M17 — animações das ações | Curto |
 | I04 | Nomes procedurais próprios para empresas | M24/M25 — websites e bolsa; gerador de empresas | Médio |
+| I05 | Tipos procedurais de empresas | M24/M25 — websites e bolsa; geração de empresas | Médio |
 
 ## Melhorias implementadas
 
