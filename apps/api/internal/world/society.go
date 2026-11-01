@@ -35,10 +35,11 @@ type NPC struct {
 }
 
 type Company struct {
-	ID            string `json:"id"`
-	GenerationKey string `json:"generationKey"`
-	RegionID      string `json:"regionId"`
-	Name          string `json:"name"`
+	ID            string              `json:"id"`
+	GenerationKey string              `json:"generationKey"`
+	RegionID      string              `json:"regionId"`
+	Name          string              `json:"name"`
+	BusinessType  CompanyBusinessType `json:"businessType"`
 }
 
 type EmploymentRelationship struct {
@@ -300,7 +301,7 @@ func GenerateNPCPair(seed string, version int, districtID string, firstSlot int,
 			ID:                "employment:" + npc.ID + ":" + company.ID,
 			EmployeeNPCID:     npc.ID,
 			EmployerCompanyID: company.ID,
-			Role:              employmentRoles[(slot-1)%len(employmentRoles)],
+			Role:              companyRoleAt(company, slot-1),
 		})
 	}
 	personAID, personBID := npcs[0].ID, npcs[1].ID
@@ -469,11 +470,13 @@ func GenerateCompany(seed string, version int, generationKey string) (Company, e
 	if !ok {
 		return Company{}, fmt.Errorf("company name catalog has no entry for national index %d", companyNameIndex)
 	}
+	companyID := "company:" + generationKey
 	return Company{
-		ID:            "company:" + generationKey,
+		ID:            companyID,
 		GenerationKey: generationKey,
 		RegionID:      city.ID + "/district/" + districtSlug,
 		Name:          companyName,
+		BusinessType:  BusinessTypeForCompany(worldSeed, version, companyID),
 	}, nil
 }
 
@@ -510,8 +513,12 @@ func generatedCompanyEmployees(seed string, version int, company Company) ([]Com
 		if err != nil {
 			return nil, err
 		}
+		roles := company.BusinessType.Roles
+		if len(roles) == 0 {
+			roles = employmentRoles
+		}
 		employees = append(employees, CompanyEmployee{
-			ID: npc.ID, Name: npc.Name, Email: EmailAddressForNPC(npc.ID, npc.Name), BankAccount: BankAccountNumberForNPC(seed, version, npc.ID), Role: employmentRoles[(slot-1)%len(employmentRoles)],
+			ID: npc.ID, Name: npc.Name, Email: EmailAddressForNPC(npc.ID, npc.Name), BankAccount: BankAccountNumberForNPC(seed, version, npc.ID), Role: roles[(slot-1)%len(roles)],
 			Status: npc.Status, Visual: npc.Visual,
 		})
 	}
@@ -604,7 +611,7 @@ func generateSociety(seed string, version int) (World, error) {
 				ID:                "employment:" + person.ID + ":" + company.ID,
 				EmployeeNPCID:     person.ID,
 				EmployerCompanyID: company.ID,
-				Role:              employmentRoles[slot-1],
+				Role:              companyRoleAt(company, slot-1),
 			})
 		}
 
@@ -670,7 +677,7 @@ func generateExpandedSociety(seed string, version int) (World, error) {
 					people = append(people, npc)
 					w.NPCs = append(w.NPCs, npc)
 					w.Entities = append(w.Entities, Entity{ID: npc.ID, EntityType: "npc", RegionID: npc.RegionID, GenerationKey: personKey, Name: npc.Name})
-					w.EmploymentRelationships = append(w.EmploymentRelationships, EmploymentRelationship{ID: "employment:" + npc.ID + ":" + company.ID, EmployeeNPCID: npc.ID, EmployerCompanyID: company.ID, Role: employmentRoles[(p-1)%len(employmentRoles)]})
+					w.EmploymentRelationships = append(w.EmploymentRelationships, EmploymentRelationship{ID: "employment:" + npc.ID + ":" + company.ID, EmployeeNPCID: npc.ID, EmployerCompanyID: company.ID, Role: companyRoleAt(company, p-1)})
 				}
 				for i := 0; i+1 < len(people); i += 2 {
 					a, b := people[i].ID, people[i+1].ID

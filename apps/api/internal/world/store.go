@@ -1969,6 +1969,7 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 					employees = append(employees, employee)
 				}
 			}
+			applyCompanyRoleProfile(company.Company, employees)
 			applyCompanySalary(employees)
 			applyBankAccountNumbers(entry.seed, cityVersion, employees)
 			if err := store.indexStaffEmailAddresses(ctx, serverID, employees); err != nil {
@@ -2002,6 +2003,8 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 				return nil, err
 			}
 		}
+		applyCompanyRoleProfile(record.Company, employees)
+		applyCompanySalary(employees)
 		applyBankAccountNumbers(seed, version, employees)
 		record.Benefits = CompanyBenefits(seed, version, companyID)
 		if err := store.indexStaffEmailAddresses(ctx, serverID, employees); err != nil {
@@ -2855,6 +2858,7 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 	if err != nil {
 		return nil, err
 	}
+	applyCompanyRoleProfile(company, employees)
 	applyCompanySalary(employees)
 	return employees, nil
 }
@@ -2862,6 +2866,12 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 func applyCompanySalary(employees []CompanyEmployee) {
 	for index := range employees {
 		employees[index].DailySalary = DailySalaryCredits(employees[index].Role)
+	}
+}
+
+func applyCompanyRoleProfile(company Company, employees []CompanyEmployee) {
+	for index := range employees {
+		employees[index].Role = companyRoleAt(company, index)
 	}
 }
 

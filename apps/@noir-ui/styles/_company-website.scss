@@ -23,6 +23,7 @@
 .company-website__masthead p,.company-website__eyebrow { margin: 0 0 .3rem; font-size: .62rem; letter-spacing: .08em; }
 .company-website__masthead h1 { margin: 0; overflow-wrap: anywhere; font-size: clamp(1.2rem, 3vw, 1.8rem); }
 .company-website__masthead > div > span { display: block; margin-top: .25rem; }
+.company-website__business-type { display: inline-block; margin-top: .25rem; padding: .12rem .3rem; border: 1px solid currentColor; font-size: .58rem; letter-spacing: .08em; }
 .company-website__mark { display: grid; width: 2.75rem; height: 2.75rem; flex: 0 0 auto; place-items: center; color: var(--company-accent); background: var(--company-paper); border: 1px solid currentColor; }
 .company-website__mark svg { width: 2rem; height: 2rem; fill: currentColor; shape-rendering: crispEdges; }
 .company-website__masthead > button,.company-website__account button { padding: .45rem .6rem; color: var(--company-paper); background: var(--company-ink); border: 1px solid var(--company-paper); font-size: .62rem; }

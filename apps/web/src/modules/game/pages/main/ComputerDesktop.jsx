@@ -47,6 +47,7 @@ import MinesweeperApp from "./MinesweeperApp.jsx";
 import EmployeeDirectoryApp from "./EmployeeDirectoryApp.jsx";
 import NotificationCenter from "./NotificationCenter.jsx";
 import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
+import ModularFace from "../../../identity/components/ModularFace.jsx";
 import { DEFAULT_DESKTOP_PREFERENCES, DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
 
 const BOOT_LINES = [
@@ -751,6 +752,23 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               <p>{facilityContext?.label || "PRIVATE INVESTIGATION SYSTEM"}</p>
               <span>PRIVATE LINE · ACCOUNT CHARGED</span>
             </div>
+            {persistent && !isCompanyComputer && <aside className="desktop-status-widgets" aria-label="Personal desktop status">
+              <section className="desktop-status-widget desktop-status-widget--identity" aria-label="Player identity">
+                <div className="desktop-status-widget__portrait">{character?.visual && <ModularFace visual={character.visual} name={character.displayName || accountUsername || "Player"} />}</div>
+                <div className="desktop-status-widget__details"><span>ACCOUNT HOLDER</span><strong>{character?.displayName || accountUsername || "PLAYER"}</strong></div>
+              </section>
+              <section className="desktop-status-widget" aria-label="Union Mercantile Bank balance">
+                <span className="desktop-status-widget__label">UNION MERCANTILE BANK</span>
+                {Number.isFinite(playerProgression?.creditsCents)
+                  ? <strong className="desktop-status-widget__value">CR {(playerProgression.creditsCents / 100).toFixed(2)}</strong>
+                  : <span className="desktop-status-widget__pending" role="status">BALANCE UNAVAILABLE</span>}
+              </section>
+              <section className="desktop-status-widget" aria-label="Rogue DNS route and local time">
+                <span className="desktop-status-widget__label">ROGUE DNS · ACTIVE EXIT</span>
+                <strong className="desktop-status-widget__route">{location || "ROUTE UNAVAILABLE"}</strong>
+                {display?.time && <time className="desktop-status-widget__clock" dateTime={serverTime?.toISOString()}>{display.time}</time>}
+              </section>
+            </aside>}
             <nav className="computer-programs" aria-label={persistent ? "Desktop browser" : "Computer programs"}>
               {visibleDesktopPrograms.map((program) => (
                 <button

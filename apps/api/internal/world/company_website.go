@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const CompanyWebsiteProfileVersion = 4
+const CompanyWebsiteProfileVersion = 5
 
 // CompanyWebsite is the deterministic public website profile generated for one company.
 // Staff records are deliberately excluded and remain behind the existing access flow.
@@ -111,7 +111,7 @@ func GenerateCompanyWebsite(seed string, generatorVersion int, company CompanyPo
 		slug = "company"
 	}
 	companyToken := companyWebsiteDomainToken(digest)
-	activity := companyWebsiteSectorForCompany(company.Company.Name, digest)
+	activity := companyWebsiteSectorForCompany(company.Company, digest)
 	template := companyWebsiteTemplate(activity, templates, choose(len(templates), 2))
 	advertising := []string{"none", "sparse", "standard", "crowded"}[choose(4, 19)]
 	bulletin := companyWebsiteBulletins[choose(len(companyWebsiteBulletins), 9)]
@@ -162,7 +162,7 @@ func GenerateCompanyWebsite(seed string, generatorVersion int, company CompanyPo
 func companyWebsiteSearchMetadata(seed string, generatorVersion int, company CompanyPortalRecord) (string, string) {
 	digest := companyWebsiteDigest(seed, generatorVersion, company.Company.ID)
 	companyToken := companyWebsiteDomainToken(digest)
-	sector := companyWebsiteSectorForCompany(company.Company.Name, digest)
+	sector := companyWebsiteSectorForCompany(company.Company, digest)
 	slug := companyWebsiteSlug(company.Company.Name)
 	if slug == "" {
 		slug = "company"
@@ -170,26 +170,34 @@ func companyWebsiteSearchMetadata(seed string, generatorVersion int, company Com
 	return slug + "-" + companyToken + ".merid.local", sector.tagline
 }
 
-func companyWebsiteSectorForCompany(name string, digest [32]byte) companyWebsiteSector {
-	normalized := companyWebsiteSlug(name)
-	sectors := map[string][]string{
-		"MANUFACTURING":          {"atelier", "manufacture", "fonderie", "verrerie", "mecanique", "industrie", "works"},
-		"TRANSPORT & LOGISTICS":  {"transport", "shipping", "messagerie", "courrier", "relay", "depot"},
-		"PROFESSIONAL SERVICES":  {"service", "bureau", "edition", "exchange", "credit", "ledger", "assurance", "mutuelle"},
-		"TRADE & SUPPLY":         {"maison", "comptoir", "magasin", "halles", "fourniture", "provision", "negociant", "entrepot", "cooperative"},
-		"PROPERTY & BUILDING":    {"property", "properties", "building", "construction", "batiment"},
-		"FOOD & HOSPITALITY":     {"hotel", "restaurant", "cafe", "boulangerie", "cuisine"},
-		"HEALTH & PERSONAL CARE": {"pharmacie", "medical", "sante", "clinic"},
+func companyWebsiteSectorForCompany(company Company, digest [32]byte) companyWebsiteSector {
+	profile := company.BusinessType
+	if profile.ID == "" {
+		index := binary.BigEndian.Uint64(digest[:8]) % uint64(len(companyTypeCatalog))
+		profile = companyTypeCatalog[index]
 	}
-	for _, sector := range companyWebsiteSectors {
-		for _, keyword := range sectors[sector.name] {
-			if strings.Contains(normalized, keyword) {
-				return sector
-			}
+	categoryNames := map[string]string{
+		"professional": "PROFESSIONAL SERVICES", "property": "PROPERTY & BUILDING",
+		"manufacturing": "MANUFACTURING", "transport": "TRANSPORT & LOGISTICS",
+		"hospitality": "FOOD & HOSPITALITY", "trade": "TRADE & SUPPLY",
+		"utilities": "PROFESSIONAL SERVICES", "health": "HEALTH & PERSONAL CARE",
+	}
+	categoryName := categoryNames[profile.Category]
+	base := companyWebsiteSectors[len(companyWebsiteSectors)-1]
+	for _, candidate := range companyWebsiteSectors {
+		if candidate.name == categoryName {
+			base = candidate
+			break
 		}
 	}
-	index := binary.BigEndian.Uint64(digest[1:9]) % uint64(len(companyWebsiteSectors))
-	return companyWebsiteSectors[index]
+	base.name = profile.Label
+	base.about = profile.Description
+	base.offerings = append([]string(nil), profile.Offerings...)
+	if len(base.offerings) == 0 {
+		base.offerings = []string{"Customer enquiries", "Local services", "Office information"}
+	}
+	base.tagline = profile.Description
+	return base
 }
 
 func companyWebsiteTemplate(sector companyWebsiteSector, templates []string, fallback int) string {

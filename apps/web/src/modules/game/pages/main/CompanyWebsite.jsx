@@ -56,6 +56,7 @@ export default function CompanyWebsite({ site: sourceSite, pageId = "home", onNa
   const pages = site.pages.filter((candidate) => candidate.id !== "account").concat(site.pages.find((candidate) => candidate.id === "account") || []);
   const markBits = Array.from(site.theme?.mark || "0000000000000000", (character) => Number.parseInt(character, 16).toString(2).padStart(4, "0")).join("").slice(0, 64);
   const companyName = site.company?.name || "Company";
+  const businessType = site.company?.businessType;
   const ads = adsFor(site, page?.id || pageId);
   const advertising = site.advertising;
   const inlineAds = advertising === "crowded"
@@ -73,7 +74,7 @@ export default function CompanyWebsite({ site: sourceSite, pageId = "home", onNa
     >
       <header className={`company-website__masthead company-website__masthead--${site.theme?.header}`}>
         <span className="company-website__mark" aria-hidden="true"><svg viewBox="0 0 8 8" focusable="false">{Array.from(markBits, (bit, index) => bit === "1" ? <rect key={index} x={index % 8} y={Math.floor(index / 8)} width="1" height="1" /> : null)}</svg></span>
-        <div><p>OFFICIAL COMPANY WEBSITE · {site.address?.city?.toUpperCase()}</p><h1>{companyName}</h1><span>{site.tagline}</span></div>
+        <div><p>OFFICIAL COMPANY WEBSITE · {site.address?.city?.toUpperCase()}</p><h1>{companyName}</h1>{businessType?.label && <small className="company-website__business-type">{businessType.label.toUpperCase()}</small>}<span>{site.tagline}</span></div>
         <button type="button" disabled aria-label="Customer account sign in is unavailable">CUSTOMER LOGIN</button>
       </header>
       <nav className="company-website__nav" aria-label={`${companyName} website`}>

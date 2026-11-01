@@ -332,6 +332,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
         <div>{companies.map(({ company, address }) => (
           <article className="world-record world-company-site" key={company.id}>
             <div className="world-company-site__heading"><span className="world-company-site__mark" aria-hidden="true">M</span><div><small>PUBLIC COMPANY INFORMATION</small><h3>{company.name}</h3></div><span className="world-company-site__status">REGISTERED</span></div>
+            {company.businessType?.label && <p className="world-company-site__type">{company.businessType.label}</p>}
             <p className="world-company-site__description">{company.websiteDescription || "Public company information"}</p>
             <dl><div><dt>WEBSITE</dt><dd>{company.websiteDomain || "NO DOMAIN LISTING"}</dd></div><div><dt>HEADQUARTERS</dt><dd>{address.full}</dd></div></dl>
             {connectingCompanyId === company.id && <p className="world-company-site__connecting" role="status" aria-live="polite">CONNECTING TO {company.name.toUpperCase()}…</p>}
@@ -343,6 +344,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
       {isStaffDirectory && staffCompanies.map(({ company, address, employees, benefits = [] }) => (
         <article className="world-record" key={company.id}>
           <header className="world-record__header"><h2>{company.name}</h2><span>EMPLOYER FILE</span></header>
+          {company.businessType?.label && <p>BUSINESS TYPE · {company.businessType.label.toUpperCase()} — {company.businessType.description}</p>}
           <p>HEADQUARTERS · {address.full}</p>
           <section className="world-record__benefits" aria-label={`Declared staff benefits at ${company.name}`}>
             <h3>DECLARED STAFF BENEFITS</h3>

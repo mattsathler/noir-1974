@@ -2607,6 +2607,7 @@
 .institutional-site--company .world-company-site__heading h3 { margin: 0.08rem 0 0; color: #173f63; font: 700 0.79rem/1.3 Arial, sans-serif; overflow-wrap: anywhere; }
 .institutional-site--company .world-company-site__status { margin-left: auto; padding: 0.18rem 0.35rem; color: #347350; background: #edf6f0; border: 1px solid #d4e7da; font: 700 0.42rem Arial, sans-serif; white-space: nowrap; }
 .institutional-site--company .world-company-site__description { margin: 0 !important; color: #516272 !important; font: 0.65rem/1.45 Arial, sans-serif !important; }
+.institutional-site--company .world-company-site__type { margin: 0 0 0.2rem !important; color: #315d4c !important; font: 700 0.58rem/1.4 Arial, sans-serif !important; letter-spacing: 0.06em; text-transform: uppercase; }
 .institutional-site--company .world-company-site dl { display: grid; gap: 0.4rem; margin: 0; padding-top: 0.5rem; border-top: 1px solid #e1e7ec; }
 .institutional-site--company .world-company-site dl > div { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.45rem; }
 .institutional-site--company .world-company-site dt { color: #758392; font: 700 0.46rem Arial, sans-serif; letter-spacing: 0.05em; }
@@ -2997,4 +2998,48 @@
 .computer-frame--persistent .computer-window--app:has(.minesweeper-app) { width: min(32rem, calc(100vw - 2rem)); height: min(35rem, calc(100svh - 3rem)); }
 @media (max-width: 42rem) {
   .computer-frame--persistent .computer-window--app:has(.minesweeper-app) { width: calc(100vw - 1.5rem); height: calc(100svh - 2rem); }
+}
+
+/* Compact read-only status cards on the personal desktop. */
+.desktop-status-widgets {
+  position: absolute;
+  z-index: 1;
+  top: 4.5rem;
+  right: clamp(1rem, 3vw, 2.5rem);
+  display: grid;
+  width: min(15rem, calc(100% - 2rem));
+  gap: 0.45rem;
+}
+.computer-desktop__content .computer-programs { align-self: flex-start; margin-left: 0; }
+.desktop-status-widget {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+  padding: 0.55rem 0.65rem;
+  color: #30372f;
+  background: rgb(238 239 229 / 88%);
+  border: 1px solid #899184;
+  box-shadow: 2px 2px 0 rgb(0 0 0 / 18%);
+  text-align: left;
+}
+.desktop-status-widget--identity { grid-template-columns: 2.75rem minmax(0, 1fr); align-items: center; gap: 0.55rem; }
+.desktop-status-widget__portrait { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; overflow: hidden; background: #dce1d5; border: 1px solid #a3aa9c; }
+.desktop-status-widget__portrait .modular-face { width: 100%; height: 100%; }
+.desktop-status-widget__details { display: grid; min-width: 0; gap: 0.25rem; }
+.desktop-status-widget__details > span,.desktop-status-widget__label { color: #59695c; font: 600 0.52rem/1.3 var(--noir-font-mono); letter-spacing: 0.07em; }
+.desktop-status-widget__details strong,.desktop-status-widget__value,.desktop-status-widget__route { overflow-wrap: anywhere; color: #263c34; font: 600 0.68rem/1.35 var(--noir-font-mono); }
+.desktop-status-widget__value { font-size: 0.85rem; }
+.desktop-status-widget__route { font-size: 0.62rem; }
+.desktop-status-widget__clock { color: #365944; font: 600 0.68rem/1.3 var(--noir-font-mono); font-variant-numeric: tabular-nums; }
+.desktop-status-widget__pending { color: #755f2d; font: 0.55rem/1.4 var(--noir-font-mono); }
+.computer-frame--persistent[data-desktop-theme="dark"] .desktop-status-widget { color: #e4e6dc; background: rgb(31 37 32 / 92%); border-color: #647465; }
+.computer-frame--persistent[data-desktop-theme="dark"] .desktop-status-widget__details > span,.computer-frame--persistent[data-desktop-theme="dark"] .desktop-status-widget__label { color: #b7c0ae; }
+.computer-frame--persistent[data-desktop-theme="dark"] .desktop-status-widget__details strong,.computer-frame--persistent[data-desktop-theme="dark"] .desktop-status-widget__value,.computer-frame--persistent[data-desktop-theme="dark"] .desktop-status-widget__route { color: #eff0e5; }
+.computer-frame--persistent[data-desktop-theme="dark"] .desktop-status-widget__clock { color: #b7d4ba; }
+.computer-frame--persistent[data-desktop-theme="dark"] .desktop-status-widget__portrait { background: #343d35; border-color: #71816f; }
+@media (max-width: 42rem) {
+  .desktop-status-widgets { top: 4rem; right: 0.75rem; width: min(12rem, calc(100% - 1.5rem)); gap: 0.35rem; }
+  .desktop-status-widget { padding: 0.45rem 0.5rem; }
+  .desktop-status-widget--identity { grid-template-columns: 2.25rem minmax(0, 1fr); }
+  .desktop-status-widget__portrait { width: 2.25rem; height: 2.25rem; }
 }
