@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getCaseFile, getCrimeReports } from "../../../world/api.js";
+import { getCaseCrimeTimeline, getCaseFile, getCrimeReports } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 
@@ -32,6 +32,8 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
   const [missing, setMissing] = useState([]);
   const [selected, setSelected] = useState(null);
   const [caseFile, setCaseFile] = useState(null);
+  const [caseTimeline, setCaseTimeline] = useState(null);
+  const [caseTimelineError, setCaseTimelineError] = useState("");
   const [caseFileError, setCaseFileError] = useState("");
   const [search, setSearch] = useState(initialSearch);
   const [appliedSearch, setAppliedSearch] = useState(initialSearch);
@@ -80,6 +82,16 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
     return () => { active = false; };
   }, [selected]);
 
+  useEffect(() => {
+    let active = true;
+    setCaseTimeline(null);
+    setCaseTimelineError("");
+    if (selected?.kind !== "case") return undefined;
+    getCaseCrimeTimeline(selected.record.id).then((result) => { if (active) setCaseTimeline(result); })
+      .catch((error) => { if (active) setCaseTimelineError(error.message || "THE CASE TIMELINE COULD NOT BE OPENED."); });
+    return () => { active = false; };
+  }, [selected]);
+
   const needle = appliedSearch.trim().toLocaleLowerCase();
   const visibleCases = useMemo(() => cases.filter((record) => !needle || `${record.victimName ?? ""} ${record.organizationName ?? ""} ${record.caseType ?? ""}`.toLocaleLowerCase().includes(needle)), [cases, needle]);
   const visibleMissing = useMemo(() => missing.filter((person) => !needle || person.name.toLocaleLowerCase().includes(needle)), [missing, needle]);
@@ -116,11 +128,21 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
             <h1>{name || "UNIDENTIFIED VICTIM"}</h1>
           </div>
         </div>
+        {kind === "case" && <section className="case-files__evidence case-files__timeline" aria-label="Occurred crimes in this case">
+          <h2>CASE TIMELINE · {caseTimeline?.crimes?.length ?? "…"}</h2>
+          {caseTimelineError && <p role="alert">{caseTimelineError}</p>}
+          {!caseTimeline && <p>CHECKING RECORDED EVENTS…</p>}
+          {caseTimeline?.crimes?.map((crime, index) => <article key={crime.id}>
+            <div><strong>{String(index + 1).padStart(2, "0")} · {crime.type.replaceAll("_", " ").toUpperCase()}</strong><p>RECORDED · {formatReportDate(crime.occurredAt, timeZone)}</p>
+              {!!crime.victims?.length && <p>VICTIMS · {crime.victims.map((victim) => victim.name).filter(Boolean).join(" · ")}</p>}</div>
+          </article>)}
+          {caseTimeline && !caseTimeline.crimes?.length && <p className="case-files__detail-note">No occurred events are available in this file.</p>}
+        </section>}
         {kind === "case" && record.caseType !== "homicide" && <section className="case-files__evidence" aria-label="Public case records">
           <h2>PUBLIC RECORDS</h2>
           {caseFileError && <p role="alert">{caseFileError}</p>}
           {!caseFile && !caseFileError && <p>READING THE PUBLIC FILE…</p>}
-          {caseFile?.evidence?.map((item) => <article key={item.id}><div><strong>{item.presentation}</strong><p>{item.content}</p></div><button type="button" onClick={() => onPrint?.({ id: item.id, source: "case", title: item.presentation, content: item.content, metadata: { caseId: record.id } })}>PRINT ↗</button></article>)}
+          {caseFile?.evidence?.map((item) => <article key={item.id}><div><strong>{item.presentation}</strong><p>{item.content}</p></div><button type="button" onClick={() => onPrint?.({ id: item.id, source: "case", title: item.presentation, content: item.content, metadata: { caseId: record.id, crimeId: item.crimeId, crimeType: item.crimeType } })}>PRINT ↗</button></article>)}
           {caseFile && !caseFile.evidence?.length && <p className="case-files__detail-note">No further public records are available.</p>}
         </section>}
         {kind === "missing" || (kind === "case" && record.caseType === "homicide") ? <p className="case-files__detail-note">The public file contains no further investigative findings.</p> : null}

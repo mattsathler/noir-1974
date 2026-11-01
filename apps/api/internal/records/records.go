@@ -28,6 +28,8 @@ var (
 // The case relationship fields are intentionally omitted from JSON.
 type Record struct {
 	ID          string    `json:"id"`
+	CrimeID     string    `json:"crimeId,omitempty"`
+	CrimeType   string    `json:"crimeType,omitempty"`
 	NPCID       string    `json:"npcId"`
 	Source      string    `json:"source"`
 	OccurredAt  time.Time `json:"occurredAt"`

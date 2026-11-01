@@ -62,11 +62,24 @@ func (service *Service) NPCRecords(ctx context.Context, serverID, npcID string, 
 		return nil, err
 	}
 	all := append(ordinary, linked...)
+	availableAt := through
+	if current := time.Now().UTC(); availableAt.After(current) {
+		availableAt = current
+	}
 	for index := range all {
+		if all[index].OccurredAt.After(availableAt) {
+			continue
+		}
 		all[index].CaseID = ""
 		all[index].InternalRelation = ""
 		all[index].RelatedNPCID = ""
 	}
-	sortRecords(all)
-	return all, nil
+	available := all[:0]
+	for _, item := range all {
+		if !item.OccurredAt.After(availableAt) {
+			available = append(available, item)
+		}
+	}
+	sortRecords(available)
+	return available, nil
 }

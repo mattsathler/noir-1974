@@ -156,6 +156,17 @@ func (service *Service) NPCEmails(ctx context.Context, serverID, npcID string, f
 		return nil, linked.err
 	}
 	all := append(ordinary, linked.messages...)
+	availableAt := through
+	if current := time.Now().UTC(); availableAt.After(current) {
+		availableAt = current
+	}
+	available := all[:0]
+	for _, message := range all {
+		if !message.SentAt.After(availableAt) {
+			available = append(available, message)
+		}
+	}
+	all = available
 	if !mailboxContext.DeathAt.IsZero() {
 		available := all[:0]
 		for _, message := range all {

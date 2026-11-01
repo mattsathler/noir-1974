@@ -29,6 +29,8 @@ var (
 // are authoritative backend metadata and are deliberately omitted from JSON.
 type Message struct {
 	ID        string    `json:"id"`
+	CrimeID   string    `json:"crimeId,omitempty"`
+	CrimeType string    `json:"crimeType,omitempty"`
 	SentAt    time.Time `json:"sentAt"`
 	Service   string    `json:"service"`
 	Sender    string    `json:"sender"`

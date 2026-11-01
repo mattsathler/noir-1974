@@ -63,6 +63,57 @@ INSERT INTO case_participants(server_id,case_id,npc_entity_id,participant_role)
 SELECT server_id,case_id,victim_entity_id,'victim' FROM cases WHERE victim_entity_id IS NOT NULL
 ON CONFLICT DO NOTHING;
 
+-- A case is an investigation; each criminal occurrence is stored independently.
+CREATE TABLE IF NOT EXISTS case_crimes (
+    server_id uuid NOT NULL,
+    case_id text NOT NULL,
+    crime_id text NOT NULL CHECK (crime_id <> ''),
+    crime_type text NOT NULL CHECK (crime_type <> ''),
+    occurred_at timestamptz NOT NULL,
+    location_entity_id text,
+    parent_crime_id text,
+    crime_sequence integer NOT NULL CHECK (crime_sequence > 0),
+    source_key text NOT NULL CHECK (source_key <> ''),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, crime_id),
+    UNIQUE (server_id, case_id, crime_id),
+    UNIQUE (server_id, case_id, crime_sequence),
+    UNIQUE (server_id, case_id, source_key),
+    FOREIGN KEY (server_id, case_id, parent_crime_id) REFERENCES case_crimes(server_id, case_id, crime_id),
+    FOREIGN KEY (server_id, case_id) REFERENCES cases(server_id, case_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, location_entity_id) REFERENCES world_entities(server_id, entity_id)
+);
+ALTER TABLE case_crimes ADD COLUMN IF NOT EXISTS parent_crime_id text;
+ALTER TABLE case_crimes DROP CONSTRAINT IF EXISTS case_crimes_server_id_case_id_parent_crime_id_fkey;
+ALTER TABLE case_crimes ADD CONSTRAINT case_crimes_server_id_case_id_parent_crime_id_fkey
+    FOREIGN KEY (server_id, case_id, parent_crime_id) REFERENCES case_crimes(server_id, case_id, crime_id);
+CREATE INDEX IF NOT EXISTS case_crimes_by_case_time_idx
+    ON case_crimes(server_id, case_id, occurred_at, crime_sequence);
+
+CREATE TABLE IF NOT EXISTS case_crime_participants (
+    server_id uuid NOT NULL,
+    crime_id text NOT NULL,
+    npc_entity_id text NOT NULL,
+    participant_role text NOT NULL CHECK (participant_role IN ('principal', 'accomplice', 'victim')),
+    PRIMARY KEY (server_id, crime_id, npc_entity_id),
+    FOREIGN KEY (server_id, crime_id) REFERENCES case_crimes(server_id, crime_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, npc_entity_id) REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS case_crime_participants_by_npc_idx
+    ON case_crime_participants(server_id, npc_entity_id, crime_id);
+
+-- Upgrade existing cases into a first persisted occurrence without changing
+-- their public representation or duplicating the event on later startups.
+INSERT INTO case_crimes(server_id, case_id, crime_id, crime_type, occurred_at, location_entity_id, crime_sequence, source_key)
+SELECT server_id, case_id, case_id || '/crime/1', case_type, COALESCE(crime_at, created_at), location_entity_id, 1, 'primary'
+FROM cases
+ON CONFLICT DO NOTHING;
+INSERT INTO case_crime_participants(server_id, crime_id, npc_entity_id, participant_role)
+SELECT p.server_id, c.crime_id, p.npc_entity_id, p.participant_role
+FROM case_participants p
+JOIN case_crimes c ON c.server_id=p.server_id AND c.case_id=p.case_id AND c.source_key='primary'
+ON CONFLICT DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS case_relationships (
     server_id uuid NOT NULL,
     case_id text NOT NULL,
@@ -86,6 +137,7 @@ ALTER TABLE case_relationships ADD CONSTRAINT case_relationships_relationship_ro
 CREATE TABLE IF NOT EXISTS case_evidence (
     server_id uuid NOT NULL,
     case_id text NOT NULL,
+    crime_id text NOT NULL,
     evidence_id text NOT NULL CHECK (evidence_id <> ''),
     location_entity_id text,
     evidence_type text NOT NULL CHECK (evidence_type <> ''),
@@ -93,9 +145,20 @@ CREATE TABLE IF NOT EXISTS case_evidence (
     PRIMARY KEY (server_id, case_id, evidence_id),
     FOREIGN KEY (server_id, case_id)
         REFERENCES cases(server_id, case_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, case_id, crime_id)
+        REFERENCES case_crimes(server_id, case_id, crime_id) ON DELETE CASCADE,
     FOREIGN KEY (server_id, location_entity_id)
         REFERENCES world_entities(server_id, entity_id)
 );
+ALTER TABLE case_evidence ADD COLUMN IF NOT EXISTS crime_id text;
+UPDATE case_evidence e SET crime_id=c.crime_id
+FROM case_crimes c
+WHERE e.server_id=c.server_id AND e.case_id=c.case_id AND c.source_key='primary' AND e.crime_id IS NULL;
+ALTER TABLE case_evidence ALTER COLUMN crime_id SET NOT NULL;
+ALTER TABLE case_evidence DROP CONSTRAINT IF EXISTS case_evidence_server_id_case_id_crime_id_fkey;
+ALTER TABLE case_evidence ADD CONSTRAINT case_evidence_server_id_case_id_crime_id_fkey
+    FOREIGN KEY (server_id, case_id, crime_id)
+    REFERENCES case_crimes(server_id, case_id, crime_id) ON DELETE CASCADE;
 ALTER TABLE case_evidence DROP CONSTRAINT IF EXISTS case_evidence_evidence_type_check;
 ALTER TABLE case_evidence ADD CONSTRAINT case_evidence_evidence_type_check CHECK (evidence_type <> '');
 CREATE INDEX IF NOT EXISTS case_evidence_by_location_idx
@@ -105,6 +168,7 @@ ALTER TABLE case_evidence ALTER COLUMN location_entity_id DROP NOT NULL;
 CREATE TABLE IF NOT EXISTS case_activity_records (
     server_id uuid NOT NULL,
     case_id text NOT NULL,
+    crime_id text NOT NULL,
     record_id text NOT NULL CHECK (record_id <> ''),
     npc_entity_id text NOT NULL,
     related_npc_entity_id text,
@@ -115,11 +179,22 @@ CREATE TABLE IF NOT EXISTS case_activity_records (
     PRIMARY KEY (server_id, record_id),
     FOREIGN KEY (server_id, case_id)
         REFERENCES cases(server_id, case_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, case_id, crime_id)
+        REFERENCES case_crimes(server_id, case_id, crime_id) ON DELETE CASCADE,
     FOREIGN KEY (server_id, npc_entity_id)
         REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE,
     FOREIGN KEY (server_id, related_npc_entity_id)
         REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE
 );
+ALTER TABLE case_activity_records ADD COLUMN IF NOT EXISTS crime_id text;
+UPDATE case_activity_records r SET crime_id=c.crime_id
+FROM case_crimes c
+WHERE r.server_id=c.server_id AND r.case_id=c.case_id AND c.source_key='primary' AND r.crime_id IS NULL;
+ALTER TABLE case_activity_records ALTER COLUMN crime_id SET NOT NULL;
+ALTER TABLE case_activity_records DROP CONSTRAINT IF EXISTS case_activity_records_server_id_case_id_crime_id_fkey;
+ALTER TABLE case_activity_records ADD CONSTRAINT case_activity_records_server_id_case_id_crime_id_fkey
+    FOREIGN KEY (server_id, case_id, crime_id)
+    REFERENCES case_crimes(server_id, case_id, crime_id) ON DELETE CASCADE;
 ALTER TABLE case_activity_records ADD COLUMN IF NOT EXISTS related_npc_entity_id text;
 ALTER TABLE case_activity_records DROP CONSTRAINT IF EXISTS case_activity_records_server_id_related_npc_entity_id_fkey;
 ALTER TABLE case_activity_records ADD CONSTRAINT case_activity_records_server_id_related_npc_entity_id_fkey
@@ -133,6 +208,7 @@ CREATE INDEX IF NOT EXISTS case_activity_records_by_npc_source_date_idx
 CREATE TABLE IF NOT EXISTS case_mail_messages (
     server_id uuid NOT NULL,
     case_id text NOT NULL,
+    crime_id text NOT NULL,
     message_id text NOT NULL CHECK (message_id <> ''),
     mailbox_npc_entity_id text NOT NULL,
     related_npc_entity_id text NOT NULL,
@@ -142,11 +218,22 @@ CREATE TABLE IF NOT EXISTS case_mail_messages (
     PRIMARY KEY (server_id, message_id),
     FOREIGN KEY (server_id, case_id)
         REFERENCES cases(server_id, case_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, case_id, crime_id)
+        REFERENCES case_crimes(server_id, case_id, crime_id) ON DELETE CASCADE,
     FOREIGN KEY (server_id, mailbox_npc_entity_id)
         REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE,
     FOREIGN KEY (server_id, related_npc_entity_id)
         REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE
 );
+ALTER TABLE case_mail_messages ADD COLUMN IF NOT EXISTS crime_id text;
+UPDATE case_mail_messages m SET crime_id=c.crime_id
+FROM case_crimes c
+WHERE m.server_id=c.server_id AND m.case_id=c.case_id AND c.source_key='primary' AND m.crime_id IS NULL;
+ALTER TABLE case_mail_messages ALTER COLUMN crime_id SET NOT NULL;
+ALTER TABLE case_mail_messages DROP CONSTRAINT IF EXISTS case_mail_messages_server_id_case_id_crime_id_fkey;
+ALTER TABLE case_mail_messages ADD CONSTRAINT case_mail_messages_server_id_case_id_crime_id_fkey
+    FOREIGN KEY (server_id, case_id, crime_id)
+    REFERENCES case_crimes(server_id, case_id, crime_id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS case_mail_messages_by_mailbox_date_idx
     ON case_mail_messages(server_id, mailbox_npc_entity_id, sent_at, message_id);
 CREATE INDEX IF NOT EXISTS case_mail_messages_by_related_date_idx
@@ -168,6 +255,27 @@ ALTER TABLE case_states ADD COLUMN IF NOT EXISTS body_found_method text;
 ALTER TABLE case_states DROP CONSTRAINT IF EXISTS case_states_body_found_method_check;
 ALTER TABLE case_states ADD CONSTRAINT case_states_body_found_method_check CHECK (body_found_method IS NULL OR body_found_method IN ('automatic', 'residential_search'));
 CREATE INDEX IF NOT EXISTS case_states_body_discovery_idx ON case_states(server_id, body_found_at) WHERE body_found_at IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS case_evolution_jobs (
+    server_id uuid NOT NULL,
+    case_id text NOT NULL,
+    event_key text NOT NULL CHECK (event_key <> ''),
+    event_type text NOT NULL CHECK (event_type <> ''),
+    plan_version integer NOT NULL DEFAULT 1 CHECK (plan_version > 0),
+    available_at timestamptz NOT NULL,
+    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled')),
+    completed_at timestamptz,
+    PRIMARY KEY (server_id, case_id, event_key),
+    FOREIGN KEY (server_id, case_id) REFERENCES cases(server_id, case_id) ON DELETE CASCADE
+);
+ALTER TABLE case_evolution_jobs ADD COLUMN IF NOT EXISTS plan_version integer NOT NULL DEFAULT 1;
+CREATE INDEX IF NOT EXISTS case_evolution_jobs_due_idx
+    ON case_evolution_jobs(server_id, available_at, case_id) WHERE status='pending';
+INSERT INTO case_evolution_jobs(server_id,case_id,event_key,event_type,available_at)
+SELECT c.server_id,c.case_id,'financial-cover-up','financial_cover_up',now()+interval '3 minutes'
+FROM cases c JOIN case_states s USING(server_id,case_id)
+WHERE c.case_type IN ('embezzlement','financial_extortion','accounting_fraud') AND s.status='open'
+ON CONFLICT DO NOTHING;
 UPDATE case_states s SET body_found_at=COALESCE(c.crime_at,c.created_at)+interval '90 minutes',body_found_method='automatic'
 FROM cases c JOIN world_entities scene ON scene.server_id=c.server_id AND scene.entity_id=c.location_entity_id
 WHERE s.server_id=c.server_id AND s.case_id=c.case_id AND s.body_found_at IS NULL
@@ -263,6 +371,8 @@ CREATE INDEX IF NOT EXISTS player_async_requests_due_idx
 CREATE TABLE IF NOT EXISTS player_inbox_messages (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
     account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    case_id text,
+    crime_id text,
     message_id text NOT NULL CHECK (message_id <> ''),
     warrant_id text,
     sent_at timestamptz NOT NULL DEFAULT now(),
@@ -274,8 +384,17 @@ CREATE TABLE IF NOT EXISTS player_inbox_messages (
     deleted_at timestamptz,
     PRIMARY KEY (server_id, account_id, message_id),
     FOREIGN KEY (server_id, account_id, warrant_id)
-        REFERENCES player_search_warrants(server_id, account_id, warrant_id) ON DELETE CASCADE
+        REFERENCES player_search_warrants(server_id, account_id, warrant_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, case_id) REFERENCES cases(server_id, case_id) ON DELETE CASCADE
 );
+ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS case_id text;
+ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS crime_id text;
+ALTER TABLE player_inbox_messages DROP CONSTRAINT IF EXISTS player_inbox_messages_server_id_case_id_fkey;
+ALTER TABLE player_inbox_messages ADD CONSTRAINT player_inbox_messages_server_id_case_id_fkey
+    FOREIGN KEY (server_id, case_id) REFERENCES cases(server_id, case_id) ON DELETE CASCADE;
+ALTER TABLE player_inbox_messages DROP CONSTRAINT IF EXISTS player_inbox_messages_server_id_case_id_crime_id_fkey;
+ALTER TABLE player_inbox_messages ADD CONSTRAINT player_inbox_messages_server_id_case_id_crime_id_fkey
+    FOREIGN KEY (server_id, case_id, crime_id) REFERENCES case_crimes(server_id, case_id, crime_id) ON DELETE CASCADE;
 ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS sender text NOT NULL DEFAULT 'BILL BOUER';
 ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS message_category text NOT NULL DEFAULT 'official';
 ALTER TABLE player_inbox_messages DROP CONSTRAINT IF EXISTS player_inbox_messages_message_category_check;
@@ -316,6 +435,7 @@ CREATE TABLE IF NOT EXISTS player_case_accusations (
     account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
     case_id text NOT NULL,
     accused_npc_entity_id text NOT NULL DEFAULT '',
+    crime_ids text[] NOT NULL DEFAULT '{}',
     board_id text NOT NULL,
     accepted boolean NOT NULL,
     outcome text NOT NULL CHECK (outcome IN ('arrested','insufficient')),
@@ -324,6 +444,7 @@ CREATE TABLE IF NOT EXISTS player_case_accusations (
     FOREIGN KEY (server_id,case_id) REFERENCES cases(server_id,case_id) ON DELETE CASCADE
 );
 ALTER TABLE player_case_accusations ADD COLUMN IF NOT EXISTS accused_npc_entity_id text NOT NULL DEFAULT '';
+ALTER TABLE player_case_accusations ADD COLUMN IF NOT EXISTS crime_ids text[] NOT NULL DEFAULT '{}';
 ALTER TABLE player_case_accusations DROP CONSTRAINT IF EXISTS player_case_accusations_pkey;
 ALTER TABLE player_case_accusations ADD PRIMARY KEY (server_id,account_id,case_id,accused_npc_entity_id);
 

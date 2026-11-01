@@ -317,6 +317,7 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 			mux.HandleFunc("GET /api/crime-reports", handler.crimeReports)
 		}
 		mux.HandleFunc("GET /api/cases/{caseID}", handler.getCase)
+		mux.HandleFunc("GET /api/cases/{caseID}/crimes", handler.caseCrimeTimeline)
 		mux.HandleFunc("POST /api/cases/{caseID}/progress", handler.saveCaseProgress)
 		if _, ok := caseReader.(CaseAccusationReader); ok {
 			mux.HandleFunc("POST /api/accusations", handler.submitAccusation)
@@ -790,6 +791,13 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	if currentTime := h.now().UTC(); through.After(currentTime) {
+		through = currentTime
+	}
+	if through.Before(from) {
+		writeJSON(w, http.StatusOK, map[string]any{"results": []records.Record{}})
+		return
+	}
 	results, err := h.recordsReader.NPCRecords(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through, source)
 	if errors.Is(err, world.ErrEntityNotFound) {
 		http.NotFound(w, r)
@@ -899,6 +907,13 @@ func (h *Handler) npcEmails(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	if currentTime := h.now().UTC(); through.After(currentTime) {
+		through = currentTime
+	}
+	if through.Before(from) {
+		writeJSON(w, http.StatusOK, map[string]any{"results": []correspondence.Message{}})
+		return
+	}
 	results, err := h.emailsReader.NPCEmails(r.Context(), h.worldServerID, r.PathValue("npcID"), from, through)
 	if errors.Is(err, world.ErrEntityNotFound) {
 		h.writeAPIError(w, r, http.StatusNotFound, "NPC_EMAIL_PROFILE_NOT_FOUND", "the selected person has no correspondence profile", err)
@@ -1317,6 +1332,27 @@ func (h *Handler) getCase(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, caseDetailResponse{Case: publicCase, Evidence: evidence, Progress: progress})
+}
+
+func (h *Handler) caseCrimeTimeline(w http.ResponseWriter, r *http.Request) {
+	_, cityID, ok := h.caseAccountAndCity(w, r)
+	if !ok {
+		return
+	}
+	publicCase, _, err := h.caseReader.GetPublicCase(r.Context(), h.worldServerID, r.PathValue("caseID"))
+	if errors.Is(err, cases.ErrCaseNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "could not retrieve case timeline", http.StatusInternalServerError)
+		return
+	}
+	if publicCase.CityID != cityID {
+		h.writeAPIError(w, r, http.StatusConflict, "CASE_CITY_MISMATCH", "connect to the case's city before opening its timeline", nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"caseId": publicCase.ID, "crimes": publicCase.Crimes})
 }
 
 func (h *Handler) validateNPCCity(w http.ResponseWriter, r *http.Request, accountID, npcID string) bool {

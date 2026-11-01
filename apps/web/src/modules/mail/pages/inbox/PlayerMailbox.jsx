@@ -207,7 +207,7 @@ export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPri
           <time dateTime={message.sentAt}>{displayDate(message.sentAt, timeZone)}</time>
         </summary>
         <div className="email-message__body">
-          <div className="email-message__header"><span>{message.category === "spam" ? "UNSOLICITED CIRCULAR · SPAM" : "PERSONAL MAIL NOTICE"}</span><time dateTime={message.sentAt}>{displayDate(message.sentAt, timeZone)}</time></div>
+          <div className="email-message__header"><span>{message.category === "spam" ? "UNSOLICITED CIRCULAR · SPAM" : message.crimeType ? `CASE EVENT · ${message.crimeType.replaceAll("_", " ").toUpperCase()}` : message.caseId ? "CASE INQUIRY · PERSONAL MAIL" : "PERSONAL MAIL NOTICE"}</span><time dateTime={message.sentAt}>{displayDate(message.sentAt, timeZone)}</time></div>
           <p>{message.body}</p>
           {!!message.attachments?.length && <section className="player-mail__attachments" aria-label="Recovered items">
             <h3 className="case-files__section-heading">RECOVERED AND SECURED · {message.attachments.length} ITEMS</h3>

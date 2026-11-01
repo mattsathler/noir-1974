@@ -106,6 +106,9 @@ type PlayerMailAttachment struct {
 
 type PlayerMailMessage struct {
 	ID          string                 `json:"id"`
+	CaseID      string                 `json:"caseId,omitempty"`
+	CrimeID     string                 `json:"crimeId,omitempty"`
+	CrimeType   string                 `json:"crimeType,omitempty"`
 	SentAt      time.Time              `json:"sentAt"`
 	Sender      string                 `json:"sender"`
 	Category    string                 `json:"category"`
@@ -266,6 +269,7 @@ type accusationPayload struct {
 	CityID     string   `json:"cityId"`
 	BoardID    string   `json:"boardId"`
 	CaseID     string   `json:"caseId,omitempty"`
+	CrimeIDs   []string `json:"crimeIds,omitempty"`
 	AccusedID  string   `json:"accusedId,omitempty"`
 	AccusedIDs []string `json:"accusedIds,omitempty"`
 	VictimID   string   `json:"victimId,omitempty"`
@@ -301,6 +305,21 @@ type PublicCase struct {
 	LocationID       string                `json:"-"`
 	Status           string                `json:"status"`
 	CreatedAt        time.Time             `json:"createdAt"`
+	Crimes           []PublicCrime         `json:"crimes,omitempty"`
+}
+
+// PublicCrime contains only occurred events made discoverable through case evidence.
+// It intentionally omits participant identities and internal event relations.
+type PublicCrime struct {
+	ID         string              `json:"id"`
+	Type       string              `json:"type"`
+	OccurredAt time.Time           `json:"occurredAt"`
+	Victims    []PublicCrimeVictim `json:"victims,omitempty"`
+}
+
+type PublicCrimeVictim struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type MissingPerson struct {
@@ -434,6 +453,8 @@ func (store *PostgresStore) PersonSearchScenes(ctx context.Context, serverID, co
 
 type PublicEvidence struct {
 	ID           string `json:"id"`
+	CrimeID      string `json:"crimeId,omitempty"`
+	CrimeType    string `json:"crimeType,omitempty"`
 	Type         string `json:"type"`
 	Presentation string `json:"presentation"`
 	Content      string `json:"content"`
@@ -1369,8 +1390,9 @@ func (store *PostgresStore) ListPlayerMail(ctx context.Context, serverID, accoun
 	if err := store.ensureSampleSpam(ctx, serverID, accountID); err != nil {
 		return nil, fmt.Errorf("prepare junk mail: %w", err)
 	}
-	rows, err := store.db.Query(ctx, `SELECT message_id,sent_at,sender,message_category,subject,body,attachments FROM player_inbox_messages
-		WHERE server_id=$1::uuid AND account_id=$2::uuid AND deleted_at IS NULL ORDER BY sent_at DESC,message_id DESC`, serverID, accountID)
+	rows, err := store.db.Query(ctx, `SELECT message.message_id,COALESCE(message.case_id,''),COALESCE(message.crime_id,''),COALESCE(crime.crime_type,''),message.sent_at,message.sender,message.message_category,message.subject,message.body,message.attachments
+		FROM player_inbox_messages message LEFT JOIN case_crimes crime ON crime.server_id=message.server_id AND crime.case_id=message.case_id AND crime.crime_id=message.crime_id
+		WHERE message.server_id=$1::uuid AND message.account_id=$2::uuid AND message.deleted_at IS NULL ORDER BY message.sent_at DESC,message.message_id DESC`, serverID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -1379,7 +1401,7 @@ func (store *PostgresStore) ListPlayerMail(ctx context.Context, serverID, accoun
 	for rows.Next() {
 		var message PlayerMailMessage
 		var attachments []byte
-		if err := rows.Scan(&message.ID, &message.SentAt, &message.Sender, &message.Category, &message.Subject, &message.Body, &attachments); err != nil {
+		if err := rows.Scan(&message.ID, &message.CaseID, &message.CrimeID, &message.CrimeType, &message.SentAt, &message.Sender, &message.Category, &message.Subject, &message.Body, &attachments); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(attachments, &message.Attachments); err != nil {
@@ -1555,6 +1577,25 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 			return fmt.Errorf("persist case participant: %w", err)
 		}
 	}
+	initialCrimeAt := definition.CrimeAt
+	if initialCrimeAt.IsZero() {
+		initialCrimeAt = time.Now().UTC()
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO case_crimes(server_id,case_id,crime_id,crime_type,occurred_at,location_entity_id,crime_sequence,source_key)
+		 VALUES($1::uuid,$2,$3,$4,$5,NULLIF($6,''),1,'primary')`,
+		serverID, definition.ID, definition.ID+"/crime/1", definition.CaseType, initialCrimeAt, definition.LocationID,
+	); err != nil {
+		return fmt.Errorf("persist initial case crime: %w", err)
+	}
+	for _, participant := range participants {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO case_crime_participants(server_id,crime_id,npc_entity_id,participant_role) VALUES($1::uuid,$2,$3,$4)`,
+			serverID, definition.ID+"/crime/1", participant.NPCID, participant.Role,
+		); err != nil {
+			return fmt.Errorf("persist initial crime participant: %w", err)
+		}
+	}
 	if err := applyCorporateMarketImpact(ctx, tx, serverID, definition); err != nil {
 		return fmt.Errorf("apply corporate market impact: %w", err)
 	}
@@ -1579,9 +1620,9 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 			return fmt.Errorf("encode case evidence: %w", err)
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO case_evidence (server_id, case_id, evidence_id, location_entity_id, evidence_type, evidence_data)
-			 VALUES ($1::uuid, $2, $3, NULLIF($4,''), $5, $6::jsonb)`,
-			serverID, definition.ID, evidence.ID, evidence.LocationID, evidence.Type, string(data),
+			`INSERT INTO case_evidence (server_id, case_id, crime_id, evidence_id, location_entity_id, evidence_type, evidence_data)
+			 VALUES ($1::uuid, $2, $3, $4, NULLIF($5,''), $6, $7::jsonb)`,
+			serverID, definition.ID, definition.ID+"/crime/1", evidence.ID, evidence.LocationID, evidence.Type, string(data),
 		); err != nil {
 			return fmt.Errorf("persist case evidence: %w", err)
 		}
@@ -1592,9 +1633,9 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 			return fmt.Errorf("encode case activity record: %w", err)
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO case_activity_records (server_id, case_id, record_id, npc_entity_id, related_npc_entity_id, source, occurred_at, internal_relation, record_data)
-			 VALUES ($1::uuid, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, $9::jsonb)`,
-			serverID, definition.ID, record.ID, record.NPCID, record.RelatedNPCID, record.Source, record.OccurredAt, record.InternalRelation, string(data),
+			`INSERT INTO case_activity_records (server_id, case_id, crime_id, record_id, npc_entity_id, related_npc_entity_id, source, occurred_at, internal_relation, record_data)
+			 VALUES ($1::uuid, $2, $3, $4, $5, NULLIF($6, ''), $7, $8, $9, $10::jsonb)`,
+			serverID, definition.ID, definition.ID+"/crime/1", record.ID, record.NPCID, record.RelatedNPCID, record.Source, record.OccurredAt, record.InternalRelation, string(data),
 		); err != nil {
 			return fmt.Errorf("persist case activity record %s: %w", record.ID, err)
 		}
@@ -1609,10 +1650,379 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 	); err != nil {
 		return fmt.Errorf("persist initial shared case state: %w", err)
 	}
+	if contains([]string{"embezzlement", "financial_extortion", "accounting_fraud"}, definition.CaseType) {
+		if _, err := tx.Exec(ctx, `INSERT INTO case_evolution_jobs(server_id,case_id,event_key,event_type,available_at)
+			VALUES($1::uuid,$2,'financial-cover-up','financial_cover_up',now()+interval '3 minutes') ON CONFLICT DO NOTHING`, serverID, definition.ID); err != nil {
+			return fmt.Errorf("schedule financial case evolution: %w", err)
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit case creation: %w", err)
 	}
 	return nil
+}
+
+// AppendCrime adds one occurred crime to an open investigation. sourceKey is
+// the caller's stable event key, so replaying the same world event is safe.
+func (store *PostgresStore) AppendCrime(ctx context.Context, serverID, caseID, crimeID, sourceKey, crimeType string, occurredAt time.Time, locationID string, participants []CaseParticipant) error {
+	return store.AppendLinkedCrime(ctx, serverID, caseID, crimeID, sourceKey, crimeType, occurredAt, locationID, "", participants)
+}
+
+// AppendLinkedCrime records the causal parent when the new occurrence follows
+// an earlier crime in the same investigation.
+func (store *PostgresStore) AppendLinkedCrime(ctx context.Context, serverID, caseID, crimeID, sourceKey, crimeType string, occurredAt time.Time, locationID, parentCrimeID string, participants []CaseParticipant) error {
+	if serverID == "" || caseID == "" || crimeID == "" || sourceKey == "" || crimeType == "" || occurredAt.IsZero() {
+		return ErrInvalidDefinition
+	}
+	occurredAt = occurredAt.UTC().Truncate(time.Microsecond)
+	if occurredAt.After(time.Now().UTC()) {
+		return ErrInvalidDefinition
+	}
+	for _, participant := range participants {
+		if participant.NPCID == "" || (participant.Role != "principal" && participant.Role != "accomplice" && participant.Role != "victim") {
+			return ErrInvalidDefinition
+		}
+	}
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin case crime append: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	var status string
+	if err := tx.QueryRow(ctx, `SELECT status FROM case_states WHERE server_id=$1::uuid AND case_id=$2 FOR UPDATE`, serverID, caseID).Scan(&status); errors.Is(err, pgx.ErrNoRows) {
+		return ErrCaseNotFound
+	} else if err != nil {
+		return fmt.Errorf("lock case before crime append: %w", err)
+	}
+	if status != "open" {
+		return ErrInvalidCaseState
+	}
+	if parentCrimeID != "" {
+		var parentAt time.Time
+		if err := tx.QueryRow(ctx, `SELECT occurred_at FROM case_crimes WHERE server_id=$1::uuid AND case_id=$2 AND crime_id=$3`, serverID, caseID, parentCrimeID).Scan(&parentAt); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrCaseNotFound
+			}
+			return err
+		}
+		if parentAt.After(occurredAt) {
+			return ErrInvalidDefinition
+		}
+	}
+	var storedID, storedType, storedParentID string
+	var storedAt time.Time
+	var storedLocation string
+	err = tx.QueryRow(ctx, `SELECT crime_id,crime_type,occurred_at,COALESCE(location_entity_id,''),COALESCE(parent_crime_id,'') FROM case_crimes WHERE server_id=$1::uuid AND case_id=$2 AND source_key=$3`, serverID, caseID, sourceKey).Scan(&storedID, &storedType, &storedAt, &storedLocation, &storedParentID)
+	if err == nil {
+		if storedID != crimeID || storedType != crimeType || !storedAt.Equal(occurredAt) || storedLocation != locationID || storedParentID != parentCrimeID {
+			return ErrPersistedConflict
+		}
+		var storedParticipantCount int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM case_crime_participants WHERE server_id=$1::uuid AND crime_id=$2`, serverID, crimeID).Scan(&storedParticipantCount); err != nil {
+			return err
+		}
+		if storedParticipantCount != len(participants) {
+			return ErrPersistedConflict
+		}
+		for _, participant := range participants {
+			var exists bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM case_crime_participants WHERE server_id=$1::uuid AND crime_id=$2 AND npc_entity_id=$3 AND participant_role=$4)`, serverID, crimeID, participant.NPCID, participant.Role).Scan(&exists); err != nil {
+				return err
+			}
+			if !exists {
+				return ErrPersistedConflict
+			}
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("commit repeated case crime: %w", err)
+		}
+		return nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("check repeated case crime: %w", err)
+	}
+	if locationID != "" {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM world_entities WHERE server_id=$1::uuid AND entity_id=$2 AND entity_type='location')`, serverID, locationID).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			return world.ErrEntityNotFound
+		}
+	}
+	for _, participant := range participants {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM world_entities WHERE server_id=$1::uuid AND entity_id=$2 AND entity_type='npc')`, serverID, participant.NPCID).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			return world.ErrEntityNotFound
+		}
+	}
+	var sequence int
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(crime_sequence),0)+1 FROM case_crimes WHERE server_id=$1::uuid AND case_id=$2`, serverID, caseID).Scan(&sequence); err != nil {
+		return fmt.Errorf("allocate case crime sequence: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO case_crimes(server_id,case_id,crime_id,crime_type,occurred_at,location_entity_id,parent_crime_id,crime_sequence,source_key)
+		 VALUES($1::uuid,$2,$3,$4,$5,NULLIF($6,''),NULLIF($7,''),$8,$9)`, serverID, caseID, crimeID, crimeType, occurredAt, locationID, parentCrimeID, sequence, sourceKey,
+	); err != nil {
+		return fmt.Errorf("persist appended case crime: %w", err)
+	}
+	for _, participant := range participants {
+		if _, err := tx.Exec(ctx, `INSERT INTO case_crime_participants(server_id,crime_id,npc_entity_id,participant_role) VALUES($1::uuid,$2,$3,$4)`, serverID, crimeID, participant.NPCID, participant.Role); err != nil {
+			return fmt.Errorf("persist appended crime participant: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO case_participants(server_id,case_id,npc_entity_id,participant_role) VALUES($1::uuid,$2,$3,$4)
+			ON CONFLICT(server_id,case_id,npc_entity_id) DO UPDATE SET participant_role=CASE WHEN EXCLUDED.participant_role IN ('principal','accomplice') THEN EXCLUDED.participant_role ELSE case_participants.participant_role END`, serverID, caseID, participant.NPCID, participant.Role); err != nil {
+			return fmt.Errorf("update case participant index: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit appended case crime: %w", err)
+	}
+	return nil
+}
+
+// AttachCrimeEvidence stores evidence against the specific occurred crime that
+// produced it. Existing evidence remains available to the case as a whole.
+func (store *PostgresStore) AttachCrimeEvidence(ctx context.Context, serverID, caseID, crimeID string, evidence EvidenceDefinition) error {
+	if serverID == "" || caseID == "" || crimeID == "" || evidence.ID == "" || evidence.Type == "" {
+		return ErrInvalidDefinition
+	}
+	data, err := json.Marshal(struct {
+		Presentation           string   `json:"presentation"`
+		Content                string   `json:"content"`
+		RelationshipIDs        []string `json:"relationshipIds"`
+		ReachableFromEntityIDs []string `json:"reachableFromEntityIds"`
+		SupportsNPCIDs         []string `json:"supportsNpcIds,omitempty"`
+	}{evidence.Presentation, evidence.Content, evidence.RelationshipIDs, evidence.ReachableFromEntityIDs, evidence.SupportsNPCIDs})
+	if err != nil {
+		return fmt.Errorf("encode crime evidence: %w", err)
+	}
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin crime evidence attachment: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	var belongs bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM case_crimes WHERE server_id=$1::uuid AND case_id=$2 AND crime_id=$3 AND occurred_at<=now())`, serverID, caseID, crimeID).Scan(&belongs); err != nil {
+		return err
+	}
+	if !belongs {
+		return ErrEvidenceNotFound
+	}
+	result, err := tx.Exec(ctx,
+		`INSERT INTO case_evidence(server_id,case_id,crime_id,evidence_id,location_entity_id,evidence_type,evidence_data)
+		 VALUES($1::uuid,$2,$3,$4,NULLIF($5,''),$6,$7::jsonb) ON CONFLICT(server_id,case_id,evidence_id) DO NOTHING`,
+		serverID, caseID, crimeID, evidence.ID, evidence.LocationID, evidence.Type, string(data),
+	)
+	if err != nil {
+		return fmt.Errorf("persist crime evidence: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		var existingCrimeID, existingType string
+		var existingData []byte
+		if err := tx.QueryRow(ctx, `SELECT crime_id,evidence_type,evidence_data FROM case_evidence WHERE server_id=$1::uuid AND case_id=$2 AND evidence_id=$3`, serverID, caseID, evidence.ID).Scan(&existingCrimeID, &existingType, &existingData); err != nil {
+			return err
+		}
+		var equal bool
+		if err := tx.QueryRow(ctx, `SELECT $1::jsonb = $2::jsonb`, string(existingData), string(data)).Scan(&equal); err != nil {
+			return err
+		}
+		if existingCrimeID != crimeID || existingType != evidence.Type || !equal {
+			return ErrPersistedConflict
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit crime evidence attachment: %w", err)
+	}
+	return nil
+}
+
+type dueEvolutionJob struct {
+	caseID, companyID, locationID string
+	principalID, accompliceID     string
+	eventType                     string
+	seed                          string
+	worldVersion                  int
+	planVersion                   int
+	scheduledAt                   time.Time
+}
+
+// ProcessDueCaseEvolution advances one queued, backend-only event at a time.
+// Plans remain invisible until the event and its evidence are committed.
+func (store *PostgresStore) ProcessDueCaseEvolution(ctx context.Context, serverID string, now time.Time) error {
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin case evolution tick: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err := tx.Exec(ctx, `UPDATE case_evolution_jobs j SET status='cancelled',completed_at=$2
+		FROM case_states s WHERE j.server_id=$1::uuid AND j.server_id=s.server_id AND j.case_id=s.case_id
+		AND j.status='pending' AND s.status<>'open'`, serverID, now.UTC()); err != nil {
+		return fmt.Errorf("cancel closed case evolution jobs: %w", err)
+	}
+	rows, err := tx.Query(ctx, `SELECT j.case_id,COALESCE(c.company_id,''),COALESCE(c.location_entity_id,''),j.event_type,
+		COALESCE((SELECT npc_entity_id FROM case_participants p WHERE p.server_id=c.server_id AND p.case_id=c.case_id AND p.participant_role='principal' ORDER BY npc_entity_id LIMIT 1),''),
+		COALESCE((SELECT npc_entity_id FROM case_participants p WHERE p.server_id=c.server_id AND p.case_id=c.case_id AND p.participant_role='accomplice' ORDER BY npc_entity_id LIMIT 1),''),
+		w.world_seed,COALESCE(city_generator.generator_version,w.generator_version),j.plan_version,j.available_at
+		FROM case_evolution_jobs j JOIN cases c USING(server_id,case_id) JOIN case_states s USING(server_id,case_id)
+		JOIN worlds w USING(server_id) LEFT JOIN world_city_generators city_generator ON city_generator.server_id=c.server_id AND city_generator.city_id=c.city_id
+		WHERE j.server_id=$1::uuid AND j.status='pending' AND j.available_at<=$2 AND s.status='open'
+		ORDER BY j.available_at,j.case_id LIMIT 10 FOR UPDATE OF j SKIP LOCKED`, serverID, now.UTC())
+	if err != nil {
+		return fmt.Errorf("load due case evolution jobs: %w", err)
+	}
+	jobs := make([]dueEvolutionJob, 0, 10)
+	for rows.Next() {
+		var item dueEvolutionJob
+		if err := rows.Scan(&item.caseID, &item.companyID, &item.locationID, &item.eventType, &item.principalID, &item.accompliceID, &item.seed, &item.worldVersion, &item.planVersion, &item.scheduledAt); err != nil {
+			rows.Close()
+			return err
+		}
+		jobs = append(jobs, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for _, job := range jobs {
+		if job.planVersion != 1 {
+			return fmt.Errorf("case %s uses unsupported evolution plan version %d", job.caseID, job.planVersion)
+		}
+		if job.eventType != "financial_cover_up" {
+			return fmt.Errorf("case %s uses unsupported evolution event %q", job.caseID, job.eventType)
+		}
+		var caseStatus string
+		if err := tx.QueryRow(ctx, `SELECT status FROM case_states WHERE server_id=$1::uuid AND case_id=$2 FOR UPDATE`, serverID, job.caseID).Scan(&caseStatus); err != nil {
+			return fmt.Errorf("lock case state before evolution: %w", err)
+		}
+		if caseStatus != "open" {
+			if _, err := tx.Exec(ctx, `UPDATE case_evolution_jobs SET status='cancelled',completed_at=$3 WHERE server_id=$1::uuid AND case_id=$2 AND event_key='financial-cover-up' AND status='pending'`, serverID, job.caseID, now.UTC()); err != nil {
+				return err
+			}
+			continue
+		}
+		if job.principalID == "" || job.accompliceID == "" || job.locationID == "" {
+			return fmt.Errorf("case %s has an incomplete financial evolution plan", job.caseID)
+		}
+		var actorStatus string
+		if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT value #>> '{}' FROM world_mutations WHERE server_id=$1::uuid AND entity_id=$2 AND field_key='status' AND created_at<=$3 ORDER BY mutation_order DESC LIMIT 1),'alive')`, serverID, job.accompliceID, job.scheduledAt).Scan(&actorStatus); err != nil {
+			return fmt.Errorf("read planned actor status: %w", err)
+		}
+		if actorStatus != "alive" {
+			if _, err := tx.Exec(ctx, `UPDATE case_evolution_jobs SET status='cancelled',completed_at=$3 WHERE server_id=$1::uuid AND case_id=$2 AND event_key='financial-cover-up'`, serverID, job.caseID, now.UTC()); err != nil {
+				return err
+			}
+			continue
+		}
+		actorKey, err := worldGenerationKeyForNPC(ctx, tx, serverID, job.accompliceID)
+		if err != nil {
+			return fmt.Errorf("load planned actor key: %w", err)
+		}
+		actor, err := world.GenerateNPCFromKey(job.seed, job.worldVersion, actorKey)
+		if err != nil {
+			return fmt.Errorf("reconstruct planned actor: %w", err)
+		}
+		principalKey, err := worldGenerationKeyForNPC(ctx, tx, serverID, job.principalID)
+		if err != nil {
+			return fmt.Errorf("load case principal key: %w", err)
+		}
+		principal, err := world.GenerateNPCFromKey(job.seed, job.worldVersion, principalKey)
+		if err != nil {
+			return fmt.Errorf("reconstruct case principal: %w", err)
+		}
+		crimeID := job.caseID + "/evolution/financial-cover-up"
+		occurredAt := job.scheduledAt.UTC().Truncate(time.Microsecond)
+		var sequence int
+		if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(crime_sequence),0)+1 FROM case_crimes WHERE server_id=$1::uuid AND case_id=$2`, serverID, job.caseID).Scan(&sequence); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO case_crimes(server_id,case_id,crime_id,crime_type,occurred_at,location_entity_id,parent_crime_id,crime_sequence,source_key)
+			VALUES($1::uuid,$2,$3,'evidence_tampering',$4,$5,$6,$7,'financial-cover-up')`, serverID, job.caseID, crimeID, occurredAt, job.locationID, job.caseID+"/crime/1", sequence); err != nil {
+			return fmt.Errorf("persist evolved case crime: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO case_crime_participants(server_id,crime_id,npc_entity_id,participant_role) VALUES($1::uuid,$2,$3,'accomplice')`, serverID, crimeID, job.accompliceID); err != nil {
+			return fmt.Errorf("persist evolved crime participant: %w", err)
+		}
+		evidence := EvidenceDefinition{ID: crimeID + "/evidence", Type: "document", Presentation: "Altered company register", Content: "A replacement register page was inserted after the original financial entry was challenged.", LocationID: job.locationID, SupportsNPCIDs: []string{job.accompliceID}}
+		evidenceData, err := json.Marshal(struct {
+			Presentation           string   `json:"presentation"`
+			Content                string   `json:"content"`
+			RelationshipIDs        []string `json:"relationshipIds"`
+			ReachableFromEntityIDs []string `json:"reachableFromEntityIds"`
+			SupportsNPCIDs         []string `json:"supportsNpcIds,omitempty"`
+		}{evidence.Presentation, evidence.Content, nil, nil, evidence.SupportsNPCIDs})
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO case_evidence(server_id,case_id,crime_id,evidence_id,location_entity_id,evidence_type,evidence_data)
+			VALUES($1::uuid,$2,$3,$4,$5,$6,$7::jsonb)`, serverID, job.caseID, crimeID, evidence.ID, job.locationID, evidence.Type, string(evidenceData)); err != nil {
+			return fmt.Errorf("persist evolved crime evidence: %w", err)
+		}
+		record := records.Record{ID: crimeID + "/gate", NPCID: job.accompliceID, Source: "gate", OccurredAt: occurredAt, Operator: "Meridian GATE Network", Description: "A staff relay entry was recorded after closing.", Destination: "Company records office", CaseID: job.caseID, InternalRelation: "financial-cover-up", RelatedNPCID: job.principalID}
+		recordData, err := json.Marshal(record)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO case_activity_records(server_id,case_id,crime_id,record_id,npc_entity_id,related_npc_entity_id,source,occurred_at,internal_relation,record_data)
+			VALUES($1::uuid,$2,$3,$4,$5,$6,'gate',$7,'financial-cover-up',$8::jsonb)`, serverID, job.caseID, crimeID, record.ID, job.accompliceID, job.principalID, occurredAt, string(recordData)); err != nil {
+			return fmt.Errorf("persist evolved crime record: %w", err)
+		}
+		message := mail.CaseMessage(job.seed, job.worldVersion, job.caseID, job.accompliceID, job.principalID, actor.Name, principal.Name, "The replacement register", "I replaced the page after the figures were challenged. Keep the earlier copy out of the file.", "financial_cover_up", occurredAt)
+		message.Service = "Meridian Personal Mail"
+		message.Recipient = principal.Name
+		message.Sender = actor.Name
+		encodedMessage, err := json.Marshal(message)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO case_mail_messages(server_id,case_id,crime_id,message_id,mailbox_npc_entity_id,related_npc_entity_id,sent_at,internal_relation,message_data)
+			VALUES($1::uuid,$2,$3,$4,$5,$6,$7,'financial_cover_up',$8::jsonb)`, serverID, job.caseID, crimeID, message.ID, job.accompliceID, job.principalID, occurredAt, string(encodedMessage)); err != nil {
+			return fmt.Errorf("persist evolved crime correspondence: %w", err)
+		}
+		var witnessKey string
+		witnessErr := tx.QueryRow(ctx, `SELECT employee.generation_key
+			FROM employment_relationships employment JOIN world_entities employee
+			 ON employee.server_id=employment.server_id AND employee.entity_id=employment.employee_npc_id AND employee.entity_type='npc'
+			WHERE employment.server_id=$1::uuid AND employment.employer_company_id=$2
+			 AND employee.entity_id<>$3 AND employee.entity_id<>$4
+			 AND COALESCE((SELECT value #>> '{}' FROM world_mutations mutation WHERE mutation.server_id=employee.server_id AND mutation.entity_id=employee.entity_id AND mutation.field_key='status' AND mutation.created_at<=$5 ORDER BY mutation_order DESC LIMIT 1),'alive')='alive'
+			ORDER BY employment.relationship_id LIMIT 1`, serverID, job.companyID, job.principalID, job.accompliceID, occurredAt).Scan(&witnessKey)
+		if witnessErr != nil && !errors.Is(witnessErr, pgx.ErrNoRows) {
+			return fmt.Errorf("find employee reporting the cover-up: %w", witnessErr)
+		}
+		if witnessErr == nil {
+			witness, err := world.GenerateNPCFromKey(job.seed, job.worldVersion, witnessKey)
+			if err != nil {
+				return fmt.Errorf("reconstruct reporting employee: %w", err)
+			}
+			messageID := "case-event:" + crimeID + ":report"
+			_, err = tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,case_id,crime_id,message_id,sent_at,sender,message_category,subject,body,attachments)
+				SELECT $1::uuid,account.id,$2,$3,$4,$5,$6,'official','A changed page in the company register',$7,'[]'::jsonb
+				FROM player_accounts account ON CONFLICT DO NOTHING`,
+				serverID, job.caseID, crimeID, messageID, occurredAt, witness.Name,
+				"Someone replaced a register page after the figures were challenged. The company records office should still have the earlier entry. Could you look into it?")
+			if err != nil {
+				return fmt.Errorf("deliver case lead to player mailboxes: %w", err)
+			}
+		}
+		if _, err := tx.Exec(ctx, `UPDATE case_evolution_jobs SET status='completed',completed_at=$3 WHERE server_id=$1::uuid AND case_id=$2 AND event_key='financial-cover-up'`, serverID, job.caseID, occurredAt); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit case evolution tick: %w", err)
+	}
+	return nil
+}
+
+func worldGenerationKeyForNPC(ctx context.Context, tx pgx.Tx, serverID, npcID string) (string, error) {
+	var key string
+	err := tx.QueryRow(ctx, `SELECT generation_key FROM world_entities WHERE server_id=$1::uuid AND entity_id=$2 AND entity_type='npc'`, serverID, npcID).Scan(&key)
+	return key, err
 }
 
 func caseSceneIsResidential(base world.World, locationID string) bool {
@@ -1671,10 +2081,10 @@ func persistCaseEmails(ctx context.Context, tx pgx.Tx, serverID string, definiti
 			return fmt.Errorf("encode case email: %w", err)
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO case_mail_messages (server_id, case_id, message_id, mailbox_npc_entity_id, related_npc_entity_id, sent_at, internal_relation, message_data)
-			 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8::jsonb)
+			`INSERT INTO case_mail_messages (server_id, case_id, crime_id, message_id, mailbox_npc_entity_id, related_npc_entity_id, sent_at, internal_relation, message_data)
+			 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
 			 ON CONFLICT (server_id, message_id) DO NOTHING`,
-			serverID, definition.ID, message.ID, message.MailboxNPCID, message.RelatedNPCID, message.SentAt, message.InternalRelation, string(data),
+			serverID, definition.ID, definition.ID+"/crime/1", message.ID, message.MailboxNPCID, message.RelatedNPCID, message.SentAt, message.InternalRelation, string(data),
 		); err != nil {
 			return fmt.Errorf("persist case email %s: %w", message.ID, err)
 		}
@@ -1685,14 +2095,14 @@ func persistCaseEmails(ctx context.Context, tx pgx.Tx, serverID string, definiti
 // NPCRecords loads only the selected person's case-related entries within the
 // requested interval. It deliberately omits the internal relationship label.
 func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID string, from, through time.Time, source string) ([]records.Record, error) {
-	query := `SELECT record_data FROM case_activity_records
-		 WHERE server_id = $1::uuid AND npc_entity_id = $2 AND occurred_at >= $3 AND occurred_at <= $4
-		 ORDER BY occurred_at, record_id`
+	query := `SELECT activity.crime_id,crime.crime_type,activity.record_data FROM case_activity_records activity JOIN case_crimes crime USING(server_id,case_id,crime_id)
+		 WHERE activity.server_id = $1::uuid AND activity.npc_entity_id = $2 AND activity.occurred_at >= $3 AND activity.occurred_at <= $4 AND activity.occurred_at <= now()
+		 ORDER BY activity.occurred_at, activity.record_id`
 	args := []any{serverID, npcID, from, through}
 	if source != "" {
-		query = `SELECT record_data FROM case_activity_records
-			 WHERE server_id = $1::uuid AND npc_entity_id = $2 AND source = $5 AND occurred_at >= $3 AND occurred_at <= $4
-			 ORDER BY occurred_at, record_id`
+		query = `SELECT activity.crime_id,crime.crime_type,activity.record_data FROM case_activity_records activity JOIN case_crimes crime USING(server_id,case_id,crime_id)
+			 WHERE activity.server_id = $1::uuid AND activity.npc_entity_id = $2 AND activity.source = $5 AND activity.occurred_at >= $3 AND activity.occurred_at <= $4 AND activity.occurred_at <= now()
+			 ORDER BY activity.occurred_at, activity.record_id`
 		args = append(args, source)
 	}
 	rows, err := store.db.Query(ctx, query, args...)
@@ -1704,7 +2114,7 @@ func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID stri
 	for rows.Next() {
 		var data []byte
 		var item records.Record
-		if err := rows.Scan(&data); err != nil {
+		if err := rows.Scan(&item.CrimeID, &item.CrimeType, &data); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(data, &item); err != nil {
@@ -1722,11 +2132,11 @@ func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID strin
 		return nil, fmt.Errorf("deliver NPC email replies: %w", err)
 	}
 	rows, err := store.db.Query(ctx,
-		`SELECT case_id, mailbox_npc_entity_id, related_npc_entity_id, internal_relation, message_data
-		 FROM case_mail_messages
-		 WHERE server_id = $1::uuid AND (mailbox_npc_entity_id = $2 OR related_npc_entity_id = $2)
-		   AND sent_at >= $3 AND sent_at <= $4
-		 ORDER BY sent_at, message_id`, serverID, npcID, from, through,
+		`SELECT message.case_id,message.crime_id,crime.crime_type,message.mailbox_npc_entity_id,message.related_npc_entity_id,message.internal_relation,message.message_data
+		 FROM case_mail_messages message JOIN case_crimes crime USING(server_id,case_id,crime_id)
+		 WHERE message.server_id = $1::uuid AND (message.mailbox_npc_entity_id = $2 OR message.related_npc_entity_id = $2)
+		   AND message.sent_at >= $3 AND message.sent_at <= $4 AND message.sent_at <= now()
+		 ORDER BY message.sent_at, message.message_id`, serverID, npcID, from, through,
 	)
 	if err != nil {
 		return nil, err
@@ -1737,7 +2147,7 @@ func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID strin
 		var item mail.Message
 		var data []byte
 		var recipientMailboxID string
-		if err := rows.Scan(&item.CaseID, &recipientMailboxID, &item.RelatedNPCID, &item.InternalRelation, &data); err != nil {
+		if err := rows.Scan(&item.CaseID, &item.CrimeID, &item.CrimeType, &recipientMailboxID, &item.RelatedNPCID, &item.InternalRelation, &data); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(data, &item); err != nil {
@@ -2115,9 +2525,64 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 			result.OrganizationName = organization.Name
 		}
 	}
+	result.Crimes = make([]PublicCrime, 0)
+	crimeRows, err := store.db.Query(ctx,
+		`SELECT crime.crime_id,crime.crime_type,crime.occurred_at
+		 FROM case_crimes crime
+		 WHERE crime.server_id=$1::uuid AND crime.case_id=$2 AND crime.occurred_at<=$3
+		   AND (crime.source_key='primary' OR EXISTS (
+		     SELECT 1 FROM case_evidence evidence
+		     WHERE evidence.server_id=crime.server_id AND evidence.case_id=crime.case_id AND evidence.crime_id=crime.crime_id
+		   ))
+		 ORDER BY crime.occurred_at,crime.crime_sequence`, serverID, caseID, time.Now().UTC(),
+	)
+	if err != nil {
+		return PublicCase{}, nil, err
+	}
+	for crimeRows.Next() {
+		var item PublicCrime
+		if err := crimeRows.Scan(&item.ID, &item.Type, &item.OccurredAt); err != nil {
+			crimeRows.Close()
+			return PublicCase{}, nil, err
+		}
+		result.Crimes = append(result.Crimes, item)
+	}
+	if err := crimeRows.Err(); err != nil {
+		crimeRows.Close()
+		return PublicCase{}, nil, err
+	}
+	crimeRows.Close()
+	for index := range result.Crimes {
+		victimRows, err := store.db.Query(ctx, `SELECT entity.entity_id,entity.generation_key FROM case_crime_participants participant
+			JOIN world_entities entity ON entity.server_id=participant.server_id AND entity.entity_id=participant.npc_entity_id AND entity.entity_type='npc'
+			WHERE participant.server_id=$1::uuid AND participant.crime_id=$2 AND participant.participant_role='victim' ORDER BY entity.entity_id`, serverID, result.Crimes[index].ID)
+		if err != nil {
+			return PublicCase{}, nil, err
+		}
+		result.Crimes[index].Victims = make([]PublicCrimeVictim, 0)
+		for victimRows.Next() {
+			var victim PublicCrimeVictim
+			var generationKey string
+			if err := victimRows.Scan(&victim.ID, &generationKey); err != nil {
+				victimRows.Close()
+				return PublicCase{}, nil, err
+			}
+			if generated, err := world.GenerateNPCFromKey(worldSeed, generatorVersion, generationKey); err == nil {
+				victim.Name = generated.Name
+			}
+			result.Crimes[index].Victims = append(result.Crimes[index].Victims, victim)
+		}
+		if err := victimRows.Err(); err != nil {
+			victimRows.Close()
+			return PublicCase{}, nil, err
+		}
+		victimRows.Close()
+	}
 	rows, err := store.db.Query(ctx,
-		`SELECT evidence_id, COALESCE(location_entity_id,''), evidence_data
-		 FROM case_evidence WHERE server_id = $1::uuid AND case_id = $2 ORDER BY evidence_id`, serverID, caseID,
+		`SELECT evidence.evidence_id,evidence.crime_id,crime.crime_type,COALESCE(evidence.location_entity_id,''),evidence.evidence_data
+		 FROM case_evidence evidence JOIN case_crimes crime USING(server_id,case_id,crime_id)
+		 WHERE evidence.server_id = $1::uuid AND evidence.case_id = $2 AND crime.occurred_at<=now()
+		 ORDER BY evidence.evidence_id`, serverID, caseID,
 	)
 	if err != nil {
 		return PublicCase{}, nil, err
@@ -2127,7 +2592,7 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 	for rows.Next() {
 		var item PublicEvidence
 		var data []byte
-		if err := rows.Scan(&item.ID, &item.LocationID, &data); err != nil {
+		if err := rows.Scan(&item.ID, &item.CrimeID, &item.CrimeType, &item.LocationID, &data); err != nil {
 			return PublicCase{}, nil, err
 		}
 		var narrative struct {
@@ -2157,16 +2622,16 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 		return result, evidence, nil
 	}
 	activityRows, err := store.db.Query(ctx,
-		`SELECT record_id, record_data FROM case_activity_records
-		 WHERE server_id = $1::uuid AND case_id = $2 ORDER BY occurred_at, record_id`, serverID, caseID,
+		`SELECT record_id, crime_id, (SELECT crime_type FROM case_crimes crime WHERE crime.server_id=case_activity_records.server_id AND crime.case_id=case_activity_records.case_id AND crime.crime_id=case_activity_records.crime_id), record_data FROM case_activity_records
+		 WHERE server_id = $1::uuid AND case_id = $2 AND occurred_at<=now() ORDER BY occurred_at, record_id`, serverID, caseID,
 	)
 	if err != nil {
 		return PublicCase{}, nil, err
 	}
 	for activityRows.Next() {
-		var id string
+		var id, crimeID, crimeType string
 		var data []byte
-		if err := activityRows.Scan(&id, &data); err != nil {
+		if err := activityRows.Scan(&id, &crimeID, &crimeType, &data); err != nil {
 			activityRows.Close()
 			return PublicCase{}, nil, err
 		}
@@ -2192,7 +2657,7 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 		if record.Origin != "" || record.Destination != "" {
 			content += fmt.Sprintf(" Recorded passage: %s to %s.", record.Origin, record.Destination)
 		}
-		evidence = append(evidence, PublicEvidence{ID: id, Type: kind, Presentation: presentation, Content: content})
+		evidence = append(evidence, PublicEvidence{ID: id, CrimeID: crimeID, CrimeType: crimeType, Type: kind, Presentation: presentation, Content: content})
 	}
 	if err := activityRows.Err(); err != nil {
 		activityRows.Close()
@@ -2200,16 +2665,16 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 	}
 	activityRows.Close()
 	mailRows, err := store.db.Query(ctx,
-		`SELECT message_id, message_data FROM case_mail_messages
-		 WHERE server_id = $1::uuid AND case_id = $2 ORDER BY sent_at, message_id`, serverID, caseID,
+		`SELECT message_id, crime_id, (SELECT crime_type FROM case_crimes crime WHERE crime.server_id=case_mail_messages.server_id AND crime.case_id=case_mail_messages.case_id AND crime.crime_id=case_mail_messages.crime_id), message_data FROM case_mail_messages
+		 WHERE server_id = $1::uuid AND case_id = $2 AND sent_at<=now() ORDER BY sent_at, message_id`, serverID, caseID,
 	)
 	if err != nil {
 		return PublicCase{}, nil, err
 	}
 	for mailRows.Next() {
-		var id string
+		var id, crimeID, crimeType string
 		var data []byte
-		if err := mailRows.Scan(&id, &data); err != nil {
+		if err := mailRows.Scan(&id, &crimeID, &crimeType, &data); err != nil {
 			mailRows.Close()
 			return PublicCase{}, nil, err
 		}
@@ -2218,7 +2683,7 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 			mailRows.Close()
 			return PublicCase{}, nil, fmt.Errorf("decode public case correspondence: %w", err)
 		}
-		evidence = append(evidence, PublicEvidence{ID: id, Type: "email", Presentation: "EMAIL · " + message.Subject, Content: message.Body})
+		evidence = append(evidence, PublicEvidence{ID: id, CrimeID: crimeID, CrimeType: crimeType, Type: "email", Presentation: "EMAIL · " + message.Subject, Content: message.Body})
 	}
 	if err := mailRows.Err(); err != nil {
 		mailRows.Close()
@@ -2245,11 +2710,7 @@ func (store *PostgresStore) SetSharedStatus(ctx context.Context, serverID, caseI
 	if status != "open" && status != "solved" && status != "archived" {
 		return ErrInvalidCaseState
 	}
-	result, err := store.db.Exec(ctx,
-		`UPDATE case_states SET status = $3, updated_at = now()
-		 WHERE server_id = $1::uuid AND case_id = $2`,
-		serverID, caseID, status,
-	)
+	result, err := store.db.Exec(ctx, `UPDATE case_states SET status=$3,updated_at=now() WHERE server_id=$1::uuid AND case_id=$2`, serverID, caseID, status)
 	if err != nil {
 		return err
 	}
@@ -2604,8 +3065,11 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	var caseID string
 	if markedVictimID != "" {
 		err = tx.QueryRow(ctx, `SELECT c.case_id FROM cases c
-			WHERE c.server_id=$1::uuid AND c.city_id=$2 AND c.victim_entity_id=$3
-			ORDER BY c.created_at DESC,c.case_id LIMIT 1`, serverID, cityID, markedVictimID).Scan(&caseID)
+			WHERE c.server_id=$1::uuid AND c.city_id=$2 AND (c.victim_entity_id=$3 OR EXISTS (
+				SELECT 1 FROM case_crime_participants participant JOIN case_crimes crime USING(server_id,crime_id)
+				WHERE participant.server_id=c.server_id AND crime.case_id=c.case_id AND participant.npc_entity_id=$3
+				AND participant.participant_role='victim' AND crime.occurred_at<=$4))
+			ORDER BY c.created_at DESC,c.case_id LIMIT 1`, serverID, cityID, markedVictimID, now.UTC()).Scan(&caseID)
 	} else {
 		err = tx.QueryRow(ctx, `SELECT c.case_id FROM cases c
 			WHERE c.server_id=$1::uuid AND c.city_id=$2 AND c.case_type<>'homicide'
@@ -2619,6 +3083,18 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		caseID = ""
+	}
+	var crimeIDs []string
+	if caseID != "" {
+		if err := tx.QueryRow(ctx, `SELECT COALESCE(array_agg(DISTINCT evidence.crime_id ORDER BY evidence.crime_id),'{}'::text[])
+			FROM (
+				SELECT server_id,case_id,crime_id FROM case_evidence WHERE server_id=$1::uuid AND case_id=$2 AND evidence_id=ANY($3::text[])
+				UNION ALL SELECT server_id,case_id,crime_id FROM case_activity_records WHERE server_id=$1::uuid AND case_id=$2 AND record_id=ANY($3::text[])
+				UNION ALL SELECT server_id,case_id,crime_id FROM case_mail_messages WHERE server_id=$1::uuid AND case_id=$2 AND message_id=ANY($3::text[])
+			) evidence JOIN case_crimes crime USING(server_id,case_id,crime_id)
+			WHERE crime.occurred_at<=$4`, serverID, caseID, proofIDs, now.UTC()).Scan(&crimeIDs); err != nil {
+			return AccusationResult{}, fmt.Errorf("snapshot crimes represented on submitted board: %w", err)
+		}
 	}
 	caseType := ""
 	if caseID != "" {
@@ -2634,7 +3110,7 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	if caseID == "" {
 		requestKey = "unmatched:" + boardID + ":" + hex.EncodeToString(submissionID[:])
 	}
-	payload := accusationPayload{CityID: cityID, BoardID: boardID, CaseID: caseID, VictimID: markedVictimID, ProofIDs: proofIDs}
+	payload := accusationPayload{CityID: cityID, BoardID: boardID, CaseID: caseID, CrimeIDs: crimeIDs, VictimID: markedVictimID, ProofIDs: proofIDs}
 	if caseType == "homicide" && len(accusedIDs) == 1 {
 		payload.AccusedID = accusedIDs[0]
 	} else {
@@ -2662,6 +3138,9 @@ WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3`
 
 // resolveAccusation delivers the delayed review based on the immutable board snapshot.
 func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, accountID, requestID string, request accusationPayload, now time.Time) (AccusationResult, error) {
+	if err := store.validateAccusationCrimeSnapshot(ctx, serverID, request, now); err != nil {
+		return AccusationResult{}, err
+	}
 	if len(request.AccusedIDs) > 0 {
 		return store.resolveParticipantAccusation(ctx, serverID, accountID, requestID, request, now)
 	}
@@ -2719,8 +3198,8 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		return AccusationResult{}, err
 	}
 	if caseStatus != "open" {
-		if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,accused_npc_entity_id,board_id,accepted,outcome,created_at)
-			VALUES($1::uuid,$2::uuid,$3,$4,$5,false,'insufficient',$6) ON CONFLICT(server_id,account_id,case_id,accused_npc_entity_id) DO UPDATE SET board_id=EXCLUDED.board_id,accepted=false,outcome='insufficient',created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, request.AccusedID, request.BoardID, now.UTC()); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,accused_npc_entity_id,board_id,crime_ids,accepted,outcome,created_at)
+			VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,false,'insufficient',$7) ON CONFLICT(server_id,account_id,case_id,accused_npc_entity_id) DO UPDATE SET board_id=EXCLUDED.board_id,crime_ids=EXCLUDED.crime_ids,accepted=false,outcome='insufficient',created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, request.AccusedID, request.BoardID, request.CrimeIDs, now.UTC()); err != nil {
 			return AccusationResult{}, err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
@@ -2787,7 +3266,17 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 	}
 	// Authenticated case evidence has different probative strength. Context-only pins
 	// do not raise arrest odds; unrelated pins marked as proof lower them.
-	chance := accusationChance(request.AccusedID == killerID && request.VictimID == victimID, totalProofs, proofStrength)
+	victimMatches := request.VictimID != "" && request.VictimID == victimID
+	if !victimMatches && request.VictimID != "" {
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(
+			SELECT 1 FROM case_crime_participants participant JOIN case_crimes crime USING(server_id,crime_id)
+			WHERE participant.server_id=$1::uuid AND crime.case_id=$2 AND participant.npc_entity_id=$3 AND participant.participant_role='victim'
+			AND crime.occurred_at<=$4 AND (cardinality($5::text[])=0 OR crime.crime_id=ANY($5::text[])))`,
+			serverID, request.CaseID, request.VictimID, now.UTC(), request.CrimeIDs).Scan(&victimMatches); err != nil {
+			return AccusationResult{}, err
+		}
+	}
+	chance := accusationChance(request.AccusedID == killerID && victimMatches, totalProofs, proofStrength)
 	accepted := accusationAccepted(serverID, accountID, request.CaseID, chance)
 	outcome, subject, body := "insufficient", "Accusation review · Case decision", "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant."
 	if accepted {
@@ -2795,8 +3284,8 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		body = "The corporate review has authorized the arrest. The accused has been taken into custody, and the city police have been notified."
 	}
 	body += billDispatchPostscript(requestID)
-	if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,accused_npc_entity_id,board_id,accepted,outcome,created_at) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8)
-		ON CONFLICT(server_id,account_id,case_id,accused_npc_entity_id) DO UPDATE SET board_id=EXCLUDED.board_id,accepted=EXCLUDED.accepted,outcome=EXCLUDED.outcome,created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, request.AccusedID, request.BoardID, accepted, outcome, now.UTC()); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,accused_npc_entity_id,board_id,crime_ids,accepted,outcome,created_at) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8,$9)
+		ON CONFLICT(server_id,account_id,case_id,accused_npc_entity_id) DO UPDATE SET board_id=EXCLUDED.board_id,crime_ids=EXCLUDED.crime_ids,accepted=EXCLUDED.accepted,outcome=EXCLUDED.outcome,created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, request.AccusedID, request.BoardID, request.CrimeIDs, accepted, outcome, now.UTC()); err != nil {
 		return AccusationResult{}, err
 	}
 	if accepted {
@@ -2819,6 +3308,28 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		return AccusationResult{}, err
 	}
 	return AccusationResult{Accepted: accepted, Status: "completed"}, nil
+}
+
+func (store *PostgresStore) validateAccusationCrimeSnapshot(ctx context.Context, serverID string, request accusationPayload, now time.Time) error {
+	if request.CaseID == "" || len(request.CrimeIDs) == 0 {
+		return nil
+	}
+	var represented int
+	err := store.db.QueryRow(ctx, `SELECT count(DISTINCT evidence.crime_id)::integer
+		FROM (
+			SELECT server_id,case_id,crime_id,evidence_id AS item_id FROM case_evidence WHERE server_id=$1::uuid AND case_id=$2
+			UNION ALL SELECT server_id,case_id,crime_id,record_id FROM case_activity_records WHERE server_id=$1::uuid AND case_id=$2
+			UNION ALL SELECT server_id,case_id,crime_id,message_id FROM case_mail_messages WHERE server_id=$1::uuid AND case_id=$2
+		) evidence JOIN case_crimes crime USING(server_id,case_id,crime_id)
+		WHERE evidence.item_id=ANY($3::text[]) AND crime.crime_id=ANY($4::text[]) AND crime.occurred_at<=$5`,
+		serverID, request.CaseID, request.ProofIDs, request.CrimeIDs, now.UTC()).Scan(&represented)
+	if err != nil {
+		return err
+	}
+	if represented != len(request.CrimeIDs) {
+		return ErrInvalidProgress
+	}
+	return nil
 }
 
 func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, serverID, accountID, requestID string, request accusationPayload, now time.Time) (AccusationResult, error) {
@@ -2850,12 +3361,12 @@ func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, se
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))`, serverID, request.CaseID); err != nil {
 		return AccusationResult{}, err
 	}
-	var caseType, caseStatus, seed string
+	var caseType, caseStatus, seed, initialVictimID string
 	var worldVersion int
-	if err := tx.QueryRow(ctx, `SELECT c.case_type,s.status,w.world_seed,COALESCE(city_generator.generator_version,w.generator_version)
+	if err := tx.QueryRow(ctx, `SELECT c.case_type,s.status,w.world_seed,COALESCE(city_generator.generator_version,w.generator_version),COALESCE(c.victim_entity_id,'')
 		FROM cases c JOIN case_states s USING(server_id,case_id) JOIN worlds w USING(server_id)
 		LEFT JOIN world_city_generators city_generator ON city_generator.server_id=c.server_id AND city_generator.city_id=c.city_id
-		WHERE c.server_id=$1::uuid AND c.case_id=$2`, serverID, request.CaseID).Scan(&caseType, &caseStatus, &seed, &worldVersion); err != nil {
+		WHERE c.server_id=$1::uuid AND c.case_id=$2`, serverID, request.CaseID).Scan(&caseType, &caseStatus, &seed, &worldVersion, &initialVictimID); err != nil {
 		return AccusationResult{}, err
 	}
 	if caseStatus != "open" {
@@ -2879,6 +3390,16 @@ func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, se
 	var principalID string
 	if err := tx.QueryRow(ctx, `SELECT npc_entity_id FROM case_participants WHERE server_id=$1::uuid AND case_id=$2 AND participant_role='principal'`, serverID, request.CaseID).Scan(&principalID); err != nil {
 		return AccusationResult{}, err
+	}
+	victimMatches := request.VictimID != "" && request.VictimID == initialVictimID
+	if !victimMatches && request.VictimID != "" && caseType == "homicide" {
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(
+			SELECT 1 FROM case_crime_participants participant JOIN case_crimes crime USING(server_id,crime_id)
+			WHERE participant.server_id=$1::uuid AND crime.case_id=$2 AND participant.npc_entity_id=$3 AND participant.participant_role='victim'
+			AND crime.occurred_at<=$4 AND (cardinality($5::text[])=0 OR crime.crime_id=ANY($5::text[])))`,
+			serverID, request.CaseID, request.VictimID, now.UTC(), request.CrimeIDs).Scan(&victimMatches); err != nil {
+			return AccusationResult{}, err
+		}
 	}
 	lines := make([]string, 0, len(uniqueIDs))
 	anyArrest := false
@@ -2916,7 +3437,7 @@ func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, se
 		}
 		correctParticipant := participantRole == "principal" || participantRole == "accomplice"
 		if caseType == "homicide" {
-			correctParticipant = npcID == principalID && participantRole == "principal"
+			correctParticipant = npcID == principalID && participantRole == "principal" && victimMatches
 		}
 		var alreadyArrested bool
 		if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT value #>> '{}' FROM world_mutations WHERE server_id=$1::uuid AND entity_id=$2 AND field_key='status' ORDER BY mutation_order DESC LIMIT 1),'')='arrested'`, serverID, npcID).Scan(&alreadyArrested); err != nil {
@@ -2940,9 +3461,9 @@ func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, se
 				}
 			}
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,accused_npc_entity_id,board_id,accepted,outcome,created_at)
-			VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8) ON CONFLICT(server_id,account_id,case_id,accused_npc_entity_id)
-			DO UPDATE SET board_id=EXCLUDED.board_id,accepted=EXCLUDED.accepted,outcome=EXCLUDED.outcome,created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, npcID, request.BoardID, accepted, outcome, now.UTC()); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,accused_npc_entity_id,board_id,crime_ids,accepted,outcome,created_at)
+			VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(server_id,account_id,case_id,accused_npc_entity_id)
+			DO UPDATE SET board_id=EXCLUDED.board_id,crime_ids=EXCLUDED.crime_ids,accepted=EXCLUDED.accepted,outcome=EXCLUDED.outcome,created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, npcID, request.BoardID, request.CrimeIDs, accepted, outcome, now.UTC()); err != nil {
 			return AccusationResult{}, err
 		}
 		name := "the selected person"

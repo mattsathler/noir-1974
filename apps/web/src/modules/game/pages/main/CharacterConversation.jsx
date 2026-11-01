@@ -54,7 +54,7 @@ export default function CharacterConversation({ characterId, onClose }) {
 
   return <div className="character-conversation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="character-conversation__dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="character-conversation-name">
-      <header className="character-conversation__header"><span>SECURE LINE · SOURCE UNVERIFIED</span><button type="button" onClick={onClose} aria-label="End conversation">×</button></header>
+      <header className="character-conversation__header"><span>INCOMING MESSAGE · SOURCE UNVERIFIED</span><button type="button" onClick={onClose} aria-label="Close conversation">×</button></header>
       <div className={`character-conversation__portrait${characterId === "crow" ? " character-conversation__portrait--crow" : ""}`}>
         <ModularFace visual={character.visual} name={character.name} />
         {characterId === "crow" && <svg className="character-conversation__skull-mark" viewBox="0 0 16 16" role="img" aria-label="The Crow's skull mark">
