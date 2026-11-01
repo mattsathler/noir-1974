@@ -224,7 +224,7 @@ function browserAddress(program, facilityContext, cityId) {
   return networkSiteAddress(program, countryId, program.id);
 }
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onNotification, notifications = [], notificationsOpen = false, onToggleNotifications = () => {}, onCloseNotifications = () => {}, snackbar, onDismissSnackbar = () => {}, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, playerProgression = null, onProgressionChange = NOOP, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onNotification, notifications = [], notificationsOpen = false, onToggleNotifications = () => {}, onCloseNotifications = () => {}, onDeleteNotification = () => {}, snackbar, onDismissSnackbar = () => {}, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, playerProgression = null, onProgressionChange = NOOP, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
   const notifyNewPlayerMessage = useCallback((message) => onNotification?.({ type: "EMAIL", title: message.subject || "New email received", message: `From ${message.sender || "unknown sender"}.` }), [onNotification]);
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
@@ -533,7 +533,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       available: true,
       siteAddress: "merid//unionmercantile.123.223.76.1:4000/bank-website",
       accessedViaGhost: true,
-      hackedBankAccount: { id: account.id, name: account.name, bankAccountNumber: account.bankAccountNumber },
+      hackedBankAccount: { id: account.id, name: account.name, visual: account.visual, bankAccountNumber: account.bankAccountNumber },
     };
     document.documentElement.dataset.noirActiveComputerWindow = id;
     setWindows((previous) => [...previous, { id, program, zIndex, position, history: [], loading: false }]);
@@ -555,6 +555,22 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     }, sourceWindowId);
   }
 
+  async function openPatientSearchFromGhost(siteAddress, sourceWindowId) {
+    const locationId = localServiceLocationId(cityId, "hospital");
+    if (!locationId) throw new Error("THE LOCAL HOSPITAL SERVICE IS NOT AVAILABLE.");
+    const attempt = await requestFacilitySiteAccess({ kind: "hospital", locationId });
+    if (attempt.status !== "granted") throw new Error("HOSPITAL SITE ACCESS WAS DENIED.");
+    const accessId = String(attempt.attemptId);
+    setAccessAttemptId(accessId);
+    launchProgram({
+      ...PATIENT_SEARCH_PROGRAM,
+      siteAddress,
+      accessedViaGhost: true,
+      facilityLocationId: locationId,
+      accessAttemptId: accessId,
+    }, sourceWindowId);
+  }
+
   function launchProgram(program, sourceWindowId = null, sourceState = null, skipGhostkeyWarning = false) {
     if (!program?.available) return;
     if (["ghostkey", "proxy", "email-breaker", "bankrupt"].includes(program.id) && !skipGhostkeyWarning && !windows.some((item) => item.program.id === program.id)) {
@@ -566,7 +582,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       if (DESKTOP_APP_IDS.includes(program.id)) {
         const existingApp = windows.find((item) => item.program.id === program.id && (program.id !== "employee-directory" || item.program.companyRecord?.company?.id === program.companyRecord?.company?.id));
         if (existingApp) {
-          if (program.id === "gate-records" && program.accessAttemptId) {
+          if (["gate-records", "patient-search"].includes(program.id) && program.accessAttemptId) {
             const zIndex = nextZIndexRef.current++;
             document.documentElement.dataset.noirActiveComputerWindow = existingApp.id;
             setWindows((previous) => previous.map((item) => item.id === existingApp.id ? { ...item, program, zIndex, minimized: false } : item));
@@ -704,7 +720,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
           if (startMenuOpen && !event.target.closest(".computer-start-menu") && !event.target.closest(".computer-start")) setStartMenuOpen(false);
         }}>
           <div className="computer-screen__glass texture-scanlines" aria-hidden="true" />
-          <NotificationCenter notifications={notifications} open={notificationsOpen} onToggle={onToggleNotifications} onClose={onCloseNotifications} snackbar={snackbar} onDismissSnackbar={onDismissSnackbar} />
+          <NotificationCenter notifications={notifications} open={notificationsOpen} onToggle={onToggleNotifications} onClose={onCloseNotifications} onDelete={onDeleteNotification} snackbar={snackbar} onDismissSnackbar={onDismissSnackbar} />
           {booting && <div className={`computer-sequence computer-sequence--boot${showMeridianLogo ? " computer-sequence--logo" : ""}`} role="status" aria-live="polite">
             {showMeridianLogo ? <strong className="computer-sequence__brand" aria-label="Meridian OS"><span>M</span><span>OS</span></strong> : <div className="computer-sequence__bios">{BOOT_LINES.slice(0, bootLinesVisible).map((line, index) => <span key={`${line}-${index}`}>{line}</span>)}</div>}
           </div>}
@@ -792,7 +808,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "terminal"
                       ? <TerminalApp onRun={(programId) => launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : programId === "bankrupt" ? BANKRUPT_PROGRAM : EMAIL_BREAKER_PROGRAM)} />
                     : program.id === "ghostkey"
-                      ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => launchProgram({ ...PATIENT_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenGateRecords={(siteAddress) => openGateRecordsFromGhost(siteAddress, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
+                      ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => openPatientSearchFromGhost(siteAddress, id)} onOpenGateRecords={(siteAddress) => openGateRecordsFromGhost(siteAddress, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
                       : program.id === "email-breaker"
                         ? <EmailBreakerApp serverTime={serverTime} onOpenHackedMailbox={openHackedMailbox} />
                       : program.id === "bankrupt"
@@ -866,7 +882,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         {program.id === "case-files"
                           ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} timeZone={timeZone} onPrint={requestPrint} />
                           : program.id === "patient-search"
-                            ? <HospitalPatientSearch key={id} accessAttemptId={accessAttemptId} timeZone={timeZone} onPrint={requestPrint} onOpenPatient={(patient) => launchProgram({ id: "hospital-patient-record", label: patient.postMortem ? `POST-MORTEM FILE · ${patient.name}` : `PATIENT FILE · ${patient.name}`, state: "ONLINE", available: true, patient }, id)} />
+                            ? <HospitalPatientSearch key={id} accessAttemptId={program.accessAttemptId || accessAttemptId} timeZone={timeZone} onPrint={requestPrint} onOpenPatient={(patient) => launchProgram({ id: "hospital-patient-record", label: patient.postMortem ? `POST-MORTEM FILE · ${patient.name}` : `PATIENT FILE · ${patient.name}`, state: "ONLINE", available: true, patient }, id)} />
                             : program.id === "hospital-patient-record"
                               ? <HospitalPatientRecord key={`${id}:${program.patient?.id}`} patient={program.patient} timeZone={timeZone} onPrint={requestPrint} />
                             : program.id === "emails"

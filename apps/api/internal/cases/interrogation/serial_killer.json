@@ -1,0 +1,77 @@
+{
+  "shared": {
+    "routine": [
+      "{victim} kept receiving unsigned messages before the first attack.",
+      "The warnings mentioned an office and someone with a distinctive appearance."
+    ],
+    "associates": [
+      "{victim} trusted very few people with the letters. They showed one of them to me.",
+      "The messages became more frequent. {victim} was frightened, but did not know who sent them."
+    ],
+    "unusual": [
+      "One message gave a workplace clue. It also described {appearance}.",
+      "The letters repeated the same detail about {appearance}, but did not name the sender."
+    ],
+    "work": [
+      "The messages pointed toward an office. Someone at the right workplace may recognize {appearance}.",
+      "{victim} thought the sender worked in an office, but could not identify the person."
+    ],
+    "worries": [
+      "{victim} was terrified the writer could see their routine. Compare the appearance clues with staff directories.",
+      "I am afraid the writer knew where {victim} would be. The details about {appearance} may matter."
+    ]
+  },
+  "roles": {
+    "colleague": {
+      "routine": [
+        "{victim} showed me the warnings at work. The writer claimed to work in an office.",
+        "The letters described {appearance}. I cannot connect that description to a particular employee."
+      ],
+      "associates": [
+        "{victim} asked whether anyone at work matched the description {appearance}.",
+        "We compared the message with the staff directory, but the description alone was not enough."
+      ],
+      "unusual": [
+        "The sender knew when {victim} left work and hinted at an office job.",
+        "The same detail about {appearance} appeared in several messages. It was not a single frightened guess."
+      ],
+      "work": [
+        "Check the staff directory for someone matching {appearance}; one message points to the sender's workplace.",
+        "{victim} thought the writer had an office job. The physical description was {appearance}."
+      ],
+      "worries": [
+        "I do not want to accuse anyone from a description. Compare it with staff records.",
+        "The letters frightened {victim}. I can only tell you what they said about the office and appearance."
+      ]
+    },
+    "acquaintance": {
+      "routine": [
+        "{victim} showed me one of the unsigned warnings. It described {appearance}.",
+        "They received more than one threat. Each one made them more afraid to go out alone."
+      ],
+      "associates": [
+        "I was someone {victim} trusted. They asked me to remember the description {appearance}.",
+        "The letters said the writer had an office job. I never saw the sender myself."
+      ],
+      "unusual": [
+        "The sender knew details of {victim}'s routine and hinted at an office job.",
+        "The description {appearance} appeared in the threats before the death."
+      ],
+      "work": [
+        "{victim} believed the writer had an office job. Their letters described {appearance}.",
+        "I cannot name the sender, but the staff directory may narrow the search."
+      ],
+      "worries": [
+        "The threats were constant and terrifying. Please check the staff directories before the writer reaches someone else.",
+        "I am afraid the writer will contact another person. The letters mention {appearance} and their workplace."
+      ]
+    },
+    "perpetrator": {
+      "routine": ["I cannot help with unsigned messages or what {victim} may have believed."],
+      "associates": ["I have no knowledge of threats sent to {victim}."],
+      "unusual": ["I do not know why anyone would mention an office or {appearance} in a threatening letter."],
+      "work": ["I have nothing to say about the staff directories."],
+      "worries": ["I will not discuss the letters further."]
+    }
+  }
+}

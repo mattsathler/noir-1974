@@ -242,7 +242,8 @@ export default function GhostkeyExplorer({ countryId, countryName, onOpenPersonS
       return;
     }
     if (entry.kind === "patient-search") {
-      onOpenPatientSearch?.(selectedDirectory.siteAddress || selectedDirectory.address);
+      Promise.resolve(onOpenPatientSearch?.(selectedDirectory.siteAddress || selectedDirectory.address))
+        .catch((cause) => setError(cause.message || "THE HOSPITAL PATIENT RECORDS APPLICATION COULD NOT BE OPENED."));
       return;
     }
     if (entry.kind === "gate-records") {

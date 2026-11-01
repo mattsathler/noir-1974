@@ -26,6 +26,7 @@ import (
 )
 
 const defaultWorldServerID = "00000000-0000-4000-8000-000000000001"
+
 // Startup materializes the shared world before applying case backfills. On a
 // cold or heavily populated database this can take longer than a normal API
 // request, so give the complete startup sequence room to finish.
@@ -62,18 +63,22 @@ func main() {
 	}
 	defer pool.Close()
 
+	log.Printf("connecting to database")
 	if err := pool.Ping(ctx); err != nil {
 		log.Fatalf("connect to database: %v", err)
 	}
+	log.Printf("database connected; applying identity schema")
 
 	identityStore := identity.NewPostgresStore(pool)
 	if err := identityStore.Migrate(ctx); err != nil {
 		log.Fatalf("migrate identity schema: %v", err)
 	}
+	log.Printf("identity schema ready; applying world schema")
 	worldStore := world.NewPostgresStoreWithCacheObserver(pool, httpMetrics)
 	if err := worldStore.Migrate(ctx); err != nil {
 		log.Fatalf("migrate world schema: %v", err)
 	}
+	log.Printf("world schema ready; checking shared world")
 	worldServerID := os.Getenv("NOIR_WORLD_SERVER_ID")
 	if worldServerID == "" {
 		worldServerID = defaultWorldServerID
@@ -92,13 +97,16 @@ func main() {
 	} else if !errors.Is(configErr, world.ErrEntityNotFound) {
 		log.Fatalf("read shared world configuration: %v", configErr)
 	}
+	log.Printf("materializing shared world")
 	if err := worldStore.Materialize(ctx, worldServerID, worldSeed, worldVersion); err != nil {
 		log.Fatalf("materialize shared world: %v", err)
 	}
+	log.Printf("shared world ready; applying cases schema")
 	caseStore := cases.NewPostgresStore(pool)
 	if err := caseStore.Migrate(ctx); err != nil {
 		log.Fatalf("migrate cases schema: %v", err)
 	}
+	log.Printf("cases schema ready; preparing opening cases")
 	caseInterval := 30 * time.Minute
 	if configured := os.Getenv("NOIR_CASE_GENERATION_INTERVAL"); configured != "" {
 		caseInterval, err = time.ParseDuration(configured)
@@ -116,23 +124,28 @@ func main() {
 	if err := caseStore.EnsureGenerationSchedule(ctx, worldServerID, caseInterval); err != nil {
 		log.Fatalf("initialize recurring case schedule: %v", err)
 	}
+	log.Printf("case schedule ready; generating opening case")
 	generatedWorld, err := world.Generate(worldSeed, worldVersion)
 	if err != nil {
 		log.Fatalf("generate shared world: %v", err)
 	}
+	log.Printf("shared world snapshot generated; selecting opening case")
 	openingCase, err := cases.Generate(generatedWorld, worldSeed+"/opening-case", cases.GeneratorVersion)
 	if err != nil {
 		log.Fatalf("generate opening case: %v", err)
 	}
+	log.Printf("opening case generated; checking persistence")
 	openingCaseExists, err := caseStore.Exists(ctx, worldServerID, openingCase.ID)
 	if err != nil {
 		log.Fatalf("check opening case: %v", err)
 	}
 	if !openingCaseExists {
-		if err := caseStore.Create(ctx, worldServerID, generatedWorld, openingCase); err != nil {
+		log.Printf("persisting opening case")
+		if err := createCaseIfMissing(ctx, caseStore, worldServerID, generatedWorld, openingCase); err != nil {
 			log.Fatalf("persist opening case: %v", err)
 		}
 	}
+	log.Printf("opening case ready")
 	if openingCase.ArchetypeID != "financial_extortion" {
 		if _, err := ensureExtortionCase(ctx, caseStore, worldServerID, worldSeed, generatedWorld); err != nil {
 			log.Fatalf("persist opening extortion case: %v", err)
@@ -194,10 +207,25 @@ func ensureExtortionCase(ctx context.Context, store *cases.PostgresStore, server
 		if exists {
 			return definition, nil
 		}
-		if err := store.Create(ctx, serverID, base, definition); err != nil {
+		if err := createCaseIfMissing(ctx, store, serverID, base, definition); err != nil {
 			return cases.Definition{}, err
 		}
 		return definition, nil
 	}
 	return cases.Definition{}, errors.New("could not derive an extortion case from the generated world")
+}
+
+// createCaseIfMissing makes startup safe when another API process wins the
+// initial-case insert after this process has checked for the deterministic ID.
+func createCaseIfMissing(ctx context.Context, store *cases.PostgresStore, serverID string, base world.World, definition cases.Definition) error {
+	if err := store.Create(ctx, serverID, base, definition); err != nil {
+		exists, checkErr := store.Exists(ctx, serverID, definition.ID)
+		if checkErr != nil {
+			return fmt.Errorf("check case after create conflict: %w (create error: %v)", checkErr, err)
+		}
+		if !exists {
+			return err
+		}
+	}
+	return nil
 }

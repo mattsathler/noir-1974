@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { getStockMarket } from "../../../world/api.js";
 
+const MARKET_REFRESH_MS = 5 * 60 * 1000;
+
 const PAGES = [
   { id: "home", label: "HOME" },
   { id: "accounts", label: "ACCOUNTS & SAVINGS" },
@@ -28,8 +30,10 @@ export default function BankWebsite({ countryId = "", onOpenStockExchange = () =
 
   useEffect(() => {
     let active = true;
-    getStockMarket(marketPage).then((result) => { if (active) { setMarket(result); setMarketError(false); } }).catch(() => { if (active) setMarketError(true); });
-    return () => { active = false; };
+    const refreshQuotes = () => getStockMarket(marketPage).then((result) => { if (active) { setMarket(result); setMarketError(false); } }).catch(() => { if (active) setMarketError(true); });
+    void refreshQuotes();
+    const timer = window.setInterval(() => { void refreshQuotes(); }, MARKET_REFRESH_MS);
+    return () => { active = false; window.clearInterval(timer); };
   }, [countryId, marketPage]);
 
   useEffect(() => setMarketPage(1), [countryId]);
@@ -57,7 +61,7 @@ export default function BankWebsite({ countryId = "", onOpenStockExchange = () =
             </div>
           </section>
           <section className="bank-website__section bank-website__market-section"><div className="bank-website__section-heading"><div><p className="bank-website__eyebrow">THE UNION EXCHANGE</p><h2>Today on the market</h2></div><button type="button" onClick={() => setPage("exchange")}>MARKET REPORT »</button></div>
-            <p className="bank-website__muted">Closing quotations · Thursday, 29 October 1974 · Prices in Credits</p>
+            <p className="bank-website__muted">Independent company quotations · Updated every five minutes · Prices in Credits</p>
             <table className="bank-website__market-table"><thead><tr><th>LISTED COMPANY</th><th>HEAD OFFICE</th><th>INDEX</th><th>CHANGE</th><th>LAST</th></tr></thead><tbody>{market.listings.slice(0, 8).map((item) => <tr key={item.companyId}><td>{item.companyName}</td><td>{item.cityName}</td><td>{item.marketScore ?? 1000}</td><td>{formatMarketChange(item.changeBps)}</td><td>{formatCredits(item.priceCents)} cr</td></tr>)}</tbody></table>{marketError && <p className="bank-website__muted">National market quotations are temporarily unavailable.</p>}
             <button className="bank-website__exchange-link" type="button" onClick={onOpenStockExchange}>OPEN STOCK EXCHANGE APP ↗</button>
           </section>
@@ -78,7 +82,7 @@ export default function BankWebsite({ countryId = "", onOpenStockExchange = () =
 function BankSubpage({ page, label, market, marketError, marketPage, setMarketPage, onNavigate, onOpenStockExchange }) {
   const content = {
     accounts: { title: "Accounts for ordinary life", intro: "Union Mercantile branches provide household savings, wage accounts and settlement services. Account opening and private account matters are handled in person at your local counter.", sections: [["Passbook savings", "A dated passbook records deposits, withdrawals and credited interest. Bring your passbook when visiting the branch."], ["Wage accounts", "Arrange regular wage deposits through your employer and review entries with a bank clerk."], ["Household credit", "Loan terms depend on the purpose, repayment period and branch review. Speak with a clerk before submitting an application."]] },
-    exchange: { title: "The Union Exchange", intro: "A public summary of listed companies and national settlement notices. Quotations are published after the close of business and may change without notice.", sections: [["Daily quotations", "The market board lists the latest recorded share prices and the daily movement for participating national companies."], ["Business settlements", "Registered businesses may request transfers through their branch. Settlement instructions are reviewed during regular office hours."], ["Market conduct", "Customers should consult the published company notices before making investment decisions. The bank does not guarantee future performance."]] },
+    exchange: { title: "The Union Exchange", intro: "A public summary of listed companies and national settlement notices. Each company follows an independent five-minute quotation cycle; incidents are recorded in the firm's market history.", sections: [["Daily quotations", "The market board lists current share prices and movement for participating national companies."], ["Business settlements", "Registered businesses may request transfers through their branch. Settlement instructions are reviewed during regular office hours."], ["Market conduct", "Customers should consult the published company notices before making investment decisions. The bank does not guarantee future performance."]] },
     branches: { title: "Your local Meridian branch", intro: "Meridian counters are found in the principal commercial districts of connected cities. Visit during posted hours for account questions, deposits and passbook service.", sections: [["Counter hours", "Monday through Friday, 9:00 AM to 4:30 PM. Saturday, 9:00 AM to noon. Closed on national holidays."], ["What to bring", "Bring your passbook, account reference and a letter of introduction when requesting account service."], ["Customer correspondence", "Write to the Customer Office through your local branch. Include your return address and branch name."]] },
     notices: { title: "Notices to customers", intro: "Public notices from Union Mercantile Bank and its national branch offices.", sections: [["28 October · Autumn savings week", "Passbook reviews are available at all city branches from 3 to 8 November."], ["22 October · Holiday exchange hours", "National settlement desks will close at noon on 11 November. Local deposit counters remain open until noon."], ["16 October · Passbook reissue", "Customers may request a replacement passbook at their home branch. Identification and account reference are required."]] },
   }[page];

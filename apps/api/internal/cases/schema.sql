@@ -84,6 +84,12 @@ CREATE TABLE IF NOT EXISTS case_crimes (
     FOREIGN KEY (server_id, location_entity_id) REFERENCES world_entities(server_id, entity_id)
 );
 ALTER TABLE case_crimes ADD COLUMN IF NOT EXISTS parent_crime_id text;
+-- Existing installations may have created this table before the case-scoped
+-- unique key was added. PostgreSQL needs an exact unique index for the
+-- composite self-reference below, even though (server_id, crime_id) is also
+-- the primary key.
+CREATE UNIQUE INDEX IF NOT EXISTS case_crimes_server_case_crime_fk_idx
+    ON case_crimes(server_id, case_id, crime_id);
 ALTER TABLE case_crimes DROP CONSTRAINT IF EXISTS case_crimes_server_id_case_id_parent_crime_id_fkey;
 ALTER TABLE case_crimes ADD CONSTRAINT case_crimes_server_id_case_id_parent_crime_id_fkey
     FOREIGN KEY (server_id, case_id, parent_crime_id) REFERENCES case_crimes(server_id, case_id, crime_id);
@@ -261,6 +267,7 @@ CREATE TABLE IF NOT EXISTS case_evolution_jobs (
     case_id text NOT NULL,
     event_key text NOT NULL CHECK (event_key <> ''),
     event_type text NOT NULL CHECK (event_type <> ''),
+    target_npc_entity_id text,
     plan_version integer NOT NULL DEFAULT 1 CHECK (plan_version > 0),
     available_at timestamptz NOT NULL,
     status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled')),
@@ -269,6 +276,7 @@ CREATE TABLE IF NOT EXISTS case_evolution_jobs (
     FOREIGN KEY (server_id, case_id) REFERENCES cases(server_id, case_id) ON DELETE CASCADE
 );
 ALTER TABLE case_evolution_jobs ADD COLUMN IF NOT EXISTS plan_version integer NOT NULL DEFAULT 1;
+ALTER TABLE case_evolution_jobs ADD COLUMN IF NOT EXISTS target_npc_entity_id text;
 CREATE INDEX IF NOT EXISTS case_evolution_jobs_due_idx
     ON case_evolution_jobs(server_id, available_at, case_id) WHERE status='pending';
 INSERT INTO case_evolution_jobs(server_id,case_id,event_key,event_type,available_at)

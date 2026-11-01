@@ -2926,13 +2926,32 @@ func (store *PostgresStore) EmployeeByBankAccount(ctx context.Context, serverID,
 		return CompanyEmployee{}, ErrEntityNotFound
 	}
 	var employee CompanyEmployee
-	err := store.db.QueryRow(ctx, `SELECT npc_id,name,email,role,status,account_number FROM world_staff_account_directory
-	 WHERE server_id=$1::uuid AND account_number=$2`, serverID, accountNumber).
-		Scan(&employee.ID, &employee.Name, &employee.Email, &employee.Role, &employee.Status, &employee.BankAccount)
+	var seed, generationKey string
+	var version int
+	err := store.db.QueryRow(ctx, `SELECT d.npc_id,d.name,d.email,d.role,d.status,d.account_number,e.generation_key,w.world_seed,
+		COALESCE(city_generator.generator_version,w.generator_version)
+		FROM world_staff_account_directory d
+		JOIN world_entities e ON e.server_id=d.server_id AND e.entity_id=d.npc_id AND e.entity_type='npc'
+		JOIN worlds w ON w.server_id=d.server_id
+		LEFT JOIN world_city_generators city_generator
+		  ON city_generator.server_id=e.server_id AND city_generator.city_id=split_part(e.region_id,'/district/',1)
+		WHERE d.server_id=$1::uuid AND d.account_number=$2`, serverID, accountNumber).
+		Scan(&employee.ID, &employee.Name, &employee.Email, &employee.Role, &employee.Status, &employee.BankAccount, &generationKey, &seed, &version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return CompanyEmployee{}, ErrEntityNotFound
 	}
-	return employee, err
+	if err != nil {
+		return CompanyEmployee{}, err
+	}
+	npc, err := GenerateNPCFromKey(seed, version, generationKey)
+	if err != nil {
+		return CompanyEmployee{}, err
+	}
+	if npc.ID != employee.ID {
+		return CompanyEmployee{}, ErrGeneratedConflict
+	}
+	employee.Visual = npc.Visual
+	return employee, nil
 }
 
 func (store *PostgresStore) indexStaffEmailAddresses(ctx context.Context, serverID string, employees []CompanyEmployee) error {

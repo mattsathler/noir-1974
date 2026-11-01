@@ -16,6 +16,12 @@ O dossiê público de Crime Reports identifica a empresa e disponibiliza documen
 
 O validador comum verifica seed/versão/ID, vítimas e culpados existentes e distintos, local existente, relações válidas do mundo, compatibilidade das relações com o arquétipo e evidências alcançáveis. As regras específicas de cada arquétipo ficam isoladas em seus geradores e validadores, para que novas motivações não ampliem as condições do arquétipo de trabalho.
 
+### Assassino em série (gerador v8)
+
+`serial_killer` é uma nova versão de caso; seeds v3–v7 continuam usando as opções e a seleção que já tinham. O gerador exige um assassino empregado, vítimas na mesma cidade e vínculos existentes que permitam ao jogador escrever para ao menos um colega ou pessoa próxima da vítima. A primeira vítima abre o caso; um alvo futuro por vez fica apenas no plano interno. O worker emite ameaças anônimas e, dois dias depois, o homicídio; depois do ataque, agenda o próximo alvo enquanto o caso continua aberto e o assassino segue vivo. O worker registra cada etapa quando ocorre, vincula o evento ao anterior e só então publica timeline, mensagens e prova.
+
+As ameaças são frequentes e escalonam. O nome exato do empregador aparece em apenas uma das cinco mensagens iniciais; as demais dão pistas indiretas e repetem a aparência física. Nas etapas posteriores, as ameaças não repetem o nome da empresa. Colegas e companheiros da vítima podem confirmar por email os detalhes sem entregar novamente o empregador. Assim, cruzar aquela única referência com a descrição e o diretório de staff é a principal dedução. Os IDs dos alvos futuros não fazem parte da API pública antes dos eventos.
+
 ## Persistência e estado
 
 - `cases` guarda a definição compacta: seed, versão, tipo, arquétipo, motivação, empresa afetada e os IDs opcionais de vítima e cena/local. `killer_entity_id` é legado e guarda o autor principal; decisões atuais usam participantes.

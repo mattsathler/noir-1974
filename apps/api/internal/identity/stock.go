@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -23,6 +24,7 @@ var (
 const (
 	stockPageSize       = 25
 	stockOrderMaxShares = 10000
+	stockMarketTick     = 5 * time.Minute
 )
 
 type playerProgression struct {
@@ -56,9 +58,15 @@ type stockPosition struct {
 }
 
 type companyMarketSnapshot struct {
-	Score       int
-	ChangeBps   int64
-	LastEventAt string
+	Score           int
+	ChangeBps       int64
+	MarketFactorBps int64
+	LastEventAt     string
+}
+
+type marketMovement struct {
+	factorBps int64
+	changeBps int64
 }
 
 type companyMarketEvent struct {
@@ -88,6 +96,46 @@ func stockQuoteCents(countryID, companyID string, marketScore int) int64 {
 	return (base*int64(marketScore) + 500) / 1000
 }
 
+// companyMarketMovement derives an independent smooth cycle from the server
+// seed, company ID, and current five-minute interval. It needs no database writes.
+func companyMarketMovement(serverID, companyID string, now time.Time) marketMovement {
+	bucketSeconds := int64(stockMarketTick / time.Second)
+	bucket := now.UTC().Unix() / bucketSeconds
+	digest := sha256.Sum256([]byte("noir-company-market-v1\x00" + serverID + "\x00" + companyID))
+	phase := func(offset int) float64 {
+		value := binary.BigEndian.Uint16(digest[offset : offset+2])
+		return float64(value) / float64(^uint16(0)) * 2 * math.Pi
+	}
+	level := func(index int64) int64 {
+		point := float64(index)
+		fastPeriod := 8 + int(digest[8]%10)
+		midPeriod := 36 + int(digest[9]%45)
+		slowPeriod := 168 + int(digest[10]%168)
+		fastAmplitude := 20 + int(digest[11]%31)
+		midAmplitude := 14 + int(digest[12]%27)
+		slowAmplitude := 7 + int(digest[13]%18)
+		value := float64(fastAmplitude)*math.Sin(2*math.Pi*point/float64(fastPeriod)+phase(0)) +
+			float64(midAmplitude)*math.Sin(2*math.Pi*point/float64(midPeriod)+phase(2)) +
+			float64(slowAmplitude)*math.Sin(2*math.Pi*point/float64(slowPeriod)+phase(4))
+		return int64(math.Round(value))
+	}
+	current, previous := level(bucket), level(bucket-1)
+	change := int64(math.Round((float64(10000+current)/float64(10000+previous) - 1) * 10000))
+	return marketMovement{factorBps: current, changeBps: change}
+}
+
+func applyMarketFactor(value int64, factorBps int64) int64 {
+	return (value*(10000+factorBps) + 5000) / 10000
+}
+
+func applyMarketScoreFactor(score int, factorBps int64) int {
+	return int(applyMarketFactor(int64(score), factorBps))
+}
+
+func combineMarketChanges(companyBps, fluctuationBps int64) int64 {
+	return int64(math.Round(float64(10000+companyBps)*float64(10000+fluctuationBps)/10000 - 10000))
+}
+
 func (s *postgresStore) companyMarketSnapshots(ctx context.Context, serverID string, companyIDs []string) (map[string]companyMarketSnapshot, error) {
 	queryer, ok := s.db.(interface {
 		Query(context.Context, string, ...any) (pgx.Rows, error)
@@ -108,12 +156,16 @@ func (s *postgresStore) companyMarketSnapshots(ctx context.Context, serverID str
 	}
 	defer rows.Close()
 	result := make(map[string]companyMarketSnapshot, len(companyIDs))
+	now := time.Now().UTC()
 	for rows.Next() {
 		var companyID string
 		var snapshot companyMarketSnapshot
 		if err := rows.Scan(&companyID, &snapshot.Score, &snapshot.ChangeBps, &snapshot.LastEventAt); err != nil {
 			return nil, err
 		}
+		movement := companyMarketMovement(serverID, companyID, now)
+		snapshot.ChangeBps = combineMarketChanges(snapshot.ChangeBps, movement.changeBps)
+		snapshot.MarketFactorBps = movement.factorBps
 		result[companyID] = snapshot
 	}
 	return result, rows.Err()
@@ -182,12 +234,16 @@ func (s *postgresStore) playerStockPortfolio(ctx context.Context, accountID, ser
 	}
 	defer rows.Close()
 	positions := make([]stockPosition, 0)
+	now := time.Now().UTC()
 	for rows.Next() {
 		var position stockPosition
 		if err := rows.Scan(&position.CompanyID, &position.CompanyName, &position.CountryID, &position.CityName, &position.Shares, &position.AverageCostCents, &position.MarketScore, &position.ChangeBps, &position.LastEventAt); err != nil {
 			return playerProgression{}, nil, err
 		}
-		position.PriceCents = stockQuoteCents(position.CountryID, position.CompanyID, position.MarketScore)
+		movement := companyMarketMovement(serverID, position.CompanyID, now)
+		position.ChangeBps = combineMarketChanges(position.ChangeBps, movement.changeBps)
+		position.PriceCents = applyMarketFactor(stockQuoteCents(position.CountryID, position.CompanyID, position.MarketScore), movement.factorBps)
+		position.MarketScore = applyMarketScoreFactor(position.MarketScore, movement.factorBps)
 		if position.Shares > math.MaxInt64/position.PriceCents {
 			return playerProgression{}, nil, errors.New("stock position value overflow")
 		}
@@ -235,7 +291,10 @@ func (s *postgresStore) executeStockOrder(ctx context.Context, accountID, server
 		FROM company_market_scores WHERE server_id=$1::uuid AND company_id=$2 FOR SHARE`, serverID, listing.CompanyID).Scan(&listing.MarketScore); err != nil {
 		return 0, err
 	}
-	listing.PriceCents = stockQuoteCents(listing.CountryID, listing.CompanyID, listing.MarketScore)
+	baseMarketScore := listing.MarketScore
+	movement := companyMarketMovement(serverID, listing.CompanyID, time.Now().UTC())
+	listing.PriceCents = applyMarketFactor(stockQuoteCents(listing.CountryID, listing.CompanyID, baseMarketScore), movement.factorBps)
+	listing.MarketScore = applyMarketScoreFactor(baseMarketScore, movement.factorBps)
 	var eventAt string
 	err = tx.QueryRow(ctx, `SELECT score_before,score_after,
 		COALESCE(ROUND((score_after-score_before)*10000.0/NULLIF(score_before,0)),0)::bigint,
@@ -245,6 +304,7 @@ func (s *postgresStore) executeStockOrder(ctx context.Context, accountID, server
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return 0, err
 	}
+	listing.ChangeBps = combineMarketChanges(listing.ChangeBps, movement.changeBps)
 	listing.LastEventAt = eventAt
 	if input.Shares > math.MaxInt64/listing.PriceCents {
 		return 0, errors.New("stock order value is too large")

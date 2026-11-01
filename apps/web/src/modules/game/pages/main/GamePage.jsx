@@ -66,6 +66,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const closeConversation = useCallback(() => setConversationCharacter(""), []);
   const closeNotifications = useCallback(() => setNotificationsOpen(false), []);
   const toggleNotifications = useCallback(() => setNotificationsOpen((open) => !open), []);
+  const deleteNotification = useCallback((notificationId) => setNotifications((current) => current.filter((item) => item.id !== notificationId)), []);
   const notify = useCallback((notification) => {
     const id = `${Date.now()}-${notificationSequence.current++}`;
     const item = { ...notification, id, time: new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date()) };
@@ -198,6 +199,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           notificationsOpen={notificationsOpen}
           onToggleNotifications={toggleNotifications}
           onCloseNotifications={closeNotifications}
+          onDeleteNotification={deleteNotification}
           snackbar={snackbar}
           onDismissSnackbar={() => setSnackbar(null)}
           onOpenWhiteboard={() => window.open("/whiteboard", "_blank", "noopener,noreferrer")}

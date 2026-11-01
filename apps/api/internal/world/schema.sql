@@ -152,9 +152,10 @@ CREATE TABLE IF NOT EXISTS world_mutations (
 );
 -- Earlier schemas allowed only alive/dead. Keep existing QA and deployed tables in
 -- sync with the status values already accepted by the world store.
-ALTER TABLE world_mutations DROP CONSTRAINT IF EXISTS world_mutations_value_check;
-ALTER TABLE world_mutations ADD CONSTRAINT world_mutations_value_check CHECK (
-    jsonb_typeof(value) = 'string' AND value #>> '{}' IN ('alive', 'missing', 'dead', 'arrested')
-);
+ALTER TABLE world_mutations
+    DROP CONSTRAINT IF EXISTS world_mutations_value_check,
+    ADD CONSTRAINT world_mutations_value_check CHECK (
+        jsonb_typeof(value) = 'string' AND value #>> '{}' IN ('alive', 'missing', 'dead', 'arrested')
+    );
 CREATE INDEX IF NOT EXISTS world_mutations_by_entity_order_idx
     ON world_mutations(server_id, entity_id, mutation_order DESC);

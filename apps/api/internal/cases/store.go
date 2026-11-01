@@ -13,6 +13,7 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -297,6 +298,7 @@ type PublicCase struct {
 	ID               string                `json:"id"`
 	CityID           string                `json:"cityId"`
 	CaseType         string                `json:"caseType"`
+	ArchetypeID      string                `json:"-"`
 	VictimID         string                `json:"victimId,omitempty"`
 	VictimName       string                `json:"victimName,omitempty"`
 	VictimVisual     *world.VisualIdentity `json:"victimVisual,omitempty"`
@@ -587,12 +589,12 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 		SELECT c.case_id,c.archetype_id,
 		       victim.generation_key, killer.generation_key,
 	       CASE WHEN c.killer_entity_id = $2 THEN 'perpetrator'
-	            WHEN c.victim_entity_id = $2 THEN 'acquaintance'
+	            WHEN current_victim.entity_id = $2 THEN 'acquaintance'
 	            WHEN EXISTS (
 	              SELECT 1 FROM personal_relationships direct_relation
 	              WHERE direct_relation.server_id = c.server_id
-	                AND ((direct_relation.person_a_npc_id = $2 AND direct_relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
-	                  OR (direct_relation.person_b_npc_id = $2 AND direct_relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
+	                AND ((direct_relation.person_a_npc_id = $2 AND direct_relation.person_b_npc_id IN (current_victim.entity_id,c.killer_entity_id))
+	                  OR (direct_relation.person_b_npc_id = $2 AND direct_relation.person_a_npc_id IN (current_victim.entity_id,c.killer_entity_id)))
 	            ) THEN 'acquaintance'
 	            WHEN EXISTS (
 	              SELECT 1 FROM employment_relationships principal_job
@@ -600,36 +602,42 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 	                ON caller_job.server_id = principal_job.server_id
 	               AND caller_job.employer_company_id = principal_job.employer_company_id
 	              WHERE principal_job.server_id = c.server_id
-	                AND principal_job.employee_npc_id IN (c.victim_entity_id,c.killer_entity_id)
+	                AND principal_job.employee_npc_id IN (current_victim.entity_id,c.killer_entity_id)
 	                AND caller_job.employee_npc_id = $2
 	            ) THEN 'colleague' ELSE 'acquaintance' END
 		FROM cases c
 	JOIN case_states s USING (server_id, case_id)
-	JOIN world_entities victim ON victim.server_id = c.server_id AND victim.entity_id = c.victim_entity_id
+	JOIN LATERAL (
+	  SELECT participant.npc_entity_id AS entity_id
+	  FROM case_crimes crime JOIN case_crime_participants participant USING(server_id,crime_id)
+	  WHERE crime.server_id=c.server_id AND crime.case_id=c.case_id AND participant.participant_role='victim' AND crime.occurred_at<=now()
+	  ORDER BY crime.crime_sequence DESC LIMIT 1
+	) current_victim ON true
+	JOIN world_entities victim ON victim.server_id = c.server_id AND victim.entity_id = current_victim.entity_id
 	JOIN world_entities killer ON killer.server_id = c.server_id AND killer.entity_id = c.killer_entity_id
 	WHERE c.server_id = $1::uuid AND s.status = 'open'
-	  AND (c.killer_entity_id = $2 OR c.victim_entity_id = $2 OR EXISTS (
+	  AND (c.killer_entity_id = $2 OR current_victim.entity_id = $2 OR EXISTS (
 	    SELECT 1 FROM employment_relationships victim_job
 	    JOIN employment_relationships caller_job
 	      ON caller_job.server_id = victim_job.server_id
 	     AND caller_job.employer_company_id = victim_job.employer_company_id
 	    WHERE victim_job.server_id = c.server_id
-	      AND victim_job.employee_npc_id IN (c.victim_entity_id,c.killer_entity_id)
+	      AND victim_job.employee_npc_id IN (current_victim.entity_id,c.killer_entity_id)
 	      AND caller_job.employee_npc_id = $2
 	  ) OR EXISTS (
 	    SELECT 1 FROM personal_relationships relation
 	    WHERE relation.server_id = c.server_id
-	      AND ((relation.person_a_npc_id = $2 AND relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
-	        OR (relation.person_b_npc_id = $2 AND relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
+	      AND ((relation.person_a_npc_id = $2 AND relation.person_b_npc_id IN (current_victim.entity_id,c.killer_entity_id))
+	        OR (relation.person_b_npc_id = $2 AND relation.person_a_npc_id IN (current_victim.entity_id,c.killer_entity_id)))
 	  ))
 	ORDER BY CASE
 	           WHEN c.killer_entity_id = $2 THEN 0
-	           WHEN c.victim_entity_id = $2 THEN 1
+	           WHEN current_victim.entity_id = $2 THEN 1
 	           WHEN EXISTS (
 	             SELECT 1 FROM personal_relationships relation
 	             WHERE relation.server_id = c.server_id
-	               AND ((relation.person_a_npc_id = $2 AND relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
-	                 OR (relation.person_b_npc_id = $2 AND relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
+	               AND ((relation.person_a_npc_id = $2 AND relation.person_b_npc_id IN (current_victim.entity_id,c.killer_entity_id))
+	                 OR (relation.person_b_npc_id = $2 AND relation.person_a_npc_id IN (current_victim.entity_id,c.killer_entity_id)))
 	           ) THEN 2
 	           ELSE 3
 	         END,
@@ -662,8 +670,8 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 			}
 			contextFound = true
 		}
-		mergeInterrogationAnswers(answers, caseFile.Shared.answers(), map[string]string{"victim": victim.Name}, 1, caseID+"/shared/"+npcID)
-		mergeInterrogationAnswers(answers, branch.answers(), map[string]string{"victim": victim.Name, "suspect": killer.Name}, 2, caseID+"/role/"+npcID)
+		mergeInterrogationAnswers(answers, caseFile.Shared.answers(), map[string]string{"victim": victim.Name, "appearance": killer.Appearance}, 1, caseID+"/shared/"+npcID)
+		mergeInterrogationAnswers(answers, branch.answers(), map[string]string{"victim": victim.Name, "suspect": killer.Name, "appearance": killer.Appearance}, 2, caseID+"/role/"+npcID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1650,16 +1658,39 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 	); err != nil {
 		return fmt.Errorf("persist initial shared case state: %w", err)
 	}
-	if contains([]string{"embezzlement", "financial_extortion", "accounting_fraud"}, definition.CaseType) {
+	if contains([]string{"embezzlement", "financial_extortion", "accounting_fraud"}, definition.CaseType) && hasCompanyHeadquarters(base, definition.CompanyID) {
 		if _, err := tx.Exec(ctx, `INSERT INTO case_evolution_jobs(server_id,case_id,event_key,event_type,available_at)
 			VALUES($1::uuid,$2,'financial-cover-up','financial_cover_up',now()+interval '3 minutes') ON CONFLICT DO NOTHING`, serverID, definition.ID); err != nil {
 			return fmt.Errorf("schedule financial case evolution: %w", err)
+		}
+	}
+	if definition.ArchetypeID == "serial_killer" {
+		for index, targetID := range definition.FutureVictimIDs {
+			threatAt := time.Now().UTC().Add(time.Duration(index*2+1) * 24 * time.Hour)
+			attackAt := threatAt.Add(24 * time.Hour)
+			if _, err := tx.Exec(ctx, `INSERT INTO case_evolution_jobs(server_id,case_id,event_key,event_type,target_npc_entity_id,available_at)
+				VALUES($1::uuid,$2,$3,'serial_threat',$4,$5) ON CONFLICT DO NOTHING`, serverID, definition.ID, fmt.Sprintf("serial-threat-%d", index+1), targetID, threatAt); err != nil {
+				return fmt.Errorf("schedule serial threat: %w", err)
+			}
+			if _, err := tx.Exec(ctx, `INSERT INTO case_evolution_jobs(server_id,case_id,event_key,event_type,target_npc_entity_id,available_at)
+				VALUES($1::uuid,$2,$3,'serial_homicide',$4,$5) ON CONFLICT DO NOTHING`, serverID, definition.ID, fmt.Sprintf("serial-homicide-%d", index+1), targetID, attackAt); err != nil {
+				return fmt.Errorf("schedule serial homicide: %w", err)
+			}
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit case creation: %w", err)
 	}
 	return nil
+}
+
+func hasCompanyHeadquarters(base world.World, companyID string) bool {
+	for _, relation := range base.CompanyLocations {
+		if relation.CompanyID == companyID && relation.LocationRole == "headquarters" {
+			return true
+		}
+	}
+	return false
 }
 
 // AppendCrime adds one occurred crime to an open investigation. sourceKey is
@@ -1841,13 +1872,13 @@ func (store *PostgresStore) AttachCrimeEvidence(ctx context.Context, serverID, c
 }
 
 type dueEvolutionJob struct {
-	caseID, companyID, locationID string
-	principalID, accompliceID     string
-	eventType                     string
-	seed                          string
-	worldVersion                  int
-	planVersion                   int
-	scheduledAt                   time.Time
+	caseID, cityID, companyID, locationID string
+	principalID, accompliceID             string
+	eventKey, eventType, targetID         string
+	seed                                  string
+	worldVersion                          int
+	planVersion                           int
+	scheduledAt                           time.Time
 }
 
 // ProcessDueCaseEvolution advances one queued, backend-only event at a time.
@@ -1863,7 +1894,8 @@ func (store *PostgresStore) ProcessDueCaseEvolution(ctx context.Context, serverI
 		AND j.status='pending' AND s.status<>'open'`, serverID, now.UTC()); err != nil {
 		return fmt.Errorf("cancel closed case evolution jobs: %w", err)
 	}
-	rows, err := tx.Query(ctx, `SELECT j.case_id,COALESCE(c.company_id,''),COALESCE(c.location_entity_id,''),j.event_type,
+	rows, err := tx.Query(ctx, `SELECT j.case_id,c.city_id,COALESCE(c.company_id,''),COALESCE(c.location_entity_id,
+		(SELECT cl.location_id FROM company_locations cl WHERE cl.server_id=c.server_id AND cl.company_id=c.company_id AND cl.location_role='headquarters' ORDER BY cl.relationship_id LIMIT 1),''),j.event_key,j.event_type,COALESCE(j.target_npc_entity_id,''),
 		COALESCE((SELECT npc_entity_id FROM case_participants p WHERE p.server_id=c.server_id AND p.case_id=c.case_id AND p.participant_role='principal' ORDER BY npc_entity_id LIMIT 1),''),
 		COALESCE((SELECT npc_entity_id FROM case_participants p WHERE p.server_id=c.server_id AND p.case_id=c.case_id AND p.participant_role='accomplice' ORDER BY npc_entity_id LIMIT 1),''),
 		w.world_seed,COALESCE(city_generator.generator_version,w.generator_version),j.plan_version,j.available_at
@@ -1877,7 +1909,7 @@ func (store *PostgresStore) ProcessDueCaseEvolution(ctx context.Context, serverI
 	jobs := make([]dueEvolutionJob, 0, 10)
 	for rows.Next() {
 		var item dueEvolutionJob
-		if err := rows.Scan(&item.caseID, &item.companyID, &item.locationID, &item.eventType, &item.principalID, &item.accompliceID, &item.seed, &item.worldVersion, &item.planVersion, &item.scheduledAt); err != nil {
+		if err := rows.Scan(&item.caseID, &item.cityID, &item.companyID, &item.locationID, &item.eventKey, &item.eventType, &item.targetID, &item.principalID, &item.accompliceID, &item.seed, &item.worldVersion, &item.planVersion, &item.scheduledAt); err != nil {
 			rows.Close()
 			return err
 		}
@@ -1892,21 +1924,34 @@ func (store *PostgresStore) ProcessDueCaseEvolution(ctx context.Context, serverI
 		if job.planVersion != 1 {
 			return fmt.Errorf("case %s uses unsupported evolution plan version %d", job.caseID, job.planVersion)
 		}
-		if job.eventType != "financial_cover_up" {
-			return fmt.Errorf("case %s uses unsupported evolution event %q", job.caseID, job.eventType)
-		}
 		var caseStatus string
 		if err := tx.QueryRow(ctx, `SELECT status FROM case_states WHERE server_id=$1::uuid AND case_id=$2 FOR UPDATE`, serverID, job.caseID).Scan(&caseStatus); err != nil {
 			return fmt.Errorf("lock case state before evolution: %w", err)
 		}
 		if caseStatus != "open" {
-			if _, err := tx.Exec(ctx, `UPDATE case_evolution_jobs SET status='cancelled',completed_at=$3 WHERE server_id=$1::uuid AND case_id=$2 AND event_key='financial-cover-up' AND status='pending'`, serverID, job.caseID, now.UTC()); err != nil {
+			if _, err := tx.Exec(ctx, `UPDATE case_evolution_jobs SET status='cancelled',completed_at=$3 WHERE server_id=$1::uuid AND case_id=$2 AND event_key=$4 AND status='pending'`, serverID, job.caseID, now.UTC(), job.eventKey); err != nil {
 				return err
 			}
 			continue
 		}
+		if strings.HasPrefix(job.eventType, "serial_") {
+			if job.planVersion != 1 || job.principalID == "" || job.targetID == "" {
+				return fmt.Errorf("case %s has an incomplete serial evolution plan", job.caseID)
+			}
+			if err := processSerialEvolutionJob(ctx, tx, serverID, job); err != nil {
+				return err
+			}
+			continue
+		}
+		if job.eventType != "financial_cover_up" || job.planVersion != 1 {
+			return fmt.Errorf("case %s uses unsupported evolution event %q version %d", job.caseID, job.eventType, job.planVersion)
+		}
 		if job.principalID == "" || job.accompliceID == "" || job.locationID == "" {
-			return fmt.Errorf("case %s has an incomplete financial evolution plan", job.caseID)
+			if _, err := tx.Exec(ctx, `UPDATE case_evolution_jobs SET status='cancelled',completed_at=$3
+				WHERE server_id=$1::uuid AND case_id=$2 AND event_key=$4 AND status='pending'`, serverID, job.caseID, now.UTC(), job.eventKey); err != nil {
+				return fmt.Errorf("cancel incomplete financial evolution plan for case %s: %w", job.caseID, err)
+			}
+			continue
 		}
 		var actorStatus string
 		if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT value #>> '{}' FROM world_mutations WHERE server_id=$1::uuid AND entity_id=$2 AND field_key='status' AND created_at<=$3 ORDER BY mutation_order DESC LIMIT 1),'alive')`, serverID, job.accompliceID, job.scheduledAt).Scan(&actorStatus); err != nil {
@@ -2023,6 +2068,197 @@ func worldGenerationKeyForNPC(ctx context.Context, tx pgx.Tx, serverID, npcID st
 	var key string
 	err := tx.QueryRow(ctx, `SELECT generation_key FROM world_entities WHERE server_id=$1::uuid AND entity_id=$2 AND entity_type='npc'`, serverID, npcID).Scan(&key)
 	return key, err
+}
+
+func processSerialEvolutionJob(ctx context.Context, tx pgx.Tx, serverID string, job dueEvolutionJob) error {
+	var actorStatus, targetStatus string
+	for npcID, status := range map[string]*string{job.principalID: &actorStatus, job.targetID: &targetStatus} {
+		if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT value #>> '{}' FROM world_mutations WHERE server_id=$1::uuid AND entity_id=$2 AND field_key='status' AND created_at<=$3 ORDER BY mutation_order DESC LIMIT 1),'alive')`, serverID, npcID, job.scheduledAt).Scan(status); err != nil {
+			return fmt.Errorf("read serial case participant status: %w", err)
+		}
+	}
+	if actorStatus != "alive" || targetStatus != "alive" {
+		if _, err := tx.Exec(ctx, `UPDATE case_evolution_jobs SET status='cancelled',completed_at=now() WHERE server_id=$1::uuid AND case_id=$2 AND event_key=$3`, serverID, job.caseID, job.eventKey); err != nil {
+			return fmt.Errorf("cancel unavailable serial case event: %w", err)
+		}
+		return nil
+	}
+	actorKey, err := worldGenerationKeyForNPC(ctx, tx, serverID, job.principalID)
+	if err != nil {
+		return fmt.Errorf("load serial killer key: %w", err)
+	}
+	targetKey, err := worldGenerationKeyForNPC(ctx, tx, serverID, job.targetID)
+	if err != nil {
+		return fmt.Errorf("load serial victim key: %w", err)
+	}
+	actor, err := world.GenerateNPCFromKey(job.seed, job.worldVersion, actorKey)
+	if err != nil {
+		return err
+	}
+	target, err := world.GenerateNPCFromKey(job.seed, job.worldVersion, targetKey)
+	if err != nil {
+		return err
+	}
+	crimeID := job.caseID + "/crime/" + job.eventKey
+	parentID := job.caseID + "/crime/1"
+	if err := tx.QueryRow(ctx, `SELECT crime_id FROM case_crimes WHERE server_id=$1::uuid AND case_id=$2 AND occurred_at<=$3 ORDER BY occurred_at DESC,crime_sequence DESC LIMIT 1`, serverID, job.caseID, job.scheduledAt).Scan(&parentID); err != nil {
+		return fmt.Errorf("find preceding serial case event: %w", err)
+	}
+	var sequence int
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(crime_sequence),0)+1 FROM case_crimes WHERE server_id=$1::uuid AND case_id=$2`, serverID, job.caseID).Scan(&sequence); err != nil {
+		return err
+	}
+	crimeType := "criminal_threat"
+	if job.eventType == "serial_homicide" {
+		crimeType = "homicide"
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO case_crimes(server_id,case_id,crime_id,crime_type,occurred_at,location_entity_id,parent_crime_id,crime_sequence,source_key)
+		VALUES($1::uuid,$2,$3,$4,$5,NULLIF($6,''),$7,$8,$9)`, serverID, job.caseID, crimeID, crimeType, job.scheduledAt, job.locationID, parentID, sequence, job.eventKey); err != nil {
+		return fmt.Errorf("persist serial case event: %w", err)
+	}
+	for _, participant := range []CaseParticipant{{NPCID: job.principalID, Role: "principal"}, {NPCID: job.targetID, Role: "victim"}} {
+		if _, err := tx.Exec(ctx, `INSERT INTO case_crime_participants(server_id,crime_id,npc_entity_id,participant_role) VALUES($1::uuid,$2,$3,$4)`, serverID, crimeID, participant.NPCID, participant.Role); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO case_participants(server_id,case_id,npc_entity_id,participant_role) VALUES($1::uuid,$2,$3,$4)
+			ON CONFLICT(server_id,case_id,npc_entity_id) DO UPDATE SET participant_role=CASE WHEN EXCLUDED.participant_role='principal' THEN 'principal' ELSE case_participants.participant_role END`, serverID, job.caseID, participant.NPCID, participant.Role); err != nil {
+			return err
+		}
+	}
+	appearance := actor.Appearance
+	if appearance == "" {
+		appearance = "a distinctive figure in a dark coat"
+	}
+	if job.eventType == "serial_threat" {
+		threats := []struct{ subject, body string }{
+			{"You cannot hide", "I know where you work. I know your route, too."},
+			{"I am still here", "You will recognize " + appearance + " when I am near. Do not show this to anyone."},
+			{"One last warning", "The people at the office know better than to interfere. Keep quiet."},
+		}
+		for index, threat := range threats {
+			message := mail.CaseMessage(job.seed, job.worldVersion, job.caseID, target.ID, actor.ID, "Unknown sender", target.Name, threat.subject, threat.body, "anonymous_warning", job.scheduledAt.Add(time.Duration(index-len(threats)+1)*time.Hour))
+			message.ID += "-" + job.eventKey
+			message.Service, message.Sender, message.Recipient = "Meridian Global Correspondence Exchange", "Unknown sender", target.Name
+			encoded, err := json.Marshal(message)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `INSERT INTO case_mail_messages(server_id,case_id,crime_id,message_id,mailbox_npc_entity_id,related_npc_entity_id,sent_at,internal_relation,message_data)
+				VALUES($1::uuid,$2,$3,$4,$5,$6,$7,'anonymous_warning',$8::jsonb)`, serverID, job.caseID, crimeID, message.ID, target.ID, actor.ID, message.SentAt, string(encoded)); err != nil {
+				return fmt.Errorf("persist serial killer threat: %w", err)
+			}
+		}
+	} else if job.eventType != "serial_homicide" {
+		return fmt.Errorf("unsupported serial evolution event %q", job.eventType)
+	}
+	content := "A set of anonymous threats was delivered to the next target. The messages refer to a workplace and repeat a physical description."
+	presentation, evidenceType := "Anonymous threat correspondence", "letter_fragment"
+	if job.eventType == "serial_homicide" {
+		content = "A new victim was attacked after receiving repeated anonymous threats. The same workplace and physical description recur in the messages."
+		presentation, evidenceType = "Serial attack scene report", "witness_statement"
+		if _, err := tx.Exec(ctx, `INSERT INTO world_mutations(server_id,entity_id,field_key,value,created_at) VALUES($1::uuid,$2,'status','"missing"'::jsonb,$3)`, serverID, target.ID, job.scheduledAt); err != nil {
+			return fmt.Errorf("mark serial victim missing: %w", err)
+		}
+	}
+	evidence := EvidenceDefinition{ID: crimeID + "/evidence", Type: evidenceType, Presentation: presentation, Content: content, LocationID: job.locationID, RelationshipIDs: []string{}, ReachableFromEntityIDs: []string{target.ID, actor.ID}, SupportsNPCIDs: []string{actor.ID}}
+	encodedEvidence, err := json.Marshal(struct {
+		Presentation           string   `json:"presentation"`
+		Content                string   `json:"content"`
+		RelationshipIDs        []string `json:"relationshipIds"`
+		ReachableFromEntityIDs []string `json:"reachableFromEntityIds"`
+		SupportsNPCIDs         []string `json:"supportsNpcIds,omitempty"`
+	}{evidence.Presentation, evidence.Content, evidence.RelationshipIDs, evidence.ReachableFromEntityIDs, evidence.SupportsNPCIDs})
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO case_evidence(server_id,case_id,crime_id,evidence_id,location_entity_id,evidence_type,evidence_data) VALUES($1::uuid,$2,$3,$4,NULLIF($5,''),$6,$7::jsonb)`, serverID, job.caseID, crimeID, evidence.ID, job.locationID, evidence.Type, string(encodedEvidence)); err != nil {
+		return fmt.Errorf("persist serial event evidence: %w", err)
+	}
+	if job.eventType == "serial_threat" {
+		var witnessKey string
+		witnessErr := tx.QueryRow(ctx, `SELECT witness.generation_key FROM world_entities witness
+			WHERE witness.server_id=$1::uuid AND witness.entity_type='npc' AND witness.entity_id<>$2 AND witness.entity_id<>$3
+			AND (EXISTS (SELECT 1 FROM personal_relationships relation WHERE relation.server_id=witness.server_id AND relation.relationship_type='marriage'
+				AND ((relation.person_a_npc_id=$2 AND relation.person_b_npc_id=witness.entity_id) OR (relation.person_b_npc_id=$2 AND relation.person_a_npc_id=witness.entity_id)))
+			OR EXISTS (SELECT 1 FROM employment_relationships target_job JOIN employment_relationships witness_job
+				ON witness_job.server_id=target_job.server_id AND witness_job.employer_company_id=target_job.employer_company_id
+				WHERE target_job.server_id=witness.server_id AND target_job.employee_npc_id=$2 AND witness_job.employee_npc_id=witness.entity_id))
+			ORDER BY CASE WHEN EXISTS (SELECT 1 FROM personal_relationships relation WHERE relation.server_id=witness.server_id AND relation.relationship_type='marriage'
+				AND ((relation.person_a_npc_id=$2 AND relation.person_b_npc_id=witness.entity_id) OR (relation.person_b_npc_id=$2 AND relation.person_a_npc_id=witness.entity_id))) THEN 0 ELSE 1 END,witness.entity_id LIMIT 1`, serverID, target.ID, actor.ID).Scan(&witnessKey)
+		if witnessErr != nil && !errors.Is(witnessErr, pgx.ErrNoRows) {
+			return fmt.Errorf("find serial case correspondent: %w", witnessErr)
+		}
+		if witnessErr == nil {
+			witness, err := world.GenerateNPCFromKey(job.seed, job.worldVersion, witnessKey)
+			if err != nil {
+				return fmt.Errorf("reconstruct serial case correspondent: %w", err)
+			}
+			messageID := "case-event:" + crimeID + ":help-request"
+			body := fmt.Sprintf("%s has been receiving frightening anonymous messages. They mention a workplace and describe someone, but we cannot identify the sender. Could you ask around and compare the details with staff records before anyone else is hurt?", target.Name)
+			if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,case_id,crime_id,message_id,sent_at,sender,message_category,subject,body,attachments)
+				SELECT $1::uuid,account.id,$2,$3,$4,$5,$6,'official','Someone is receiving anonymous threats',$7,'[]'::jsonb
+				FROM player_accounts account ON CONFLICT DO NOTHING`, serverID, job.caseID, crimeID, messageID, job.scheduledAt, witness.Name, body); err != nil {
+				return fmt.Errorf("deliver serial case lead to player mailboxes: %w", err)
+			}
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE case_evolution_jobs SET status='completed',completed_at=$4 WHERE server_id=$1::uuid AND case_id=$2 AND event_key=$3`, serverID, job.caseID, job.eventKey, job.scheduledAt); err != nil {
+		return err
+	}
+	if job.eventType == "serial_homicide" {
+		if err := scheduleNextSerialVictim(ctx, tx, serverID, job); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func scheduleNextSerialVictim(ctx context.Context, tx pgx.Tx, serverID string, job dueEvolutionJob) error {
+	sequence, err := strconv.Atoi(strings.TrimPrefix(job.eventKey, "serial-homicide-"))
+	if err != nil || sequence < 1 {
+		return fmt.Errorf("invalid serial evolution key %q", job.eventKey)
+	}
+	rows, err := tx.Query(ctx, `SELECT npc.entity_id FROM world_entities npc JOIN world_regions region ON region.server_id=npc.server_id AND region.region_id=npc.region_id
+		WHERE npc.server_id=$1::uuid AND npc.entity_type='npc' AND region.region_id LIKE $2 || '/district/%'
+		AND npc.entity_id<>$3 AND NOT EXISTS (SELECT 1 FROM case_participants participant WHERE participant.server_id=$1::uuid AND participant.case_id=$4 AND participant.npc_entity_id=npc.entity_id)
+		AND COALESCE((SELECT mutation.value #>> '{}' FROM world_mutations mutation WHERE mutation.server_id=npc.server_id AND mutation.entity_id=npc.entity_id AND mutation.field_key='status' ORDER BY mutation.mutation_order DESC LIMIT 1),'alive')='alive'
+		AND EXISTS (SELECT 1 FROM employment_relationships own_job JOIN employment_relationships colleague_job
+			ON colleague_job.server_id=own_job.server_id AND colleague_job.employer_company_id=own_job.employer_company_id
+			WHERE own_job.server_id=npc.server_id AND own_job.employee_npc_id=npc.entity_id AND colleague_job.employee_npc_id<>npc.entity_id AND colleague_job.employee_npc_id<>$3)
+		ORDER BY npc.entity_id`, serverID, job.cityID, job.principalID, job.caseID)
+	if err != nil {
+		return fmt.Errorf("find next serial case target: %w", err)
+	}
+	targets := make([]string, 0)
+	for rows.Next() {
+		var targetID string
+		if err := rows.Scan(&targetID); err != nil {
+			rows.Close()
+			return err
+		}
+		targets = append(targets, targetID)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	if len(targets) == 0 {
+		return nil
+	}
+	targetID := targets[keyIndex(job.seed, "serial-next-target/"+job.eventKey, len(targets))]
+	nextSequence := sequence + 1
+	threatAt := job.scheduledAt.Add(24 * time.Hour)
+	attackAt := threatAt.Add(24 * time.Hour)
+	if _, err := tx.Exec(ctx, `INSERT INTO case_evolution_jobs(server_id,case_id,event_key,event_type,target_npc_entity_id,available_at)
+		VALUES($1::uuid,$2,$3,'serial_threat',$4,$5) ON CONFLICT DO NOTHING`, serverID, job.caseID, fmt.Sprintf("serial-threat-%d", nextSequence), targetID, threatAt); err != nil {
+		return fmt.Errorf("schedule next serial threat: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO case_evolution_jobs(server_id,case_id,event_key,event_type,target_npc_entity_id,available_at)
+		VALUES($1::uuid,$2,$3,'serial_homicide',$4,$5) ON CONFLICT DO NOTHING`, serverID, job.caseID, fmt.Sprintf("serial-homicide-%d", nextSequence), targetID, attackAt); err != nil {
+		return fmt.Errorf("schedule next serial homicide: %w", err)
+	}
+	return nil
 }
 
 func caseSceneIsResidential(base world.World, locationID string) bool {
@@ -2508,19 +2744,19 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 	var generatorVersion int
 	var worldSeed, organizationKey string
 	err := store.db.QueryRow(ctx,
-		`SELECT c.case_id, c.city_id, c.case_type, COALESCE(c.victim_entity_id,''), COALESCE(c.location_entity_id,''), s.status, c.created_at, c.generator_version,
+		`SELECT c.case_id, c.city_id, c.case_type, c.archetype_id, COALESCE(c.victim_entity_id,''), COALESCE(c.location_entity_id,''), s.status, c.created_at, c.generator_version,
 		 w.world_seed, COALESCE(organization.generation_key,'')
 		 FROM cases c JOIN case_states s USING (server_id, case_id) JOIN worlds w USING(server_id)
 		 LEFT JOIN world_entities organization ON organization.server_id=c.server_id AND organization.entity_id=c.company_id AND organization.entity_type='company'
 		 WHERE c.server_id = $1::uuid AND c.case_id = $2`, serverID, caseID,
-	).Scan(&result.ID, &result.CityID, &result.CaseType, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt, &generatorVersion, &worldSeed, &organizationKey)
+	).Scan(&result.ID, &result.CityID, &result.CaseType, &result.ArchetypeID, &result.VictimID, &result.LocationID, &result.Status, &result.CreatedAt, &generatorVersion, &worldSeed, &organizationKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return PublicCase{}, nil, ErrCaseNotFound
 	}
 	if err != nil {
 		return PublicCase{}, nil, err
 	}
-	if organizationKey != "" {
+	if organizationKey != "" && result.ArchetypeID != "serial_killer" {
 		if organization, err := world.GenerateCompanyFromKey(worldSeed, generatorVersion, organizationKey); err == nil {
 			result.OrganizationName = organization.Name
 		}
@@ -3244,7 +3480,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 			WHEN EXISTS (
 				SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
 				WHERE e.server_id=$1::uuid AND e.case_id=$2 AND e.evidence_id=proof.item_id
-				  AND ((c.archetype_id='workplace_conflict' AND e.evidence_type='office_log')
+				  AND ((c.archetype_id IN ('workplace_conflict','serial_killer') AND e.evidence_type='office_log')
 				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='travel_register'))
 			) THEN 1.0
 			WHEN EXISTS (
@@ -3252,7 +3488,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 				WHERE e.server_id=$1::uuid AND e.case_id=$2 AND e.evidence_id=proof.item_id
 				  AND ((c.archetype_id='workplace_conflict' AND e.evidence_type='meeting_minutes')
 				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='account_record')
-				    OR (c.archetype_id='jealousy' AND e.evidence_type IN ('letter_fragment','witness_statement')))
+				    OR (c.archetype_id IN ('jealousy','serial_killer') AND e.evidence_type IN ('letter_fragment','witness_statement')))
 			) THEN 0.75
 			WHEN EXISTS (
 				SELECT 1 FROM case_mail_messages m JOIN cases c USING(server_id,case_id)

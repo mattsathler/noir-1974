@@ -3,6 +3,7 @@ import { getStockMarket, getStockMarketHistory, getStockPortfolio, placeStockOrd
 import { BankMasthead } from "./BankWebsite.jsx";
 
 const NOOP = () => {};
+const MARKET_REFRESH_MS = 5 * 60 * 1000;
 function credits(cents = 0) { return `${(Number(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CR`; }
 function stockSymbol(name = "") {
   const words = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().match(/[A-Z0-9]+/g) || [];
@@ -48,6 +49,21 @@ export default function StockExchangeApp({ countryId = "", onProgressionChange =
     setPositions(result.positions || []);
     onProgressionChange(result.progression);
   }, [onProgressionChange]);
+
+  const refreshQuotes = useCallback(async () => {
+    try {
+      const result = await getStockMarket(page, search);
+      setMarket(result);
+      setError("");
+    } catch (cause) {
+      setError(readableError(cause));
+    }
+  }, [page, search]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => { void refreshQuotes(); }, MARKET_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [refreshQuotes]);
 
   useEffect(() => {
     let active = true;
@@ -189,7 +205,7 @@ export default function StockExchangeApp({ countryId = "", onProgressionChange =
     </> : <div className="stock-exchange__table-wrap"><table className="stock-exchange__table stock-exchange__table--portfolio"><thead><tr><th>COMPANY</th><th>SHARES</th><th>AVG. COST</th><th>MARKET PRICE</th><th>POSITION VALUE</th><th>ORDER</th></tr></thead><tbody>
       {positions.map((position) => <tr key={position.companyId}><td><strong>{stockSymbol(position.companyName)}</strong><small>{position.companyName} · {position.cityName} · {position.countryId.toUpperCase()}</small></td><td>{position.shares}</td><td>{credits(position.averageCostCents)}</td><td>{credits(position.priceCents)}</td><td>{credits(position.marketValueCents)}</td><td className="stock-exchange__actions">{position.countryId === market.countryId ? <><button type="button" disabled={busy} onClick={() => openOrder(position, "buy")}>BUY ↗</button><button type="button" disabled={busy} onClick={() => openOrder(position, "sell")}>SELL ↘</button></> : <small>CHANGE PROXY TO TRADE</small>}</td></tr>)}
       </tbody></table>{positions.length === 0 && <p className="stock-exchange__empty">NO SHARES HELD. SELECT A COMPANY FROM THE NATIONAL MARKET.</p>}</div>}
-    <footer className="stock-exchange__footnote">Quotes are set by the national exchange. Prices remain fixed until a market bulletin is issued. Trades require a Proxy in the listing's country.</footer>
+    <footer className="stock-exchange__footnote">Each company's quotation moves independently every five minutes. Company incidents remain listed in each firm's market history. Trades require a Proxy in the listing's country.</footer>
     {orderDraft && <div className="stock-exchange__modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setOrderDraft(null); }}><section className="stock-exchange__order-modal" role="dialog" aria-modal="true" aria-labelledby="stock-order-title"><header><div><span>UNION MERCANTILE · THE UNION EXCHANGE</span><h2 id="stock-order-title">{orderDraft.side === "buy" ? "Buy shares" : "Sell shares"}</h2></div><button type="button" aria-label="Close order" disabled={busy} onClick={() => setOrderDraft(null)}>×</button></header><p className="stock-exchange__modal-company"><strong>{stockSymbol(orderDraft.listing.companyName)}</strong><span>{orderDraft.listing.companyName}</span></p><label className="stock-exchange__modal-quantity" htmlFor="stock-share-quantity">SHARE QUANTITY<input id="stock-share-quantity" type="number" min="1" max={orderDraft.side === "sell" ? draftPosition?.shares || 0 : 10000} step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={busy} /></label><dl><div><dt>Current share price</dt><dd>{credits(orderDraft.listing.priceCents)}</dd></div><div><dt>{orderDraft.side === "buy" ? "Estimated debit" : "Estimated proceeds"}</dt><dd>{credits((Number(quantity) || 0) * orderDraft.listing.priceCents)}</dd></div>{orderDraft.side === "sell" && <div><dt>Shares held</dt><dd>{draftPosition?.shares || 0}</dd></div>}{orderDraft.side === "buy" && progression && <div><dt>Available after order</dt><dd>{credits(progression.creditsCents - (Number(quantity) || 0) * orderDraft.listing.priceCents)}</dd></div>}</dl>{error && <p className="stock-exchange__message stock-exchange__message--error" role="alert">{error}</p>}<footer><button className="stock-exchange__cancel" type="button" disabled={busy} onClick={() => setOrderDraft(null)}>CANCEL</button><button type="button" disabled={busy || !draftValid || (orderDraft.side === "buy" && (Number(quantity) || 0) * orderDraft.listing.priceCents > (progression?.creditsCents ?? 0))} onClick={submitOrder}>{busy ? "PROCESSING…" : `CONFIRM ${orderDraft.side.toUpperCase()}`}</button></footer></section></div>}
   </main>;
 }

@@ -103,8 +103,8 @@ func (h *Handler) stockMarket(w http.ResponseWriter, r *http.Request) {
 		listings = append(listings, stockListing{
 			CompanyID: record.Company.ID, CompanyName: record.Company.Name,
 			CountryID: city.CountryID, CityName: record.Address.City,
-			PriceCents:  stockQuoteCents(city.CountryID, record.Company.ID, snapshot.Score),
-			MarketScore: snapshot.Score, ChangeBps: snapshot.ChangeBps, LastEventAt: snapshot.LastEventAt,
+			PriceCents:  applyMarketFactor(stockQuoteCents(city.CountryID, record.Company.ID, snapshot.Score), snapshot.MarketFactorBps),
+			MarketScore: applyMarketScoreFactor(snapshot.Score, snapshot.MarketFactorBps), ChangeBps: snapshot.ChangeBps, LastEventAt: snapshot.LastEventAt,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -310,8 +310,8 @@ func (h *Handler) stockOrder(w http.ResponseWriter, r *http.Request) {
 	if snapshot.Score == 0 {
 		snapshot.Score = 1000
 	}
-	listing.MarketScore, listing.ChangeBps, listing.LastEventAt = snapshot.Score, snapshot.ChangeBps, snapshot.LastEventAt
-	listing.PriceCents = stockQuoteCents(city.CountryID, listing.CompanyID, snapshot.Score)
+	listing.MarketScore, listing.ChangeBps, listing.LastEventAt = applyMarketScoreFactor(snapshot.Score, snapshot.MarketFactorBps), snapshot.ChangeBps, snapshot.LastEventAt
+	listing.PriceCents = applyMarketFactor(stockQuoteCents(city.CountryID, listing.CompanyID, snapshot.Score), snapshot.MarketFactorBps)
 	writer, ok := h.store.(stockOrderWriter)
 	if !ok {
 		h.writeAPIError(w, r, http.StatusServiceUnavailable, "STOCK_TRADING_UNAVAILABLE", "Stock trading is temporarily unavailable.", nil)

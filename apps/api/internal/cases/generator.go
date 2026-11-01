@@ -15,7 +15,8 @@ import (
 	"noir-1974/apps/api/internal/world"
 )
 
-const GeneratorVersion = 7
+const GeneratorVersion = 8
+const previousFinancialGeneratorVersion = 7
 const connectedGeneratorVersion = 4
 const contextualGeneratorVersion = 6
 const previousGeneratorVersion = 5
@@ -44,6 +45,7 @@ type Definition struct {
 	LocationID       string                  `json:"locationId"`
 	CrimeAt          time.Time               `json:"-"`
 	ParamourID       string                  `json:"-"`
+	FutureVictimIDs  []string                `json:"-"`
 	Relationships    []RelationshipReference `json:"relationships"`
 	Evidence         []EvidenceDefinition    `json:"evidence"`
 	Records          []records.Record        `json:"records,omitempty"`
@@ -78,17 +80,18 @@ type employmentLink struct {
 }
 
 type candidate struct {
-	caseType      string
-	archetypeID   string
-	companyID     string
-	motive        string
-	relationships []RelationshipReference
-	evidence      []evidencePlan
-	killerID      string
-	accompliceID  string
-	victimID      string
-	locationID    string
-	paramourID    string
+	caseType        string
+	archetypeID     string
+	companyID       string
+	motive          string
+	relationships   []RelationshipReference
+	evidence        []evidencePlan
+	killerID        string
+	accompliceID    string
+	victimID        string
+	locationID      string
+	paramourID      string
+	futureVictimIDs []string
 }
 
 type evidencePlan struct {
@@ -109,6 +112,7 @@ var archetypeGenerators = []archetypeGenerator{
 	{id: "workplace_conflict", candidates: workplaceCandidates, validate: validateWorkplaceConflict, evidenceTypes: []string{"employment_record", "meeting_minutes", "office_log"}},
 	{id: "jealousy", candidates: jealousyCandidates, validate: validateJealousy, evidenceTypes: []string{"civil_record", "letter_fragment", "witness_statement"}},
 	{id: "financial_extortion", candidates: extortionCandidates, validate: validateExtortion, evidenceTypes: []string{"account_record", "travel_register", "personnel_record"}},
+	{id: "serial_killer", candidates: serialKillerCandidates, validate: validateSerialKiller, evidenceTypes: []string{"letter_fragment", "witness_statement", "office_log"}},
 }
 
 // Generate creates a deterministic homicide definition from existing world facts.
@@ -121,7 +125,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	if strings.TrimSpace(seed) == "" {
 		return Definition{}, ErrInvalidCaseSeed
 	}
-	if version != GeneratorVersion && version != contextualGeneratorVersion && version != previousGeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
+	if version != GeneratorVersion && version != previousFinancialGeneratorVersion && version != contextualGeneratorVersion && version != previousGeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
 		return Definition{}, fmt.Errorf("%w: %d", ErrUnsupportedGenerator, version)
 	}
 	candidateWorld := base
@@ -148,7 +152,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 		}
 	}
 	var selected candidate
-	if version >= GeneratorVersion {
+	if version >= previousFinancialGeneratorVersion {
 		choices := currentCaseChoices(candidateWorld, version)
 		if len(choices) == 0 {
 			return Definition{}, ErrNoValidCaseCandidates
@@ -214,6 +218,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	if selected.caseType == "" && version >= connectedGeneratorVersion {
 		definition.CrimeAt = crimeAt
 		definition.ParamourID = selected.paramourID
+		definition.FutureVictimIDs = append([]string(nil), selected.futureVictimIDs...)
 	}
 	if selected.caseType == "" && version == legacyGeneratorVersion && selected.archetypeID == "financial_extortion" {
 		region := regionName(base, npcByID(base.NPCs, selected.killerID).RegionID)
@@ -224,7 +229,11 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 		definition.Records = buildFinancialCaseRecords(seed, caseID, selected, crimeAt)
 	} else if version >= connectedGeneratorVersion {
 		definition.Records = buildConnectedCaseRecords(seed, base.GeneratorVersion, caseID, selected, base, crimeAt, version)
-		definition.Emails = buildConnectedCaseEmails(seed, base.GeneratorVersion, caseID, selected, base, crimeAt)
+		if selected.archetypeID == "serial_killer" {
+			definition.Emails = buildSerialKillerEmails(seed, base.GeneratorVersion, caseID, selected, base, crimeAt)
+		} else {
+			definition.Emails = buildConnectedCaseEmails(seed, base.GeneratorVersion, caseID, selected, base, crimeAt)
+		}
 	} else {
 		definition.Emails = buildCaseEmails(seed, base.GeneratorVersion, caseID, selected, base, caseDate)
 	}
@@ -273,6 +282,11 @@ func currentCaseChoices(base world.World, version int) []caseChoice {
 			choices = append(choices, caseChoice{id: caseType, candidates: candidates})
 		}
 	}
+	if version >= GeneratorVersion {
+		if candidates := serialKillerCandidates(base); len(candidates) > 0 {
+			choices = append(choices, caseChoice{id: "homicide/serial_killer", candidates: candidates})
+		}
+	}
 	return choices
 }
 
@@ -302,7 +316,7 @@ func financialCandidates(base world.World, caseType string) []candidate {
 	for _, companyID := range companyIDs {
 		locationID := hqByCompany[companyID]
 		staff := companyEmployees[companyID]
-		if len(staff) < 2 {
+		if locationID == "" || len(staff) < 2 {
 			continue
 		}
 		sort.Slice(staff, func(i, j int) bool { return staff[i].employee < staff[j].employee })
@@ -350,8 +364,193 @@ func financialCandidates(base world.World, caseType string) []candidate {
 	return result
 }
 
+// serialKillerCandidates requires the existing world to support the entire
+// first victim clue chain: a working killer, a distinct victim, and someone
+// close to that victim whom the player can write to.
+func serialKillerCandidates(base world.World) []candidate {
+	if !world.SupportsSocietyVersion(base.GeneratorVersion) {
+		return nil
+	}
+	type serialWitness struct {
+		npcID        string
+		relationship RelationshipReference
+	}
+	locationsByCity := make(map[string][]string)
+	for _, entity := range base.Entities {
+		if entity.EntityType == "location" {
+			city := cityForLocation(base, entity.ID)
+			locationsByCity[city] = append(locationsByCity[city], entity.ID)
+		}
+	}
+	for city := range locationsByCity {
+		sort.Strings(locationsByCity[city])
+	}
+	peopleByID := make(map[string]world.NPC, len(base.NPCs))
+	peopleByCity := make(map[string][]world.NPC)
+	for _, person := range base.NPCs {
+		peopleByID[person.ID] = person
+		city := serialNPCcity(person)
+		peopleByCity[city] = append(peopleByCity[city], person)
+	}
+	for city := range peopleByCity {
+		sort.Slice(peopleByCity[city], func(i, j int) bool { return peopleByCity[city][i].ID < peopleByCity[city][j].ID })
+	}
+	jobsByNPC := make(map[string][]world.EmploymentRelationship)
+	coWorkersByCompany := make(map[string][]world.EmploymentRelationship)
+	for _, relation := range base.EmploymentRelationships {
+		jobsByNPC[relation.EmployeeNPCID] = append(jobsByNPC[relation.EmployeeNPCID], relation)
+		coWorkersByCompany[relation.EmployerCompanyID] = append(coWorkersByCompany[relation.EmployerCompanyID], relation)
+	}
+	for npcID := range jobsByNPC {
+		sort.Slice(jobsByNPC[npcID], func(i, j int) bool { return jobsByNPC[npcID][i].ID < jobsByNPC[npcID][j].ID })
+	}
+	witnessesByVictim := make(map[string][]serialWitness, len(base.NPCs))
+	for _, relation := range base.PersonalRelationships {
+		if relation.RelationshipType != "marriage" {
+			continue
+		}
+		if relation.PersonANPCID != "" && peopleByID[relation.PersonBNPCID].ID != "" {
+			witnessesByVictim[relation.PersonANPCID] = append(witnessesByVictim[relation.PersonANPCID], serialWitness{npcID: relation.PersonBNPCID, relationship: RelationshipReference{ID: relation.ID, Type: "personal", Role: "victim_partner"}})
+		}
+		if relation.PersonBNPCID != "" && peopleByID[relation.PersonANPCID].ID != "" {
+			witnessesByVictim[relation.PersonBNPCID] = append(witnessesByVictim[relation.PersonBNPCID], serialWitness{npcID: relation.PersonANPCID, relationship: RelationshipReference{ID: relation.ID, Type: "personal", Role: "victim_partner"}})
+		}
+	}
+	for victimID, jobs := range jobsByNPC {
+		for _, job := range jobs {
+			for _, coworker := range coWorkersByCompany[job.EmployerCompanyID] {
+				if coworker.EmployeeNPCID != victimID {
+					witnessesByVictim[victimID] = append(witnessesByVictim[victimID], serialWitness{npcID: coworker.EmployeeNPCID, relationship: RelationshipReference{ID: job.ID, Type: "employment", Role: "victim_employment"}})
+					break
+				}
+			}
+		}
+	}
+	companiesByID := make(map[string]world.Company, len(base.Companies))
+	for _, company := range base.Companies {
+		companiesByID[company.ID] = company
+	}
+	var result []candidate
+	witnessFor := func(victimID, killerID string) (RelationshipReference, bool) {
+		for _, witness := range witnessesByVictim[victimID] {
+			if witness.npcID != killerID && witness.npcID != victimID && peopleByID[witness.npcID].ID != "" {
+				return witness.relationship, true
+			}
+		}
+		return RelationshipReference{}, false
+	}
+	for city, cityPeople := range peopleByCity {
+		locations := locationsByCity[city]
+		if len(locations) == 0 {
+			continue
+		}
+		for _, killer := range cityPeople {
+			killerID := killer.ID
+			if len(jobsByNPC[killerID]) == 0 || killer.Status != "" && killer.Status != "alive" {
+				continue
+			}
+			killerJob := jobsByNPC[killerID][0]
+			company := companiesByID[killerJob.EmployerCompanyID]
+			if company.ID == "" {
+				continue
+			}
+			var victimID, futureVictimID string
+			var witnessRelation RelationshipReference
+			for _, victim := range cityPeople {
+				if victim.ID == killerID || victim.Status != "" && victim.Status != "alive" || !hasJobAtCompany(jobsByNPC[victim.ID], killerJob.EmployerCompanyID) {
+					continue
+				}
+				if witness, ok := witnessFor(victim.ID, killerID); ok {
+					victimID, witnessRelation = victim.ID, witness
+					break
+				}
+			}
+			if victimID == "" {
+				continue
+			}
+			for _, possible := range cityPeople {
+				if possible.ID == killerID || possible.ID == victimID || possible.Status != "" && possible.Status != "alive" {
+					continue
+				}
+				if len(jobsByNPC[possible.ID]) == 0 {
+					continue
+				}
+				if _, ok := witnessFor(possible.ID, killerID); ok {
+					futureVictimID = possible.ID
+					break
+				}
+			}
+			if futureVictimID == "" {
+				continue
+			}
+			result = append(result, candidate{
+				archetypeID: "serial_killer", motive: "An unknown correspondent terrorized several people before a sequence of murders. The messages point toward the killer's workplace and appearance; people close to the victims can help identify the sender.",
+				killerID: killerID, victimID: victimID, locationID: locations[0], companyID: company.ID,
+				futureVictimIDs: []string{futureVictimID},
+				relationships:   []RelationshipReference{{ID: killerJob.ID, Type: "employment", Role: "killer_employment"}, witnessRelation},
+				evidence: []evidencePlan{
+					{typeID: "letter_fragment", presentation: "Anonymous threat correspondence", content: "Several unsigned messages threaten the recipient. Their repeated details should be compared with testimony from people who knew the victim.", supports: []string{killerID}},
+					{typeID: "witness_statement", presentation: "Statement from someone close to the victim", content: "The victim shared the threats with someone they trusted. That person may recall what the messages said about the sender.", supports: []string{killerID}},
+					{typeID: "office_log", presentation: "Staff access ledger", content: "Company staff records can be compared with the workplace and appearance details described in the correspondence.", supports: []string{killerID}},
+				},
+			})
+		}
+	}
+	return result
+}
+
+func serialNPCcity(npc world.NPC) string {
+	if index := strings.Index(npc.RegionID, "/district/"); index >= 0 {
+		return npc.RegionID[:index]
+	}
+	return npc.RegionID
+}
+
+func hasJobAtCompany(jobs []world.EmploymentRelationship, companyID string) bool {
+	for _, job := range jobs {
+		if job.EmployerCompanyID == companyID {
+			return true
+		}
+	}
+	return false
+}
+
+func serialVictimWitness(base world.World, victimID, killerID string, jobsByNPC map[string][]world.EmploymentRelationship) (string, RelationshipReference) {
+	for _, relation := range base.PersonalRelationships {
+		if relation.RelationshipType != "marriage" {
+			continue
+		}
+		other := ""
+		if relation.PersonANPCID == victimID {
+			other = relation.PersonBNPCID
+		} else if relation.PersonBNPCID == victimID {
+			other = relation.PersonANPCID
+		}
+		if other != "" && other != killerID && npcByID(base.NPCs, other).ID != "" {
+			return other, RelationshipReference{ID: relation.ID, Type: "personal", Role: "victim_partner"}
+		}
+	}
+	for _, victimJob := range jobsByNPC[victimID] {
+		for _, coworkerJob := range base.EmploymentRelationships {
+			if coworkerJob.EmployerCompanyID == victimJob.EmployerCompanyID && coworkerJob.EmployeeNPCID != victimID && coworkerJob.EmployeeNPCID != killerID {
+				return coworkerJob.EmployeeNPCID, RelationshipReference{ID: victimJob.ID, Type: "employment", Role: "victim_employment"}
+			}
+		}
+	}
+	return "", RelationshipReference{}
+}
+
+func companyByID(companies []world.Company, id string) world.Company {
+	for _, company := range companies {
+		if company.ID == id {
+			return company
+		}
+	}
+	return world.Company{}
+}
+
 func validateFinancialDefinition(definition Definition, base world.World) error {
-	if definition.GeneratorVersion < GeneratorVersion || definition.CaseType != definition.ArchetypeID || !contains([]string{"embezzlement", "financial_extortion", "accounting_fraud"}, definition.CaseType) || definition.VictimID != "" || definition.KillerID == "" || definition.CompanyID == "" || definition.CrimeAt.IsZero() || len(definition.Participants) != 2 || len(definition.Relationships) != 2 || len(definition.Evidence) != 3 {
+	if definition.GeneratorVersion < previousFinancialGeneratorVersion || definition.CaseType != definition.ArchetypeID || !contains([]string{"embezzlement", "financial_extortion", "accounting_fraud"}, definition.CaseType) || definition.VictimID != "" || definition.KillerID == "" || definition.CompanyID == "" || definition.CrimeAt.IsZero() || len(definition.Participants) != 2 || len(definition.Relationships) != 2 || len(definition.Evidence) != 3 {
 		return ErrInvalidDefinition
 	}
 	if !containsNPC(base.NPCs, definition.KillerID) || !containsNPC(base.NPCs, definition.Participants[1].NPCID) || definition.Participants[0] != (CaseParticipant{NPCID: definition.KillerID, Role: "principal"}) || definition.Participants[1].Role != "accomplice" || definition.Participants[0].NPCID == definition.Participants[1].NPCID || definition.LocationID != "" {
@@ -476,6 +675,9 @@ func availableArchetypesForVersion(base world.World, version int) []archetypeGen
 }
 
 func archetypeCandidates(archetype archetypeGenerator, base world.World, version int) []candidate {
+	if archetype.id == "serial_killer" && version < GeneratorVersion {
+		return nil
+	}
 	if version >= contextualGeneratorVersion && archetype.id == "jealousy" {
 		return jealousyCandidatesV6(base)
 	}
@@ -636,6 +838,33 @@ func buildConnectedCaseEmails(seed string, worldVersion int, caseID string, sele
 	return result
 }
 
+func buildSerialKillerEmails(seed string, worldVersion int, caseID string, selected candidate, base world.World, crimeAt time.Time) []mail.Message {
+	victim, killer := npcByID(base.NPCs, selected.victimID), npcByID(base.NPCs, selected.killerID)
+	company := companyByID(base.Companies, selected.companyID)
+	appearance := killer.Appearance
+	if appearance == "" {
+		appearance = "a distinctive figure in a dark coat"
+	}
+	letters := []struct{ subject, body string }{
+		{"You have been noticed", "I know when you leave. I know the route you take home. Do not ask who sent this."},
+		{"You should have listened", "You saw me near the office. Remember " + appearance + ". You will see me again before this is finished."},
+		{"The last warning", "The people at work know how to keep quiet. You should learn from them. I am closer than you think."},
+		{"Still watching", "You told someone about my messages. That was a mistake. " + appearance + ". I am still there after the bell."},
+		{"No one can keep you safe", "You can change your route, but not what you know about where I work. Stop talking, or the next letter will be the last."},
+	}
+	// The precise employer appears in only one deterministic letter for the case.
+	workplaceClueIndex := keyIndex(seed, "serial-workplace-letter", len(letters))
+	letters[workplaceClueIndex].body += " I work at " + company.Name + "."
+	messages := make([]mail.Message, 0, len(letters))
+	for index, letter := range letters {
+		message := mail.CaseMessage(seed, worldVersion, caseID, victim.ID, killer.ID, "Unknown sender", victim.Name,
+			letter.subject, letter.body, "anonymous_warning", crimeAt.AddDate(0, 0, index-len(letters)))
+		message.ID += fmt.Sprintf("-serial-%02d", index+1)
+		messages = append(messages, message)
+	}
+	return messages
+}
+
 func killerCorrespondent(base world.World, selected candidate) world.NPC {
 	var candidates []world.NPC
 	for _, relation := range base.PersonalRelationships {
@@ -779,7 +1008,7 @@ func Validate(definition Definition, base world.World) error {
 }
 
 func supportedCaseGeneratorVersion(version int) bool {
-	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == previousGeneratorVersion || version == contextualGeneratorVersion || version == GeneratorVersion
+	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == previousGeneratorVersion || version == contextualGeneratorVersion || version == previousFinancialGeneratorVersion || version == GeneratorVersion
 }
 
 func availableArchetypes(base world.World) []archetypeGenerator {
@@ -1120,6 +1349,63 @@ func validateWorkplaceConflict(definition Definition, base world.World) bool {
 	return killerLink != nil && victimLink != nil && killerLink.EmployerCompanyID == victimLink.EmployerCompanyID && killerLink.EmployerCompanyID == definition.CompanyID && hasHeadquarters(base.CompanyLocations, killerLink.EmployerCompanyID, definition.LocationID)
 }
 
+func validateSerialKiller(definition Definition, base world.World) bool {
+	if definition.GeneratorVersion < GeneratorVersion || definition.CompanyID == "" || len(definition.FutureVictimIDs) != 1 {
+		return false
+	}
+	killer, victim := npcByID(base.NPCs, definition.KillerID), npcByID(base.NPCs, definition.VictimID)
+	if killer.ID == "" || victim.ID == "" || killer.ID == victim.ID || cityForLocation(base, definition.LocationID) != cityForNPC(killer) || cityForNPC(victim) != cityForNPC(killer) {
+		return false
+	}
+	killerEmployed := false
+	for _, relation := range base.EmploymentRelationships {
+		if relation.EmployeeNPCID == killer.ID && relation.EmployerCompanyID == definition.CompanyID {
+			for _, reference := range definition.Relationships {
+				if reference.ID == relation.ID && reference.Type == "employment" && reference.Role == "killer_employment" {
+					killerEmployed = true
+				}
+			}
+		}
+	}
+	witnessID, witnessLink := serialVictimWitness(base, victim.ID, killer.ID, employmentByNPC(base.EmploymentRelationships))
+	if witnessID == "" {
+		return false
+	}
+	witnessLinked := false
+	for _, reference := range definition.Relationships {
+		if reference.ID == witnessLink.ID && reference.Type == witnessLink.Type && reference.Role == witnessLink.Role {
+			witnessLinked = true
+		}
+	}
+	if !killerEmployed || !witnessLinked {
+		return false
+	}
+	seen := map[string]bool{killer.ID: true, victim.ID: true}
+	for _, targetID := range definition.FutureVictimIDs {
+		target := npcByID(base.NPCs, targetID)
+		if target.ID == "" || target.Status != "" && target.Status != "alive" || cityForNPC(target) != cityForNPC(killer) || seen[targetID] || len(employmentByNPC(base.EmploymentRelationships)[targetID]) == 0 {
+			return false
+		}
+		seen[targetID] = true
+	}
+	return true
+}
+
+func employmentByNPC(relationships []world.EmploymentRelationship) map[string][]world.EmploymentRelationship {
+	result := make(map[string][]world.EmploymentRelationship)
+	for _, relationship := range relationships {
+		result[relationship.EmployeeNPCID] = append(result[relationship.EmployeeNPCID], relationship)
+	}
+	return result
+}
+
+func cityForNPC(npc world.NPC) string {
+	if index := strings.Index(npc.RegionID, "/district/"); index >= 0 {
+		return npc.RegionID[:index]
+	}
+	return npc.RegionID
+}
+
 func validateJealousy(definition Definition, base world.World) bool {
 	for _, relation := range base.PersonalRelationships {
 		referenced := false
@@ -1254,10 +1540,22 @@ func validateConnectedCaseRecords(definition Definition, base world.World) bool 
 
 func validateConnectedCaseEmails(definition Definition, base world.World) bool {
 	remorse := false
+	serialThreat := false
+	workplaceClueCount := 0
+	workplaceName := companyByID(base.Companies, definition.CompanyID).Name
 	for _, message := range definition.Emails {
 		if message.InternalRelation == "killer_remorse" && message.MailboxNPCID == definition.KillerID && message.RelatedNPCID != "" && message.Sender == npcByID(base.NPCs, definition.KillerID).Name {
 			remorse = true
 		}
+		if message.InternalRelation == "anonymous_warning" && message.MailboxNPCID == definition.VictimID && message.RelatedNPCID == definition.KillerID && message.Sender == "Unknown sender" && strings.Contains(message.Body, "work") {
+			serialThreat = true
+			if workplaceName != "" && strings.Contains(message.Body, workplaceName) {
+				workplaceClueCount++
+			}
+		}
+	}
+	if definition.ArchetypeID == "serial_killer" {
+		return serialThreat && workplaceClueCount == 1 && len(definition.Emails) == 5
 	}
 	return remorse
 }

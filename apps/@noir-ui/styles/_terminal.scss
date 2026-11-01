@@ -1084,6 +1084,9 @@
 .notification-center__heading h2 { margin: 0.2rem 0 0; color: #35443c; font-size: 1rem; }
 .notification-center__content ol { display: grid; gap: 0.4rem; margin: 0; padding: 0.6rem; overflow-y: auto; list-style: none; }
 .notification-center__content li { display: grid; gap: 0.25rem; padding: 0.65rem; background: #e6e8df; border: 1px solid #c9c9bb; text-align: left; }
+.notification-center__item-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.notification-center__delete { flex: 0 0 auto; padding: 0; color: #75574c; background: transparent !important; border: 0; box-shadow: none; cursor: pointer; font: 0.48rem var(--noir-font-mono); letter-spacing: 0.06em; }
+.notification-center__delete:hover,.notification-center__delete:focus-visible { color: #4b3028; text-decoration: underline; outline: 1px dotted #8d796d; outline-offset: 2px; }
 .notification-center__content li small { color: #527467; font: 0.5rem var(--noir-font-mono); letter-spacing: 0.06em; }
 .notification-center__content li strong { color: #303832; font-size: 0.72rem; }
 .notification-center__content li p,.notification-center__empty { margin: 0; color: #545a53; font: 0.62rem/1.5 var(--noir-font-mono); }

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
-export default function NotificationCenter({ notifications = [], open = false, onToggle, onClose, snackbar, onDismissSnackbar }) {
+export default function NotificationCenter({ notifications = [], open = false, onToggle, onClose, onDelete, snackbar, onDismissSnackbar }) {
   const dialogRef = useRef(null);
   useEffect(() => {
     if (!open) return undefined;
@@ -34,7 +34,10 @@ export default function NotificationCenter({ notifications = [], open = false, o
       <div className="computer-window__body notification-center__content">
         <div className="notification-center__heading"><span>MERIDIAN OS · SYSTEM MESSAGES</span><h2 id="notification-center-title">Notification history</h2></div>
         {!notifications.length ? <p className="notification-center__empty">No new information.</p> : <ol>
-          {notifications.map((item) => <li key={item.id}><small>{item.type} · {item.time}</small><strong>{item.title}</strong><p>{item.message}</p></li>)}
+          {notifications.map((item) => <li key={item.id}>
+            <div className="notification-center__item-meta"><small>{item.type} · {item.time}</small><button className="notification-center__delete" type="button" aria-label={`Delete notification: ${item.title}`} onClick={() => onDelete?.(item.id)}>DELETE ×</button></div>
+            <strong>{item.title}</strong><p>{item.message}</p>
+          </li>)}
         </ol>}
       </div>
     </section>}

@@ -93,7 +93,7 @@ export default function AccusationWindow({ cityId, onClose, standalone = false, 
         {selectedBoard && <ul className="accusation-window__checklist" aria-label="Required board contents">
           <li className={readiness.hasProof ? "is-ready" : "is-missing"}>{readiness.hasProof ? "✓" : "!"} AT LEAST ONE PIN MARKED PROOF</li>
           <li className={readiness.hasAccused ? "is-ready" : "is-missing"}>{readiness.hasAccused ? "✓" : "!"} {readiness.accusedCount} {readiness.accusedCount === 1 ? "PERSON" : "PEOPLE"} MARKED ACCUSED</li>
-          <li>{readiness.hasVictim ? "VICTIM MARKED" : "VICTIM PIN REQUIRED FOR HOMICIDE · OPTIONAL OTHERWISE"}</li>
+          <li className={readiness.hasVictim ? "is-ready" : "is-missing"}>{readiness.hasVictim ? "✓ VICTIM MARKED" : "VICTIM PIN REQUIRED FOR HOMICIDE · OPTIONAL OTHERWISE"}</li>
         </ul>}
         {selectedBoard && !readiness.ready && <p className="accusation-window__warning" role="alert">Add at least one proof and mark at least one accused person. Homicide reports also require the victim to be marked.</p>}
         {selectedBoard?.lockedAt && <p className="accusation-window__warning" role="alert">This board is locked while its review is in progress. It will unlock when the decision is delivered.</p>}
