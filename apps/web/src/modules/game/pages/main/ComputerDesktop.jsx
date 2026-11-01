@@ -16,6 +16,7 @@ import { Target } from "pixelarticons/react/Target";
 import { Mic } from "pixelarticons/react/Mic";
 import { BatteryFull } from "pixelarticons/react/BatteryFull";
 import { Terminal } from "pixelarticons/react/Terminal";
+import { Bomb } from "pixelarticons/react/Bomb";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
 import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, requestFacilitySiteAccess, setWhiteboardSaveState } from "../../../world/api.js";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
@@ -42,6 +43,7 @@ import GhostkeyExplorer from "./GhostkeyExplorer.jsx";
 import EmailBreakerApp from "./EmailBreakerApp.jsx";
 import BankruptApp from "./BankruptApp.jsx";
 import TerminalApp from "./TerminalApp.jsx";
+import MinesweeperApp from "./MinesweeperApp.jsx";
 import EmployeeDirectoryApp from "./EmployeeDirectoryApp.jsx";
 import NotificationCenter from "./NotificationCenter.jsx";
 import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
@@ -87,6 +89,7 @@ const PERSONAL_PROGRAMS = [
   { id: "personal-mail", label: "PERSONAL MAIL", Icon: Mail, state: "ONLINE", available: true },
   { id: "company-portal", label: "COMPANY PORTAL", Icon: MapIcon, state: "ONLINE", available: true },
   { id: "stock-exchange", label: "STOCK EXCHANGE", Icon: Dollar, state: "ONLINE", available: true },
+  { id: "minesweeper", label: "MINESWEEPER", Icon: Bomb, state: "READY", available: true },
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
 ];
 const WEB_BROWSER_PROGRAM = PERSONAL_PROGRAMS[0];
@@ -109,7 +112,7 @@ function localServiceLocationId(cityId, service) {
   const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
   return `service:${cityKey}/${service}`;
 }
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "mail-compose"];
+const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "minesweeper", "mail-compose"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -228,7 +231,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const notifyNewPlayerMessage = useCallback((message) => onNotification?.({ type: "EMAIL", title: message.subject || "New email received", message: `From ${message.sender || "unknown sender"}.` }), [onNotification]);
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
-  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PROXY_PROGRAM, TERMINAL_PROGRAM, ...(!isCompanyComputer ? [PERSONAL_PROGRAMS.find((program) => program.id === "stock-exchange")] : []), PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
+  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PROXY_PROGRAM, TERMINAL_PROGRAM, ...(!isCompanyComputer ? [PERSONAL_PROGRAMS.find((program) => program.id === "stock-exchange"), PERSONAL_PROGRAMS.find((program) => program.id === "minesweeper")] : []), PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
   const startMenuPrograms = persistent ? PERSONAL_START_MENU_PROGRAMS : programs;
   const facilityAccessGranted = !isCompanyComputer || initialFacilityAccessGranted;
   const [startMenuOpen, setStartMenuOpen] = useState(false);
@@ -819,6 +822,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         ? <EmployeeDirectoryApp companyRecord={program.companyRecord} onOpenCompanyStaff={onOpenCompanyStaff} onPrint={requestPrint} />
                     : program.id === "stock-exchange"
                       ? <StockExchangeApp countryId={cityId?.split("/")[0] || ""} onProgressionChange={onProgressionChange} />
+                    : program.id === "minesweeper"
+                      ? <MinesweeperApp />
                     : program.id === "proxy"
                     ? <ProxyConnection
                         world={{ city: location?.split(",")[0], cityId, country: countryName }}

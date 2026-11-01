@@ -2625,6 +2625,7 @@
 }
 .institutional-site--mail { --institutional-primary: #4e426e; --institutional-accent: #a6a0ce; --institutional-nav: #eeeaf4; --institutional-link: #51407b; }
 .computer-frame--persistent .computer-window--app:has(.email-compose-window) .computer-window__body { flex-direction: column; align-items: stretch; padding: 0; background: #fff; }
+.computer-frame--persistent .computer-window--app:has(.minesweeper-app) .computer-window__body { flex-direction: column; align-items: stretch; padding: 0; overflow: hidden; background: #f2f4ea; }
 .email-compose-window { width: 100%; min-height: 100%; flex: 1 0 auto; box-sizing: border-box; padding: clamp(1rem, 3vw, 1.75rem); color: #29272e; background: repeating-linear-gradient(to bottom, #fff 0, #fff 7px, #f0eef2 8px); font: 0.75rem/1.55 Arial, Helvetica, sans-serif; text-align: left; }
 .email-compose-window .player-mail__compose { align-content: start; margin: 0; padding: 0.75rem 0; border-top: 0; }
 .institutional-site--mail .institutional-site__symbol { color: #fff; background: #665589; border-color: #c9c1e3; }
@@ -2992,4 +2993,8 @@
   .institutional-site--bank .world-record__activity-entry .page-print-button { justify-self: start; }
   .institutional-site--mail .player-mail__date-range { align-items: stretch; flex-direction: column; }
   .institutional-site--mail .player-mail__date-range .world-record__activity-filter { justify-content: flex-start; }
+}
+.computer-frame--persistent .computer-window--app:has(.minesweeper-app) { width: min(32rem, calc(100vw - 2rem)); height: min(35rem, calc(100svh - 3rem)); }
+@media (max-width: 42rem) {
+  .computer-frame--persistent .computer-window--app:has(.minesweeper-app) { width: calc(100vw - 1.5rem); height: calc(100svh - 2rem); }
 }

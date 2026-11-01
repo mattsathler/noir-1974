@@ -1,0 +1,111 @@
+.minesweeper-app {
+  --minesweeper-cell-size: clamp(18px, min(5vw, calc((100svh - 175px) / 9), 46px), 46px);
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  padding: 12px clamp(14px, 3vw, 32px);
+  color: #252a26;
+  background: #c5c8c2;
+  text-align: left;
+}
+.minesweeper-app__topbar {
+  display: flex;
+  min-height: 45px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 5px 7px;
+  border: 2px solid;
+  border-color: #7d827c #fff #fff #7d827c;
+  background: #c5c8c2;
+}
+.minesweeper-app__counter {
+  display: grid;
+  min-width: 52px;
+  min-height: 31px;
+  place-items: center;
+  padding: 1px 5px;
+  border: 2px solid;
+  border-color: #777c76 #f2f3f1 #f2f3f1 #777c76;
+  background: #171b19;
+  color: #d94c42;
+  font: 700 24px/1 "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+}
+.minesweeper-app__face {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0 0 2px;
+  border: 2px solid;
+  border-color: #fff #777c76 #777c76 #fff;
+  background: #d5d8d2;
+  color: #252a26;
+  font: 700 24px/1 Arial, sans-serif;
+  cursor: pointer;
+}
+.minesweeper-app__face:active { border-color: #777c76 #fff #fff #777c76; }
+.minesweeper-app__face:focus-visible { outline: 2px solid #8a742e; outline-offset: 2px; }
+.minesweeper-app__announcement,
+.minesweeper-app__instructions { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.minesweeper-app__board {
+  display: grid;
+  grid-template-columns: repeat(9, var(--minesweeper-cell-size));
+  grid-template-rows: repeat(9, var(--minesweeper-cell-size));
+  align-self: center;
+  justify-self: center;
+  width: max-content;
+  max-width: 100%;
+  max-height: 100%;
+  border: 3px solid;
+  border-color: #767b75 #fff #fff #767b75;
+  background: #a3a7a1;
+  gap: 1px;
+  padding: 3px;
+}
+.minesweeper-app__cell {
+  display: grid;
+  width: var(--minesweeper-cell-size);
+  height: var(--minesweeper-cell-size);
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  border: 2px solid;
+  border-color: #fff #858a84 #858a84 #fff;
+  background: #c8cbc6;
+  color: #202521;
+  font-family: inherit;
+  font-size: clamp(13px, 1.8vh, 17px);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.minesweeper-app__cell:hover:not(.is-revealed) { background: #d7dad5; }
+.minesweeper-app__cell:focus-visible { z-index: 1; outline: 2px solid #8a742e; outline-offset: -3px; }
+.minesweeper-app__cell.is-revealed { border: 1px solid #a5aaa3; background: #d2d5d0; }
+.minesweeper-app__cell.is-flagged { color: #a33c32; }
+.minesweeper-app__cell.is-mine { background: #d8aca3; color: #7d2017; }
+.minesweeper-app__bomb { width: 54%; height: 54%; stroke-width: 2; }
+.minesweeper-app__cell.number-1 { color: #174fba; }
+.minesweeper-app__cell.number-2 { color: #26763a; }
+.minesweeper-app__cell.number-3 { color: #c32d25; }
+.minesweeper-app__cell.number-4 { color: #202e80; }
+.minesweeper-app__cell.number-5 { color: #79251f; }
+.minesweeper-app__cell.number-6 { color: #168388; }
+.minesweeper-app__cell.number-7 { color: #202521; }
+.minesweeper-app__cell.number-8 { color: #666b65; }
+@media (max-width: 520px) {
+  .minesweeper-app { --minesweeper-cell-size: clamp(18px, min(9vw, calc((100svh - 175px) / 9), 34px), 34px); padding: 8px; }
+  .minesweeper-app__topbar { min-height: 40px; margin-bottom: 7px; }
+  .minesweeper-app__counter { min-width: 46px; min-height: 28px; font-size: 21px; }
+  .minesweeper-app__face { width: 31px; height: 31px; }
+}

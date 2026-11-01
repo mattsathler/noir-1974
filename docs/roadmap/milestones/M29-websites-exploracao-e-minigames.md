@@ -1,6 +1,6 @@
 # M29 — Websites, exploração e minigames
 
-**Status:** Proposta  
+**Status:** Em andamento · Campo Minado
 **Trilha:** Independente; amplia exploração e atividades no computador sem alterar o fluxo criminal  
 **Depende de:** M23 — computador pessoal, Proxy e sites investigativos; M24 — Company Websites procedurais; M25 — saldo em Credits por personagem/servidor  
 
@@ -16,7 +16,7 @@ As recompensas devem despertar curiosidade e dar contexto ao universo sem transf
 - Anúncios podem esconder referências, mensagens, pistas de lore ou oportunidades de recompensa. O jogador precisa explorar e interpretar o conteúdo; anúncios não devem ser pop-ups obrigatórios.
 - Surveys são atividades diegéticas, opcionais e sobre produtos, instituições e acontecimentos fictícios do universo. Não coletam respostas nem dados pessoais fora do jogo.
 - A moeda desta entrega é **Credits**, já existente no perfil por personagem/servidor. Ganhos são registrados no escopo econômico atual e não podem ser criados exclusivamente pelo cliente.
-- O primeiro minigame é Campo Minado, acessível como aplicativo no computador pessoal. O resultado do minigame pode conceder recompensa limitada, mas não pode virar fonte repetível de saldo sem limite.
+- O primeiro minigame é Campo Minado, acessível como aplicativo no computador pessoal. Ele é uma atividade opcional para passar o tempo e não concede Credits nem outras recompensas econômicas.
 - Recompensas em dinheiro real, pagamentos externos, anúncios de terceiros e surveys comerciais não fazem parte do contrato implícito desta milestone. Se essa ideia for mantida, precisa de decisão própria sobre pagamentos, elegibilidade, consentimento, privacidade, fraude e requisitos legais antes de entrar em escopo implementável.
 
 ## Escopo
@@ -43,10 +43,10 @@ As recompensas devem despertar curiosidade e dar contexto ao universo sem transf
 
 - Disponibilizar Campo Minado como aplicativo próprio no computador pessoal, integrado ao NOIR Browser/MeridOS sem abrir serviço externo.
 - Implementar tabuleiro, casas seguras e minas, contagem de minas adjacentes, marcar/desmarcar bandeiras, revelar casas, derrota por mina e vitória ao revelar todas as casas seguras.
-- Oferecer instruções e pelo menos uma configuração de dificuldade adequada ao tamanho da interface do computador.
+- Oferecer instruções e uma configuração inicial de 9×9 casas com 10 minas, adequada ao tamanho da interface do computador.
 - Permitir jogar com mouse e teclado, com foco visível, nomes acessíveis para casas, leitura do estado da partida e controles que funcionem nos viewports suportados.
 - Reiniciar uma partida deve criar tabuleiro novo e estado coerente. O jogo deve impedir comandos incompatíveis após vitória ou derrota e não deve perder a partida por clique duplo acidental na primeira jogada.
-- Integrar uma recompensa de Credits limitada à conclusão elegível definida pela milestone; repetir partidas não pode gerar recompensa ilimitada.
+- Não conceder Credits, itens ou progresso de caso por iniciar, vencer ou repetir partidas; o cronômetro registra somente a duração da partida atual.
 - Manter o minigame opcional e separado dos requisitos para investigar, acusar ou concluir casos.
 
 ## Critérios de aceite
@@ -61,7 +61,7 @@ As recompensas devem despertar curiosidade e dar contexto ao universo sem transf
 - [ ] O Campo Minado abre pelo computador pessoal e permite iniciar, jogar, vencer, perder e reiniciar uma partida funcional.
 - [ ] Campo Minado calcula números adjacentes, bandeiras e condição de vitória corretamente, incluindo tabuleiro e primeiro clique seguros conforme as regras implementadas.
 - [ ] Cada ação do Campo Minado é acessível por teclado e ponteiro, com estado anunciável, foco visível e interface utilizável nos viewports suportados.
-- [ ] A recompensa do Campo Minado é validada no backend e limitada por uma regra explícita; não há repetição ilimitada de ganho.
+- [x] Campo Minado é uma atividade opcional sem recompensas econômicas ou progresso de caso; o cronômetro é apenas informativo.
 - [ ] Nenhuma atividade de websites ou minigame é requisito para completar casos, acusar ou prender pessoas.
 - [ ] A suíte de testes cobre regras do Campo Minado, navegação/atividades web, persistência e idempotência de recompensas e isolamento entre personagens/servidores.
 
@@ -71,7 +71,7 @@ As recompensas devem despertar curiosidade e dar contexto ao universo sem transf
 - Quais empresas, instituições e sites recebem as primeiras atividades e como a distribuição procedural evita duplicação de conteúdo.
 - Se pistas descobertas em sites entram no whiteboard automaticamente ou ficam guardadas numa caixa de descobertas para o jogador registrar.
 - Quais temas e formatos de survey fictício cabem na ambientação autoritária e como deixar claro que responder é opcional.
-- Níveis de dificuldade, dimensões e configuração de minas do Campo Minado; se recordes e estatísticas ficam locais ou persistem por personagem/servidor.
+- Recordes e estatísticas futuras do Campo Minado, caso sejam adicionados, e se ficam locais ou persistem por personagem/servidor.
 - Se recompensas reais externas continuam sendo um objetivo de produto. Qualquer entrega desse tipo exige escopo e autorização separados, integração de pagamentos explicitamente definida e revisão de privacidade, fraude e conformidade; M29 usa Credits fictícios até essa decisão.
 
 ## Fora de escopo
