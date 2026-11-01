@@ -93,6 +93,7 @@
 .minesweeper-app__cell:focus-visible { z-index: 1; outline: 2px solid #8a742e; outline-offset: -3px; }
 .minesweeper-app__cell.is-revealed { border: 1px solid #a5aaa3; background: #d2d5d0; }
 .minesweeper-app__cell.is-flagged { color: #a33c32; }
+.minesweeper-app__flag { width: 60%; height: 60%; color: #a33c32; stroke-width: 2; }
 .minesweeper-app__cell.is-mine { background: #d8aca3; color: #7d2017; }
 .minesweeper-app__bomb { width: 54%; height: 54%; stroke-width: 2; }
 .minesweeper-app__cell.number-1 { color: #174fba; }

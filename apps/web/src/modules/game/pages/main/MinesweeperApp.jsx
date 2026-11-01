@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bomb } from "pixelarticons/react/Bomb";
+import { Flag } from "pixelarticons/react/Flag";
 import "./MinesweeperApp.css";
 
 const SIZE = 9;
@@ -139,7 +140,7 @@ export default function MinesweeperApp() {
             if (event.key.startsWith("Arrow")) { event.preventDefault(); moveFocus(index, event.key); }
             else if (event.key.toLowerCase() === "f") { event.preventDefault(); toggleFlag(index); }
           }}
-        >{cell.flagged ? "⚑" : cell.revealed ? cell.mine ? <Bomb className="minesweeper-app__bomb" aria-hidden="true" /> : cell.adjacent || "" : ""}</button>;
+        >{cell.flagged ? <Flag className="minesweeper-app__flag" aria-hidden="true" /> : cell.revealed ? cell.mine ? <Bomb className="minesweeper-app__bomb" aria-hidden="true" /> : cell.adjacent || "" : ""}</button>;
       })}
     </div>
     <p className="minesweeper-app__instructions">Use the arrow keys to move, Enter or Space to reveal, and F to place a flag. Right-click also places a flag.</p>
