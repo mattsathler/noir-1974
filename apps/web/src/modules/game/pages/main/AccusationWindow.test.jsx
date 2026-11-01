@@ -13,7 +13,7 @@ vi.mock("../../../world/api.js", () => ({
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("AccusationWindow", () => {
-  it("marks missing board requirements in red and blocks submission", async () => {
+  it("marks missing proof and explains when a victim pin is needed", async () => {
     getWhiteboards.mockResolvedValue([{ id: "board-1", title: "Case notes" }]);
     getWhiteboard.mockResolvedValue({
       id: "board-1", title: "Case notes", pins: [
@@ -24,9 +24,28 @@ describe("AccusationWindow", () => {
     render(<AccusationWindow cityId="fr/lyon" onClose={vi.fn()} />);
 
     expect(await screen.findByText(/AT LEAST ONE PIN MARKED PROOF/)).toHaveClass("is-missing");
-    expect(screen.getByText(/ONE PERSON MARKED VICTIM/)).toHaveClass("is-missing");
+    expect(screen.getByText(/VICTIM PIN REQUIRED FOR HOMICIDE · OPTIONAL OTHERWISE/)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Homicide reports also require the victim to be marked/);
     expect(screen.getByRole("button", { name: "SUBMIT ACCUSATION" })).toBeDisabled();
     expect(submitCaseAccusation).not.toHaveBeenCalled();
+  });
+
+  it("allows a financial case board to submit without a victim pin", async () => {
+    getWhiteboards.mockResolvedValue([{ id: "board-financial", title: "Company accounts" }]);
+    getWhiteboard.mockResolvedValue({
+      id: "board-financial", title: "Company accounts", pins: [
+        { id: "record-1", source: "bank", designation: "proof" },
+        { id: "person-1", source: "person", designation: "accused" },
+        { id: "person-2", source: "person", designation: "accused" },
+      ],
+    });
+    submitCaseAccusation.mockResolvedValue({ status: "pending" });
+
+    render(<AccusationWindow cityId="fr/lyon" onClose={vi.fn()} />);
+
+    expect(await screen.findByText(/2 PEOPLE MARKED ACCUSED/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "SUBMIT ACCUSATION" }));
+    expect(submitCaseAccusation).toHaveBeenCalledWith("board-financial", "service:lyon/police-station");
   });
 
   it("does not count a blank note marked as proof toward accusation readiness", async () => {

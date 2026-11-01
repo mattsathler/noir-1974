@@ -56,6 +56,16 @@
 .company-website__staff-page .world-record__staff-member strong { color: var(--company-ink); font-weight: 700; }
 .company-website__staff-page .world-record__staff-member span { color: var(--company-accent); font-size: .62rem; }
 .company-website__staff-page .world-record__staff-member small { color: var(--company-ink); font: .72rem Arial, Helvetica, sans-serif; letter-spacing: normal; }
+.company-website__staff-page .world-record__benefits { margin: .6rem 0 1rem; padding: .55rem .7rem; color: var(--company-ink); border: 1px solid color-mix(in srgb, var(--company-accent) 34%, var(--company-paper)); background: color-mix(in srgb, var(--company-accent) 5%, var(--company-paper)); }
+.company-website__staff-page .world-record__benefits h3 { margin: 0 0 .4rem; color: var(--company-accent); font: 700 .58rem Arial, Helvetica, sans-serif; letter-spacing: .08em; }
+.company-website__staff-page .world-record__benefits ul { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.company-website__staff-page .world-record__benefits li { display: grid; gap: .12rem; padding-bottom: .3rem; border-bottom: 1px solid color-mix(in srgb, var(--company-accent) 18%, var(--company-paper)); }
+.company-website__staff-page .world-record__benefits li:last-child { padding-bottom: 0; border-bottom: 0; }
+.company-website__staff-page .world-record__benefits li strong { color: var(--company-ink); font: 700 .72rem Arial, Helvetica, sans-serif; }
+.company-website__staff-page .world-record__benefits li span,
+.company-website__staff-page .world-record__benefits li small,
+.company-website__staff-page .world-record__benefits > p { margin: 0; color: var(--company-ink); font: .66rem Arial, Helvetica, sans-serif; letter-spacing: normal; }
+.company-website__staff-page .world-record__benefits li small { font-size: .58rem; }
 .company-website__feature h2 { margin: .2rem 0 .8rem; color: var(--company-accent); font-size: clamp(1.25rem, 3vw, 2rem); }
 .company-website__eyebrow { color: var(--company-accent); }
 .company-website__sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1.4rem; }

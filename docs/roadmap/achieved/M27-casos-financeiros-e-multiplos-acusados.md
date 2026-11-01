@@ -1,6 +1,6 @@
 # M27 — Casos financeiros e múltiplos acusados
 
-**Status:** Proposta  
+**Status:** Concluída
 **Trilha:** Independente; expande o sistema criminal sem alterar o cálculo do fluxo já concluído  
 **Depende de:** ciclo atual de casos, whiteboards e acusação; contrato de eventos corporativos da bolsa quando houver integração com mercado
 
@@ -48,30 +48,39 @@ Expandir os casos além de homicídios com uma única vítima morta. A geração
 
 ## Critérios de aceite
 
-- [ ] O modelo permite tipos de caso com e sem vítima individual, sem fabricar NPCs mortos para crimes financeiros.
-- [ ] O gerador produz casos de desvio de dinheiro de empresa, extorsão financeira e fraude contábil envolvendo declarações ao governo.
-- [ ] Casos financeiros podem nomear uma organização afetada sem revelar autores, cúmplices, provas internas ou a verdade do caso.
-- [ ] Casos corporativos guardam IDs estáveis da empresa/órgão e dados suficientes para consultas; qualquer integração com mercado usa o contrato da M26 sem duplicar sua lógica.
-- [ ] Crime Reports apresenta casos não letais sem campos ou mensagens de cadáver, desaparecimento ou vítima humana obrigatória.
-- [ ] A acusação permite selecionar múltiplos participantes e aceita ausência de vítima somente nos tipos que permitem isso.
-- [ ] O backend valida individualmente participantes, papéis, evidências e requisitos por tipo de caso.
-- [ ] Acusar um inocente não o prende, mesmo quando outros participantes do mesmo caso são culpados.
-- [ ] A evidência ligada a um participante não condena automaticamente os demais; cúmplices são avaliados conforme seu próprio envolvimento.
-- [ ] Um caso permite prender mais de um participante culpado sem duplicar prisões em retries ou operações concorrentes.
-- [ ] Resultado e comunicação identificam os participantes julgados sem revelar a classificação interna dos elementos.
-- [ ] Homicídios já existentes continuam exigindo vítima e preservam suas pistas, exames, relatórios e resultados.
-- [ ] Casos novos são determinísticos/versionados e passam por validação de participantes existentes, papéis coerentes e evidências suficientes para solução.
+- [x] O modelo permite homicídios com vítima e crimes financeiros sem vítima humana ou cena obrigatória.
+- [x] O gerador v7 inclui desvio de dinheiro, extorsão corporativa e fraude contábil a partir de vínculos de emprego existentes.
+- [x] Casos financeiros podem identificar a empresa afetada sem publicar autores, cúmplices ou classificações internas de evidência.
+- [x] Casos corporativos guardam o ID estável da empresa; extorsão financeira usa o impacto corporativo já definido pela M26.
+- [x] Crime Reports apresenta casos financeiros por empresa, sem corpo ou pessoa desaparecida.
+- [x] O whiteboard permite vários acusados; vítima só é necessária no fluxo de homicídio.
+- [x] O backend valida papéis e evidência de cada participante separadamente.
+- [x] Pessoas que não participam do crime têm chance zero de prisão, mesmo quando outro participante é culpado.
+- [x] Evidências financeiras carregam vínculos individuais internos; acusar um cúmplice exige sustentação própria.
+- [x] A revisão pode prender vários participantes e usa bloqueio transacional, chave idempotente por participante e estado compartilhado do caso.
+- [x] O email de decisão apresenta o resultado de cada pessoa avaliada sem detalhar o peso interno das pistas.
+- [x] Homicídios mantêm vítima, descoberta de corpo, evidências e fluxo de acusação já existente.
+- [x] A geração financeira é determinística e versionada separadamente das versões v3–v6 já persistidas.
 
 ## Decisões necessárias antes do aceite
 
-- Se “vítima opcional” se aplica somente a crimes financeiros ou a todo crime não letal futuro.
-- Se o órgão afetado será uma entidade investigativa do caso, uma empresa ou ambos; se o governo é instituição formal no mundo gerado.
-- Definição de autor principal versus cúmplice e quais evidências podem demonstrar cada papel.
-- Se o jogador pode acusar somente alguns participantes e encerrar o caso parcialmente, ou se o caso permanece aberto até decidir sobre todos.
-- Se a primeira decisão pode prender vários acusados de uma vez ou se cada acusado exige submissão e julgamento independentes.
-- Regras de pontuação e nível de prova individual para crimes financeiros e para múltiplos acusados, preservando a garantia de nunca prender inocentes.
-- Quais registros governamentais e contábeis ficam disponíveis nas ferramentas existentes e quais exigiriam novas fontes.
-- Como e em que momento casos financeiros corporativos publicam um evento elegível para a bolsa da M26, sem antecipar informação reservada.
+As decisões de modelo e fluxo desta etapa foram fixadas assim:
+
+- A vítima é ausente apenas nos três crimes financeiros desta milestone; homicídio continua exigindo uma pessoa vítima.
+- A organização afetada é uma empresa existente. No caso de fraude contábil, o destinatário da declaração é o órgão nacional de receita, referido nos documentos do caso sem inventar uma pessoa vítima.
+- Cada caso financeiro gerado nesta etapa tem um autor principal e um cúmplice com relação de emprego verificável. Novos tipos poderão variar essa composição em milestones futuras.
+- Uma submissão pode avaliar vários acusados; a resposta é individual. Acusações parciais deixam o caso aberto até que todos os participantes culpados estejam presos.
+- A evidência recebe vínculos internos aos participantes que sustenta. Uma pessoa inocente nunca é presa por evidências ligadas a outro participante.
+- Em casos financeiros, cada pessoa precisa ter ao menos uma prova apresentada que aponte especificamente para ela; a chance-base do fluxo antigo de homicídio não vale para acusações sem sustentação individual.
+- Os casos financeiros usam o Union Mercantile Bank e o dossiê público em Crime Reports como fontes existentes. Novos portais públicos do governo ficam para uma etapa futura.
+- Somente extorsão financeira envia o evento corporativo já reconhecido pela M26. Desvio e fraude contábil não introduzem novos efeitos de mercado.
+- A migração preserva os casos atuais e versões antigas do gerador; não foi necessário limpar o banco.
+
+## Validação de encerramento
+
+- Testes Go dos módulos internos e do endpoint e2e de saúde passaram.
+- Os testes web de acusação e whiteboard passaram; o build de produção do frontend também.
+- A API de desenvolvimento respondeu com o banco conectado após as alterações. A branch Neon temporária foi criada, mas não recebeu compute: a API da Neon falhou ao provisioná-lo, então não houve validação isolada da migração nessa branch.
 
 ## Fora de escopo
 

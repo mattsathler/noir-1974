@@ -15,11 +15,11 @@ func TestGenerateHomicideIsDeterministicAndUsesWorldRelationships(t *testing.T) 
 	if err != nil {
 		t.Fatalf("world.Generate() error = %v", err)
 	}
-	first, err := Generate(base, "case-seed-one", GeneratorVersion)
+	first, err := Generate(base, "case-seed-one", contextualGeneratorVersion)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
-	second, err := Generate(base, "case-seed-one", GeneratorVersion)
+	second, err := Generate(base, "case-seed-one", contextualGeneratorVersion)
 	if err != nil {
 		t.Fatalf("Generate() second call error = %v", err)
 	}
@@ -43,12 +43,60 @@ func TestGenerateHomicideIsDeterministicAndUsesWorldRelationships(t *testing.T) 
 			t.Fatal("case contains an empty entity reference")
 		}
 	}
-	other, err := Generate(base, "case-seed-two", GeneratorVersion)
+	other, err := Generate(base, "case-seed-two", contextualGeneratorVersion)
 	if err != nil {
 		t.Fatalf("Generate() with another seed error = %v", err)
 	}
 	if first.ID == other.ID {
 		t.Fatal("different case seeds produced the same case ID")
+	}
+}
+
+func TestGeneratorV7ProducesEachFinancialCaseWithoutVictimOrScene(t *testing.T) {
+	base, err := world.Generate("m27-financial-world-fixture", world.GeneratorVersion2)
+	if err != nil {
+		t.Fatalf("world.Generate() error = %v", err)
+	}
+	want := map[string]bool{"embezzlement": false, "financial_extortion": false, "accounting_fraud": false}
+	definitions := make(map[string]Definition, len(want))
+	for index := 0; index < 500 && (len(definitions) < len(want)); index++ {
+		definition, err := Generate(base, fmt.Sprintf("m27-financial-case-%d", index), GeneratorVersion)
+		if err != nil {
+			t.Fatalf("Generate() seed %d error = %v", index, err)
+		}
+		if _, financial := want[definition.CaseType]; !financial {
+			continue
+		}
+		definitions[definition.CaseType] = definition
+	}
+	if len(definitions) != len(want) {
+		t.Fatalf("generated financial types = %v, want one each of embezzlement, financial_extortion, accounting_fraud", definitions)
+	}
+	for caseType, definition := range definitions {
+		t.Run(caseType, func(t *testing.T) {
+			if definition.GeneratorVersion != GeneratorVersion || definition.VictimID != "" || definition.LocationID != "" || definition.CrimeAt.IsZero() {
+				t.Fatalf("financial case has homicide-only or incomplete fields: %+v", definition)
+			}
+			if len(definition.Participants) != 2 || definition.Participants[0] != (CaseParticipant{NPCID: definition.KillerID, Role: "principal"}) || definition.Participants[1].Role != "accomplice" {
+				t.Fatalf("financial participants = %+v, want principal and accomplice", definition.Participants)
+			}
+			if err := Validate(definition, base); err != nil {
+				t.Fatalf("Validate() generated financial definition error = %v", err)
+			}
+			if len(definition.Records) != 2 || definition.Records[0].Source != "bank" || definition.Records[1].Source != "bank" || definition.Records[0].Reference != definition.Records[1].Reference || definition.Records[0].Amount != definition.Records[1].Amount {
+				t.Fatalf("financial bank records do not describe a matched transfer: %+v", definition.Records)
+			}
+			for _, evidence := range definition.Evidence {
+				if len(evidence.SupportsNPCIDs) == 0 {
+					t.Fatalf("evidence %q has no individual participant support", evidence.ID)
+				}
+			}
+			invalid := cloneDefinition(definition)
+			invalid.Evidence[0].SupportsNPCIDs = []string{"npc:unrelated"}
+			if err := Validate(invalid, base); !errors.Is(err, ErrInvalidDefinition) {
+				t.Fatalf("Validate() unsupported participant evidence error = %v, want ErrInvalidDefinition", err)
+			}
+		})
 	}
 }
 
@@ -59,7 +107,7 @@ func TestFinancialExtortionIncludesMixedBankAndGATECaseRecords(t *testing.T) {
 	}
 	var definition Definition
 	for index := 0; index < 200; index++ {
-		definition, err = Generate(base, fmt.Sprintf("m07-case-seed-%d", index), GeneratorVersion)
+		definition, err = Generate(base, fmt.Sprintf("m07-case-seed-%d", index), contextualGeneratorVersion)
 		if err != nil {
 			t.Fatalf("Generate() error = %v", err)
 		}
@@ -114,7 +162,7 @@ func TestJealousyCaseConnectsSpousesParamourAndInvestigationChannels(t *testing.
 	}
 	var definition Definition
 	for index := 0; index < 300; index++ {
-		definition, err = Generate(base, fmt.Sprintf("jealousy-v4-%d", index), GeneratorVersion)
+		definition, err = Generate(base, fmt.Sprintf("jealousy-v4-%d", index), contextualGeneratorVersion)
 		if err != nil {
 			t.Fatalf("Generate() error = %v", err)
 		}
@@ -181,7 +229,7 @@ func TestAnonymousCaseMessagesAreRareAndRetainSenderIdentityInSourceData(t *test
 	}
 	anonymousCount := 0
 	for index := 0; index < 100; index++ {
-		definition, err := Generate(base, fmt.Sprintf("anonymous-mail-case-%d", index), GeneratorVersion)
+		definition, err := Generate(base, fmt.Sprintf("anonymous-mail-case-%d", index), contextualGeneratorVersion)
 		if err != nil {
 			t.Fatalf("Generate() error = %v", err)
 		}
@@ -205,7 +253,7 @@ func TestValidateRejectsUnsolvableOrInvalidCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("world.Generate() error = %v", err)
 	}
-	definition, err := Generate(base, "case-validation", GeneratorVersion)
+	definition, err := Generate(base, "case-validation", contextualGeneratorVersion)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
@@ -292,6 +340,7 @@ func cloneDefinition(definition Definition) Definition {
 		copy.Evidence[index] = evidence
 		copy.Evidence[index].RelationshipIDs = append([]string(nil), evidence.RelationshipIDs...)
 		copy.Evidence[index].ReachableFromEntityIDs = append([]string(nil), evidence.ReachableFromEntityIDs...)
+		copy.Evidence[index].SupportsNPCIDs = append([]string(nil), evidence.SupportsNPCIDs...)
 	}
 	return copy
 }

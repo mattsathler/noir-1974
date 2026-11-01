@@ -45,6 +45,7 @@ Remover o telefone como canal de contato e interrogatório de NPCs. NPCs procedu
 - A geração incremental deve produzir pistas consultáveis depois do acontecimento, mantendo coerência temporal entre emails, registros, locais e participantes.
 - O primeiro recorte deve demonstrar pelo menos uma cadeia de acontecimentos que progrida em etapas depois da abertura do caso e possa terminar por descoberta/prisão dos responsáveis.
 - O sistema deve aceitar futuramente um caso de serial killer com múltiplos homicídios e vítimas em tempos diferentes, sem presumir que o assassino já foi preso na abertura.
+- O sistema também deve aceitar futuramente casos financeiros recorrentes, como um constante desvio de dinheiro da empresa. Salários alterados, etc.
 
 ### Comunicação com NPCs
 

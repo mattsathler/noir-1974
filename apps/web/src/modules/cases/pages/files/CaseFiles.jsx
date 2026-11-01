@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getCrimeReports } from "../../../world/api.js";
+import { getCaseFile, getCrimeReports } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 
@@ -26,11 +26,13 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = "" }) {
+export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = "", onPrint }) {
   const initialTo = issueDay || todayKey();
   const [cases, setCases] = useState([]);
   const [missing, setMissing] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [caseFile, setCaseFile] = useState(null);
+  const [caseFileError, setCaseFileError] = useState("");
   const [search, setSearch] = useState(initialSearch);
   const [appliedSearch, setAppliedSearch] = useState(initialSearch);
   const [fromDate, setFromDate] = useState(dateDaysBefore(initialTo, 30));
@@ -68,8 +70,18 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
     return () => { active = false; };
   }, [cityId, appliedRange, retryCount]);
 
+  useEffect(() => {
+    let active = true;
+    setCaseFile(null);
+    setCaseFileError("");
+    if (selected?.kind !== "case" || selected.record.caseType === "homicide") return undefined;
+    getCaseFile(selected.record.id).then((result) => { if (active) setCaseFile(result); })
+      .catch((error) => { if (active) setCaseFileError(error.message || "THE CASE FILE COULD NOT BE OPENED."); });
+    return () => { active = false; };
+  }, [selected]);
+
   const needle = appliedSearch.trim().toLocaleLowerCase();
-  const visibleCases = useMemo(() => cases.filter((record) => !needle || (record.victimName ?? "").toLocaleLowerCase().includes(needle)), [cases, needle]);
+  const visibleCases = useMemo(() => cases.filter((record) => !needle || `${record.victimName ?? ""} ${record.organizationName ?? ""} ${record.caseType ?? ""}`.toLocaleLowerCase().includes(needle)), [cases, needle]);
   const visibleMissing = useMemo(() => missing.filter((person) => !needle || person.name.toLocaleLowerCase().includes(needle)), [missing, needle]);
   const missingIds = useMemo(() => new Set(missing.map((person) => person.npcId)), [missing]);
   const openCaseVictims = useMemo(() => new Set(visibleCases.map((record) => record.victimId)), [visibleCases]);
@@ -91,20 +103,27 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
 
   if (selected) {
     const { kind, record } = selected;
-    const name = kind === "case" ? record.victimName : record.name;
+    const name = kind === "case" ? (record.victimName || record.organizationName) : record.name;
     const visual = kind === "case" ? record.victimVisual : record.visual;
     return (
       <section className="case-files case-files--detail" aria-label="Public case file">
         <button className="case-files__back" type="button" onClick={() => setSelected(null)}>← BACK TO CITY REPORTS</button>
         <p className="computer-window__eyebrow">CITY POLICE · PUBLIC CASE FILE</p>
         <div className="case-files__identity">
-          <figure className="case-files__portrait"><ModularFace visual={visual ?? FALLBACK_VISUAL} name={name || "Unidentified victim"} /></figure>
+          {kind === "missing" || record.caseType === "homicide" ? <figure className="case-files__portrait"><ModularFace visual={visual ?? FALLBACK_VISUAL} name={name || "Unidentified victim"} /></figure> : <span className="case-files__portrait" aria-hidden="true">▤</span>}
           <div>
-            <p className="case-files__record-type">{kind === "case" ? "OPEN HOMICIDE INQUIRY" : "MISSING PERSON"}</p>
+            <p className="case-files__record-type">{kind === "case" ? `${record.caseType?.replaceAll("_", " ").toUpperCase() || "OPEN CASE"} · PUBLIC FILE` : "MISSING PERSON"}</p>
             <h1>{name || "UNIDENTIFIED VICTIM"}</h1>
           </div>
         </div>
-        <p className="case-files__detail-note">The public file contains no further investigative findings.</p>
+        {kind === "case" && record.caseType !== "homicide" && <section className="case-files__evidence" aria-label="Public case records">
+          <h2>PUBLIC RECORDS</h2>
+          {caseFileError && <p role="alert">{caseFileError}</p>}
+          {!caseFile && !caseFileError && <p>READING THE PUBLIC FILE…</p>}
+          {caseFile?.evidence?.map((item) => <article key={item.id}><div><strong>{item.presentation}</strong><p>{item.content}</p></div><button type="button" onClick={() => onPrint?.({ id: item.id, source: "case", title: item.presentation, content: item.content, metadata: { caseId: record.id } })}>PRINT ↗</button></article>)}
+          {caseFile && !caseFile.evidence?.length && <p className="case-files__detail-note">No further public records are available.</p>}
+        </section>}
+        {kind === "missing" || (kind === "case" && record.caseType === "homicide") ? <p className="case-files__detail-note">The public file contains no further investigative findings.</p> : null}
       </section>
     );
   }
@@ -116,7 +135,7 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
 
       <form className="case-files__filters" onSubmit={searchDateRange}>
         <label className="case-files__name-search">
-          <span>SEARCH VICTIM OR MISSING PERSON</span>
+          <span>SEARCH PERSON OR ORGANIZATION</span>
           <input type="search" maxLength="80" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="TYPE A NAME · PRESS ENTER" aria-keyshortcuts="Enter" />
         </label>
         <div className="world-record__activity-filter">
@@ -135,8 +154,8 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
           <div className="case-files__list">
             {visibleCases.map((record) => (
               <article className="case-files__record" key={record.id}>
-                <span className="case-files__select-status">{missingIds.has(record.victimId) ? "MISSING PERSON · OPEN INQUIRY" : "OPEN HOMICIDE INQUIRY"}</span>
-                <button className="case-files__name-link" type="button" onClick={() => openRecord("case", record)}>{record.victimName || "UNIDENTIFIED VICTIM"}</button>
+                <span className="case-files__select-status">{record.caseType === "homicide" ? (missingIds.has(record.victimId) ? "MISSING PERSON · OPEN INQUIRY" : "OPEN HOMICIDE INQUIRY") : `${record.caseType?.replaceAll("_", " ").toUpperCase()} · CORPORATE INQUIRY`}</span>
+                <button className="case-files__name-link" type="button" onClick={() => openRecord("case", record)}>{record.victimName || record.organizationName || "PUBLIC INVESTIGATION"}</button>
                 <time dateTime={record.crimeAt}>REPORTED · {formatReportDate(record.crimeAt, timeZone)}</time>
               </article>
             ))}

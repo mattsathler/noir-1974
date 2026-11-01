@@ -11,7 +11,7 @@ describe("NotificationCenter", () => {
     render(<NotificationCenter notifications={[notification]} open={false} onToggle={onToggle} onClose={vi.fn()} snackbar={notification} onDismissSnackbar={vi.fn()} />);
 
     expect(screen.getByRole("status")).toHaveTextContent("New case report");
-    fireEvent.click(screen.getByRole("button", { name: /NOTICES/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Open notification history, 1 total/ }));
     expect(onToggle).toHaveBeenCalledOnce();
     cleanup();
 

@@ -6,7 +6,7 @@ function boardReadiness(board) {
   const hasProof = pins.some((pin) => pin.designation === "proof" && pin.source !== "note");
   const hasAccused = pins.some((pin) => pin.designation === "accused" && pin.source === "person");
   const hasVictim = pins.some((pin) => pin.designation === "victim" && pin.source === "person");
-  return { hasProof, hasAccused, hasVictim, ready: hasProof && hasAccused && hasVictim };
+  return { hasProof, hasAccused, hasVictim, accusedCount: pins.filter((pin) => pin.designation === "accused" && pin.source === "person").length, ready: hasProof && hasAccused };
 }
 
 export default function AccusationWindow({ cityId, onClose, standalone = false, publicSubmission = false }) {
@@ -80,8 +80,8 @@ export default function AccusationWindow({ cityId, onClose, standalone = false, 
   }
 
   const panel = <section className={`warrant-window__panel accusation-window__panel${standalone ? " police-restricted-app__panel" : ""}`}>
-      <header className="warrant-window__header"><div><p className="computer-window__eyebrow">{publicSubmission ? "MERIDIAN POLICE SERVICE · PUBLIC REPORT FORM" : "CORPORATE SECURITY OFFICE · FORM 74-C"}</p><h1 id="accusation-title">{publicSubmission ? "FILE A POLICE REPORT" : "MURDER ACCUSATION"}</h1></div>{onClose && <button type="button" aria-label="Close accusation form" onClick={onClose}>×</button>}</header>
-      <p className="warrant-window__copy">{publicSubmission ? "Submit an investigation board identifying the accused person, the victim, and supporting evidence. The police service will review the report and send its decision to personal mail." : "Submit an investigation board naming the accused person, the victim, and supporting proof. The review decision will be delivered to personal mail."}</p>
+      <header className="warrant-window__header"><div><p className="computer-window__eyebrow">{publicSubmission ? "MERIDIAN POLICE SERVICE · PUBLIC REPORT FORM" : "CORPORATE SECURITY OFFICE · FORM 74-C"}</p><h1 id="accusation-title">{publicSubmission ? "FILE A POLICE REPORT" : "SUBMIT CASE REVIEW"}</h1></div>{onClose && <button type="button" aria-label="Close accusation form" onClick={onClose}>×</button>}</header>
+      <p className="warrant-window__copy">{publicSubmission ? "Submit an investigation board naming one or more accused persons and supporting evidence. Identify a victim when the case involves one. The police service will review each person separately and send its decision to personal mail." : "Submit an investigation board naming one or more accused persons and supporting proof. Identify a victim when the case involves one. Each person is assessed separately; the decision will arrive by personal mail."}</p>
       <form className="accusation-window__form" onSubmit={submit}>
         <label className="world-directory__label" htmlFor="accusation-board">INVESTIGATION BOARD</label>
         <select id="accusation-board" value={selectedId} disabled={loading || busy || submitted || boards.length === 0} onChange={(event) => setSelectedId(event.target.value)}>
@@ -92,10 +92,10 @@ export default function AccusationWindow({ cityId, onClose, standalone = false, 
         </select>
         {selectedBoard && <ul className="accusation-window__checklist" aria-label="Required board contents">
           <li className={readiness.hasProof ? "is-ready" : "is-missing"}>{readiness.hasProof ? "✓" : "!"} AT LEAST ONE PIN MARKED PROOF</li>
-          <li className={readiness.hasAccused ? "is-ready" : "is-missing"}>{readiness.hasAccused ? "✓" : "!"} ONE PERSON MARKED ACCUSED</li>
-          <li className={readiness.hasVictim ? "is-ready" : "is-missing"}>{readiness.hasVictim ? "✓" : "!"} ONE PERSON MARKED VICTIM</li>
+          <li className={readiness.hasAccused ? "is-ready" : "is-missing"}>{readiness.hasAccused ? "✓" : "!"} {readiness.accusedCount} {readiness.accusedCount === 1 ? "PERSON" : "PEOPLE"} MARKED ACCUSED</li>
+          <li>{readiness.hasVictim ? "VICTIM MARKED" : "VICTIM PIN REQUIRED FOR HOMICIDE · OPTIONAL OTHERWISE"}</li>
         </ul>}
-        {selectedBoard && !readiness.ready && <p className="accusation-window__warning" role="alert">This board is missing required pins. Complete all three items above before submitting.</p>}
+        {selectedBoard && !readiness.ready && <p className="accusation-window__warning" role="alert">Add at least one proof and mark at least one accused person. Homicide reports also require the victim to be marked.</p>}
         {selectedBoard?.lockedAt && <p className="accusation-window__warning" role="alert">This board is locked while its review is in progress. It will unlock when the decision is delivered.</p>}
         <p className="world-directory__message" role="status" aria-live="polite">{loading ? "LOADING INVESTIGATION BOARDS…" : message}</p>
         <footer className="warrant-window__actions"><button type="submit" disabled={loading || busy || submitted || selectedBoard?.lockedAt || !readiness.ready}>{busy ? "SUBMITTING…" : submitted ? "SUBMITTED" : publicSubmission ? "SUBMIT REPORT" : "SUBMIT ACCUSATION"}</button></footer>

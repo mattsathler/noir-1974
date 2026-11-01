@@ -1452,6 +1452,12 @@
 .case-files__record-type { margin: 0 0 var(--noir-space-3); color: var(--noir-brass-300); font-size: 0.62rem; letter-spacing: 0.12em; }
 .case-files__identity h1 { margin: 0; color: var(--noir-paper-100); font-family: var(--noir-font-sans); font-size: clamp(1rem, 2.5vw, 1.35rem); font-weight: 400; letter-spacing: 0.04em; overflow-wrap: anywhere; }
 .case-files__detail-note { max-width: 42rem; margin-top: var(--noir-space-6); padding-top: var(--noir-space-4); color: var(--noir-paper-400); border-top: 1px solid var(--noir-ink-700); font-size: 0.7rem; line-height: 1.6; }
+.case-files__evidence { margin-top: var(--noir-space-7); border-top: 1px solid var(--noir-ink-700); }
+.case-files__evidence > h2 { margin: var(--noir-space-4) 0; color: var(--noir-brass-300); font-size: 0.66rem; letter-spacing: 0.12em; }
+.case-files__evidence article { display: flex; justify-content: space-between; align-items: start; gap: var(--noir-space-4); padding: var(--noir-space-4) 0; border-top: 1px solid var(--noir-ink-800); }
+.case-files__evidence article strong { color: var(--noir-paper-100); font-size: 0.75rem; font-weight: 500; }
+.case-files__evidence article p { max-width: 48rem; color: var(--noir-paper-400); font-size: 0.68rem; line-height: 1.6; }
+.case-files__evidence article button { flex: 0 0 auto; padding: 0.25rem 0; border: 0; background: transparent; color: var(--noir-brass-300); font: inherit; font-size: 0.61rem; letter-spacing: 0.08em; cursor: pointer; }
 .case-files__evidence { margin-top: var(--noir-space-3); padding: var(--noir-space-3); background: var(--noir-ink-900); border-left: 2px solid var(--noir-ink-500); }
 .case-files__evidence-title { margin: 0; color: var(--noir-paper-200); font-size: 0.7rem; letter-spacing: 0.08em; }
 .case-files__evidence > p:nth-child(2) { color: var(--noir-paper-400); font-size: 0.68rem; line-height: 1.55; }
@@ -2917,6 +2923,54 @@
 .email-breaker .email-breaker__deeplink::before { color: #667461; content: "> "; }
 .email-breaker .email-breaker__deeplink:disabled { opacity: 0.55; cursor: progress; }
 .email-breaker > .world-directory__message { min-height: 1em; margin: 0; color: #899486; text-align: left; }
+.bankrupt-app { display: flex; width: 100%; min-height: 100%; flex: 1 1 auto; flex-direction: column; gap: 1rem; box-sizing: border-box; padding: clamp(1rem, 3vw, 2rem); color: #c2c9b8; background: #0d100d; font: 0.72rem/1.5 var(--noir-font-mono); text-align: left; }
+.bankrupt-app__header { display: grid; grid-template-columns: 2.7rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding-bottom: 0.8rem; border-bottom: 1px solid #394237; }
+.bankrupt-app__seal { position: relative; display: grid; width: 2.4rem; height: 2.4rem; place-items: center; color: #d1c28f; border: 1px solid #8a815d; border-radius: 50%; box-shadow: inset 0 0 0 3px #0d100d, inset 0 0 0 4px #57573f; }
+.bankrupt-app__seal i { font: 700 1rem Georgia, serif; font-style: normal; }
+.bankrupt-app__seal b { position: absolute; right: -0.18rem; bottom: -0.1rem; display: grid; width: 0.8rem; height: 0.8rem; place-items: center; color: #141711; background: #a3996b; border-radius: 50%; font: 700 0.58rem Arial, sans-serif; }
+.bankrupt-app__header p,.bankrupt-app__header h1 { margin: 0; }
+.bankrupt-app__header p { color: #89927e; font-size: 0.52rem; letter-spacing: 0.09em; }
+.bankrupt-app__header h1 { color: #d8dccb; font: 600 0.92rem var(--noir-font-mono); letter-spacing: 0.06em; }
+.bankrupt-app__session { display: flex; align-items: center; gap: 0.35rem; color: #92997e; font-size: 0.48rem; letter-spacing: 0.08em; white-space: nowrap; }
+.bankrupt-app__session i { width: 0.4rem; height: 0.4rem; background: #8a9b78; border: 1px solid #b1bb9d; border-radius: 50%; box-shadow: 0 0 0.4rem rgb(138 155 120 / 25%); }
+.bankrupt-app__intro { display: grid; grid-template-columns: minmax(8rem, 0.28fr) minmax(0, 1fr); align-items: center; gap: 1.2rem; padding: 0.8rem 0 1rem; border-bottom: 1px solid #293128; }
+.bankrupt-app__intro pre { display: grid; min-height: 8rem; align-content: center; justify-content: center; margin: 0; padding: 0.7rem; color: #8b9277; background: #141812; border: 1px solid #353a2c; font: 0.58rem/1.2 var(--noir-font-mono); white-space: pre; }
+.bankrupt-app__intro > div > p { margin: 0 0 0.3rem; color: #9c9168; font-size: 0.49rem; letter-spacing: 0.1em; }
+.bankrupt-app__intro h2 { margin: 0; color: #d0d4c4; font: 500 clamp(0.95rem, 2vw, 1.2rem) var(--noir-font-mono); letter-spacing: 0.025em; }
+.bankrupt-app__intro > div > span { display: block; max-width: 34rem; margin-top: 0.45rem; color: #929a8a; font-size: 0.63rem; }
+.bankrupt-app__lookup { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 1rem; margin: 0; padding: 0.8rem 0.9rem; background: #141812; border: 1px solid #3b4031; border-left: 3px solid #817a55; }
+.bankrupt-app__input-block { display: grid; min-width: 0; gap: 0.45rem; }
+.bankrupt-app__input-block label { display: flex; justify-content: space-between; gap: 0.5rem; color: #b4b394; font-size: 0.51rem; letter-spacing: 0.08em; }
+.bankrupt-app__input-block label small { color: #757d6d; font: inherit; font-size: 0.45rem; }
+.bankrupt-app__input-line { display: flex; min-height: 2.4rem; align-items: center; gap: 0.55rem; padding: 0 0.65rem; background: #0b0e0b; border: 1px solid #404735; }
+.bankrupt-app__input-line > span { color: #928b62; font-size: 0.64rem; }
+.bankrupt-app__input-line input { width: 100%; min-width: 0; padding: 0.45rem 0; color: #d4d9c8; background: transparent; border: 0; outline: 0; font: inherit; letter-spacing: 0.12em; }
+.bankrupt-app__input-line:focus-within { border-color: #a99c68; box-shadow: 0 0 0 1px rgb(169 156 104 / 16%); }
+.bankrupt-app__input-line input::placeholder { color: #697061; }
+.bankrupt-app__link,.bankrupt-app__link:hover:not(:disabled),.bankrupt-app__link:focus-visible { justify-self: start; padding: 0; color: #aaa477; background: transparent; border: 0; box-shadow: none; cursor: pointer; font: inherit; font-size: 0.57rem; letter-spacing: 0.05em; text-align: left; }
+.bankrupt-app__link::before { color: #77785c; content: "> "; }
+.bankrupt-app__link:hover:not(:disabled),.bankrupt-app__link:focus-visible { color: #ded5a7; text-decoration: underline; text-underline-offset: 0.2em; }
+.bankrupt-app__link:disabled { opacity: 0.5; cursor: progress; }
+.bankrupt-app__account { display: grid; gap: 0.75rem; margin: 0; padding: 0.85rem 0.9rem; background: #111510; border: 1px solid #4a4935; border-top: 2px solid #9d9160; }
+.bankrupt-app__account > header { display: flex; justify-content: space-between; gap: 0.75rem; padding-bottom: 0.45rem; color: #9a936f; border-bottom: 1px solid #33382d; font-size: 0.49rem; letter-spacing: 0.08em; }
+.bankrupt-app__account > header span:last-child { color: #9ba68c; }
+.bankrupt-app__account-identity { display: flex; align-items: center; gap: 0.7rem; }
+.bankrupt-app__account-mark { display: grid; width: 2.5rem; height: 2.5rem; flex: 0 0 auto; place-items: center; color: #c4bd8d; background: #1b2018; border: 1px solid #626047; font-size: 0.75rem; }
+.bankrupt-app__account-identity h2 { margin: 0; color: #d2d7c8; font: 500 0.85rem var(--noir-font-mono); }
+.bankrupt-app__account-identity p { margin: 0.2rem 0 0; color: #87907e; font-size: 0.49rem; letter-spacing: 0.04em; }
+.bankrupt-app__account-identity p i { color: #a39a66; font-style: normal; }
+.bankrupt-app__account dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border-top: 1px solid #30362b; border-bottom: 1px solid #30362b; }
+.bankrupt-app__account dl > div { display: grid; gap: 0.2rem; padding: 0.5rem 0.65rem; border-right: 1px solid #30362b; }
+.bankrupt-app__account dl > div:last-child { border: 0; }
+.bankrupt-app__account dt { color: #858b75; font-size: 0.45rem; letter-spacing: 0.08em; }
+.bankrupt-app__account dd { margin: 0; color: #c7c9b4; font-size: 0.57rem; letter-spacing: 0.035em; overflow-wrap: anywhere; }
+.bankrupt-app__account dl > div:last-child dd { color: #b5a66b; }
+.bankrupt-app__account > form { margin: 0; padding-top: 0.05rem; }
+.bankrupt-app__status { display: flex; gap: 0.45rem; min-height: 1.2em; margin: 0; color: #9a9b7a; font-size: 0.56rem; letter-spacing: 0.035em; }
+.bankrupt-app__status > span { color: #797b5d; }
+.bankrupt-app__status--located { color: #b4b99c; }
+.bankrupt-app__footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 1rem; margin-top: auto; padding-top: 0.55rem; color: #626b5d; border-top: 1px solid #293128; font-size: 0.43rem; letter-spacing: 0.06em; }
+.computer-frame--persistent .computer-window--app:has(.bankrupt-app) .computer-window__body { flex-direction: column; align-items: stretch; }
 .world-calendar { z-index: 10000; }
 .computer-window--ghost-compromised:has(.email-inbox--hacked) .computer-window__body { position: relative; }
 .computer-window--ghost-compromised:has(.email-inbox--hacked) .computer-window__body::after { position: absolute; z-index: 2; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, transparent 0 7px, rgb(64 201 92 / 9%) 8px, transparent 9px); content: ""; opacity: 0.45; animation: ghostkey-signal 4.6s steps(1, end) infinite; }
@@ -2942,8 +2996,80 @@
 .computer-window--ghost-compromised:has(.email-inbox--hacked) .email-message__print { display: grid !important; visibility: visible !important; opacity: 1 !important; }
 .computer-window--ghost-compromised:has(.email-inbox--hacked) .email-message__delete:disabled { opacity: 1; cursor: default; }
 
+/* Bankrupt opens the Union's statement page in the normal bank visual language. */
+.computer-window--ghost-compromised:has(.world-directory--bank-records) { animation-name: ghostkey-window-flick-contained; }
+.computer-window--ghost-compromised:has(.world-directory--bank-records) .institutional-site { filter: none !important; font: 12px/1.45 Arial, Helvetica, sans-serif !important; letter-spacing: normal !important; }
+.computer-window--ghost-compromised:has(.world-directory--bank-records) .institutional-site__masthead { background: linear-gradient(110deg, #18392d, #315d46 72%, #446f4f) !important; border-bottom: 3px solid #bc9b4b !important; transform: none !important; }
+.computer-window--ghost-compromised:has(.world-directory--bank-records) .institutional-site__nav { min-height: 1.8rem !important; flex-wrap: nowrap !important; gap: 0 !important; transform: none !important; }
+.computer-window--ghost-compromised:has(.world-directory--bank-records) .institutional-site__content { padding: 0.85rem !important; background: repeating-linear-gradient(0deg, #fff 0 23px, #f5f6f0 24px) !important; }
+.computer-window--ghost-compromised:has(.world-directory--bank-records) .institutional-site h1,
+.computer-window--ghost-compromised:has(.world-directory--bank-records) .institutional-site h2 { letter-spacing: normal !important; text-shadow: none !important; }
+.computer-window--ghost-compromised:has(.world-directory--bank-records) .institutional-site h1::after,
+.computer-window--ghost-compromised:has(.world-directory--bank-records) .institutional-site h2::after { content: none !important; animation: none !important; }
+.institutional-site--bank .world-directory--bank-records { width: 100%; max-width: 72rem; margin: 0 auto; color: #303a33; font: 0.75rem/1.5 Arial, Helvetica, sans-serif; letter-spacing: normal; }
+.institutional-site--bank .world-directory--bank-records > .computer-window__eyebrow { margin: 0 0 0.35rem; color: #617267; font: 700 0.55rem Arial, sans-serif; letter-spacing: 0.09em; }
+.institutional-site--bank .world-directory--bank-records > h1 { margin: 0 0 0.8rem; padding-bottom: 0.55rem; color: #244734; border-bottom: 2px solid #bc9b4b; font: 700 clamp(1.2rem, 2.5vw, 1.55rem) Georgia, serif; letter-spacing: 0.025em; }
+.institutional-site--bank .world-directory--bank-records .world-person-file { margin: 0; padding: 0.7rem 0; color: #303a33; background: transparent; border: 0; }
+.institutional-site--bank .world-directory--bank-records .world-person-file__toolbar { padding-bottom: 0.45rem; color: #52675a; border-color: #d8ddd4; font: 700 0.53rem Arial, sans-serif; letter-spacing: 0.08em; }
+.institutional-site--bank .world-directory--bank-records .world-person-file__identity { margin: 0.65rem 0; gap: 0.7rem; }
+.institutional-site--bank .world-directory--bank-records .world-directory__person-portrait { width: 3.4rem; height: 3.4rem; padding: 0.2rem; background: #f1f2ea; border: 1px solid #c9cabb; }
+.institutional-site--bank .world-directory--bank-records .world-person-file__identity h2 { color: #263b2e; font: 700 1rem Georgia, serif; }
+.institutional-site--bank .world-directory--bank-records .world-person-file__identity p { margin-top: 0.2rem; color: #627467; font: 700 0.52rem Arial, sans-serif; letter-spacing: 0.06em; }
+.institutional-site--bank .world-record__bank-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; margin: 0.7rem 0 1rem; padding: 0.65rem 0; background: #f0f2e9; border-top: 1px solid #d8dccd; border-bottom: 1px solid #d8dccd; }
+.institutional-site--bank .world-record__bank-summary > div { display: grid; gap: 0.2rem; padding: 0 0.65rem; border-right: 1px solid #d3d8ca; }
+.institutional-site--bank .world-record__bank-summary > div:last-child { border: 0; }
+.institutional-site--bank .world-record__bank-summary dt { color: #667368; font: 700 0.47rem Arial, sans-serif; letter-spacing: 0.08em; }
+.institutional-site--bank .world-record__bank-summary dd { margin: 0; color: #2e4737; font: 700 0.66rem/1.35 Arial, sans-serif; overflow-wrap: anywhere; }
+.institutional-site--bank .world-directory--bank-records .world-record__activity { margin-top: 0.85rem; padding-top: 0; border: 0; }
+.institutional-site--bank .world-directory--bank-records .world-record__activity h3 { margin: 0; padding: 0.45rem 0; color: #52675a; border-bottom: 1px solid #cbd2c6; font: 700 0.54rem Arial, sans-serif; letter-spacing: 0.08em; }
+.institutional-site--bank .world-directory--bank-records .world-record__activity-filter { align-items: end; gap: 0.55rem; margin: 0.6rem 0; }
+.institutional-site--bank .world-record__date-label { color: #657267; font: 700 0.49rem Arial, sans-serif; }
+.institutional-site--bank .world-record__date-trigger { min-height: 1.8rem; padding: 0.32rem 0.5rem; color: #31553d; background: #fff; border: 1px solid #bdc7b9; font: 0.63rem Arial, sans-serif; letter-spacing: normal; }
+.institutional-site--bank .world-record__date-trigger:hover,.institutional-site--bank .world-record__date-trigger[aria-expanded="true"] { background: #f2f5ed; border-color: #718b70; }
+.institutional-site--bank .world-record__activity-filter > button { padding: 0.35rem 0; color: #31553d; font: 700 0.55rem Arial, sans-serif; }
+.institutional-site--bank .world-record__activity-message { color: #607567 !important; font: 700 0.52rem Arial, sans-serif !important; letter-spacing: 0.05em; }
+.institutional-site--bank .world-record__activity-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "heading heading" "description amount" "operator print"; align-items: center; gap: 0.32rem 1rem; margin: 0; padding: 0.7rem 0.25rem; color: #303a33; background: transparent; border: 0; border-bottom: 1px solid #d8ddd4; }
+.institutional-site--bank .world-record__activity-entry header { grid-area: heading; display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding-bottom: 0.35rem; color: #657267; border-bottom: 1px dotted #d2d8ce; font: 700 0.49rem Arial, sans-serif; }
+.institutional-site--bank .world-record__activity-entry header span { color: #31553d; letter-spacing: 0.06em; }
+.institutional-site--bank .world-record__activity-entry header time { color: #52675a; white-space: nowrap; }
+.institutional-site--bank .world-record__activity-entry > p:first-of-type { grid-area: description; margin: 0; color: #303a33; font: 0.7rem/1.4 Arial, sans-serif; }
+.institutional-site--bank .world-record__activity-entry > p:nth-of-type(2) { grid-area: operator; margin: 0; color: #727d73; font: 0.54rem Arial, sans-serif; }
+.institutional-site--bank .world-record__activity-entry .world-record__amount { grid-area: amount; justify-content: flex-end; gap: 0.65rem; margin: 0; padding: 0; border: 0; white-space: nowrap; }
+.institutional-site--bank .world-record__activity-entry .world-record__amount span { color: #657267; font: 700 0.46rem Arial, sans-serif; }
+.institutional-site--bank .world-record__activity-entry .world-record__amount strong { font: 700 0.72rem Arial, sans-serif; letter-spacing: normal; }
+.institutional-site--bank .world-record__activity-entry .world-record__amount--incoming,
+.institutional-site--bank .world-record__activity-entry .world-record__amount--incoming strong { color: #347246 !important; }
+.institutional-site--bank .world-record__activity-entry .world-record__amount--outgoing,
+.institutional-site--bank .world-record__activity-entry .world-record__amount--outgoing strong { color: #8c3d38 !important; }
+.institutional-site--bank .world-record__activity-entry .page-print-button { grid-area: print; justify-self: end; width: 1.6rem; height: 1.6rem; margin: 0; color: #31553d; background: transparent; border-color: #c5cec1; }
+.institutional-site--bank .world-record__activity-entry .page-print-button:hover { color: #244734; background: #eef2e9; border-color: #82977f; }
+.institutional-site--bank .world-record__activity-entry .world-record__route { grid-column: 1 / -1; color: #303a33; background: #f0f2e9; border-color: #d6dccf; }
+.institutional-site--bank .world-record__activity-entry .world-record__route strong { color: #2e4737; }
+.world-calendar[data-site-variant="bank"] { color: #303a33; background: #fff; border-color: #9eac99; box-shadow: 2px 2px 0 rgb(36 71 52 / 15%); }
+.world-calendar[data-site-variant="bank"] .world-calendar__header { color: #244734; }
+.world-calendar[data-site-variant="bank"] .world-calendar__header button { color: #31553d; background: #f0f2e9; border-color: #cbd2c6; }
+.world-calendar[data-site-variant="bank"] .world-calendar__weekday { color: #68766c; }
+.world-calendar[data-site-variant="bank"] .world-calendar__day { color: #303a33; background: #f0f2e9; }
+.world-calendar[data-site-variant="bank"] .world-calendar__day:hover:not(:disabled) { color: #244734; border-color: #718b70; }
+
 @media (max-width: 42rem) {
   .email-breaker { gap: 0.85rem; padding: 0.85rem; }
+  .bankrupt-app { gap: 0.8rem; padding: 0.8rem; }
+  .bankrupt-app__header { grid-template-columns: 2.4rem minmax(0, 1fr); }
+  .bankrupt-app__session { display: none; }
+  .bankrupt-app__intro { grid-template-columns: minmax(0, 1fr); }
+  .bankrupt-app__intro pre { display: none; }
+  .bankrupt-app__lookup { grid-template-columns: minmax(0, 1fr); }
+  .bankrupt-app__account dl { grid-template-columns: minmax(0, 1fr); }
+  .bankrupt-app__account dl > div { padding-inline: 0; border-right: 0; border-bottom: 1px solid #30362b; }
+  .bankrupt-app__account dl > div:last-child { border: 0; }
+  .bankrupt-app__footer { flex-direction: column; }
+  .institutional-site--bank .world-record__bank-summary { grid-template-columns: minmax(0, 1fr); }
+  .institutional-site--bank .world-record__bank-summary > div { padding: 0.25rem 0; border-right: 0; border-bottom: 1px solid #d3d8ca; }
+  .institutional-site--bank .world-record__bank-summary > div:last-child { border: 0; }
+  .institutional-site--bank .world-record__activity-entry { grid-template-columns: minmax(0, 1fr); grid-template-areas: "heading" "description" "amount" "operator" "print"; }
+  .institutional-site--bank .world-record__activity-entry .world-record__amount { justify-content: flex-start; }
+  .institutional-site--bank .world-record__activity-entry .page-print-button { justify-self: start; }
   .institutional-site--mail .player-mail__date-range { align-items: stretch; flex-direction: column; }
   .institutional-site--mail .player-mail__date-range .world-record__activity-filter { justify-content: flex-start; }
 }

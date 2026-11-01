@@ -511,7 +511,7 @@ func generatedCompanyEmployees(seed string, version int, company Company) ([]Com
 			return nil, err
 		}
 		employees = append(employees, CompanyEmployee{
-			ID: npc.ID, Name: npc.Name, Email: EmailAddressForNPC(npc.ID, npc.Name), Role: employmentRoles[(slot-1)%len(employmentRoles)],
+			ID: npc.ID, Name: npc.Name, Email: EmailAddressForNPC(npc.ID, npc.Name), BankAccount: BankAccountNumberForNPC(seed, version, npc.ID), Role: employmentRoles[(slot-1)%len(employmentRoles)],
 			Status: npc.Status, Visual: npc.Visual,
 		})
 	}

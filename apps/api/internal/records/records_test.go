@@ -58,6 +58,121 @@ func TestGenerateIsDeterministicAndLimitedToNPCAndInterval(t *testing.T) {
 	}
 }
 
+func TestDailyWageDepositMatchesStaffDirectoryPay(t *testing.T) {
+	from := time.Date(1974, time.November, 24, 0, 0, 0, 0, time.UTC)
+	through := from.Add(23*time.Hour + 59*time.Minute)
+	items, err := GenerateForSource("payroll-seed", 2, "npc:ada", Context{
+		Employer: "Aurore Industries", DailySalary: world.DailySalaryCredits("accountant"),
+	}, from, through, "bank")
+	if err != nil {
+		t.Fatalf("GenerateForSource() error = %v", err)
+	}
+	var wage *Record
+	for index := range items {
+		if items[index].Description == "Daily wages from Aurore Industries were deposited." {
+			wage = &items[index]
+			break
+		}
+	}
+	if wage == nil {
+		t.Fatalf("daily ledger omitted wage deposit: %+v", items)
+	}
+	if wage.Amount != 18 || wage.Direction != "incoming" || wage.Reference != "Aurore Industries" || wage.Source != "bank" {
+		t.Fatalf("payroll record = %+v, want directory daily wage 18 credits, incoming, and matching employer", *wage)
+	}
+}
+
+func TestDailyWagesRepeatAcrossSelectedDates(t *testing.T) {
+	from := time.Date(1974, time.November, 24, 0, 0, 0, 0, time.UTC)
+	through := from.AddDate(0, 0, 2).Add(23*time.Hour + 59*time.Minute)
+	items, err := GenerateForSource("payroll-seed", 2, "npc:ada", Context{Employer: "Aurore Industries", DailySalary: 15}, from, through, "bank")
+	if err != nil {
+		t.Fatalf("GenerateForSource() error = %v", err)
+	}
+	wages := 0
+	for _, item := range items {
+		if item.Description == "Daily wages from Aurore Industries were deposited." {
+			wages++
+		}
+	}
+	if wages != 3 {
+		t.Fatalf("got %d daily wage deposits, want one per each of 3 days", wages)
+	}
+}
+
+func TestCompanyBenefitDepositsFollowPublishedScheduleAndRole(t *testing.T) {
+	from := time.Date(1974, time.November, 1, 0, 0, 0, 0, time.UTC) // first Friday
+	through := from.AddDate(0, 0, 2).Add(23*time.Hour + 59*time.Minute)
+	items, err := GenerateForSource("benefit-seed", 2, "npc:ada", Context{
+		Employer: "Aurore Industries", DailySalary: 18, Role: "accountant",
+		Benefits: []world.CompanyBenefit{
+			{Code: "meal_voucher", Name: "Meal voucher", RatePercent: 25, Schedule: "Monday–Friday", EligibleRoles: []string{"accountant"}},
+			{Code: "profit_sharing", Name: "Profit sharing", RatePercent: 200, Schedule: "First Friday of each month", EligibleRoles: []string{"accountant", "manager"}},
+		},
+	}, from, through, "bank")
+	if err != nil {
+		t.Fatalf("GenerateForSource() error = %v", err)
+	}
+	got := map[string]int{}
+	for _, item := range items {
+		if item.Operator == "Employer Payroll Office" && item.Description != "Daily wages from Aurore Industries were deposited." {
+			got[item.Description] = item.Amount
+		}
+	}
+	if got["Meal voucher benefit from Aurore Industries was credited."] != 5 {
+		t.Fatalf("weekday meal voucher amount missing or wrong: %+v", got)
+	}
+	if got["Profit sharing benefit from Aurore Industries was credited."] != 36 {
+		t.Fatalf("first-Friday profit sharing amount missing or wrong: %+v", got)
+	}
+	if len(got) != 2 {
+		t.Fatalf("unexpected benefits outside eligible date/rule: %+v", got)
+	}
+
+	items, err = GenerateForSource("benefit-seed", 2, "npc:ada", Context{
+		Employer: "Aurore Industries", DailySalary: 18, Role: "driver",
+		Benefits: []world.CompanyBenefit{{Code: "profit_sharing", Name: "Profit sharing", RatePercent: 200, Schedule: "First Friday of each month", EligibleRoles: []string{"accountant", "manager"}}},
+	}, from, from.Add(23*time.Hour), "bank")
+	if err != nil {
+		t.Fatalf("GenerateForSource() error = %v", err)
+	}
+	for _, item := range items {
+		if item.Description == "Profit sharing benefit from Aurore Industries was credited." {
+			t.Fatalf("ineligible role received profit sharing: %+v", item)
+		}
+	}
+}
+
+func TestUnlistedBenefitCanSurfaceAsARepeatableLedgerClue(t *testing.T) {
+	context := Context{Employer: "Aurore Industries", EmployerID: "company:aurore", DailySalary: 18, Role: "accountant"}
+	var date time.Time
+	var expected world.CompanyBenefit
+	for day := 1; day <= 366; day++ {
+		candidateDate := time.Date(1974, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, day-1)
+		if benefit, ok := unlistedBenefit("benefits-ledger-seed", 2, "npc:ada", candidateDate, context); ok {
+			date, expected = candidateDate, benefit
+			break
+		}
+	}
+	if date.IsZero() {
+		t.Fatal("expected the deterministic year to contain an unlisted benefit entry")
+	}
+	items, err := GenerateForSource("benefits-ledger-seed", 2, "npc:ada", context, date, date.Add(23*time.Hour), "bank")
+	if err != nil {
+		t.Fatalf("GenerateForSource() error = %v", err)
+	}
+	for _, item := range items {
+		if item.Description == expected.Name+" benefit from Aurore Industries was credited." {
+			want := (context.DailySalary*expected.RatePercent + 50) / 100
+			if item.Amount != want || item.Direction != "incoming" || item.Reference != context.Employer {
+				t.Fatalf("unlisted benefit record = %+v, want %d-credit employer deposit", item, want)
+			}
+			return
+		}
+	}
+	t.Fatalf("unlisted benefit clue was not present on %s: %+v", date.Format("2006-01-02"), items)
+}
+
 func TestExtortionEventsKeepCaseLinksOutOfPublicJSON(t *testing.T) {
 	events := ExtortionEvents("case-seed", 2, "case:123", "npc:killer", "npc:victim", "Bellecour", time.Date(1974, time.November, 12, 0, 0, 0, 0, time.UTC))
 	if len(events) != 2 || events[0].InternalRelation != "extortion_payment" || events[1].InternalRelation != "precrime_route" {

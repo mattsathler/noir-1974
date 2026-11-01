@@ -469,6 +469,53 @@ func TestAccusationDecisionRollIsStableForRetries(t *testing.T) {
 	}
 }
 
+func TestParticipantAccusationRequiresIndividualSupport(t *testing.T) {
+	cases := []struct {
+		name            string
+		correct         bool
+		alreadyArrested bool
+		relevantProofs  int
+		want            bool
+	}{
+		{name: "innocent cannot be arrested", correct: false, relevantProofs: 3, want: false},
+		{name: "participant needs own evidence", correct: true, relevantProofs: 0, want: false},
+		{name: "participant with own evidence can be considered", correct: true, relevantProofs: 1, want: true},
+		{name: "existing arrest remains idempotent", correct: true, alreadyArrested: true, want: true},
+		{name: "arrested nonparticipant is not adopted as a case verdict", correct: false, alreadyArrested: true, want: false},
+	}
+	for _, item := range cases {
+		t.Run(item.name, func(t *testing.T) {
+			if got := participantAccusationEligible(item.correct, item.alreadyArrested, item.relevantProofs); got != item.want {
+				t.Fatalf("participantAccusationEligible() = %t, want %t", got, item.want)
+			}
+		})
+	}
+}
+
+func TestParticipantAccusationDecisionIsStableAndScopedPerNPC(t *testing.T) {
+	first := accusationAcceptedForParticipant("server", "account", "case", "npc-a", 75)
+	for attempt := 0; attempt < 20; attempt++ {
+		if got := accusationAcceptedForParticipant("server", "account", "case", "npc-a", 75); got != first {
+			t.Fatalf("retry %d verdict = %t, want stable verdict %t", attempt, got, first)
+		}
+	}
+	independentOutcome := false
+	firstAtFifty := accusationAcceptedForParticipant("server", "account", "case", "npc-a", 50)
+	for index := 0; index < 100; index++ {
+		candidate := fmt.Sprintf("npc-%d", index)
+		if firstAtFifty != accusationAcceptedForParticipant("server", "account", "case", candidate, 50) {
+			independentOutcome = true
+			break
+		}
+	}
+	if !independentOutcome {
+		t.Fatal("different participant identities should have independent deterministic rolls")
+	}
+	if accusationAcceptedForParticipant("server", "account", "case", "npc-a", 0) {
+		t.Fatal("zero chance should never accept a participant accusation")
+	}
+}
+
 func TestAsyncRequestIDIsStableAndScoped(t *testing.T) {
 	want := asyncRequestID("server-a", "account-a", "accusation", "case-1")
 	if got := asyncRequestID("server-a", "account-a", "accusation", "case-1"); got != want {

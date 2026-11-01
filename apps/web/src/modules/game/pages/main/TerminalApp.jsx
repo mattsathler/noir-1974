@@ -35,6 +35,9 @@ const COMMANDS = {
   "email_breaker.exe": { id: "email-breaker", label: "EMAIL_BREAKER.EXE", art: [
     "     .------------.", "     |  MAILBOX   |", "     |   .----.   |", "  @--|--|XXXX|---+", "     |  '----'   |", "     '-----||-----'", "           \\\\", "        MAIL BREACH",
   ] },
+  "bankrupt.exe": { id: "bankrupt", label: "BANKRUPT.EXE", art: [
+    "      .----------.", "   .--|  UNION   |--.", "  /   |  .----.  |   /", " |    |  |####|  |    |", " |    |  '----'  |    |", "  '---'----||----'---'", "   '------LOCK------'", "       BANK BREACH",
+  ] },
 };
 
 export default function TerminalApp({ onRun }) {
@@ -72,7 +75,7 @@ export default function TerminalApp({ onRun }) {
     setHistoryIndex(-1);
 
     if (entered.toLowerCase() === "help") {
-      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                 Show this command list", "  RUN GHOSTKEY.EXE     Start Ghostkey", "  RUN MAILBREAKER.EXE  Start Email Breaker", ""]);
+      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                 Show this command list", "  RUN GHOSTKEY.EXE     Start Ghostkey", "  RUN MAILBREAKER.EXE  Start Email Breaker", "  RUN BANKRUPT.EXE     Start Bankrupt", ""]);
       return;
     }
 

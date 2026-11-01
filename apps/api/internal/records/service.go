@@ -53,7 +53,7 @@ func (service *Service) NPCRecords(ctx context.Context, serverID, npcID string, 
 	if employer == "" {
 		employer = "Independent account"
 	}
-	ordinary, err := GenerateForSource(profile.WorldSeed, profile.GeneratorVersion, npcID, Context{RegionName: "Lyon", HomeDistrict: regionName, Employer: employer, Districts: districts}, from, through, source)
+	ordinary, err := GenerateForSource(profile.WorldSeed, profile.GeneratorVersion, npcID, Context{RegionName: "Lyon", HomeDistrict: regionName, Employer: employer, Districts: districts, DailySalary: profile.DailySalary, Role: profile.Role, EmployerID: profile.EmployerID, Benefits: profile.EmployerBenefits}, from, through, source)
 	if err != nil {
 		return nil, err
 	}

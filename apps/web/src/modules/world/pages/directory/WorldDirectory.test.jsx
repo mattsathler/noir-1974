@@ -1,16 +1,36 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WorldDirectory from "./WorldDirectory.jsx";
-import { getNPCRecords, searchPeople } from "../../api.js";
+import { getCompanyAtLocation, getNPCRecords, searchPeople } from "../../api.js";
 
 vi.mock("../../api.js", () => ({
   getNPCRecords: vi.fn(),
+  getCompanyAtLocation: vi.fn(),
   searchCompanies: vi.fn(),
   searchLocations: vi.fn(),
   searchPeople: vi.fn(),
 }));
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+describe("Company staff directory", () => {
+  it("publishes the employee's daily wage alongside their role", async () => {
+    getCompanyAtLocation.mockResolvedValue([{
+      company: { id: "company:aurora", name: "Aurore Industries" },
+      address: { full: "Aurore Industries, Bellecour, Lyon, France" },
+      employees: [{ id: "npc:ada", name: "Ada Morel", role: "accountant", email: "ada.morel@example.test", dailySalaryCredits: 15, bankAccountNumber: "12003456" }],
+      benefits: [{ code: "meal_voucher", name: "Meal voucher", ratePercent: 25, schedule: "Monday–Friday", eligibleRoles: ["accountant", "clerk"] }],
+    }]);
+
+    render(<WorldDirectory program="staff-directory" companyLocationId="location:office" companyId="company:aurora" accessAttemptId="attempt-1" />);
+
+    expect(await screen.findByText("DAILY WAGE · 15 CREDITS")).toBeInTheDocument();
+    expect(await screen.findByText("BANK ACCOUNT · 12003456")).toBeInTheDocument();
+    expect(await screen.findByText("DECLARED STAFF BENEFITS")).toBeInTheDocument();
+    expect(screen.getByText("25% of daily wage · Monday–Friday")).toBeInTheDocument();
+    expect(screen.getByText("ACCOUNTANT")).toBeInTheDocument();
+  });
+});
 
 describe("WorldDirectory activity records", () => {
   it("queries the bank ledger while showing only the account holder's name", async () => {
@@ -39,7 +59,7 @@ describe("WorldDirectory activity records", () => {
     expect(screen.getByText("DEBIT · SENT")).toBeInTheDocument();
     expect(screen.getByText("−68 CREDITS")).toBeInTheDocument();
     expect(screen.getByText("Sun, Nov 10, 5:42 PM")).toBeInTheDocument();
-    expect(screen.getByText("FINANCIAL LEDGER")).toBeInTheDocument();
+    expect(screen.getByText("UNION MERCANTILE BANK")).toBeInTheDocument();
     expect(screen.queryByText(/case|extortion|evidence|clue/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/\b\d{4}\b/)).not.toBeInTheDocument();
   });

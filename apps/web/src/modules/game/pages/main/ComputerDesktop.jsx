@@ -41,6 +41,7 @@ import DesktopSettings from "./DesktopSettings.jsx";
 import ProxyConnection from "../../../world/components/ProxyConnection.jsx";
 import GhostkeyExplorer from "./GhostkeyExplorer.jsx";
 import EmailBreakerApp from "./EmailBreakerApp.jsx";
+import BankruptApp from "./BankruptApp.jsx";
 import TerminalApp from "./TerminalApp.jsx";
 import EmployeeDirectoryApp from "./EmployeeDirectoryApp.jsx";
 import NotificationCenter from "./NotificationCenter.jsx";
@@ -95,6 +96,7 @@ const SETTINGS_PROGRAM = { id: "settings", label: "SETTINGS", Icon: Brush, state
 const PROXY_PROGRAM = { id: "proxy", label: "ROGUE DNS", Icon: Wifi, state: "UNLISTED", available: true };
 const GHOSTKEY_PROGRAM = { id: "ghostkey", label: "GHOSTKEY.EXE", Icon: Bug, state: "READY", available: true };
 const EMAIL_BREAKER_PROGRAM = { id: "email-breaker", label: "EMAIL_BREAKER.EXE", Icon: Mail, state: "UNSIGNED", available: true };
+const BANKRUPT_PROGRAM = { id: "bankrupt", label: "BANKRUPT.EXE", Icon: Dollar, state: "UNSIGNED", available: true };
 const PERSON_SEARCH_PROGRAM = { id: "person-search", label: "PERSON_SEARCH_APP.EXE", Icon: User, state: "PRIVILEGED", available: true };
 const PATIENT_SEARCH_PROGRAM = { id: "patient-search", label: "PATIENT_SEARCH_APP.EXE", Icon: Cross, state: "PRIVILEGED", available: true };
 const GATE_RECORDS_PROGRAM = { id: "gate-records", label: "GATE_ACCESS_LOG_APP.EXE", Icon: MapIcon, state: "PRIVILEGED", available: true };
@@ -106,7 +108,7 @@ function localServiceLocationId(cityId, service) {
   const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
   return `service:${cityKey}/${service}`;
 }
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange"];
+const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -513,6 +515,29 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     setWindows((previous) => [...previous, { id, program, zIndex, position, history: [], loading: false }]);
   }
 
+  function openHackedBankLedger(account) {
+    const zIndex = nextZIndexRef.current++;
+    const offset = windows.length;
+    const compact = window.matchMedia("(max-width: 42rem)").matches;
+    const position = offset === 0 ? null : {
+      left: Math.min(compact ? 8 + offset * 10 : 40 + offset * 28, compact ? 32 : 140),
+      top: Math.min(compact ? 8 + offset * 10 : 32 + offset * 24, compact ? 32 : 120),
+    };
+    const id = `${persistent ? "noir-browser" : "bank-records"}:${zIndex}`;
+    const program = {
+      id: "bank-records",
+      label: `UNION MERCANTILE · ${account.name.toUpperCase()}`,
+      Icon: Dollar,
+      state: "BREACHED",
+      available: true,
+      siteAddress: "merid//unionmercantile.123.223.76.1:4000/bank-website",
+      accessedViaGhost: true,
+      hackedBankAccount: { id: account.id, name: account.name, bankAccountNumber: account.bankAccountNumber },
+    };
+    document.documentElement.dataset.noirActiveComputerWindow = id;
+    setWindows((previous) => [...previous, { id, program, zIndex, position, history: [], loading: false }]);
+  }
+
   async function openGateRecordsFromGhost(siteAddress, sourceWindowId) {
     const locationId = localServiceLocationId(cityId, "gate-station");
     if (!locationId) throw new Error("THE LOCAL GATE SERVICE IS NOT AVAILABLE.");
@@ -531,7 +556,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
 
   function launchProgram(program, sourceWindowId = null, sourceState = null, skipGhostkeyWarning = false) {
     if (!program?.available) return;
-    if (["ghostkey", "proxy", "email-breaker"].includes(program.id) && !skipGhostkeyWarning && !windows.some((item) => item.program.id === program.id)) {
+    if (["ghostkey", "proxy", "email-breaker", "bankrupt"].includes(program.id) && !skipGhostkeyWarning && !windows.some((item) => item.program.id === program.id)) {
       setSecurityWarningProgram(program);
       setGhostkeyWarningOpen(true);
       return;
@@ -764,11 +789,13 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "character-appearance"
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
                     : program.id === "terminal"
-                      ? <TerminalApp onRun={(programId) => launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : EMAIL_BREAKER_PROGRAM)} />
+                      ? <TerminalApp onRun={(programId) => launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : programId === "bankrupt" ? BANKRUPT_PROGRAM : EMAIL_BREAKER_PROGRAM)} />
                     : program.id === "ghostkey"
                       ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => launchProgram({ ...PATIENT_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenGateRecords={(siteAddress) => openGateRecordsFromGhost(siteAddress, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
                       : program.id === "email-breaker"
                         ? <EmailBreakerApp serverTime={serverTime} onOpenHackedMailbox={openHackedMailbox} />
+                      : program.id === "bankrupt"
+                        ? <BankruptApp onOpenBankLedger={openHackedBankLedger} />
                       : program.id === "person-search"
                         ? <PoliceWebsite page="person-search" navigate={(destination) => launchProgram(destination, id)} searchId={`police-site-search-${id}`}><WorldDirectory key={`${id}:person-search`} program="interpol" countryName={countryName} cityId={cityId} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} /></PoliceWebsite>
                       : program.id === "employee-directory"
@@ -796,7 +823,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })}
                       />
                     : ["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports"].includes(program.id)
-                      ? <PoliceWebsite page={program.id} navigate={(destination) => launchProgram(destination, id)}>{program.id === "crime-reports" ? <CaseFiles key={`${id}:crime-reports:${program.searchTerm || ""}`} initialSearch={program.searchTerm} cityId={cityId} issueDay={issueDay} timeZone={timeZone} /> : program.id === "police-complaints" ? <AccusationWindow key={id} cityId={cityId} standalone publicSubmission /> : null}</PoliceWebsite>
+                      ? <PoliceWebsite page={program.id} navigate={(destination) => launchProgram(destination, id)}>{program.id === "crime-reports" ? <CaseFiles key={`${id}:crime-reports:${program.searchTerm || ""}`} initialSearch={program.searchTerm} cityId={cityId} issueDay={issueDay} timeZone={timeZone} onPrint={requestPrint} /> : program.id === "police-complaints" ? <AccusationWindow key={id} cityId={cityId} standalone publicSubmission /> : null}</PoliceWebsite>
                       : program.id === "deep-link"
                         ? <InstitutionalWebsiteFrame variant="civic" organizationName={program.label}><DeepLinkWebsite linkId={program.linkId} /></InstitutionalWebsiteFrame>
                       : program.id === "newspaper"
@@ -836,7 +863,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         }, id) : undefined}
                       >
                         {program.id === "case-files"
-                          ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} timeZone={timeZone} />
+                          ? <CaseFiles key={id} cityId={cityId} issueDay={issueDay} timeZone={timeZone} onPrint={requestPrint} />
                           : program.id === "patient-search"
                             ? <HospitalPatientSearch key={id} accessAttemptId={accessAttemptId} timeZone={timeZone} onPrint={requestPrint} onOpenPatient={(patient) => launchProgram({ id: "hospital-patient-record", label: patient.postMortem ? `POST-MORTEM FILE · ${patient.name}` : `PATIENT FILE · ${patient.name}`, state: "ONLINE", available: true, patient }, id)} />
                             : program.id === "hospital-patient-record"
@@ -847,7 +874,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                                 ? <PlayerMailbox key={id} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onMessageReceived={notifyNewPlayerMessage} hackedAccount={program.hackedAccount} />
                                 : program.id === "warrant-request"
                                     ? <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} onClose={() => closeWindow(id)} />
-                                    : <WorldDirectory key={`${id}:${program.id}`} program={program.id} facilityLocationId={program.facilityLocationId || facilityContext?.locationId} accessAttemptId={program.accessAttemptId || accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} onBeginCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, true) : undefined} onCancelCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, false) : undefined} initialSearch={program.searchTerm} initialCompanies={program.searchResults} onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })} />}
+                    : <WorldDirectory key={`${id}:${program.id}`} program={program.id} initialTargetNPC={program.hackedBankAccount} facilityLocationId={program.facilityLocationId || facilityContext?.locationId} accessAttemptId={program.accessAttemptId || accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} onBeginCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, true) : undefined} onCancelCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, false) : undefined} initialSearch={program.searchTerm} initialCompanies={program.searchResults} onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })} />}
                     {desktopWindow.navigationPending && <div className="computer-browser-loading" role="status" aria-label="Loading webpage" />}
                       </InstitutionalWebsiteFrame>}
                   </>}

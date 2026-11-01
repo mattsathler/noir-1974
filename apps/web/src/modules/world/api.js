@@ -164,6 +164,20 @@ export async function findNPCByEmail(email) {
   return payload.results ?? [];
 }
 
+export async function findNPCByBankAccount(accountNumber) {
+  const params = new URLSearchParams({ accountNumber });
+  const payload = await apiRequest(`/api/world/npcs/bank-account?${params}`);
+  return payload.results ?? [];
+}
+
+export async function breachBankAccount(npcId, accountNumber) {
+  const payload = await requestCase("/api/bankrupt", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ npcId, accountNumber }),
+  });
+  return payload.account;
+}
+
 export async function requestEmailBreaker(npcId, email) {
   const payload = await requestCase("/api/email-breaker", {
     method: "POST", headers: { "Content-Type": "application/json" },

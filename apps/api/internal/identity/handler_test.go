@@ -302,17 +302,8 @@ func TestNPCRecordsRequiresSessionAndReturnsSelectedIntervalWithoutClassificatio
 	request.AddCookie(&http.Cookie{Name: sessionCookie, Value: "valid"})
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
-	}
-	if reader.npcID != "npc:one" || reader.from.Format("2006-01-02") != "1974-11-06" || reader.to.Format("2006-01-02") != "1974-11-12" {
-		t.Fatalf("query forwarded wrong target or interval: %+v", reader)
-	}
-	if strings.Contains(recorder.Body.String(), "case:hidden") || strings.Contains(recorder.Body.String(), "extortion_payment") {
-		t.Fatalf("API leaked internal crime classification: %s", recorder.Body.String())
-	}
-	if strings.Contains(recorder.Body.String(), "record:2") || strings.Contains(recorder.Body.String(), "passenger entry") {
-		t.Fatalf("bank app returned a GATE record: %s", recorder.Body.String())
+	if recorder.Code != http.StatusForbidden || !strings.Contains(recorder.Body.String(), "BANKRUPT_ACCESS_REQUIRED") {
+		t.Fatalf("remote bank query without a breach should be denied: status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 }
 
@@ -370,7 +361,7 @@ func TestHospitalPatientSearchDeniesMissingOrMismatchedLocalAccess(t *testing.T)
 	}
 }
 
-func TestBankRecordsAreAvailableBeforePhysicalVisitsAreEnabled(t *testing.T) {
+func TestBankRecordsRequireBankruptAccessWhenNoLocalServiceIsSelected(t *testing.T) {
 	repository := &fakeStore{account: account{ID: "account-1"}, sessionToken: "valid"}
 	reader := &fakeRecordReader{items: []records.Record{
 		{ID: "bank:1", Source: "bank", Description: "A remittance was recorded."},
@@ -386,8 +377,8 @@ func TestBankRecordsAreAvailableBeforePhysicalVisitsAreEnabled(t *testing.T) {
 	}
 
 	bank := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12&source=bank")
-	if bank.Code != http.StatusOK || !strings.Contains(bank.Body.String(), "A remittance") {
-		t.Fatalf("bank query without a physical visit: status=%d body=%s", bank.Code, bank.Body.String())
+	if bank.Code != http.StatusForbidden || !strings.Contains(bank.Body.String(), "BANKRUPT_ACCESS_REQUIRED") {
+		t.Fatalf("bank query without a local service or breach should be denied: status=%d body=%s", bank.Code, bank.Body.String())
 	}
 	mixed := request("/api/world/npcs/npc:one/records?from=1974-11-06&to=1974-11-12")
 	if mixed.Code != http.StatusOK || !strings.Contains(mixed.Body.String(), "bank:1") || !strings.Contains(mixed.Body.String(), "gate:1") {

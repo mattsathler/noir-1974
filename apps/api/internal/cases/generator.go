@@ -15,7 +15,7 @@ import (
 	"noir-1974/apps/api/internal/world"
 )
 
-const GeneratorVersion = 6
+const GeneratorVersion = 7
 const connectedGeneratorVersion = 4
 const contextualGeneratorVersion = 6
 const previousGeneratorVersion = 5
@@ -37,6 +37,7 @@ type Definition struct {
 	CaseType         string                  `json:"caseType"`
 	ArchetypeID      string                  `json:"archetypeId"`
 	CompanyID        string                  `json:"-"`
+	Participants     []CaseParticipant       `json:"participants,omitempty"`
 	Motive           string                  `json:"motive"`
 	VictimID         string                  `json:"victimId"`
 	KillerID         string                  `json:"killerId"`
@@ -47,6 +48,11 @@ type Definition struct {
 	Evidence         []EvidenceDefinition    `json:"evidence"`
 	Records          []records.Record        `json:"records,omitempty"`
 	Emails           []mail.Message          `json:"-"`
+}
+
+type CaseParticipant struct {
+	NPCID string `json:"npcId"`
+	Role  string `json:"role"`
 }
 
 type RelationshipReference struct {
@@ -63,6 +69,7 @@ type EvidenceDefinition struct {
 	LocationID             string   `json:"locationId"`
 	RelationshipIDs        []string `json:"relationshipIds"`
 	ReachableFromEntityIDs []string `json:"reachableFromEntityIds"`
+	SupportsNPCIDs         []string `json:"supportsNpcIds,omitempty"`
 }
 
 type employmentLink struct {
@@ -71,12 +78,14 @@ type employmentLink struct {
 }
 
 type candidate struct {
+	caseType      string
 	archetypeID   string
 	companyID     string
 	motive        string
 	relationships []RelationshipReference
 	evidence      []evidencePlan
 	killerID      string
+	accompliceID  string
 	victimID      string
 	locationID    string
 	paramourID    string
@@ -86,6 +95,7 @@ type evidencePlan struct {
 	typeID       string
 	presentation string
 	content      string
+	supports     []string
 }
 
 type archetypeGenerator struct {
@@ -111,7 +121,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	if strings.TrimSpace(seed) == "" {
 		return Definition{}, ErrInvalidCaseSeed
 	}
-	if version != GeneratorVersion && version != previousGeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
+	if version != GeneratorVersion && version != contextualGeneratorVersion && version != previousGeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
 		return Definition{}, fmt.Errorf("%w: %d", ErrUnsupportedGenerator, version)
 	}
 	candidateWorld := base
@@ -137,21 +147,35 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 			}
 		}
 	}
-	available := availableArchetypesForVersion(candidateWorld, version)
-	if len(available) == 0 {
-		return Definition{}, ErrNoValidCaseCandidates
+	var selected candidate
+	if version >= GeneratorVersion {
+		choices := currentCaseChoices(candidateWorld, version)
+		if len(choices) == 0 {
+			return Definition{}, ErrNoValidCaseCandidates
+		}
+		choice := choices[caseIndex(seed+"/archetype", version, len(choices))]
+		selected = choice.candidates[caseIndex(seed+"/"+choice.id, version, len(choice.candidates))]
+	} else {
+		available := availableArchetypesForVersion(candidateWorld, version)
+		if len(available) == 0 {
+			return Definition{}, ErrNoValidCaseCandidates
+		}
+		archetype := available[caseIndex(seed+"/archetype", version, len(available))]
+		candidates := archetypeCandidates(archetype, candidateWorld, version)
+		selected = candidates[caseIndex(seed+"/"+archetype.id, version, len(candidates))]
 	}
-	archetype := available[caseIndex(seed+"/archetype", version, len(available))]
-	candidates := archetypeCandidates(archetype, candidateWorld, version)
-	selected := candidates[caseIndex(seed+"/"+archetype.id, version, len(candidates))]
 	caseID := makeCaseID(seed, version)
 	generatedAt := time.Now()
 	caseDate := generatedAt.UTC().Truncate(24 * time.Hour)
 	caseDay := caseDate
+	caseCityID := cityForLocation(base, selected.locationID)
+	if selected.caseType != "" {
+		caseCityID = cityForCompany(base, selected.companyID)
+	}
 	var cityLocation *time.Location
 	if version >= contextualGeneratorVersion {
-		caseDay = cityLocalDay(selected.locationID, base, generatedAt)
-		if city, ok := world.CityByID(cityForLocation(base, selected.locationID)); ok {
+		caseDay = cityLocalDayInCity(caseCityID, generatedAt)
+		if city, ok := world.CityByID(caseCityID); ok {
 			if location, err := time.LoadLocation(city.TimeZone); err == nil {
 				cityLocation = location
 			}
@@ -164,10 +188,10 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	}
 	definition := Definition{
 		ID:               caseID,
-		CityID:           cityForLocation(base, selected.locationID),
+		CityID:           caseCityID,
 		Seed:             seed,
 		GeneratorVersion: version,
-		CaseType:         "homicide",
+		CaseType:         selected.caseType,
 		ArchetypeID:      selected.archetypeID,
 		CompanyID:        selected.companyID,
 		Motive:           selected.motive,
@@ -177,15 +201,28 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 		Relationships:    selected.relationships,
 		Evidence:         buildEvidence(caseID, selected),
 	}
-	if version >= connectedGeneratorVersion {
+	if definition.CaseType == "" {
+		definition.CaseType = "homicide"
+	} else {
+		definition.LocationID = ""
+	}
+	if selected.caseType == "" {
+		definition.Participants = []CaseParticipant{{NPCID: selected.killerID, Role: "principal"}, {NPCID: selected.victimID, Role: "victim"}}
+	} else {
+		definition.Participants = []CaseParticipant{{NPCID: selected.killerID, Role: "principal"}, {NPCID: selected.accompliceID, Role: "accomplice"}}
+	}
+	if selected.caseType == "" && version >= connectedGeneratorVersion {
 		definition.CrimeAt = crimeAt
 		definition.ParamourID = selected.paramourID
 	}
-	if version == legacyGeneratorVersion && selected.archetypeID == "financial_extortion" {
+	if selected.caseType == "" && version == legacyGeneratorVersion && selected.archetypeID == "financial_extortion" {
 		region := regionName(base, npcByID(base.NPCs, selected.killerID).RegionID)
 		definition.Records = records.ExtortionEvents(seed, base.GeneratorVersion, caseID, selected.killerID, selected.victimID, region, caseDate)
 	}
-	if version >= connectedGeneratorVersion {
+	if selected.caseType != "" {
+		definition.CrimeAt = crimeAt
+		definition.Records = buildFinancialCaseRecords(seed, caseID, selected, crimeAt)
+	} else if version >= connectedGeneratorVersion {
 		definition.Records = buildConnectedCaseRecords(seed, base.GeneratorVersion, caseID, selected, base, crimeAt, version)
 		definition.Emails = buildConnectedCaseEmails(seed, base.GeneratorVersion, caseID, selected, base, crimeAt)
 	} else {
@@ -197,8 +234,201 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	return definition, nil
 }
 
+func buildFinancialCaseRecords(seed, caseID string, selected candidate, crimeAt time.Time) []records.Record {
+	amount := 2750 + keyIndex(seed, "corporate-value", 9251)
+	reference := fmt.Sprintf("company settlement %06d", keyIndex(seed, "corporate-reference", 1000000))
+	principal, accomplice := selected.killerID, selected.accompliceID
+	descriptionOut, descriptionIn := "A company settlement was issued outside the approved ledger.", "A matching company settlement cleared through a secondary account."
+	internalRelation := "embezzlement_transfer"
+	switch selected.caseType {
+	case "financial_extortion":
+		descriptionOut, descriptionIn = "A private company payment cleared under an unregistered settlement reference.", "A matching private remittance was received shortly after the company payment."
+		internalRelation = "extortion_payment"
+	case "accounting_fraud":
+		descriptionOut, descriptionIn = "A revenue adjustment was credited after a revised company declaration was filed.", "A matching adjustment was transferred into a secondary account."
+		internalRelation = "accounting_adjustment"
+	}
+	return []records.Record{
+		{ID: caseRecordID(caseID, internalRelation+"-source", principal), NPCID: principal, RelatedNPCID: accomplice, Source: "bank", OccurredAt: crimeAt.Add(-24 * time.Hour), Operator: "Union Mercantile Settlement Office", Description: descriptionOut, Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: internalRelation},
+		{ID: caseRecordID(caseID, internalRelation+"-recipient", accomplice), NPCID: accomplice, RelatedNPCID: principal, Source: "bank", OccurredAt: crimeAt.Add(-24*time.Hour + 8*time.Minute), Operator: "Union Mercantile Settlement Office", Description: descriptionIn, Reference: reference, Amount: amount, Direction: "incoming", CaseID: caseID, InternalRelation: internalRelation},
+	}
+}
+
+type caseChoice struct {
+	id         string
+	candidates []candidate
+}
+
+func currentCaseChoices(base world.World, version int) []caseChoice {
+	choices := make([]caseChoice, 0, len(archetypeGenerators)+3)
+	for _, archetype := range archetypeGenerators {
+		candidates := archetypeCandidates(archetype, base, version)
+		if len(candidates) > 0 {
+			choices = append(choices, caseChoice{id: "homicide/" + archetype.id, candidates: candidates})
+		}
+	}
+	for _, caseType := range []string{"embezzlement", "financial_extortion", "accounting_fraud"} {
+		candidates := financialCandidates(base, caseType)
+		if len(candidates) > 0 {
+			choices = append(choices, caseChoice{id: caseType, candidates: candidates})
+		}
+	}
+	return choices
+}
+
+func financialCandidates(base world.World, caseType string) []candidate {
+	entities := make(map[string]string, len(base.Entities))
+	for _, entity := range base.Entities {
+		entities[entity.ID] = entity.EntityType
+	}
+	hqByCompany := make(map[string]string)
+	for _, location := range base.CompanyLocations {
+		if location.LocationRole == "headquarters" && entities[location.LocationID] == "location" {
+			hqByCompany[location.CompanyID] = location.LocationID
+		}
+	}
+	companyEmployees := make(map[string][]employmentLink)
+	for _, relation := range base.EmploymentRelationships {
+		if entities[relation.EmployeeNPCID] == "npc" && entities[relation.EmployerCompanyID] == "company" {
+			companyEmployees[relation.EmployerCompanyID] = append(companyEmployees[relation.EmployerCompanyID], employmentLink{id: relation.ID, employee: relation.EmployeeNPCID})
+		}
+	}
+	companyIDs := make([]string, 0, len(companyEmployees))
+	for companyID := range companyEmployees {
+		companyIDs = append(companyIDs, companyID)
+	}
+	sort.Strings(companyIDs)
+	result := make([]candidate, 0)
+	for _, companyID := range companyIDs {
+		locationID := hqByCompany[companyID]
+		staff := companyEmployees[companyID]
+		if len(staff) < 2 {
+			continue
+		}
+		sort.Slice(staff, func(i, j int) bool { return staff[i].employee < staff[j].employee })
+		for principalIndex := range staff {
+			for accompliceIndex := range staff {
+				if principalIndex == accompliceIndex {
+					continue
+				}
+				principal, accomplice := staff[principalIndex], staff[accompliceIndex]
+				item := candidate{
+					caseType: caseType, archetypeID: caseType, companyID: companyID,
+					killerID: principal.employee, accompliceID: accomplice.employee, locationID: locationID,
+					relationships: []RelationshipReference{
+						{ID: principal.id, Type: "employment", Role: "principal_employment"},
+						{ID: accomplice.id, Type: "employment", Role: "accomplice_employment"},
+					},
+				}
+				switch caseType {
+				case "embezzlement":
+					item.motive = "Company funds were redirected through a false settlement and a second employee helped conceal the transfer."
+					item.evidence = []evidencePlan{
+						{typeID: "settlement_ledger", presentation: "Settlement ledger", content: "A numbered company transfer was entered under the principal's authorization code.", supports: []string{principal.employee}},
+						{typeID: "duplicate_receipt", presentation: "Duplicate receipt", content: "A receipt copy was removed from the filing packet after the transfer cleared.", supports: []string{accomplice.employee}},
+						{typeID: "account_reconciliation", presentation: "Account reconciliation", content: "The company total differs from the bank settlement by the same amount and reference.", supports: []string{principal.employee, accomplice.employee}},
+					}
+				case "financial_extortion":
+					item.motive = "A company employee used confidential financial information to demand an unauthorized payment, with a colleague arranging collection."
+					item.evidence = []evidencePlan{
+						{typeID: "payment_demand", presentation: "Private payment demand", content: "A demand for an unrecorded payment refers to a restricted company account.", supports: []string{principal.employee}},
+						{typeID: "collection_record", presentation: "Collection record", content: "A sealed envelope was logged under a second employee's initials.", supports: []string{accomplice.employee}},
+						{typeID: "account_reconciliation", presentation: "Account reconciliation", content: "An irregular transfer matches the amount named in the private demand.", supports: []string{principal.employee, accomplice.employee}},
+					}
+				case "accounting_fraud":
+					item.motive = "Filed company figures were altered before submission to the national revenue office, with two employees handling the changes."
+					item.evidence = []evidencePlan{
+						{typeID: "filing_copy", presentation: "Filed declaration copy", content: "The submitted revenue declaration carries the principal's revision initials.", supports: []string{principal.employee}},
+						{typeID: "working_ledger", presentation: "Working ledger", content: "The retained ledger contains the original figures and a second employee's correction marks.", supports: []string{accomplice.employee}},
+						{typeID: "submission_register", presentation: "Submission register", content: "A dispatch entry links both employees to the altered filing packet.", supports: []string{principal.employee, accomplice.employee}},
+					}
+				}
+				result = append(result, item)
+			}
+		}
+	}
+	return result
+}
+
+func validateFinancialDefinition(definition Definition, base world.World) error {
+	if definition.GeneratorVersion < GeneratorVersion || definition.CaseType != definition.ArchetypeID || !contains([]string{"embezzlement", "financial_extortion", "accounting_fraud"}, definition.CaseType) || definition.VictimID != "" || definition.KillerID == "" || definition.CompanyID == "" || definition.CrimeAt.IsZero() || len(definition.Participants) != 2 || len(definition.Relationships) != 2 || len(definition.Evidence) != 3 {
+		return ErrInvalidDefinition
+	}
+	if !containsNPC(base.NPCs, definition.KillerID) || !containsNPC(base.NPCs, definition.Participants[1].NPCID) || definition.Participants[0] != (CaseParticipant{NPCID: definition.KillerID, Role: "principal"}) || definition.Participants[1].Role != "accomplice" || definition.Participants[0].NPCID == definition.Participants[1].NPCID || definition.LocationID != "" {
+		return ErrInvalidDefinition
+	}
+	validPrincipal, validAccomplice := false, false
+	for _, relation := range base.EmploymentRelationships {
+		for _, reference := range definition.Relationships {
+			if reference.ID != relation.ID || reference.Type != "employment" || relation.EmployerCompanyID != definition.CompanyID {
+				continue
+			}
+			validPrincipal = validPrincipal || reference.Role == "principal_employment" && relation.EmployeeNPCID == definition.KillerID
+			validAccomplice = validAccomplice || reference.Role == "accomplice_employment" && relation.EmployeeNPCID == definition.Participants[1].NPCID
+		}
+	}
+	if !validPrincipal || !validAccomplice || !companyExists(base.Companies, definition.CompanyID) || cityForCompany(base, definition.CompanyID) != definition.CityID {
+		return ErrInvalidDefinition
+	}
+	required := map[string]bool{}
+	supportedParticipants := map[string]bool{}
+	for _, evidence := range definition.Evidence {
+		if len(evidence.SupportsNPCIDs) == 0 || evidence.ID == "" || evidence.Presentation == "" || evidence.Content == "" {
+			return ErrUnsolvableCase
+		}
+		required[evidence.Type] = true
+		for _, id := range evidence.SupportsNPCIDs {
+			if id != definition.KillerID && id != definition.Participants[1].NPCID {
+				return ErrInvalidDefinition
+			}
+			supportedParticipants[id] = true
+		}
+	}
+	expectedTypes := map[string][]string{
+		"embezzlement":        {"settlement_ledger", "duplicate_receipt", "account_reconciliation"},
+		"financial_extortion": {"payment_demand", "collection_record", "account_reconciliation"},
+		"accounting_fraud":    {"filing_copy", "working_ledger", "submission_register"},
+	}
+	for _, evidenceType := range expectedTypes[definition.CaseType] {
+		if !required[evidenceType] {
+			return ErrUnsolvableCase
+		}
+	}
+	if !supportedParticipants[definition.KillerID] || !supportedParticipants[definition.Participants[1].NPCID] {
+		return ErrUnsolvableCase
+	}
+	if len(definition.Records) != 2 {
+		return ErrUnsolvableCase
+	}
+	var sharedReference string
+	var sharedAmount int
+	seenNPCs := map[string]bool{}
+	for _, record := range definition.Records {
+		if record.CaseID != definition.ID || record.Source != "bank" || record.Amount <= 0 || record.Reference == "" || record.RelatedNPCID == "" || record.InternalRelation == "" || (record.NPCID != definition.KillerID && record.NPCID != definition.Participants[1].NPCID) {
+			return ErrInvalidDefinition
+		}
+		if record.RelatedNPCID == record.NPCID || seenNPCs[record.NPCID] {
+			return ErrInvalidDefinition
+		}
+		seenNPCs[record.NPCID] = true
+		if sharedReference == "" {
+			sharedReference, sharedAmount = record.Reference, record.Amount
+		} else if sharedReference != record.Reference || sharedAmount != record.Amount {
+			return ErrUnsolvableCase
+		}
+	}
+	if !seenNPCs[definition.KillerID] || !seenNPCs[definition.Participants[1].NPCID] {
+		return ErrUnsolvableCase
+	}
+	return nil
+}
+
 func cityLocalDay(locationID string, base world.World, now time.Time) time.Time {
-	city, ok := world.CityByID(cityForLocation(base, locationID))
+	return cityLocalDayInCity(cityForLocation(base, locationID), now)
+}
+
+func cityLocalDayInCity(cityID string, now time.Time) time.Time {
+	city, ok := world.CityByID(cityID)
 	if !ok {
 		return now.UTC().Truncate(24 * time.Hour)
 	}
@@ -208,6 +438,18 @@ func cityLocalDay(locationID string, base world.World, now time.Time) time.Time 
 	}
 	localNow := now.In(zone)
 	return time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, zone).UTC()
+}
+
+func cityForCompany(base world.World, companyID string) string {
+	for _, company := range base.Companies {
+		if company.ID == companyID {
+			parts := strings.Split(company.RegionID, "/")
+			if len(parts) >= 2 {
+				return strings.Join(parts[:2], "/")
+			}
+		}
+	}
+	return "fr/lyon"
 }
 
 func caseTimeOffset(seed, archetypeID string, version int) time.Duration {
@@ -473,8 +715,11 @@ func Validate(definition Definition, base world.World) error {
 	if !world.SupportsSocietyVersion(base.GeneratorVersion) {
 		return ErrInvalidDefinition
 	}
-	if strings.TrimSpace(definition.Seed) == "" || !supportedCaseGeneratorVersion(definition.GeneratorVersion) || definition.ID != makeCaseID(definition.Seed, definition.GeneratorVersion) || definition.CaseType != "homicide" || definition.ArchetypeID == "" || definition.Motive == "" {
+	if strings.TrimSpace(definition.Seed) == "" || !supportedCaseGeneratorVersion(definition.GeneratorVersion) || definition.ID != makeCaseID(definition.Seed, definition.GeneratorVersion) || definition.ArchetypeID == "" || definition.Motive == "" {
 		return ErrInvalidDefinition
+	}
+	if definition.CaseType != "homicide" {
+		return validateFinancialDefinition(definition, base)
 	}
 	if definition.GeneratorVersion >= connectedGeneratorVersion && definition.CrimeAt.IsZero() {
 		return ErrInvalidDefinition
@@ -534,7 +779,7 @@ func Validate(definition Definition, base world.World) error {
 }
 
 func supportedCaseGeneratorVersion(version int) bool {
-	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == previousGeneratorVersion || version == GeneratorVersion
+	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == previousGeneratorVersion || version == contextualGeneratorVersion || version == GeneratorVersion
 }
 
 func availableArchetypes(base world.World) []archetypeGenerator {
@@ -790,14 +1035,24 @@ func validateContextualTiming(definition Definition) bool {
 func buildEvidence(caseID string, selected candidate) []EvidenceDefinition {
 	evidence := make([]EvidenceDefinition, 0, len(selected.evidence))
 	for index, plan := range selected.evidence {
+		reachable := []string{selected.killerID, selected.victimID}
+		supports := append([]string(nil), plan.supports...)
+		locationID := selected.locationID
+		if selected.caseType != "" {
+			reachable = []string{selected.killerID, selected.accompliceID}
+			locationID = ""
+		} else if len(supports) == 0 {
+			supports = []string{selected.killerID}
+		}
 		evidence = append(evidence, EvidenceDefinition{
 			ID:                     fmt.Sprintf("evidence:%s:%02d:%s", caseID, index+1, plan.typeID),
 			Type:                   plan.typeID,
 			Presentation:           plan.presentation,
 			Content:                plan.content,
-			LocationID:             selected.locationID,
+			LocationID:             locationID,
 			RelationshipIDs:        relationshipIDs(selected.relationships),
-			ReachableFromEntityIDs: []string{selected.killerID, selected.victimID},
+			ReachableFromEntityIDs: reachable,
+			SupportsNPCIDs:         supports,
 		})
 	}
 	return evidence
@@ -1083,6 +1338,15 @@ func hasReachableEvidence(evidence []EvidenceDefinition, definition Definition, 
 func hasHeadquarters(relations []world.CompanyLocation, companyID, locationID string) bool {
 	for _, relation := range relations {
 		if relation.CompanyID == companyID && relation.LocationID == locationID && relation.LocationRole == "headquarters" {
+			return true
+		}
+	}
+	return false
+}
+
+func companyExists(companies []world.Company, companyID string) bool {
+	for _, company := range companies {
+		if company.ID == companyID {
 			return true
 		}
 	}

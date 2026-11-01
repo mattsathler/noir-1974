@@ -419,7 +419,7 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
   async function changeDesignation(pin, designation) {
     if (!board || boardLocked || busy) return;
     const boardID=board.id;
-    setBoard((previous) => previous?.id===boardID ? {...previous,pins:previous.pins.map((item)=>item.id===pin.id?{...item,designation}:((designation==="accused"||designation==="victim")&&item.designation===designation)?{...item,designation:""}:item)} : previous);
+    setBoard((previous) => previous?.id===boardID ? {...previous,pins:previous.pins.map((item)=>item.id===pin.id?{...item,designation}:item)} : previous);
     setBusy(true);
     try { await designateWhiteboardPin(boardID,pin.id,designation); await loadBoard(boardID); }
     catch(error) { await loadBoard(boardID).catch(()=>{}); setMessage(error.message||"THE PIN DESIGNATION COULD NOT BE SAVED"); }

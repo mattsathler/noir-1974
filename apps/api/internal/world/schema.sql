@@ -85,6 +85,18 @@ CREATE TABLE IF NOT EXISTS world_staff_email_directory (
     UNIQUE (server_id, npc_id, email)
 );
 
+CREATE TABLE IF NOT EXISTS world_staff_account_directory (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_number text NOT NULL CHECK (account_number ~ '^[0-9]{8}$'),
+    npc_id text NOT NULL CHECK (npc_id <> ''),
+    name text NOT NULL CHECK (name <> ''),
+    email text NOT NULL CHECK (email <> ''),
+    role text NOT NULL DEFAULT '',
+    status text NOT NULL DEFAULT 'alive',
+    PRIMARY KEY (server_id, account_number),
+    UNIQUE (server_id, npc_id)
+);
+
 CREATE TABLE IF NOT EXISTS personal_relationships (
     server_id uuid NOT NULL,
     relationship_id text NOT NULL CHECK (relationship_id <> ''),

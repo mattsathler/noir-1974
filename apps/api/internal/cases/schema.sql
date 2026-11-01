@@ -4,13 +4,13 @@ CREATE TABLE IF NOT EXISTS cases (
     case_seed text NOT NULL CHECK (case_seed <> ''),
     city_id text NOT NULL DEFAULT 'fr/lyon' CHECK (city_id <> ''),
     generator_version integer NOT NULL CHECK (generator_version > 0),
-    case_type text NOT NULL CHECK (case_type = 'homicide'),
+    case_type text NOT NULL CHECK (case_type IN ('homicide', 'embezzlement', 'financial_extortion', 'accounting_fraud')),
     archetype_id text NOT NULL DEFAULT 'workplace_conflict' CHECK (archetype_id <> ''),
     company_id text,
     motive text NOT NULL DEFAULT 'Legacy workplace homicide.' CHECK (motive <> ''),
-    victim_entity_id text NOT NULL,
+    victim_entity_id text,
     killer_entity_id text NOT NULL,
-    location_entity_id text NOT NULL,
+    location_entity_id text,
     crime_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (server_id, case_id),
@@ -30,6 +30,10 @@ ALTER TABLE cases ADD COLUMN IF NOT EXISTS company_id text;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS motive text NOT NULL DEFAULT 'Legacy workplace homicide.';
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS city_id text NOT NULL DEFAULT 'fr/lyon';
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS crime_at timestamptz;
+ALTER TABLE cases ALTER COLUMN victim_entity_id DROP NOT NULL;
+ALTER TABLE cases ALTER COLUMN location_entity_id DROP NOT NULL;
+ALTER TABLE cases DROP CONSTRAINT IF EXISTS cases_case_type_check;
+ALTER TABLE cases ADD CONSTRAINT cases_case_type_check CHECK (case_type IN ('homicide', 'embezzlement', 'financial_extortion', 'accounting_fraud'));
 UPDATE cases c
 SET city_id = substring(r.region_id from '^([^/]+/[^/]+)')
 FROM world_entities e
@@ -40,6 +44,24 @@ WHERE c.server_id = e.server_id
   AND r.region_id LIKE '%/district/%';
 CREATE INDEX IF NOT EXISTS cases_by_server_city_created_idx
     ON cases(server_id, city_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS case_participants (
+    server_id uuid NOT NULL,
+    case_id text NOT NULL,
+    npc_entity_id text NOT NULL,
+    participant_role text NOT NULL CHECK (participant_role IN ('principal', 'accomplice', 'victim')),
+    PRIMARY KEY (server_id, case_id, npc_entity_id),
+    FOREIGN KEY (server_id, case_id) REFERENCES cases(server_id, case_id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id, npc_entity_id) REFERENCES world_entities(server_id, entity_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS case_participants_by_npc_idx ON case_participants(server_id, npc_entity_id, case_id);
+
+INSERT INTO case_participants(server_id,case_id,npc_entity_id,participant_role)
+SELECT server_id,case_id,killer_entity_id,'principal' FROM cases
+ON CONFLICT DO NOTHING;
+INSERT INTO case_participants(server_id,case_id,npc_entity_id,participant_role)
+SELECT server_id,case_id,victim_entity_id,'victim' FROM cases WHERE victim_entity_id IS NOT NULL
+ON CONFLICT DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS case_relationships (
     server_id uuid NOT NULL,
@@ -65,7 +87,7 @@ CREATE TABLE IF NOT EXISTS case_evidence (
     server_id uuid NOT NULL,
     case_id text NOT NULL,
     evidence_id text NOT NULL CHECK (evidence_id <> ''),
-    location_entity_id text NOT NULL,
+    location_entity_id text,
     evidence_type text NOT NULL CHECK (evidence_type <> ''),
     evidence_data jsonb NOT NULL DEFAULT '{}'::jsonb,
     PRIMARY KEY (server_id, case_id, evidence_id),
@@ -78,6 +100,7 @@ ALTER TABLE case_evidence DROP CONSTRAINT IF EXISTS case_evidence_evidence_type_
 ALTER TABLE case_evidence ADD CONSTRAINT case_evidence_evidence_type_check CHECK (evidence_type <> '');
 CREATE INDEX IF NOT EXISTS case_evidence_by_location_idx
     ON case_evidence(server_id, location_entity_id);
+ALTER TABLE case_evidence ALTER COLUMN location_entity_id DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS case_activity_records (
     server_id uuid NOT NULL,
@@ -148,11 +171,12 @@ CREATE INDEX IF NOT EXISTS case_states_body_discovery_idx ON case_states(server_
 UPDATE case_states s SET body_found_at=COALESCE(c.crime_at,c.created_at)+interval '90 minutes',body_found_method='automatic'
 FROM cases c JOIN world_entities scene ON scene.server_id=c.server_id AND scene.entity_id=c.location_entity_id
 WHERE s.server_id=c.server_id AND s.case_id=c.case_id AND s.body_found_at IS NULL
+  AND c.case_type='homicide'
   AND scene.generation_key !~* '(^|/)(residence|residential|apartment|house|home|immeuble|flat)(/|[-_]|$)|/building/(residence|residential|apartment|house|home|immeuble|flat)([-_/]|$)';
 INSERT INTO world_mutations(server_id,entity_id,field_key,value)
 SELECT c.server_id,c.victim_entity_id,'status','"missing"'::jsonb
 FROM cases c JOIN case_states s USING(server_id,case_id)
-WHERE s.status IN ('open','solved') AND COALESCE(c.crime_at,c.created_at)<=now() AND (s.body_found_at IS NULL OR s.body_found_at>now())
+WHERE c.victim_entity_id IS NOT NULL AND s.status IN ('open','solved') AND COALESCE(c.crime_at,c.created_at)<=now() AND (s.body_found_at IS NULL OR s.body_found_at>now())
   AND (SELECT value #>> '{}' FROM world_mutations m WHERE m.server_id=c.server_id AND m.entity_id=c.victim_entity_id AND m.field_key='status' ORDER BY mutation_order DESC LIMIT 1)='dead';
 
 CREATE TABLE IF NOT EXISTS player_case_progress (
@@ -217,6 +241,19 @@ CREATE TABLE IF NOT EXISTS player_email_breaker_access (
     PRIMARY KEY (server_id, account_id, request_id),
     CHECK (through_date >= from_date)
 );
+
+CREATE TABLE IF NOT EXISTS player_bankrupt_access (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    target_npc_id text NOT NULL CHECK (target_npc_id <> ''),
+    target_account_number text NOT NULL CHECK (target_account_number ~ '^[0-9]{8}$'),
+    target_name text NOT NULL CHECK (target_name <> ''),
+    opened_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, target_npc_id),
+    UNIQUE (server_id, account_id, target_account_number)
+);
+CREATE INDEX IF NOT EXISTS player_bankrupt_access_by_player_idx
+    ON player_bankrupt_access(server_id, account_id, opened_at DESC);
 CREATE INDEX IF NOT EXISTS player_email_breaker_access_by_player_idx
     ON player_email_breaker_access(server_id, account_id, ready_at DESC);
 CREATE INDEX IF NOT EXISTS player_async_requests_due_idx
@@ -251,13 +288,17 @@ CREATE TABLE IF NOT EXISTS player_case_accusations (
     server_id uuid NOT NULL,
     account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
     case_id text NOT NULL,
+    accused_npc_entity_id text NOT NULL DEFAULT '',
     board_id text NOT NULL,
     accepted boolean NOT NULL,
     outcome text NOT NULL CHECK (outcome IN ('arrested','insufficient')),
     created_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (server_id,account_id,case_id),
+    PRIMARY KEY (server_id,account_id,case_id,accused_npc_entity_id),
     FOREIGN KEY (server_id,case_id) REFERENCES cases(server_id,case_id) ON DELETE CASCADE
 );
+ALTER TABLE player_case_accusations ADD COLUMN IF NOT EXISTS accused_npc_entity_id text NOT NULL DEFAULT '';
+ALTER TABLE player_case_accusations DROP CONSTRAINT IF EXISTS player_case_accusations_pkey;
+ALTER TABLE player_case_accusations ADD PRIMARY KEY (server_id,account_id,case_id,accused_npc_entity_id);
 
 CREATE TABLE IF NOT EXISTS player_local_access_attempts (
     server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
@@ -318,7 +359,7 @@ CREATE TABLE IF NOT EXISTS player_whiteboard_pins (
 ALTER TABLE player_whiteboard_pins ADD COLUMN IF NOT EXISTS designation text NOT NULL DEFAULT '';
 ALTER TABLE player_whiteboard_pins DROP CONSTRAINT IF EXISTS player_whiteboard_pins_designation_check;
 ALTER TABLE player_whiteboard_pins ADD CONSTRAINT player_whiteboard_pins_designation_check CHECK (designation IN ('', 'proof', 'accused', 'victim'));
-CREATE UNIQUE INDEX IF NOT EXISTS player_whiteboard_one_accused_idx ON player_whiteboard_pins(server_id,account_id,whiteboard_id) WHERE designation='accused';
+DROP INDEX IF EXISTS player_whiteboard_one_accused_idx;
 CREATE UNIQUE INDEX IF NOT EXISTS player_whiteboard_one_victim_idx ON player_whiteboard_pins(server_id,account_id,whiteboard_id) WHERE designation='victim';
 
 CREATE TABLE IF NOT EXISTS player_whiteboard_connections (
@@ -430,7 +471,7 @@ WITH impacts AS (
            COALESCE(crime_at, created_at) AS occurred_at,
            created_at AS recorded_at
     FROM cases
-    WHERE company_id IS NOT NULL AND case_type = 'homicide'
+    WHERE company_id IS NOT NULL AND case_type IN ('homicide','financial_extortion')
       AND archetype_id IN ('workplace_conflict', 'financial_extortion')
 ), cumulative AS (
     SELECT impacts.*,

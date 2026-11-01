@@ -2,6 +2,7 @@ package cases
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -122,11 +123,60 @@ func TestRecurringGeneratorPersistsCursorAcrossRestartAndSharesCreatedCase(t *te
 	if store.created[0].ID == store.created[1].ID {
 		t.Fatalf("successive cursor slots produced duplicate case ID %q", store.created[0].ID)
 	}
-	if len(worldStore.deadNPCIDs) != 2 || worldStore.deadNPCIDs[0] != store.created[0].VictimID || worldStore.deadNPCIDs[1] != store.created[1].VictimID {
-		t.Fatalf("shared victim status updates = %v, want generated victims %q and %q", worldStore.deadNPCIDs, store.created[0].VictimID, store.created[1].VictimID)
+	wantDeadNPCIDs := make([]string, 0, 2)
+	for _, definition := range store.created {
+		if definition.CaseType == "homicide" {
+			wantDeadNPCIDs = append(wantDeadNPCIDs, definition.VictimID)
+		}
+	}
+	if len(worldStore.deadNPCIDs) != len(wantDeadNPCIDs) {
+		t.Fatalf("shared victim status updates = %v, want only generated homicide victims %v", worldStore.deadNPCIDs, wantDeadNPCIDs)
+	}
+	for index := range wantDeadNPCIDs {
+		if worldStore.deadNPCIDs[index] != wantDeadNPCIDs[index] {
+			t.Fatalf("shared victim status updates = %v, want generated homicide victims %v", worldStore.deadNPCIDs, wantDeadNPCIDs)
+		}
 	}
 	if len(store.serverIDs) != 2 || store.serverIDs[0] != "server-shared" || store.serverIDs[1] != "server-shared" {
 		t.Fatalf("created cases used server IDs %v, want the shared server", store.serverIDs)
+	}
+}
+
+func TestRecurringGeneratorDoesNotMarkVictimDeadForFinancialCase(t *testing.T) {
+	base := recurringTestWorld(t)
+	cityIDs := materializedCityIDs(base)
+	var financialSlot int64
+	var financialCase Definition
+	for slot := int64(1); slot <= 500; slot++ {
+		cityID := cityIDs[int((slot-1)%int64(len(cityIDs)))]
+		localBase := worldForCity(base, cityID)
+		seed := fmt.Sprintf("noir-1974/recurring-case/%s/%s/%d", "server-shared", cityID, slot)
+		definition, err := GenerateExcluding(localBase, seed, GeneratorVersion, nil)
+		if err != nil {
+			t.Fatalf("GenerateExcluding() slot %d error = %v", slot, err)
+		}
+		if definition.CaseType != "homicide" {
+			financialSlot, financialCase = slot, definition
+			break
+		}
+	}
+	if financialSlot == 0 {
+		t.Fatal("test fixture did not produce a financial case in 500 generation slots")
+	}
+	store := &recurringStoreFixture{slot: financialSlot}
+	worldStore := &recurringWorldFixture{base: base}
+	generator := newRecurringTestGenerator(t, store, worldStore, func(_ context.Context, generate func() error) error { return generate() })
+	if err := generator.generateOne(context.Background()); err != nil {
+		t.Fatalf("generateOne() financial case error = %v", err)
+	}
+	if len(store.created) != 1 || store.created[0].ID != financialCase.ID || store.created[0].VictimID != "" {
+		t.Fatalf("created cases = %+v, want one victimless financial case %q", store.created, financialCase.ID)
+	}
+	if len(worldStore.deadNPCIDs) != 0 {
+		t.Fatalf("financial case marked NPCs dead: %v", worldStore.deadNPCIDs)
+	}
+	if store.advanced != 1 || store.slot != financialSlot+1 {
+		t.Fatalf("generation cursor slot=%d advanced=%d; want %d advanced once", store.slot, store.advanced, financialSlot+1)
 	}
 }
 

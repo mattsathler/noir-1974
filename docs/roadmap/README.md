@@ -55,7 +55,7 @@ Ordem e regras de entrada/saída: [`ciclos.md`](ciclos.md).
 | 24 | Company Websites procedurais | [M24](achieved/M24-company-websites-procedurais.md) |
 | 25 | Bolsa de valores e progressão do jogador | [M25](milestones/M25-bolsa-e-progressao-do-jogador.md) |
 | 26 | Flutuação da bolsa por eventos corporativos | [M26](milestones/M26-flutuacao-da-bolsa-por-eventos-corporativos.md) |
-| 27 | Casos financeiros e múltiplos acusados | [M27](milestones/M27-casos-financeiros-e-multiplos-acusados.md) |
+| 27 | Casos financeiros e múltiplos acusados | [M27](achieved/M27-casos-financeiros-e-multiplos-acusados.md) |
 | 28 | Casos evolutivos e comunicação por email | [M28](milestones/M28-casos-evolutivos-e-comunicacao-por-email.md) |
 | 29 | Websites, exploração e minigames | [M29](milestones/M29-websites-exploracao-e-minigames.md) |
 

@@ -8,10 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
+
+	"noir-1974/apps/api/internal/world"
 )
 
-const GeneratorVersion = 1
+const GeneratorVersion = 2
 const MaxRangeDays = 7
 
 var (
@@ -47,6 +50,10 @@ type Context struct {
 	Employer     string
 	HomeDistrict string
 	Districts    []string
+	DailySalary  int
+	Role         string
+	EmployerID   string
+	Benefits     []world.CompanyBenefit
 }
 
 var bankActivities = []string{
@@ -56,7 +63,6 @@ var bankActivities = []string{
 	"A small payment for household goods was recorded.",
 	"A personal transfer was received and cleared.",
 	"A personal transfer was sent and cleared.",
-	"A salary allocation was entered by the employer's accounts office.",
 }
 
 var gateActivities = []string{
@@ -148,9 +154,91 @@ func GenerateForSource(seed string, worldVersion int, npcID string, context Cont
 			}
 			result = append(result, record)
 		}
+		if source != "gate" && context.DailySalary > 0 {
+			result = append(result, Record{
+				ID: stableID(seed, worldVersion, npcID, date, 2), NPCID: npcID, Source: "bank",
+				OccurredAt: date.Add(9 * time.Hour), Operator: "Employer Payroll Office",
+				Description: fmt.Sprintf("Daily wages from %s were deposited.", context.Employer),
+				Reference:   context.Employer, Amount: context.DailySalary, Direction: "incoming",
+			})
+			for index, benefit := range context.Benefits {
+				if !benefitEligible(benefit, context, date) {
+					continue
+				}
+				amount := (context.DailySalary*benefit.RatePercent + 50) / 100
+				if amount < 1 {
+					amount = 1
+				}
+				result = append(result, Record{
+					ID: stableID(seed, worldVersion, npcID, date, 10+index), NPCID: npcID, Source: "bank",
+					OccurredAt: date.Add(9*time.Hour + time.Duration(index+1)*time.Minute), Operator: "Employer Payroll Office",
+					Description: fmt.Sprintf("%s benefit from %s was credited.", benefit.Name, context.Employer),
+					Reference:   context.Employer, Amount: amount, Direction: "incoming",
+				})
+			}
+			if benefit, ok := unlistedBenefit(seed, worldVersion, npcID, date, context); ok {
+				amount := (context.DailySalary*benefit.RatePercent + 50) / 100
+				if amount < 1 {
+					amount = 1
+				}
+				result = append(result, Record{
+					ID: stableID(seed, worldVersion, npcID, date, 20), NPCID: npcID, Source: "bank",
+					OccurredAt: date.Add(10 * time.Hour), Operator: "Employer Payroll Office",
+					Description: fmt.Sprintf("%s benefit from %s was credited.", benefit.Name, context.Employer),
+					Reference:   context.Employer, Amount: amount, Direction: "incoming",
+				})
+			}
+		}
 	}
 	sortRecords(result)
 	return result, nil
+}
+
+func unlistedBenefit(seed string, worldVersion int, npcID string, date time.Time, context Context) (world.CompanyBenefit, bool) {
+	if context.EmployerID == "" || date.Weekday() == time.Saturday || date.Weekday() == time.Sunday {
+		return world.CompanyBenefit{}, false
+	}
+	key := fmt.Sprintf("%s/%d/%s/%s/%s", seed, worldVersion, context.EmployerID, npcID, date.Format("2006-01-02"))
+	if intFromKey(key, "unlisted-benefit-roll", 61) != 0 {
+		return world.CompanyBenefit{}, false
+	}
+	offered := make(map[string]bool, len(context.Benefits))
+	for _, benefit := range context.Benefits {
+		offered[benefit.Code] = true
+	}
+	catalog := world.BenefitCatalog()
+	candidates := make([]world.CompanyBenefit, 0, len(catalog))
+	for _, benefit := range catalog {
+		if offered[benefit.Code] || !benefitEligible(benefit, context, date) {
+			continue
+		}
+		candidates = append(candidates, benefit)
+	}
+	if len(candidates) == 0 {
+		return world.CompanyBenefit{}, false
+	}
+	return candidates[intFromKey(key, "unlisted-benefit-type", len(candidates))], true
+}
+
+func benefitEligible(benefit world.CompanyBenefit, context Context, date time.Time) bool {
+	roleEligible := false
+	for _, role := range benefit.EligibleRoles {
+		if strings.EqualFold(strings.TrimSpace(role), strings.TrimSpace(context.Role)) {
+			roleEligible = true
+			break
+		}
+	}
+	if !roleEligible {
+		return false
+	}
+	switch benefit.Code {
+	case "meal_voucher", "transport_allowance":
+		return date.Weekday() >= time.Monday && date.Weekday() <= time.Friday
+	case "profit_sharing":
+		return date.Weekday() == time.Friday && date.Day() <= 7
+	default:
+		return false
+	}
 }
 
 // ExtortionEvents creates ordinary-looking ledger and movement entries for a
@@ -187,7 +275,7 @@ func ExtortionEvents(seed string, worldVersion int, caseID, killerID, victimID, 
 
 func bankDirection(description string) string {
 	switch description {
-	case "A personal transfer was received and cleared.", "A salary allocation was entered by the employer's accounts office.":
+	case "A personal transfer was received and cleared.":
 		return "incoming"
 	default:
 		return "outgoing"

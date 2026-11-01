@@ -171,8 +171,10 @@ func (g *RecurringGenerator) generateOne(ctx context.Context) error {
 	if err := g.store.Create(ctx, g.serverID, base, definition); err != nil {
 		return err
 	}
-	if err := g.world.SetNPCStatus(ctx, g.serverID, definition.VictimID, "dead"); err != nil {
-		return fmt.Errorf("mark generated case victim dead: %w", err)
+	if definition.CaseType == "homicide" && definition.VictimID != "" {
+		if err := g.world.SetNPCStatus(ctx, g.serverID, definition.VictimID, "dead"); err != nil {
+			return fmt.Errorf("mark generated case victim dead: %w", err)
+		}
 	}
 	return g.store.AdvanceGeneration(ctx, g.serverID, slot, g.interval)
 }

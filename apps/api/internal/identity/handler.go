@@ -200,11 +200,20 @@ type employeeEmailReader interface {
 	EmployeeByNPCID(context.Context, string, string, string) (world.CompanyEmployee, error)
 }
 
+type employeeBankAccountReader interface {
+	EmployeeByBankAccount(context.Context, string, string) (world.CompanyEmployee, error)
+}
+
 type EmailBreakerReader interface {
 	RequestEmailBreaker(context.Context, string, string, world.CompanyEmployee, string, string, string) (cases.EmailBreakerAccess, error)
 	EmailBreakerRequest(context.Context, string, string, string) (cases.EmailBreakerAccess, error)
 	ListEmailBreakerAccess(context.Context, string, string) ([]cases.EmailBreakerAccess, error)
 	HasEmailBreakerAccess(context.Context, string, string, string) (bool, error)
+}
+
+type BankruptAccessReader interface {
+	GrantBankruptAccess(context.Context, string, string, world.CompanyEmployee) (cases.BankruptAccess, error)
+	HasBankruptAccess(context.Context, string, string, string) (bool, error)
 }
 
 type WhiteboardAPIReader interface {
@@ -293,6 +302,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		if _, ok := reader.(employeeEmailReader); ok && caseReader != nil {
 			mux.HandleFunc("GET /api/world/npcs/email", handler.lookupNPCByEmail)
 		}
+		if _, ok := reader.(employeeBankAccountReader); ok && caseReader != nil {
+			mux.HandleFunc("GET /api/world/npcs/bank-account", handler.lookupNPCByBankAccount)
+		}
 	}
 	if recordsReader != nil {
 		mux.HandleFunc("GET /api/world/npcs/{npcID}/records", handler.npcRecords)
@@ -324,6 +336,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 			mux.HandleFunc("POST /api/email-breaker", handler.requestEmailBreaker)
 			mux.HandleFunc("GET /api/email-breaker", handler.listEmailBreakerAccess)
 			mux.HandleFunc("GET /api/email-breaker/{requestID}", handler.getEmailBreakerRequest)
+		}
+		if _, ok := caseReader.(BankruptAccessReader); ok {
+			mux.HandleFunc("POST /api/bankrupt", handler.requestBankruptAccess)
 		}
 		if _, ok := caseReader.(PlayerMailDeleteReader); ok {
 			mux.HandleFunc("DELETE /api/player/emails/{messageID}", handler.deletePlayerEmail)
@@ -668,7 +683,10 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !h.validateNPCCity(w, r, current.ID, r.PathValue("npcID")) {
+	source := r.URL.Query().Get("source")
+	initialLocationID := strings.TrimSpace(r.URL.Query().Get("locationId"))
+	remoteBankAccess := source == "bank" && initialLocationID == ""
+	if !remoteBankAccess && !h.validateNPCCity(w, r, current.ID, r.PathValue("npcID")) {
 		return
 	}
 	from, err := time.Parse("2006-01-02", r.URL.Query().Get("from"))
@@ -685,20 +703,36 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "date range must be valid and no longer than 7 calendar days", http.StatusBadRequest)
 		return
 	}
-	source := r.URL.Query().Get("source")
 	if source != "" && source != "bank" && source != "gate" {
 		http.Error(w, "source must be bank or gate", http.StatusBadRequest)
 		return
 	}
 	if source != "" {
 		locationID := strings.TrimSpace(r.URL.Query().Get("locationId"))
-		_, canValidateCity := h.worldReader.(cityNPCReader)
-		if (locationID == "" && canValidateCity) || (locationID != "" && locationID != expectedServiceLocationID(h.worldFor(r.Context(), current.ID).CityID, source)) {
-			h.writeAPIError(w, r, http.StatusBadRequest, "RECORDS_LOCATION_REQUIRED", "select the matching local records service", nil)
-			return
-		}
-		if locationID != "" && !h.requireLocalAccessAttempt(w, r, current.ID, source, locationID, "") {
-			return
+		if source == "bank" && locationID == "" {
+			reader, available := h.caseReader.(BankruptAccessReader)
+			if !available {
+				h.writeAPIError(w, r, http.StatusForbidden, "BANKRUPT_ACCESS_REQUIRED", "breach this person's bank account before retrieving the ledger", nil)
+				return
+			}
+			allowed, err := reader.HasBankruptAccess(r.Context(), h.worldServerID, current.ID, r.PathValue("npcID"))
+			if err != nil {
+				h.writeAPIError(w, r, http.StatusInternalServerError, "BANKRUPT_ACCESS_FAILED", "could not verify the bank account breach", err)
+				return
+			}
+			if !allowed {
+				h.writeAPIError(w, r, http.StatusForbidden, "BANKRUPT_ACCESS_REQUIRED", "breach this person's bank account before retrieving the ledger", nil)
+				return
+			}
+		} else {
+			_, canValidateCity := h.worldReader.(cityNPCReader)
+			if (locationID == "" && canValidateCity) || (locationID != "" && locationID != expectedServiceLocationID(h.worldFor(r.Context(), current.ID).CityID, source)) {
+				h.writeAPIError(w, r, http.StatusBadRequest, "RECORDS_LOCATION_REQUIRED", "select the matching local records service", nil)
+				return
+			}
+			if locationID != "" && !h.requireLocalAccessAttempt(w, r, current.ID, source, locationID, "") {
+				return
+			}
 		}
 	}
 	through = through.AddDate(0, 0, 1).Add(-time.Nanosecond)
@@ -873,6 +907,89 @@ func (h *Handler) lookupNPCByEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": []world.CompanyEmployee{employee}})
+}
+
+func (h *Handler) lookupNPCByBankAccount(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.caseAccount(w, r); !ok {
+		return
+	}
+	reader, ok := h.worldReader.(employeeBankAccountReader)
+	if !ok {
+		http.Error(w, "bank account directory unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	accountNumber := strings.TrimSpace(r.URL.Query().Get("accountNumber"))
+	if !validEightDigitAccount(accountNumber) {
+		http.Error(w, "an eight-digit bank account number is required", http.StatusBadRequest)
+		return
+	}
+	employee, err := reader.EmployeeByBankAccount(r.Context(), h.worldServerID, accountNumber)
+	if errors.Is(err, world.ErrEntityNotFound) {
+		writeJSON(w, http.StatusOK, map[string]any{"results": []world.CompanyEmployee{}})
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "BANK_ACCOUNT_TARGET_LOOKUP_FAILED", "could not verify the account number", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": []world.CompanyEmployee{employee}})
+}
+
+type bankruptRequestBody struct {
+	NPCID         string `json:"npcId"`
+	AccountNumber string `json:"accountNumber"`
+}
+
+func (h *Handler) requestBankruptAccess(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input bankruptRequestBody
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if !validEightDigitAccount(input.AccountNumber) || strings.TrimSpace(input.NPCID) == "" {
+		http.Error(w, "a valid target and eight-digit bank account number are required", http.StatusBadRequest)
+		return
+	}
+	worldReader, ok := h.worldReader.(employeeBankAccountReader)
+	if !ok {
+		http.Error(w, "bank account directory unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	employee, err := worldReader.EmployeeByBankAccount(r.Context(), h.worldServerID, input.AccountNumber)
+	if errors.Is(err, world.ErrEntityNotFound) || err == nil && employee.ID != input.NPCID {
+		h.writeAPIError(w, r, http.StatusNotFound, "BANK_ACCOUNT_TARGET_NOT_FOUND", "the selected person does not match that staff bank account", nil)
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "BANK_ACCOUNT_TARGET_LOOKUP_FAILED", "could not verify the account number", err)
+		return
+	}
+	reader, ok := h.caseReader.(BankruptAccessReader)
+	if !ok {
+		http.Error(w, "bank account breaker unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	access, err := reader.GrantBankruptAccess(r.Context(), h.worldServerID, current.ID, employee)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "BANKRUPT_ACCESS_FAILED", "could not breach the bank account", err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"account": access})
+}
+
+func validEightDigitAccount(number string) bool {
+	if len(number) != 8 {
+		return false
+	}
+	for _, digit := range number {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 type emailBreakerRequestBody struct {

@@ -160,6 +160,10 @@ type NPCRecordsProfile struct {
 	WorldSeed        string
 	GeneratorVersion int
 	Employer         string
+	DailySalary      int
+	Role             string
+	EmployerID       string
+	EmployerBenefits []CompanyBenefit
 }
 
 type PersonSearchRecord struct {
@@ -203,6 +207,7 @@ type CompanyRecord struct {
 	Company   Company           `json:"company"`
 	Address   Address           `json:"address"`
 	Employees []CompanyEmployee `json:"employees"`
+	Benefits  []CompanyBenefit  `json:"benefits,omitempty"`
 }
 
 type CompanyPortalRecord struct {
@@ -217,7 +222,9 @@ type CompanyEmployee struct {
 	ID              string          `json:"id"`
 	Name            string          `json:"name"`
 	Email           string          `json:"email"`
+	BankAccount     string          `json:"bankAccountNumber,omitempty"`
 	Role            string          `json:"role"`
+	DailySalary     int             `json:"dailySalaryCredits"`
 	Status          string          `json:"status"`
 	StatusChangedAt time.Time       `json:"-"`
 	Visual          *VisualIdentity `json:"visual,omitempty"`
@@ -855,17 +862,17 @@ func npcBelongsToCity(cityID, npcID string) bool {
 // single indexed query, without loading unrelated relationships or mutations.
 func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcID string, includeEmployer bool) (NPCRecordsProfile, error) {
 	var result NPCRecordsProfile
-	var generationKey, companyID, companyKey string
+	var generationKey, companyID, companyKey, role string
 	err := store.db.QueryRow(ctx,
 		`SELECT w.world_seed, COALESCE(city_generator.generator_version, w.generator_version), e.generation_key,
-		        COALESCE(employer.entity_id, ''), COALESCE(employer.generation_key, '')
+		        COALESCE(employer.entity_id, ''), COALESCE(employer.generation_key, ''), COALESCE(employer.role, '')
 		 FROM world_entities e
 		 JOIN worlds w ON w.server_id = e.server_id
 		 LEFT JOIN world_city_generators city_generator
 		   ON city_generator.server_id=e.server_id
 		  AND city_generator.city_id=split_part(e.region_id, '/district/', 1)
 		 LEFT JOIN LATERAL (
-		     SELECT c.entity_id, c.generation_key
+	     SELECT c.entity_id, c.generation_key, r.role
 		     FROM employment_relationships r
 		     JOIN world_entities c
 		       ON c.server_id = r.server_id AND c.entity_id = r.employer_company_id
@@ -875,7 +882,7 @@ func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcI
 		 ) employer ON true
 		 WHERE e.server_id = $1::uuid AND e.entity_id = $2 AND e.entity_type = 'npc'`,
 		serverID, npcID, includeEmployer,
-	).Scan(&result.WorldSeed, &result.GeneratorVersion, &generationKey, &companyID, &companyKey)
+	).Scan(&result.WorldSeed, &result.GeneratorVersion, &generationKey, &companyID, &companyKey, &role)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return NPCRecordsProfile{}, ErrEntityNotFound
 	}
@@ -898,6 +905,10 @@ func (store *PostgresStore) GetNPCForRecords(ctx context.Context, serverID, npcI
 			return NPCRecordsProfile{}, ErrGeneratedConflict
 		}
 		result.Employer = company.Name
+		result.DailySalary = DailySalaryCredits(role)
+		result.Role = role
+		result.EmployerID = companyID
+		result.EmployerBenefits = CompanyBenefits(result.WorldSeed, result.GeneratorVersion, company.ID)
 	}
 	return result, nil
 }
@@ -1967,10 +1978,13 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 					employees = append(employees, employee)
 				}
 			}
+			applyCompanySalary(employees)
+			applyBankAccountNumbers(entry.seed, cityVersion, employees)
 			if err := store.indexStaffEmailAddresses(ctx, serverID, employees); err != nil {
 				return nil, fmt.Errorf("index company staff email addresses: %w", err)
 			}
-			return []CompanyRecord{{Company: company.Company, Address: company.Address, Employees: employees}}, nil
+			benefits := CompanyBenefits(entry.seed, cityVersion, company.Company.ID)
+			return []CompanyRecord{{Company: company.Company, Address: company.Address, Employees: employees, Benefits: benefits}}, nil
 		}
 		store.observeCache("company_directory_index", false)
 	}
@@ -1987,6 +2001,18 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 			return nil, err
 		}
 		record.Employees = employees
+		seed, version, err := store.worldSeedAndVersion(ctx, serverID)
+		if err != nil {
+			return nil, err
+		}
+		if city, exists := CityForLocation(locationID); exists {
+			version, err = store.cityGeneratorVersion(ctx, serverID, city.ID, version)
+			if err != nil {
+				return nil, err
+			}
+		}
+		applyBankAccountNumbers(seed, version, employees)
+		record.Benefits = CompanyBenefits(seed, version, companyID)
 		if err := store.indexStaffEmailAddresses(ctx, serverID, employees); err != nil {
 			return nil, fmt.Errorf("index company staff email addresses: %w", err)
 		}
@@ -2882,7 +2908,24 @@ func (store *PostgresStore) EmployeesOfCompany(ctx context.Context, serverID, co
 	if company.ID != companyID {
 		return nil, ErrGeneratedConflict
 	}
-	return store.employeesOfCompany(ctx, serverID, companyID, seed, version)
+	employees, err := store.employeesOfCompany(ctx, serverID, companyID, seed, version)
+	if err != nil {
+		return nil, err
+	}
+	applyCompanySalary(employees)
+	return employees, nil
+}
+
+func applyCompanySalary(employees []CompanyEmployee) {
+	for index := range employees {
+		employees[index].DailySalary = DailySalaryCredits(employees[index].Role)
+	}
+}
+
+func applyBankAccountNumbers(seed string, version int, employees []CompanyEmployee) {
+	for index := range employees {
+		employees[index].BankAccount = BankAccountNumberForNPC(seed, version, employees[index].ID)
+	}
 }
 
 // employeesOfCompany reuses the versioned country index config when available.
@@ -2934,12 +2977,29 @@ func (store *PostgresStore) EmployeeByEmail(ctx context.Context, serverID, addre
 	return employee, err
 }
 
+// EmployeeByBankAccount resolves only account numbers published in an accessed staff directory.
+func (store *PostgresStore) EmployeeByBankAccount(ctx context.Context, serverID, accountNumber string) (CompanyEmployee, error) {
+	if len(accountNumber) != 8 {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	var employee CompanyEmployee
+	err := store.db.QueryRow(ctx, `SELECT npc_id,name,email,role,status,account_number FROM world_staff_account_directory
+	 WHERE server_id=$1::uuid AND account_number=$2`, serverID, accountNumber).
+		Scan(&employee.ID, &employee.Name, &employee.Email, &employee.Role, &employee.Status, &employee.BankAccount)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return CompanyEmployee{}, ErrEntityNotFound
+	}
+	return employee, err
+}
+
 func (store *PostgresStore) indexStaffEmailAddresses(ctx context.Context, serverID string, employees []CompanyEmployee) error {
 	if len(employees) == 0 {
 		return nil
 	}
 	values := make([]string, 0, len(employees))
 	args := make([]any, 0, 6*len(employees))
+	accountValues := make([]string, 0, len(employees))
+	accountArgs := make([]any, 0, 7*len(employees))
 	for _, employee := range employees {
 		if employee.ID == "" || employee.Email == "" || employee.Name == "" {
 			continue
@@ -2950,12 +3010,24 @@ func (store *PostgresStore) indexStaffEmailAddresses(ctx context.Context, server
 		first = len(args) + 1
 		values = append(values, fmt.Sprintf("($%d::uuid,$%d,$%d,$%d,$%d,$%d)", first, first+1, first+2, first+3, first+4, first+5))
 		args = append(args, serverID, strings.ToLower(legacyEmailAddressForNPC(employee.ID, employee.Name)), employee.ID, employee.Name, employee.Role, employee.Status)
+		if employee.BankAccount != "" {
+			first = len(accountArgs) + 1
+			accountValues = append(accountValues, fmt.Sprintf("($%d::uuid,$%d,$%d,$%d,$%d,$%d,$%d)", first, first+1, first+2, first+3, first+4, first+5, first+6))
+			accountArgs = append(accountArgs, serverID, employee.BankAccount, employee.ID, employee.Name, employee.Email, employee.Role, employee.Status)
+		}
 	}
 	if len(values) == 0 {
 		return nil
 	}
 	_, err := store.db.Exec(ctx, `INSERT INTO world_staff_email_directory(server_id,email,npc_id,name,role,status) VALUES `+strings.Join(values, ",")+
 		` ON CONFLICT(server_id,email) DO UPDATE SET npc_id=EXCLUDED.npc_id,name=EXCLUDED.name,role=EXCLUDED.role,status=EXCLUDED.status`, args...)
+	if err != nil {
+		return err
+	}
+	if len(accountValues) > 0 {
+		_, err = store.db.Exec(ctx, `INSERT INTO world_staff_account_directory(server_id,account_number,npc_id,name,email,role,status) VALUES `+strings.Join(accountValues, ",")+
+			` ON CONFLICT(server_id,npc_id) DO UPDATE SET account_number=EXCLUDED.account_number,name=EXCLUDED.name,email=EXCLUDED.email,role=EXCLUDED.role,status=EXCLUDED.status`, accountArgs...)
+	}
 	return err
 }
 
