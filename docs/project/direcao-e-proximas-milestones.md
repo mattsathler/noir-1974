@@ -49,4 +49,12 @@ As próximas milestones devem desenvolver a lore do universo e apresentá-la ao 
 
 A M29 inicia essa direção com atividades opcionais nos websites e Campo Minado no computador pessoal. Seu escopo base usa Credits fictícios e surveys diegéticos sem coleta externa; pagamentos em dinheiro real, anúncios de terceiros ou surveys comerciais exigem decisão e escopo separados antes de qualquer implementação.
 
+A M30 introduz a Blackwire, rede clandestina criada por The Crow. A primeira etapa será vender post-its dos whiteboards por Credits. A venda inutiliza permanentemente a anotação como prova; dados triviais valem muito pouco, enquanto evidências de casos, finanças e liderança corporativa podem valer mais e provocar exposição pública, impacto na bolsa e cobertura jornalística conforme a gravidade.
+
+A M31 aprofunda a manipulação de mercado: grupos de empresas rivais do mesmo ramo terão relações determinísticas e estáveis por seed. Movimentos ligados à rivalidade devem ser opostos entre a empresa afetada e todas as suas rivais. O jogador aprenderá essas relações observando cotações e changes e poderá usá-las em conjunto com a venda de informações da Blackwire. Evidências sem ligação direta com a empresa terão impacto menor; crimes financeiros, fraude corporativa, extorsão e dados de executivos terão peso maior. Exposições mais graves, especialmente políticas, serão raras e difíceis de rastrear, podendo gerar consequências e notícias conforme sua gravidade.
+
+A M32 separa a progressão legal do personagem da progressão clandestina de seu alter ego hacker. Vendas e atividades da Blackwire passam a render Crypto, com saldo, conta e desbloqueios próprios; Credits permanecem na economia legal. Crypto poderá ser lavado lentamente em Credits. A identidade hacker pode perder conta e progresso em milestones posteriores sem apagar o personagem legal.
+
+A M33 introduz cautela para ações ilegais por meio de exposição invisível, defesas virtuais empresariais determinísticas e consequências narrativas crescentes. Rogue DNS ajuda a interromper alertas no país anterior e reduzir exposição. Em níveis críticos, The Crow poderá banir a conta Blackwire, levando à perda da progressão ilegal. As empresas terão níveis crescentes de proteção, do sistema desprotegido à Meridian Web Security.
+
 O Online permanece uma proposta arquitetural até que o modelo de personagens, instâncias e compartilhamento de estado seja fechado em um ADR aceito.

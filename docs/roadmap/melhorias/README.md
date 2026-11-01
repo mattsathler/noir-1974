@@ -14,6 +14,7 @@ Cada melhoria deve explicar o problema observável, o resultado esperado, o esco
 | I02 | Introdução visual após viagem confirmada pelo GATE (substituída) | M17 — animações das ações | Curto |
 | I04 | Nomes procedurais próprios para empresas | M24/M25 — websites e bolsa; gerador de empresas | Médio |
 | I05 | Tipos procedurais de empresas | M24/M25 — websites e bolsa; geração de empresas | Médio |
+| I06 | Widgets informativos no desktop | Computador pessoal, Union Mercantile Bank e Rogue DNS | Médio |
 
 ## Melhorias implementadas
 
