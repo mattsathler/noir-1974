@@ -114,6 +114,27 @@ type PlayerMailMessage struct {
 	Attachments []PlayerMailAttachment `json:"attachments"`
 }
 
+type PlayerEmailQuestionRequest struct {
+	RequestID  string    `json:"requestId"`
+	NPCID      string    `json:"npcId"`
+	Name       string    `json:"name"`
+	Email      string    `json:"email"`
+	QuestionID string    `json:"questionId"`
+	Subject    string    `json:"subject"`
+	Status     string    `json:"status"`
+	ReadyAt    time.Time `json:"readyAt"`
+}
+
+var playerEmailQuestions = map[string]struct {
+	prompt string
+}{
+	"routine":    {"How has your routine been lately?"},
+	"associates": {"Who do you usually spend time with?"},
+	"unusual":    {"Has anything unusual happened around here recently?"},
+	"work":       {"How are things at work?"},
+	"worries":    {"Is anything worrying you?"},
+}
+
 func billDispatchPostscript(seed string) string {
 	bulletins := [...]string{
 		"BILL BOUER, CITY POLICE: The Crow left his skull mark on another breached terminal. He calls the intrusion resistance; this office continues to treat it as theft. His capture remains an active priority.",
@@ -473,9 +494,9 @@ func politicalInterrogationAnswers(seed, npcID string) InterrogationAnswers {
 	}
 }
 
-// InterrogationAnswersForNPC returns authored dialogue for open cases connected to this NPC.
-// The response contains only spoken lines; internal case roles and culprit IDs stay server-side.
-func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serverID, cityID, npcID string) (InterrogationAnswers, error) {
+// InterrogationAnswersForNPC returns authored reply text for open cases connected to this NPC.
+// Internal case roles and culprit IDs stay server-side.
+func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serverID, npcID string) (InterrogationAnswers, error) {
 	data, err := caseSchema.ReadFile("interrogation/default.json")
 	if err != nil {
 		return nil, err
@@ -544,13 +565,13 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 	rows, err := store.db.Query(ctx, `
 		SELECT c.case_id,c.archetype_id,
 		       victim.generation_key, killer.generation_key,
-	       CASE WHEN c.killer_entity_id = $3 THEN 'perpetrator'
-	            WHEN c.victim_entity_id = $3 THEN 'acquaintance'
+	       CASE WHEN c.killer_entity_id = $2 THEN 'perpetrator'
+	            WHEN c.victim_entity_id = $2 THEN 'acquaintance'
 	            WHEN EXISTS (
 	              SELECT 1 FROM personal_relationships direct_relation
 	              WHERE direct_relation.server_id = c.server_id
-	                AND ((direct_relation.person_a_npc_id = $3 AND direct_relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
-	                  OR (direct_relation.person_b_npc_id = $3 AND direct_relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
+	                AND ((direct_relation.person_a_npc_id = $2 AND direct_relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
+	                  OR (direct_relation.person_b_npc_id = $2 AND direct_relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
 	            ) THEN 'acquaintance'
 	            WHEN EXISTS (
 	              SELECT 1 FROM employment_relationships principal_job
@@ -559,40 +580,40 @@ func (store *PostgresStore) InterrogationAnswersForNPC(ctx context.Context, serv
 	               AND caller_job.employer_company_id = principal_job.employer_company_id
 	              WHERE principal_job.server_id = c.server_id
 	                AND principal_job.employee_npc_id IN (c.victim_entity_id,c.killer_entity_id)
-	                AND caller_job.employee_npc_id = $3
+	                AND caller_job.employee_npc_id = $2
 	            ) THEN 'colleague' ELSE 'acquaintance' END
 		FROM cases c
 	JOIN case_states s USING (server_id, case_id)
 	JOIN world_entities victim ON victim.server_id = c.server_id AND victim.entity_id = c.victim_entity_id
 	JOIN world_entities killer ON killer.server_id = c.server_id AND killer.entity_id = c.killer_entity_id
-	WHERE c.server_id = $1::uuid AND c.city_id = $2 AND s.status = 'open'
-	  AND (c.killer_entity_id = $3 OR c.victim_entity_id = $3 OR EXISTS (
+	WHERE c.server_id = $1::uuid AND s.status = 'open'
+	  AND (c.killer_entity_id = $2 OR c.victim_entity_id = $2 OR EXISTS (
 	    SELECT 1 FROM employment_relationships victim_job
 	    JOIN employment_relationships caller_job
 	      ON caller_job.server_id = victim_job.server_id
 	     AND caller_job.employer_company_id = victim_job.employer_company_id
 	    WHERE victim_job.server_id = c.server_id
 	      AND victim_job.employee_npc_id IN (c.victim_entity_id,c.killer_entity_id)
-	      AND caller_job.employee_npc_id = $3
+	      AND caller_job.employee_npc_id = $2
 	  ) OR EXISTS (
 	    SELECT 1 FROM personal_relationships relation
 	    WHERE relation.server_id = c.server_id
-	      AND ((relation.person_a_npc_id = $3 AND relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
-	        OR (relation.person_b_npc_id = $3 AND relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
+	      AND ((relation.person_a_npc_id = $2 AND relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
+	        OR (relation.person_b_npc_id = $2 AND relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
 	  ))
 	ORDER BY CASE
-	           WHEN c.killer_entity_id = $3 THEN 0
-	           WHEN c.victim_entity_id = $3 THEN 1
+	           WHEN c.killer_entity_id = $2 THEN 0
+	           WHEN c.victim_entity_id = $2 THEN 1
 	           WHEN EXISTS (
 	             SELECT 1 FROM personal_relationships relation
 	             WHERE relation.server_id = c.server_id
-	               AND ((relation.person_a_npc_id = $3 AND relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
-	                 OR (relation.person_b_npc_id = $3 AND relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
+	               AND ((relation.person_a_npc_id = $2 AND relation.person_b_npc_id IN (c.victim_entity_id,c.killer_entity_id))
+	                 OR (relation.person_b_npc_id = $2 AND relation.person_a_npc_id IN (c.victim_entity_id,c.killer_entity_id)))
 	           ) THEN 2
 	           ELSE 3
 	         END,
 	         c.created_at DESC, c.case_id
-		LIMIT 1`, serverID, cityID, npcID)
+		LIMIT 1`, serverID, npcID)
 	if err != nil {
 		return nil, err
 	}
@@ -1208,7 +1229,143 @@ func makeResidentialAttachment(warrantID string, index int, finding residentialF
 	}
 }
 
+func (store *PostgresStore) QueueNPCEmailQuestion(ctx context.Context, serverID, accountID string, employee world.CompanyEmployee, questionID, requestID string, now time.Time) (PlayerEmailQuestionRequest, error) {
+	question, valid := playerEmailQuestions[questionID]
+	if !valid || requestID == "" || employee.ID == "" || employee.Email == "" {
+		return PlayerEmailQuestionRequest{}, ErrInvalidProgress
+	}
+	now = now.UTC()
+	var canRespond bool
+	err := store.db.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM world_entities e
+		WHERE e.server_id=$1::uuid AND e.entity_id=$2 AND e.entity_type='npc'
+		AND COALESCE((SELECT value #>> '{}' FROM world_mutations m
+			WHERE m.server_id=e.server_id AND m.entity_id=e.entity_id AND m.field_key='status'
+			ORDER BY m.mutation_order DESC LIMIT 1),'alive') NOT IN ('dead','missing')
+	)`, serverID, employee.ID).Scan(&canRespond)
+	if err != nil {
+		return PlayerEmailQuestionRequest{}, err
+	}
+	answer := "[no reply generated]"
+	replyGenerated := canRespond
+	var deliveredAt any
+	if canRespond {
+		answers, err := store.InterrogationAnswersForNPC(ctx, serverID, employee.ID)
+		if err != nil {
+			return PlayerEmailQuestionRequest{}, err
+		}
+		pool := answers[questionID]
+		if len(pool) == 0 {
+			return PlayerEmailQuestionRequest{}, ErrInvalidProgress
+		}
+		digest := sha256.Sum256([]byte(serverID + "/" + accountID + "/" + employee.ID + "/" + requestID + "/" + questionID))
+		answer = pool[binary.BigEndian.Uint64(digest[:8])%uint64(len(pool))]
+	} else {
+		// Persist the accepted request for idempotency, but mark it consumed without creating a reply.
+		deliveredAt = now
+	}
+	readyAt := now.Add(15 * time.Second)
+	subject := "Re: " + question.prompt
+	_, err = store.db.Exec(ctx, `INSERT INTO player_npc_email_questions(server_id,account_id,request_id,target_npc_id,target_name,target_email,question_id,subject,reply_body,reply_generated,ready_at,delivered_at)
+		VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(server_id,account_id,request_id) DO NOTHING`, serverID, accountID, requestID, employee.ID, employee.Name, strings.ToLower(employee.Email), questionID, subject, answer, replyGenerated, readyAt, deliveredAt)
+	if err != nil {
+		return PlayerEmailQuestionRequest{}, err
+	}
+	var result PlayerEmailQuestionRequest
+	err = store.db.QueryRow(ctx, `SELECT request_id,target_npc_id,target_name,target_email,question_id,subject,
+		CASE WHEN ready_at<=now() THEN 'ready' ELSE 'pending' END,ready_at
+		FROM player_npc_email_questions WHERE server_id=$1::uuid AND account_id=$2::uuid AND request_id=$3`, serverID, accountID, requestID).
+		Scan(&result.RequestID, &result.NPCID, &result.Name, &result.Email, &result.QuestionID, &result.Subject, &result.Status, &result.ReadyAt)
+	if err != nil {
+		return PlayerEmailQuestionRequest{}, err
+	}
+	if result.NPCID != employee.ID || result.Email != strings.ToLower(employee.Email) || result.QuestionID != questionID {
+		return PlayerEmailQuestionRequest{}, ErrPersistedConflict
+	}
+	return result, nil
+}
+
+func (store *PostgresStore) deliverNPCEmailReplies(ctx context.Context, serverID, accountID string) error {
+	return store.deliverNPCEmailRepliesMatching(ctx, serverID, accountID, "")
+}
+
+func (store *PostgresStore) deliverNPCEmailRepliesForNPC(ctx context.Context, serverID, npcID string) error {
+	return store.deliverNPCEmailRepliesMatching(ctx, serverID, "", npcID)
+}
+
+func (store *PostgresStore) deliverNPCEmailRepliesMatching(ctx context.Context, serverID, accountID, npcID string) error {
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	query := `SELECT q.account_id,q.request_id,q.target_npc_id,q.target_name,q.subject,q.reply_body,q.ready_at,
+		EXISTS(SELECT 1 FROM world_entities e WHERE e.server_id=q.server_id AND e.entity_id=q.target_npc_id AND e.entity_type='npc'),
+		COALESCE((SELECT value #>> '{}' FROM world_mutations m WHERE m.server_id=q.server_id AND m.entity_id=q.target_npc_id AND m.field_key='status' ORDER BY m.mutation_order DESC LIMIT 1),'alive')
+		FROM player_npc_email_questions q WHERE q.server_id=$1::uuid AND q.delivered_at IS NULL AND q.ready_at<=now()`
+	args := []any{serverID}
+	if accountID != "" {
+		query += ` AND q.account_id=$2::uuid`
+		args = append(args, accountID)
+	}
+	if npcID != "" {
+		query += fmt.Sprintf(` AND q.target_npc_id=$%d`, len(args)+1)
+		args = append(args, npcID)
+	}
+	query += ` ORDER BY q.ready_at,q.request_id FOR UPDATE OF q SKIP LOCKED`
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	type dueReply struct {
+		accountID string
+		requestID string
+		targetNPC string
+		sender    string
+		subject   string
+		body      string
+		readyAt   time.Time
+		npcExists bool
+		npcStatus string
+	}
+	due := make([]dueReply, 0)
+	for rows.Next() {
+		var item dueReply
+		if err := rows.Scan(&item.accountID, &item.requestID, &item.targetNPC, &item.sender, &item.subject, &item.body, &item.readyAt, &item.npcExists, &item.npcStatus); err != nil {
+			rows.Close()
+			return err
+		}
+		due = append(due, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for _, item := range due {
+		if !item.npcExists || item.npcStatus == "dead" || item.npcStatus == "missing" {
+			if _, err := tx.Exec(ctx, `UPDATE player_npc_email_questions SET delivered_at=now(),reply_generated=false WHERE server_id=$1::uuid AND account_id=$2::uuid AND request_id=$3 AND delivered_at IS NULL`, serverID, item.accountID, item.requestID); err != nil {
+				return err
+			}
+			continue
+		}
+		messageID := "npc-question:" + item.requestID + ":reply"
+		if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,sent_at,sender,message_category,subject,body,attachments)
+			VALUES($1::uuid,$2::uuid,$3,$4,$5,'official',$6,$7,'[]'::jsonb) ON CONFLICT(server_id,account_id,message_id) DO NOTHING`,
+			serverID, item.accountID, messageID, item.readyAt, item.sender, item.subject, item.body); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE player_npc_email_questions SET delivered_at=now() WHERE server_id=$1::uuid AND account_id=$2::uuid AND request_id=$3 AND delivered_at IS NULL`, serverID, item.accountID, item.requestID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
 func (store *PostgresStore) ListPlayerMail(ctx context.Context, serverID, accountID string) ([]PlayerMailMessage, error) {
+	if err := store.deliverNPCEmailReplies(ctx, serverID, accountID); err != nil {
+		return nil, fmt.Errorf("deliver NPC email replies: %w", err)
+	}
 	if err := store.ensureSampleSpam(ctx, serverID, accountID); err != nil {
 		return nil, fmt.Errorf("prepare junk mail: %w", err)
 	}
@@ -1561,6 +1718,9 @@ func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID stri
 // NPCEmails loads messages sent or received by the requested NPC and interval
 // while retaining case classification as backend-only metadata.
 func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID string, from, through time.Time) ([]mail.Message, error) {
+	if err := store.deliverNPCEmailRepliesForNPC(ctx, serverID, npcID); err != nil {
+		return nil, fmt.Errorf("deliver NPC email replies: %w", err)
+	}
 	rows, err := store.db.Query(ctx,
 		`SELECT case_id, mailbox_npc_entity_id, related_npc_entity_id, internal_relation, message_data
 		 FROM case_mail_messages
@@ -1589,7 +1749,63 @@ func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID strin
 		}
 		result = append(result, item)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	questionRows, err := store.db.Query(ctx, `SELECT q.account_id::text,COALESCE(c.display_name,p.username),q.request_id,q.question_id,q.target_name,q.created_at
+		FROM player_npc_email_questions q JOIN player_accounts p ON p.id=q.account_id
+		LEFT JOIN player_characters c ON c.account_id=q.account_id
+		WHERE q.server_id=$1::uuid AND q.target_npc_id=$2 AND q.created_at >= $3 AND q.created_at <= $4
+		ORDER BY q.created_at,q.request_id`, serverID, npcID, from, through)
+	if err != nil {
+		return nil, err
+	}
+	defer questionRows.Close()
+	for questionRows.Next() {
+		var accountID, sender, requestID, questionID, recipient string
+		var sentAt time.Time
+		if err := questionRows.Scan(&accountID, &sender, &requestID, &questionID, &recipient, &sentAt); err != nil {
+			return nil, err
+		}
+		question, ok := playerEmailQuestions[questionID]
+		if !ok {
+			continue
+		}
+		result = append(result, mail.Message{
+			ID: "player-npc:" + accountID + ":" + requestID + ":question", SentAt: sentAt,
+			Service: "Meridian Global Correspondence Exchange", Sender: sender, Recipient: recipient,
+			Subject: question.prompt, Body: question.prompt, MailboxNPCID: npcID,
+		})
+	}
+	if err := questionRows.Err(); err != nil {
+		return nil, err
+	}
+	replyRows, err := store.db.Query(ctx, `SELECT q.account_id::text,COALESCE(c.display_name,p.username),q.request_id,q.target_name,q.subject,q.reply_body,q.ready_at
+		FROM player_npc_email_questions q JOIN player_accounts p ON p.id=q.account_id
+		LEFT JOIN player_characters c ON c.account_id=q.account_id
+		WHERE q.server_id=$1::uuid AND q.target_npc_id=$2 AND q.reply_generated=true AND q.delivered_at IS NOT NULL
+		AND q.ready_at >= $3 AND q.ready_at <= $4 ORDER BY q.ready_at,q.request_id`, serverID, npcID, from, through)
+	if err != nil {
+		return nil, err
+	}
+	defer replyRows.Close()
+	for replyRows.Next() {
+		var accountID, username, requestID, sender, subject, body string
+		var sentAt time.Time
+		if err := replyRows.Scan(&accountID, &username, &requestID, &sender, &subject, &body, &sentAt); err != nil {
+			return nil, err
+		}
+		result = append(result, mail.Message{
+			ID: "npc-player:" + accountID + ":" + requestID + ":reply", SentAt: sentAt,
+			Service: "Meridian Global Correspondence Exchange", Sender: sender, Recipient: username,
+			Subject: subject, Body: body, MailboxNPCID: npcID,
+		})
+	}
+	if err := replyRows.Err(); err != nil {
+		return nil, err
+	}
+	mail.SortMessages(result)
+	return result, nil
 }
 
 // LatestPublicCase returns the newest active case without disclosing its killer.

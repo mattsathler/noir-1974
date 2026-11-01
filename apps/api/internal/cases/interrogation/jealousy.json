@@ -29,7 +29,7 @@
       "I used to visit their home with a small group. We have not gathered since the death.",
       "I keep to my family. {victim} was an acquaintance, not someone I saw every day.",
       "There were friends who visited them separately. I could not tell who was closest to whom.",
-      "I know the neighbours on either side of their building. I would not call them close friends.",
+      "I know the neighbours on either side of their building. We were never close friends.",
       "I spent time with {victim} before the marriage became strained, as far as I could tell.",
       "I do not know who {victim} wrote to. We mostly spoke about ordinary things.",
       "Their circle was larger than mine. I only knew a handful of people they invited over.",
@@ -103,12 +103,12 @@
       "I worry someone will mistake my silence for having something to hide.",
       "The truth may be in the small details, but I cannot remember them clearly.",
       "I am afraid the family will be blamed for something they did not do.",
-      "I would rather not discuss a death over a telephone line.",
+      "I would rather not discuss a death in a written message.",
       "I worry that the meeting was arranged for a reason no one has mentioned yet.",
       "I have nothing certain to offer. Please do not put words in my mouth.",
       "The building has been full of strangers asking questions. It makes people nervous.",
       "I do not know what happened, and I do not want to invent an answer.",
-      "I would like to end this call. This is all too personal."
+      "I would rather end this exchange here. This is all too personal."
     ]
   },
   "roles": {
@@ -162,7 +162,7 @@
         "I will not discuss whether I met {victim} that evening. The letter does not establish that."
       ],
       "associates": [
-        "{victim} was my spouse. We had friends in common, but I will not name them over this line.",
+        "{victim} was my spouse. We had friends in common, but I will not name them in this message.",
         "Our friends did not know what was written in the missing part of the letter."
       ],
       "unusual": [

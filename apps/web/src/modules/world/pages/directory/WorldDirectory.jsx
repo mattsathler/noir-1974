@@ -3,7 +3,6 @@ import { Printer } from "pixelarticons/react/Printer";
 import { getCompanyAtLocation, getNPCRecords, searchCompanies, searchLocations, searchNationalCompanies, searchPeople } from "../../api.js";
 import DatePicker from "../../components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
-import { phoneNumberForNPC } from "../../phoneDirectory.js";
 
 const FALLBACK_NPC_VISUAL = {
   hairId: "hair_short_brown",
@@ -359,7 +358,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               <figure className="world-record__staff-portrait">
                 <ModularFace visual={employee.visual ?? FALLBACK_NPC_VISUAL} name={employee.name} />
               </figure>
-              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span><small>DAILY WAGE · {Number(employee.dailySalaryCredits || 0).toLocaleString("en-US")} CREDITS</small><small>BANK ACCOUNT · {employee.bankAccountNumber || "NOT LISTED"}</small><small>TELEPHONE · {phoneNumberForNPC(employee.id)}</small><small>EMAIL · {employee.email}</small></div>
+              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span><small>DAILY WAGE · {Number(employee.dailySalaryCredits || 0).toLocaleString("en-US")} CREDITS</small><small>BANK ACCOUNT · {employee.bankAccountNumber || "NOT LISTED"}</small><small>EMAIL · {employee.email}</small></div>
             </article>)}
           </div>
         </article>

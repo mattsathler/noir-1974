@@ -13,7 +13,7 @@ export default function MeridianEnterprisesWebsite({ location, countryName }) {
             <h2 id="enterprise-divisions-title">Our divisions</h2>
             <article><p>TRANSIT NETWORK</p><h3>GATE</h3><span>The General Access Transit Exchange links cities through Meridian relay stations. Access logs require an authorized terminal application.</span></article>
             <article><p>PERSONAL COMPUTING</p><h3>Meridian OS</h3><span>The operating environment used by homes, offices and public terminals across the connected world.</span></article>
-            <article><p>GLOBAL INFRASTRUCTURE</p><h3>Meridian Relay</h3><span>Telephone, records and information services delivered through a dependable national network.</span></article>
+            <article><p>GLOBAL INFRASTRUCTURE</p><h3>Meridian Relay</h3><span>Postal, records and information services delivered through a dependable national network.</span></article>
           </section>
           <aside className="meridian-enterprises__bulletin">
             <h2>Company bulletin</h2>

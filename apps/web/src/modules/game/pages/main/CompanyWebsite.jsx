@@ -9,7 +9,7 @@ const LOCAL_ADS = [
   { name: "MAISON VAUTRIN", headline: "Good shoes carry you further.", detail: "Repairs while you wait at our rue Victor-Hugo workshop." },
   { name: "CAFÉ DU PONT", headline: "The kettle is always on.", detail: "A warm lunch and a quiet table beside the river." },
   { name: "SAINT-CLAIRE PHARMACY", headline: "For the small things that keep a household well.", detail: "Open weekdays until seven; prescriptions prepared promptly." },
-  { name: "LYON TAXI EXCHANGE", headline: "Across town, whatever the weather.", detail: "Telephone the exchange to arrange a dependable cab." },
+  { name: "LYON TAXI EXCHANGE", headline: "Across town, whatever the weather.", detail: "Write to the local exchange to arrange a dependable cab." },
   { name: "VINCENT’S PHOTOGRAPHIC SUPPLY", headline: "Keep the moment, not just the memory.", detail: "Film, camera repairs and same-day developing." },
   { name: "UNION MERCANTILE BANK", headline: "A safe place for the next good idea.", detail: "Visit your neighborhood counter for savings advice." },
   { name: "JARDIN DES FLEURS", headline: "A fresh arrangement brightens any room.", detail: "Seasonal flowers delivered throughout the city." },

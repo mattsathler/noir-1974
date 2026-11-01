@@ -1071,27 +1071,10 @@
 .computer-window__body p { color: var(--noir-paper-300); font-size: 0.875rem; line-height: 1.8; letter-spacing: 0.06em; }
 .computer-window__cursor { color: var(--noir-brass-300); animation: computer-cursor 1s steps(2, end) infinite; }
 
-.telephone-overlay { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(4 6 5 / 78%); }
-.character-conversation { position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(4 6 5 / 84%); }
-.character-conversation__dialog { display: flex; width: min(54rem, 100%); max-height: min(48rem, calc(100svh - 2rem)); flex-direction: column; align-items: center; padding: clamp(0.75rem, 3vw, 1.5rem); overflow-y: auto; color: var(--noir-paper-200); background: #111511; border: 2px solid var(--noir-ink-500); box-shadow: 8px 8px 0 #050605, inset 0 0 0 2px #242a24; text-align: center; }
-.character-conversation__header { display: flex; width: 100%; min-height: 2rem; align-items: center; justify-content: space-between; color: var(--noir-brass-300); font: 0.58rem var(--noir-font-mono); letter-spacing: 0.1em; }
-.character-conversation__header button { width: 2rem; height: 2rem; color: var(--noir-paper-200); background: transparent; border: 1px solid var(--noir-ink-500); cursor: pointer; font: 1.2rem var(--noir-font-mono); }
-.character-conversation__portrait { position: relative; display: grid; width: 12rem; height: 12rem; flex: 0 0 auto; place-items: center; margin: clamp(0.5rem, 3vh, 1.5rem) 0 0.5rem; background: #080b09; border: 2px solid var(--noir-brass-500); box-shadow: 4px 4px 0 #050605; }
-.character-conversation__portrait .modular-face { width: 100%; }
-.character-conversation__portrait--crow { border-color: #c5c2b2; box-shadow: 4px 4px 0 #050605, inset 0 0 0 3px #2b302b; }
-.character-conversation__skull-mark { position: absolute; right: -0.55rem; bottom: -0.55rem; width: 3rem; height: 3rem; padding: 0.35rem; color: #ddd9c8; background: #111511; border: 1px solid #868473; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 #050605); }
-.character-conversation__dialog h1 { margin: 0.45rem 0 0.15rem; color: var(--noir-brass-300); font-size: 1.25rem; }
-.character-conversation__role { margin: 0; color: var(--noir-paper-400); font: 0.55rem var(--noir-font-mono); letter-spacing: 0.08em; }
-.character-conversation__speech { display: grid; width: min(42rem, 100%); min-height: 6rem; align-content: center; margin-top: auto; padding: 1rem; color: var(--noir-paper-200); background: #080b09; border: 1px solid var(--noir-ink-600); box-shadow: inset 0 0 0 2px #111713; font: 0.78rem/1.65 var(--noir-font-mono); text-align: left; }
-.character-conversation__replies { display: grid; width: min(42rem, 100%); grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; margin-top: 0.55rem; }
-.character-conversation__replies button { min-height: 3.25rem; padding: 0.6rem; color: var(--noir-paper-200); background: var(--noir-ink-800); border: 1px solid var(--noir-ink-600); cursor: pointer; font: 0.68rem/1.45 var(--noir-font-mono); text-align: left; }
-.character-conversation__replies button:hover,.character-conversation__replies button:focus-visible { color: var(--noir-brass-300); background: var(--noir-ink-900); border-color: var(--noir-brass-500); outline: 2px solid transparent; }
-.character-conversation__dialog footer { width: 100%; margin-top: 0.8rem; color: var(--noir-paper-500); font: 0.5rem var(--noir-font-mono); letter-spacing: 0.1em; text-align: right; }
 .notification-center__toggle { position: absolute; z-index: 9997; top: 0.8rem; right: 1rem; display: grid; width: 2.5rem; height: 2.5rem; place-items: center; padding: 0; color: #33443e; background: transparent; border: 0; box-shadow: none; cursor: pointer; }
-.notification-center__toggle svg { width: 1.15rem; height: 1.15rem; fill: currentColor; shape-rendering: crispEdges; }
+.notification-center__toggle svg { display: block; width: 1.15rem; height: 1.15rem; fill: currentColor; shape-rendering: crispEdges; }
 .notification-center__toggle span { position: absolute; top: -0.3rem; right: -0.3rem; display: grid; min-width: 1.05rem; height: 1.05rem; place-items: center; padding-inline: 0.15rem; color: var(--noir-ink-950); background: var(--noir-brass-300); border: 1px solid var(--noir-ink-950); font: 700 0.52rem var(--noir-font-mono); }
 .notification-center__toggle:hover,.notification-center__toggle:focus-visible { color: #173d34; outline: 1px dotted #607b6d; outline-offset: 2px; }
-.notification-center__toggle span { color: #fff; background: #8b4b3e; border-color: #f0eee3; }
 .computer-frame--persistent .computer-screen .notification-center__window { position: absolute; z-index: 9997; top: 4rem; right: 1rem; left: auto; display: flex; width: min(25rem, calc(100% - 2rem)); height: auto; max-height: min(64vh, 38rem); flex-direction: column; overflow: hidden; color: #343a35; background: #e6e8df; border: 1px solid #858b7d; box-shadow: 3px 3px 0 rgb(0 0 0 / 48%); text-align: left; transform: none; }
 .computer-frame--persistent .computer-screen .notification-center__content { display: flex; min-height: 0; flex-direction: column; padding: 0; overflow-y: auto; color: #343a35; background: #e6e8df !important; text-align: left; }
 .computer-frame--persistent .computer-screen .notification-center__content,
@@ -1110,94 +1093,6 @@
 .notification-center__snackbar strong { color: #40594c; font: 700 0.62rem var(--noir-font-mono); }
 .notification-center__snackbar small { color: #545a53; font: 0.62rem/1.45 var(--noir-font-mono); }
 .notification-center__snackbar button { width: 2rem; min-width: 2rem; height: 2rem; color: #3e4942; background: #e3e8e2; border: 1px solid #9ba092; cursor: pointer; font: 1.2rem var(--noir-font-mono); }
-.telephone-device { position: relative; display: flex; width: min(34rem, 100%); height: min(40rem, calc(100svh - 2rem)); flex-direction: column; padding: 0.45rem; overflow: hidden; color: var(--noir-paper-200); background: #252a25; border: 2px solid var(--noir-ink-500); border-radius: 1.1rem; box-shadow: 8px 8px 0 #050605, inset 0 0 0 2px #383e37; }
-.telephone-device__header { display: flex; min-height: 3rem; align-items: center; justify-content: space-between; padding: 0 0.8rem; color: var(--noir-brass-300); font: 0.8rem var(--noir-font-mono); letter-spacing: 0.14em; }
-.telephone-device__header button { width: 2rem; height: 2rem; color: var(--noir-paper-200); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 1.1rem; }
-.telephone-device__body { display: grid; min-height: 0; flex: 1; grid-template-columns: 9rem minmax(0, 1fr); gap: 0.8rem; align-items: stretch; padding: 0.25rem; }
-.telephone-device__handset { display: grid; min-height: 0; place-items: center; color: var(--noir-ink-950); background: linear-gradient(180deg, #202621 0%, #394239 22%, #50594f 50%, #394239 78%, #202621 100%); border: 2px solid #111511; border-radius: 0.7rem; box-shadow: inset 0 8px 12px rgb(0 0 0 / 38%), inset 0 -8px 12px rgb(0 0 0 / 38%), inset 0 0 0 3px #4c534b; }
-.telephone-device__handset--active { background: #101511; box-shadow: inset 0 0 0 3px #1b211d; }
-.telephone-device__handset--active .telephone-device__receiver { visibility: hidden; }
-.telephone-device__handset .telephone-device__receiver { width: 4.5rem; height: 4.5rem; shape-rendering: crispEdges; filter: drop-shadow(2px 2px 0 #101310); transform: rotate(-90deg); }
-.telephone-app { display: flex; width: min(100%, 23rem); min-height: 0; height: 100%; flex-direction: column; margin-inline: auto; overflow: hidden; text-align: left; }
-.telephone-app__display {
-  display: flex;
-  min-height: 4rem;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0.55rem 0.7rem;
-  overflow: hidden;
-  color: var(--noir-success);
-  background: #08110d;
-  border: 1px solid var(--noir-ink-500);
-  border-radius: 0.4rem;
-  box-shadow: inset 0 0 0 2px var(--noir-ink-900);
-  font: 1.2rem/1.2 var(--noir-font-mono);
-  letter-spacing: 0.12em;
-  white-space: nowrap;
-}
-.telephone-app__display,
-.telephone-app__call-status { background: #08110d; border: 1px solid var(--noir-ink-500); border-radius: 0.4rem; box-shadow: inset 0 0 0 2px var(--noir-ink-900); }
-.telephone-app__number-input { width: 100%; min-width: 0; padding: 0; color: var(--noir-success); text-align: right; background: transparent; border: 0; outline: 0; font: inherit; letter-spacing: inherit; }
-.telephone-app__number-input:focus-visible { outline: 1px solid var(--noir-success); outline-offset: 3px; }
-.telephone-app__call-status { display: flex; height: 2rem; min-height: 2rem; align-items: center; margin: 0.5rem 0 0.65rem; padding: 0.3rem 0.6rem; color: var(--noir-success); font: 0.68rem/1.4 var(--noir-font-mono); letter-spacing: 0.06em; overflow-wrap: anywhere; text-align: left; }
-.telephone-app__call-status--calling { color: var(--noir-brass-300); }
-.telephone-app__call-status--not-found,
-.telephone-app__call-status--dead { color: var(--noir-danger); }
-.telephone-interrogation { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 0.45rem; overflow: hidden; color: var(--noir-paper-200); margin-bottom: 8px; }
-.telephone-interrogation__header { display: grid; flex: 0 0 auto; gap: 0.15rem; text-align: center; }
-.telephone-interrogation__header strong { overflow: hidden; color: var(--noir-brass-300); font-size: 1.05rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.telephone-interrogation__header span { overflow: hidden; color: var(--noir-paper-400); font-size: 0.7rem; letter-spacing: 0.06em; text-overflow: ellipsis; white-space: nowrap; }
-.telephone-interrogation__portrait { display: grid; height: 8rem; flex: 0 0 8rem; place-items: center; }
-.telephone-interrogation__portrait .modular-face { width: 8rem; border: 1px solid var(--noir-brass-500); background: var(--noir-ink-950); box-shadow: 3px 3px 0 #060706; }
-.telephone-interrogation__answer { height: 6rem; min-height: 0; max-height: 6rem; flex: 0 0 6rem; padding: 0.7rem; overflow: hidden; color: var(--noir-paper-200); background: #080b09; border: 1px solid var(--noir-ink-700); box-shadow: inset 0 0 0 2px #111713; font: 0.76rem/1.5 var(--noir-font-mono); }
-.telephone-interrogation__questions { display: grid; min-height: 0; flex: 1; grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 0.25rem; margin-top: auto; overflow: hidden; }
-.telephone-interrogation__questions button { min-height: 0; padding: 0.35rem 0.55rem; overflow: hidden; color: var(--noir-paper-200); background: var(--noir-ink-800); border: 1px solid var(--noir-ink-600); cursor: pointer; font: 0.68rem/1.3 var(--noir-font-mono); text-align: left; }
-.telephone-interrogation__questions button:hover,
-.telephone-interrogation__questions button[aria-pressed="true"] { color: var(--noir-brass-300); border-color: var(--noir-brass-500); background: var(--noir-ink-900); }
-.telephone-interrogation__questions button:focus-visible { outline: 2px solid var(--noir-brass-300); outline-offset: 1px; }
-.telephone-interrogation__hangup { display: grid; width: 2.8rem; min-width: 2.8rem; min-height: 2.2rem; flex: 0 0 2.2rem; place-items: center; align-self: flex-end; padding: 0.25rem; color: #fff0e8; background: linear-gradient(180deg, #c65b50, #85302d); border: 1px solid #d17668; border-radius: 0.4rem; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 25%), inset -1px -2px 0 rgb(0 0 0 / 32%), 2px 2px 0 #080706; cursor: pointer; }
-.telephone-interrogation__hangup svg { width: 20px; height: 20px; fill: currentColor; shape-rendering: crispEdges; }
-.telephone-interrogation__hangup:hover { background: linear-gradient(180deg, #d56a5d, #983a34); }
-.telephone-interrogation__hangup:focus-visible { outline: 2px solid var(--noir-brass-300); outline-offset: 2px; }
-.telephone-app__cursor { color: var(--noir-brass-300); animation: computer-cursor 1s steps(2, end) infinite; }
-.telephone-app__decorative-actions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.25rem; margin: 0.75rem 0 0.65rem; }
-.telephone-app__decorative-action { min-width: 0; min-height: 1.55rem; padding: 0.15rem 0.1rem; overflow: hidden; color: #e0dbcf; background: linear-gradient(180deg, #626a69 0%, #4b5353 100%); border: 1px solid #92958d; border-radius: 0.3rem; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 26%), inset -1px -2px 0 rgb(0 0 0 / 38%), 1px 1px 0 #070908; cursor: default !important; font: 700 0.42rem/1 var(--noir-font-mono); opacity: 1 !important; text-overflow: clip; white-space: nowrap; }
-.telephone-app__keypad { display: grid; width: 100%; min-height: 0; flex: 1 1 auto; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 0.75rem 1rem; margin-inline: auto; }
-.telephone-app__keypad button,
-.telephone-app__controls button {
-  min-height: 2.35rem;
-  padding: 0;
-  color: var(--noir-paper-100);
-  background: var(--noir-ink-800);
-  border: 1px solid var(--noir-ink-500);
-  border-radius: 0.4rem;
-  box-shadow: 2px 2px 0 var(--noir-ink-950);
-  cursor: pointer;
-  font: 700 1rem/1 var(--noir-font-mono);
-}
-.telephone-app__keypad button { position: relative; display: flex; min-height: 0; height: 100%; align-items: center; justify-content: center; gap: 0.3rem; color: #e7e0d4; background: linear-gradient(180deg, #626a69 0%, #4b5353 100%); border: 1px solid #92958d; border-radius: 0.42rem; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 26%), inset -1px -2px 0 rgb(0 0 0 / 38%), 2px 2px 0 #070908; text-shadow: 1px 1px 0 #202321; }
-.telephone-app__keypad button small { align-self: center; color: #d1c8b9; font: 0.42rem/1 var(--noir-font-mono); letter-spacing: 0.04em; text-shadow: none; }
-.telephone-app__keypad button:hover,
-.telephone-app__controls button:not(:disabled):hover { color: var(--noir-ink-950); background: var(--noir-brass-300); }
-.telephone-app__keypad button:hover { color: #fff8eb; background: linear-gradient(180deg, #777e79 0%, #555d58 100%); }
-.telephone-app__keypad button:active { transform: translate(1px, 1px); box-shadow: inset 1px 1px 2px rgb(0 0 0 / 45%), 1px 1px 0 #070908; }
-.telephone-app__keypad button:focus-visible,
-.telephone-app__controls button:focus-visible { outline: 2px solid var(--noir-brass-300); outline-offset: 2px; }
-.telephone-app__grille { display: grid; flex: 0 0 auto; gap: 0.7rem; margin-top: auto; }
-.telephone-app__grille span { display: block; height: 1px; background: #777d72; opacity: 0.72; }
-.telephone-app__controls { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0.65rem 0; }
-.telephone-app__controls button { min-height: 2rem; padding-inline: 0.75rem; font-size: 0.65rem; letter-spacing: 0.1em; }
-.telephone-app__controls button:disabled { opacity: 0.45; cursor: default; }
-.telephone-app__controls .telephone-app__clear { color: #fff0e8; background: linear-gradient(180deg, #c65b50, #85302d); border-color: #d17668; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 25%), inset -1px -2px 0 rgb(0 0 0 / 32%), 2px 2px 0 #080706; }
-.telephone-app__controls .telephone-app__clear:not(:disabled):hover { color: #fff; background: linear-gradient(180deg, #d56a5d, #983a34); }
-.telephone-app__controls .telephone-app__clear:disabled { color: #b88f88; background: #67312f; border-color: #85504a; opacity: 1; }
-.telephone-app__controls .telephone-app__dial { display: grid; width: 2.8rem; min-width: 2.8rem; place-items: center; padding: 0; color: #102016; background: linear-gradient(180deg, #82cf83, #529b5b); border-color: #9cdd8c; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 30%), inset -1px -2px 0 rgb(0 0 0 / 30%), 2px 2px 0 #17251a; }
-.telephone-app__dial svg { width: 20px; height: 20px; fill: currentColor; shape-rendering: crispEdges; }
-.telephone-app__controls .telephone-app__dial:not(:disabled):hover { color: #102016; background: linear-gradient(180deg, #9cdd8c, #65b36a); }
-.telephone-app__controls .telephone-app__dial:disabled { color: #8c9b8b; background: linear-gradient(180deg, #465348, #303a34); border-color: #596653; opacity: 1; }
-.telephone-app__controls .telephone-app__dial--active { color: #fff0e8; background: linear-gradient(180deg, #c65b50, #85302d); border-color: #d17668; box-shadow: inset 1px 1px 0 rgb(255 255 255 / 25%), inset -1px -2px 0 rgb(0 0 0 / 32%), 2px 2px 0 #080706; }
-.telephone-app__controls .telephone-app__dial--active:not(:disabled):hover { color: #fff; background: linear-gradient(180deg, #d56a5d, #983a34); }
-.telephone-app__status { margin: 0.9rem 0 0; color: var(--noir-paper-400); font-size: 0.6rem !important; letter-spacing: 0.12em !important; text-align: center; }
 
 .computer-window:has(.world-directory) {
   display: flex;
@@ -2726,6 +2621,9 @@
   .institutional-site--company .world-company-site__status { margin-left: auto; }
 }
 .institutional-site--mail { --institutional-primary: #4e426e; --institutional-accent: #a6a0ce; --institutional-nav: #eeeaf4; --institutional-link: #51407b; }
+.computer-frame--persistent .computer-window--app:has(.email-compose-window) .computer-window__body { flex-direction: column; align-items: stretch; padding: 0; background: #fff; }
+.email-compose-window { width: 100%; min-height: 100%; flex: 1 0 auto; box-sizing: border-box; padding: clamp(1rem, 3vw, 1.75rem); color: #29272e; background: repeating-linear-gradient(to bottom, #fff 0, #fff 7px, #f0eef2 8px); font: 0.75rem/1.55 Arial, Helvetica, sans-serif; text-align: left; }
+.email-compose-window .player-mail__compose { align-content: start; margin: 0; padding: 0.75rem 0; border-top: 0; }
 .institutional-site--mail .institutional-site__symbol { color: #fff; background: #665589; border-color: #c9c1e3; }
 .institutional-site .page-print-button { color: #176b52; background: #fff; border-color: #b8c5bd; }
 .institutional-site .page-print-button:hover { color: #0d503c; border-color: #176b52; background: #f1f7f3; }
@@ -2737,6 +2635,35 @@
 .institutional-site--mail .email-inbox { color: #29272e; font: 0.75rem/1.55 Arial, Helvetica, sans-serif; letter-spacing: normal; }
 .institutional-site--mail .email-inbox > .computer-window__eyebrow { color: #5b526d; font: 700 0.58rem Arial, sans-serif; letter-spacing: 0.08em; }
 .institutional-site--mail .email-inbox > h1 { color: #4e426e; font: 700 clamp(1rem, 2.5vw, 1.35rem) Arial, sans-serif; letter-spacing: 0.04em; }
+.institutional-site--mail .player-mail__heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.institutional-site--mail .player-mail__heading h1 { margin: 0.5rem 0 0.35rem; color: #4e426e; font: 700 clamp(1rem, 2.5vw, 1.35rem) Arial, sans-serif; letter-spacing: 0.04em; }
+.institutional-site--mail .player-mail__heading > button,
+.institutional-site--mail .player-mail__compose button { padding: 0.25rem 0; color: #51407b; background: transparent; border: 0; cursor: pointer; font: 700 0.62rem Arial, sans-serif; }
+.institutional-site--mail .player-mail__heading > button:hover,
+.institutional-site--mail .player-mail__compose button:hover { color: #2f2448; text-decoration: underline; }
+.institutional-site--mail .player-mail__compose { display: grid; gap: 0.65rem; margin: 0.7rem 0; padding: 0.8rem 0; border-top: 1px solid #d8d5dd; border-bottom: 1px solid #d8d5dd; }
+.institutional-site--mail .player-mail__compose > header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.institutional-site--mail .player-mail__compose > header p,
+.institutional-site--mail .player-mail__question-list > p { margin: 0; color: #625875; font: 700 0.52rem Arial, sans-serif; letter-spacing: 0.08em; }
+.institutional-site--mail .player-mail__compose h2 { margin: 0.2rem 0 0; color: #4e426e; font: 700 0.9rem Arial, sans-serif; }
+.institutional-site--mail .player-mail__compose > header > span { color: #6e6877; font: 0.52rem Arial, sans-serif; }
+.institutional-site--mail .player-mail__compose form { display: grid; gap: 0.3rem; }
+.institutional-site--mail .player-mail__compose label { color: #625875; font: 700 0.54rem Arial, sans-serif; }
+.institutional-site--mail .player-mail__compose-line { display: flex; align-items: center; gap: 0.8rem; }
+.institutional-site--mail .player-mail__compose input { width: min(100%, 28rem); min-width: 0; padding: 0.35rem 0.45rem; color: #29272e; background: #fff; border: 1px solid #c9c4d3; font: 0.7rem Arial, sans-serif; }
+.institutional-site--mail .player-mail__compose input:focus-visible { outline: 2px solid #8c80a7; outline-offset: 1px; }
+.institutional-site--mail .player-mail__compose-target { display: grid; gap: 0.15rem; padding: 0.45rem 0; border-top: 1px solid #e4e0ea; }
+.institutional-site--mail .player-mail__compose-target strong { color: #3f315f; font-size: 0.75rem; }
+.institutional-site--mail .player-mail__compose-target span { color: #51407b; font-size: 0.68rem; }
+.institutional-site--mail .player-mail__compose-target small { color: #6e6877; font-size: 0.53rem; }
+.institutional-site--mail .player-mail__question-list { display: grid; gap: 0.35rem; }
+.institutional-site--mail .player-mail__question-list > button { display: flex; min-height: 2.25rem; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.45rem 0.65rem; color: #51407b; background: #f7f5fa; border: 1px solid #c9c4d3; border-left: 3px solid #8c80a7; box-shadow: inset 1px 1px #fff; cursor: pointer; font: 0.68rem Arial, sans-serif; text-align: left; text-decoration: none; }
+.institutional-site--mail .player-mail__question-list > button:hover { color: #3f315f; background: #eeeaf4; border-color: #8c80a7; border-left-color: #51407b; text-decoration: none; }
+.institutional-site--mail .player-mail__question-list > button:focus-visible { outline: 2px solid #665589; outline-offset: 2px; }
+.institutional-site--mail .player-mail__question-list > button span { color: #665589; }
+.institutional-site--mail .player-mail__compose button:disabled { opacity: 0.55; cursor: wait; }
+.institutional-site--mail .player-mail__reply-pending { margin: 0; color: #426449; font: 700 0.62rem Arial, sans-serif; }
+.institutional-site--mail .player-mail__compose-status { margin: 0; color: #53515a; font: 0.62rem/1.45 Arial, sans-serif; }
 .institutional-site--mail .player-mail__date-range { display: flex; align-items: end; justify-content: space-between; gap: 0.7rem; margin: 0.85rem 0 0.4rem; padding: 0.55rem 0; border-top: 1px solid #d8d5dd; border-bottom: 1px solid #d8d5dd; }
 .institutional-site--mail .player-mail__date-range > .world-record__date-label { color: #625875; font: 700 0.55rem Arial, sans-serif; }
 .institutional-site--mail .player-mail__date-range .world-record__activity-filter { justify-content: flex-end; gap: 0.5rem; }
@@ -2818,21 +2745,11 @@
 @media (max-width: 42rem) {
   .email-message__summary { grid-template-columns: minmax(0, 1fr) auto; gap: var(--noir-space-2); }
   .email-message__summary > span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .institutional-site--mail .player-mail__compose-line { align-items: stretch; flex-direction: column; gap: 0.35rem; }
+  .institutional-site--mail .player-mail__compose input { width: 100%; }
 }
 
 @media (max-width: 42rem) {
-  .telephone-overlay { padding: 0.5rem; }
-  .telephone-device { width: min(34rem, 100%); height: min(40rem, calc(100svh - 1rem)); max-height: calc(100svh - 1rem); padding: 0.3rem; }
-  .telephone-device__body { min-height: 0; grid-template-columns: 5rem minmax(0, 1fr); gap: 0.5rem; padding: 0.15rem; }
-  .telephone-device__handset { min-height: 0; }
-  .telephone-device__handset .telephone-device__receiver { width: 3.25rem; height: 3.25rem; }
-  .telephone-interrogation { min-height: 0; }
-  .telephone-interrogation__portrait { height: 7rem; flex-basis: 7rem; }
-  .telephone-interrogation__portrait .modular-face { width: 7rem; }
-  .telephone-interrogation__answer { height: 5rem; min-height: 0; max-height: 5rem; flex-basis: 5rem; font-size: 0.7rem; }
-  .telephone-interrogation__questions button { min-height: 1.9rem; font-size: 0.64rem; }
-  .telephone-app__keypad { gap: 0.2rem; }
-  .telephone-app__keypad button { min-height: 0; }
   .computer-window--terminal { width: min(94%, 26rem); }
   .building-interior { gap: var(--noir-space-3); padding: var(--noir-space-4); }
   .building-interior__header { align-items: flex-start; flex-direction: column; }

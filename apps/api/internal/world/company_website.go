@@ -76,7 +76,7 @@ var companyWebsiteBulletins = []string{
 	"Please allow additional time for deliveries during market week.",
 	"The customer desk will close early on the last Saturday of the month.",
 	"New service hours have been posted at our local office.",
-	"Telephone enquiries are answered during regular business hours.",
+	"Written enquiries are answered during regular business hours.",
 	"A printed list of current services may be requested in person.",
 	"Our staff are preparing the next district notice for publication.",
 	"The office will observe the municipal holiday schedule.",
@@ -116,7 +116,6 @@ func GenerateCompanyWebsite(seed string, generatorVersion int, company CompanyPo
 	advertising := []string{"none", "sparse", "standard", "crowded"}[choose(4, 19)]
 	bulletin := companyWebsiteBulletins[choose(len(companyWebsiteBulletins), 9)]
 	offerings := rotateCompanyWebsiteItems(activity.offerings, choose(len(activity.offerings), 10))
-	phone := fmt.Sprintf("%02d-%02d-%02d-%02d", 10+choose(80, 5), choose(100, 6), choose(100, 7), choose(100, 8))
 	city := company.Address.City
 	if city == "" {
 		city = "the connected city"
@@ -150,7 +149,6 @@ func GenerateCompanyWebsite(seed string, generatorVersion int, company CompanyPo
 			}},
 			{ID: "contact", Title: "CONTACT & LOCATIONS", Sections: []CompanyWebsiteSection{
 				{Kind: "address", Heading: "HEAD OFFICE", Body: company.Address.Full},
-				{Kind: "fact", Heading: "TELEPHONE", Body: phone},
 				{Kind: "fact", Heading: "OFFICE HOURS", Body: "Monday–Friday · 9:00 AM–5:00 PM"},
 			}},
 			{ID: "account", Title: "CUSTOMER ACCOUNT", Sections: []CompanyWebsiteSection{

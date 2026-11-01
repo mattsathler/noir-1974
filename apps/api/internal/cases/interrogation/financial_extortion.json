@@ -14,7 +14,7 @@
       "I have kept to my normal hours. {victim} was often still at their desk when I left.",
       "There were more sealed envelopes than usual in the registry that week.",
       "My daily work is predictable. It is the questions about one payment that are not.",
-      "I have not changed my habits, though I have stopped using the company telephone.",
+      "I have not changed my habits, though I have stopped writing to the company office.",
       "The settlement day came and went. I thought the matter was finished then.",
       "I have been assigned to ordinary filing. I do not handle the private accounts.",
       "People were checking the clock more often than they checked their papers.",
@@ -42,7 +42,7 @@
       "The people I trust at work are not the people who control the ledgers.",
       "I have only spoken with {victim} a handful of times. They seemed careful about what they said.",
       "I know who carries the sealed statements. I do not know who reads them.",
-      "I would rather not discuss my friends or colleagues on a line that may be monitored."
+      "I would rather not discuss my friends or colleagues in correspondence that may be monitored."
     ],
     "unusual": [
       "A payment appeared under a reference instead of a name. I assumed that was how the system worked.",
@@ -108,7 +108,7 @@
       "I do not feel safe keeping copies at my desk.",
       "People are asking me to remember dates from months ago. I may get them wrong.",
       "I am afraid someone will blame the first clerk whose initials appear in the book.",
-      "I have said everything I know. Please do not call me again."
+      "I have written everything I know. Please do not write again."
     ]
   },
   "roles": {
@@ -162,7 +162,7 @@
         "The payment was ordinary. I cannot explain why {victim} kept asking about its reference."
       ],
       "associates": [
-        "I spend time with people outside the office. I will not name anyone on a call that may be recorded.",
+        "I spend time with people outside the office. I will not name anyone in a message that may be recorded.",
         "I knew {victim} through work. I have nothing else to say about them."
       ],
       "unusual": [

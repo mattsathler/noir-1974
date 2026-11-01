@@ -4,10 +4,21 @@ import { Files } from "pixelarticons/react/Files";
 import { Note } from "pixelarticons/react/Note";
 import { Box } from "pixelarticons/react/Box";
 import { Trash } from "pixelarticons/react/Trash";
-import { deletePlayerEmail, getNPCEmails, getPlayerEmails } from "../../../world/api.js";
+import { deletePlayerEmail, findNPCByEmail, getNPCEmails, getPlayerEmails, sendNPCEmailQuestion } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
 
 const ATTACHMENT_ICONS = { document: Files, paper: Note, object: Box };
+const NPC_QUESTIONS = [
+  { id: "routine", text: "How has your routine been lately?" },
+  { id: "associates", text: "Who do you usually spend time with?" },
+  { id: "unusual", text: "Has anything unusual happened around here recently?" },
+  { id: "work", text: "How are things at work?" },
+  { id: "worries", text: "Is anything worrying you?" },
+];
+
+function newEmailRequestID() {
+  return globalThis.crypto?.randomUUID?.() || `mail-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function displayDate(value, timeZone) {
   const date = new Date(value);
@@ -21,7 +32,64 @@ function dateBefore(value, days) {
   return date.toISOString().slice(0, 10);
 }
 
-export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPrint, onMessageReceived, hackedAccount = null, from: initialFrom = "", through: initialThrough = "", onExit }) {
+export function NPCEmailComposer() {
+  const [email, setEmail] = useState("");
+  const [target, setTarget] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("Use the email address published in the company staff directory.");
+  const [sentRequest, setSentRequest] = useState(null);
+
+  async function lookup(event) {
+    event.preventDefault();
+    if (busy || !email.trim()) return;
+    setBusy(true);
+    setTarget(null);
+    setSentRequest(null);
+    setMessage("SEARCHING THE STAFF DIRECTORY…");
+    try {
+      const matches = await findNPCByEmail(email.trim());
+      const match = matches[0] || null;
+      setTarget(match);
+      setMessage(match ? "ADDRESS VERIFIED. SELECT A QUESTION TO WRITE." : "NO STAFF ACCOUNT MATCHES THAT EMAIL ADDRESS.");
+    } catch (error) {
+      setMessage(error.message || "THE STAFF DIRECTORY COULD NOT BE REACHED.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function ask(question) {
+    if (!target || busy) return;
+    setBusy(true);
+    setMessage("SENDING YOUR MESSAGE…");
+    try {
+      const result = await sendNPCEmailQuestion(email.trim(), question.id, newEmailRequestID());
+      setSentRequest(result.request);
+      setMessage(`MESSAGE SENT TO ${target.name.toUpperCase()}. CHECK YOUR PERSONAL MAILBOX FOR ANY REPLY.`);
+    } catch (error) {
+      setMessage(error.message || "THE MESSAGE COULD NOT BE SENT.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <section className="player-mail__compose" aria-label="Write to a staff member">
+    <header><div><p>OUTGOING CORRESPONDENCE</p><h2>Write to a staff member</h2></div><span>PERSONAL MAIL</span></header>
+    <form onSubmit={lookup}>
+      <label htmlFor="player-mail-npc-address">TO EMAIL ADDRESS</label>
+      <div className="player-mail__compose-line"><input id="player-mail-npc-address" type="email" autoComplete="off" required value={email} onChange={(event) => { setEmail(event.target.value); setTarget(null); setSentRequest(null); }} placeholder="name@meridian-mail.net" /><button type="submit" disabled={busy}>{busy ? "SEARCHING…" : "VERIFY ADDRESS ↵"}</button></div>
+    </form>
+    {target && <div className="player-mail__compose-target"><strong>{target.name}</strong><span>{target.email}</span><small>{target.role?.toUpperCase() || "COMPANY STAFF"}</small></div>}
+    {target && !sentRequest && <div className="player-mail__question-list" aria-label="Questions">
+      <p>CHOOSE A QUESTION</p>
+      {NPC_QUESTIONS.map((question) => <button key={question.id} type="button" disabled={busy} onClick={() => ask(question)}>{question.text}<span aria-hidden="true">↗</span></button>)}
+    </div>}
+    {sentRequest && <p className="player-mail__reply-pending">MESSAGE SENT · REPLIES MAY TAKE TIME</p>}
+    <p className="player-mail__compose-status" role="status" aria-live="polite">{message}</p>
+  </section>;
+}
+
+export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPrint, onMessageReceived, onOpenCompose, hackedAccount = null, from: initialFrom = "", through: initialThrough = "", onExit }) {
   const throughToday = new Date(serverTime).toISOString().slice(0, 10);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("OPENING MAILBOX…");
@@ -121,8 +189,8 @@ export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPri
 
   return <div className={`email-inbox${hackedAccount ? " email-inbox--hacked" : ""}`}>
     {hackedAccount && onExit && <button className="email-inbox__hacked-back" type="button" onClick={onExit}>← RETURN TO EMAIL_BREAKER</button>}
-    <p className="computer-window__eyebrow">PRIVATE LINE · PERSONAL ACCOUNT</p>
-    <h1>PERSONAL MAILBOX</h1>
+    <p className="computer-window__eyebrow">PRIVATE ACCOUNT · PERSONAL MAIL</p>
+    <div className="player-mail__heading"><h1>PERSONAL MAILBOX</h1>{!hackedAccount && <button type="button" onClick={onOpenCompose}>SEND EMAIL ↗</button>}</div>
     <section className="player-mail__date-range" aria-label="Email date range">
       <span className="world-record__date-label">DATE RANGE</span>
       <div className="world-record__activity-filter">
@@ -131,7 +199,6 @@ export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPri
       </div>
     </section>
     <p className="world-directory__message" role="status" aria-live="polite">{displayStatus}</p>
-    {!visibleMessages.length && displayStatus === "NO MESSAGES IN THIS DATE RANGE" && <p className="email-inbox__empty">No messages are available for this date range.</p>}
     {visibleMessages.map((message) => <div className="email-message-row" key={message.id}>
       <details className={`email-message${message.category === "spam" ? " email-message--spam" : ""}`}>
         <summary className="email-message__summary">

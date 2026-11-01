@@ -1,7 +1,7 @@
 # M28 — Casos evolutivos e comunicação por email
 
-**Status:** Proposta  
-**Trilha:** Independente; amplia o modelo criminal e a simulação do mundo  
+**Status:** Em andamento
+**Trilha:** Independente; amplia o modelo criminal e a simulação do mundo
 **Depende de:** M08 — correio eletrônico; M10 — mundo compartilhado e casos recorrentes; M27 — crimes financeiros e múltiplos acusados
 
 ## Objetivo
@@ -22,6 +22,14 @@ Remover o telefone como canal de contato e interrogatório de NPCs. NPCs procedu
 - NPCs fixos não ficam disponíveis a qualquer momento. Eles iniciam conversas roteirizadas por gatilhos explícitos do jogo, por exemplo para conduzir um tutorial ou apresentar um acontecimento. Não há lista persistente para o jogador contatá-los quando quiser.
 - A conversa de um NPC fixo é uma cena de diálogo própria, iniciada pelo jogo, com falas e opções de resposta; não representa uma chamada telefônica nem exige que o NPC esteja continuamente online.
 - Consulta de registros, pesquisa de NPCs e acesso a websites continuam disponíveis: a remoção é do contato direto síncrono, não das fontes investigativas.
+
+### Primeira decisão de implementação
+
+- O telefone, a discagem, os números publicados de funcionários e a rota de entrevista em tempo real serão removidos.
+- A caixa de Personal Mail passa a oferecer uma composição guiada para funcionários: o jogador informa o email publicado e escolhe entre as mesmas cinco perguntas da antiga entrevista.
+- O NPC recebe uma mensagem assíncrona e a resposta chega à caixa do jogador depois de um intervalo curto. A composição nunca mostra a resposta antes da entrega.
+- A resposta é registrada como email normal e mantém remetente, assunto e horário; não cria uma conversa ao vivo nem uma lista permanente de contatos.
+- Emails passam a ser o único canal de contato entre jogador e NPCs; chamadas, discador e números de funcionários foram removidos.
 
 ## Escopo
 
@@ -75,8 +83,8 @@ Remover o telefone como canal de contato e interrogatório de NPCs. NPCs procedu
 - [ ] O mundo consegue progredir e adicionar um acontecimento enquanto o jogador está ocupado com outras ferramentas/casos.
 - [ ] Uma cadeia de eventos demonstrativa pode evoluir em etapas a partir das ações e do conhecimento dos NPCs e produz registros investigáveis coerentes.
 - [ ] O modelo comporta um caso de serial killer com múltiplas vítimas em momentos diferentes, aberto até prisão/descoberta ou condição de término configurada.
-- [ ] As rotas e telas atuais de telefone, números de staff, chamadas e interrogatórios de NPCs procedurais em tempo real são removidas ou substituídas por email assíncrono.
-- [ ] NPCs procedurais usam email como único canal de comunicação direta; NPCs fixos só iniciam conversa roteirizada quando um gatilho de narrativa/tutorial ocorrer.
+- [x] As rotas e telas atuais de telefone, números de staff, chamadas e interrogatórios de NPCs procedurais em tempo real são removidas ou substituídas por email assíncrono.
+- [x] NPCs procedurais usam email como único canal de comunicação direta; NPCs fixos só iniciam conversa roteirizada quando um gatilho de narrativa/tutorial ocorrer.
 - [ ] Não existe lista ou botão permanente para o jogador iniciar contato com NPCs fixos a qualquer momento.
 - [ ] Emails de casos em andamento podem chegar em momentos diferentes e não precisam aguardar uma nova sessão do jogador para existir, conforme a política temporal definida.
 - [ ] Mensagens e registros apresentam cronologia consistente com os eventos do caso.
@@ -97,7 +105,6 @@ Remover o telefone como canal de contato e interrogatório de NPCs. NPCs procedu
 - Como a verdade causal de um caso evolutivo é gerada sem tornar futuras vítimas inevitáveis nem antecipar pistas.
 - Que emails são produzidos por cada evento e quem tem conhecimento para enviá-los; política de atraso, entrega e retenção.
 - Quais migrations e compatibilidade são necessárias para migrar casos de um crime e progresso de acusação existentes.
-- Como remover os números de telefone publicados e preservar o conteúdo útil do Staff Directory que hoje compartilha a interface com eles.
 
 ## Fora de escopo
 

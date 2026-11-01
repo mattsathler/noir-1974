@@ -31,7 +31,7 @@ GET /api/hospital/patients?q=<name>&accessAttemptId=<id>
 GET /api/cases
 GET /api/cases/:caseID
 POST /api/cases/:caseID/progress
-GET /api/cases/interrogation/:npcID
+POST /api/player/emails/questions
 POST /api/police/warrants
 GET /api/player/emails
 POST /api/facilities/access
@@ -69,9 +69,9 @@ O serviço bancário é operado pelo Union Mercantile Settlement Office e a infr
 
 `GET /api/hospital/patients?q=...&accessAttemptId=...` consulta pacientes da cidade Proxy ativa. A rota exige uma tentativa concedida para o hospital daquela cidade. Relatórios post-mortem são apresentados como uma página interna do site do hospital; descobertas retornadas pela busca podem ser registradas no whiteboard da conta.
 
-### Interações da M12
+### Correspondência com NPCs
 
-`GET /api/cases/interrogation/:npcID` exige sessão autenticada e retorna respostas narrativas escolhidas pela pergunta, relação do NPC com a vítima e arquétipos abertos na cidade. As falas não são descobertas, não expõem classificação interna e não confirmam diretamente a culpa.
+`POST /api/player/emails/questions` recebe `{ "email": "…", "questionId": "routine|associates|unusual|work|worries", "requestId": "…" }`. A sessão define conta e servidor; o endereço precisa corresponder ao email publicado no diretório de staff. Uma resposta narrativa é agendada e entregue à caixa pessoal após um breve intervalo. Reenvios com o mesmo `requestId` são idempotentes. O conteúdo não é tratado como prova, não revela classificações internas e não confirma diretamente a culpa.
 
 `POST /api/police/warrants` recebe `{ "targetNpcId": "…", "stationLocationId": "…" }`. A conta vem da sessão; cidade atual, Delegacia e alvo são validados no servidor. Toda solicitação válida é autorizada, sem consultar descobertas nem classificações internas dos itens. A busca pode incluir NPCs falecidos e não persiste nem retorna endereço residencial. O relatório e os anexos são enviados à caixa privada retornada por `GET /api/player/emails`; os anexos também são registrados como descobertas antes de serem pinados em um whiteboard. Buscas ao culpado podem incluir, de forma opcional, um objeto que poderia servir como arma do crime; sua presença não atribui automaticamente o objeto ao homicídio. Limites ou custos contra pedidos repetidos continuam como regra futura.
 

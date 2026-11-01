@@ -284,6 +284,33 @@ ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS deleted_at timestampt
 CREATE INDEX IF NOT EXISTS player_inbox_messages_by_date_idx
     ON player_inbox_messages(server_id, account_id, sent_at DESC) WHERE deleted_at IS NULL;
 
+CREATE TABLE IF NOT EXISTS player_npc_email_questions (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    request_id text NOT NULL CHECK (request_id <> ''),
+    target_npc_id text NOT NULL CHECK (target_npc_id <> ''),
+    target_name text NOT NULL CHECK (target_name <> ''),
+    target_email text NOT NULL CHECK (target_email <> ''),
+    question_id text NOT NULL CHECK (question_id IN ('routine','associates','unusual','work','worries')),
+    subject text NOT NULL CHECK (subject <> ''),
+    reply_body text NOT NULL CHECK (reply_body <> ''),
+    reply_generated boolean NOT NULL DEFAULT true,
+    ready_at timestamptz NOT NULL,
+    delivered_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, request_id)
+);
+ALTER TABLE player_npc_email_questions ADD COLUMN IF NOT EXISTS reply_generated boolean NOT NULL DEFAULT true;
+UPDATE player_npc_email_questions SET reply_generated=false WHERE reply_body='[no reply generated]' AND reply_generated=true;
+CREATE INDEX IF NOT EXISTS player_npc_email_questions_due_idx
+    ON player_npc_email_questions(server_id, account_id, ready_at)
+    WHERE delivered_at IS NULL;
+CREATE INDEX IF NOT EXISTS player_npc_email_questions_by_npc_date_idx
+    ON player_npc_email_questions(server_id, target_npc_id, created_at, request_id);
+CREATE INDEX IF NOT EXISTS player_npc_email_replies_by_npc_date_idx
+    ON player_npc_email_questions(server_id, target_npc_id, ready_at, request_id)
+    WHERE delivered_at IS NOT NULL AND reply_generated=true;
+
 CREATE TABLE IF NOT EXISTS player_case_accusations (
     server_id uuid NOT NULL,
     account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,

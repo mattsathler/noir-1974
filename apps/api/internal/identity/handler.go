@@ -112,10 +112,6 @@ type countryPersonSearchReader interface {
 	SearchNPCsInCountry(context.Context, string, string, string) ([]world.PersonSearchRecord, error)
 }
 
-type phoneDirectoryReader interface {
-	PhoneContactByNumber(context.Context, string, string, string) (world.PhoneContact, error)
-}
-
 type companyLocationReader interface {
 	CompanyAtLocation(context.Context, string, string) ([]world.CompanyRecord, error)
 }
@@ -161,10 +157,6 @@ type sessionCaseListReader interface {
 	ListOpenPublicCasesForSession(context.Context, string, string, time.Time) ([]cases.PublicCase, error)
 }
 
-type CaseInterrogationReader interface {
-	InterrogationAnswersForNPC(context.Context, string, string, string) (cases.InterrogationAnswers, error)
-}
-
 type CasePersonSearchReader interface {
 	PersonSearchScenes(context.Context, string, string, []string) (map[string]world.PersonSearchScene, error)
 }
@@ -176,6 +168,10 @@ type ResidentialSearchReader interface {
 
 type PlayerMailDeleteReader interface {
 	DeletePlayerMail(context.Context, string, string, string) error
+}
+
+type PlayerNPCEmailQuestionReader interface {
+	QueueNPCEmailQuestion(context.Context, string, string, world.CompanyEmployee, string, string, time.Time) (cases.PlayerEmailQuestionRequest, error)
 }
 
 type HospitalRecordsReader interface {
@@ -296,11 +292,11 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("POST /api/world/gate/travel", handler.gateTravel)
 		mux.HandleFunc("GET /api/world/proxy/nodes", handler.proxyNodes)
 		mux.HandleFunc("POST /api/world/proxy/connect", handler.proxyConnect)
-		if _, ok := reader.(phoneDirectoryReader); ok && caseReader != nil {
-			mux.HandleFunc("GET /api/world/phone/{number}", handler.lookupPhoneContact)
-		}
 		if _, ok := reader.(employeeEmailReader); ok && caseReader != nil {
 			mux.HandleFunc("GET /api/world/npcs/email", handler.lookupNPCByEmail)
+			if _, ok := caseReader.(PlayerNPCEmailQuestionReader); ok {
+				mux.HandleFunc("POST /api/player/emails/questions", handler.sendNPCEmailQuestion)
+			}
 		}
 		if _, ok := reader.(employeeBankAccountReader); ok && caseReader != nil {
 			mux.HandleFunc("GET /api/world/npcs/bank-account", handler.lookupNPCByBankAccount)
@@ -324,9 +320,6 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("POST /api/cases/{caseID}/progress", handler.saveCaseProgress)
 		if _, ok := caseReader.(CaseAccusationReader); ok {
 			mux.HandleFunc("POST /api/accusations", handler.submitAccusation)
-		}
-		if _, ok := caseReader.(CaseInterrogationReader); ok {
-			mux.HandleFunc("GET /api/cases/interrogation/{npcID}", handler.getInterrogationAnswers)
 		}
 		if _, ok := caseReader.(ResidentialSearchReader); ok {
 			mux.HandleFunc("POST /api/police/warrants", handler.requestResidentialSearch)
@@ -565,6 +558,67 @@ func (h *Handler) playerEmails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": messages})
+}
+
+type playerNPCEmailQuestionBody struct {
+	Email      string `json:"email"`
+	QuestionID string `json:"questionId"`
+	RequestID  string `json:"requestId"`
+}
+
+func (h *Handler) sendNPCEmailQuestion(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	var input playerNPCEmailQuestionBody
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+	input.RequestID = strings.TrimSpace(input.RequestID)
+	if !validNPCEmailQuestion(input.QuestionID) || input.RequestID == "" || len(input.RequestID) > 128 || !strings.Contains(input.Email, "@") || strings.ContainsAny(input.Email, " \t\r\n") {
+		http.Error(w, "a published staff email, question and request ID are required", http.StatusBadRequest)
+		return
+	}
+	worldReader, ok := h.worldReader.(employeeEmailReader)
+	if !ok {
+		http.Error(w, "staff email directory unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	employee, err := worldReader.EmployeeByEmail(r.Context(), h.worldServerID, input.Email)
+	if errors.Is(err, world.ErrEntityNotFound) {
+		h.writeAPIError(w, r, http.StatusNotFound, "NPC_EMAIL_NOT_FOUND", "no published staff account matches that email address", nil)
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "NPC_EMAIL_LOOKUP_FAILED", "could not verify the staff email address", err)
+		return
+	}
+	reader, ok := h.caseReader.(PlayerNPCEmailQuestionReader)
+	if !ok {
+		http.Error(w, "NPC email service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	request, err := reader.QueueNPCEmailQuestion(r.Context(), h.worldServerID, current.ID, employee, input.QuestionID, input.RequestID, h.now())
+	if errors.Is(err, cases.ErrInvalidProgress) {
+		http.Error(w, "the selected question cannot be sent to this address", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "NPC_EMAIL_SEND_FAILED", "could not send the question", err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"request": request})
+}
+
+func validNPCEmailQuestion(questionID string) bool {
+	switch questionID {
+	case "routine", "associates", "unusual", "work", "worries":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *Handler) deletePlayerEmail(w http.ResponseWriter, r *http.Request) {
@@ -1265,27 +1319,6 @@ func (h *Handler) getCase(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, caseDetailResponse{Case: publicCase, Evidence: evidence, Progress: progress})
 }
 
-func (h *Handler) getInterrogationAnswers(w http.ResponseWriter, r *http.Request) {
-	current, ok := h.caseAccount(w, r)
-	if !ok {
-		return
-	}
-	if !h.validateNPCCity(w, r, current.ID, r.PathValue("npcID")) {
-		return
-	}
-	reader, ok := h.caseReader.(CaseInterrogationReader)
-	if !ok {
-		http.Error(w, "interrogation service unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	answers, err := reader.InterrogationAnswersForNPC(r.Context(), h.worldServerID, h.worldFor(r.Context(), current.ID).CityID, r.PathValue("npcID"))
-	if err != nil {
-		http.Error(w, "could not retrieve interview testimony", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"answers": answers})
-}
-
 func (h *Handler) validateNPCCity(w http.ResponseWriter, r *http.Request, accountID, npcID string) bool {
 	return h.validateNPCInCity(w, r, h.worldFor(r.Context(), accountID).CityID, npcID)
 }
@@ -1745,29 +1778,6 @@ func (h *Handler) caseAccount(w http.ResponseWriter, r *http.Request) (account, 
 		return account{}, false
 	}
 	return current, true
-}
-
-func (h *Handler) lookupPhoneContact(w http.ResponseWriter, r *http.Request) {
-	current, ok := h.caseAccount(w, r)
-	if !ok {
-		return
-	}
-	reader, ok := h.worldReader.(phoneDirectoryReader)
-	if !ok {
-		http.Error(w, "phone directory unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	cityID := h.worldFor(r.Context(), current.ID).CityID
-	contact, err := reader.PhoneContactByNumber(r.Context(), h.worldServerID, cityID, r.PathValue("number"))
-	if errors.Is(err, world.ErrEntityNotFound) {
-		h.writeAPIError(w, r, http.StatusNotFound, "PHONE_NUMBER_NOT_FOUND", "number not in directory", err)
-		return
-	}
-	if err != nil {
-		h.writeAPIError(w, r, http.StatusInternalServerError, "PHONE_LOOKUP_FAILED", "could not search the phone directory", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"contact": contact})
 }
 
 func (h *Handler) newspaper(w http.ResponseWriter, r *http.Request) {

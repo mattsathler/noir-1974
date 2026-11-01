@@ -1,17 +1,10 @@
 const PAGES = {
   "municipal-directory": {
-    title: "Municipal Telephone Directory",
+    title: "Municipal Directory",
     eyebrow: "CITY SERVICES · DIRECTORY OFFICE",
     headline: "Find the right public office.",
     paragraphs: ["The Meridian municipal directory lists public counters, district offices and civic services connected to the national relay.", "For corrections to a household or business listing, write to the Directory Office, 12 rue de la République, Lyon. Changes are reviewed during regular office hours."],
     notice: "AUTUMN EDITION",
-  },
-  "telephone-service": {
-    title: "Meridian Telephone Exchange",
-    eyebrow: "PUBLIC TELEPHONE SERVICE",
-    headline: "An operator is ready to assist.",
-    paragraphs: ["For emergency services, dial 17 for police, 15 for medical assistance, or 18 for the fire brigade.", "For other numbers, ask the city exchange for a local connection. Long-distance calls may be placed through the national operator."],
-    notice: "EMERGENCY LINES REMAIN OPEN AT ALL HOURS",
   },
   "evening-courier": {
     title: "The Evening Courier",

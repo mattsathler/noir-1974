@@ -10,6 +10,8 @@ Os padrões editáveis ficam em [`apps/api/internal/mail/templates.json`](../../
 
 O Crime Generator também cria mensagens de caso — por exemplo, conversa conjugal marcada por ciúme, cobrança de extorsão ou uma fala de arrependimento enviada a um colega. Elas são persistidas em `case_mail_messages`, relacionadas ao caso, ao destinatário e ao remetente. A consulta inclui a mesma mensagem na caixa de quem a recebeu e na caixa de quem a enviou. Mensagens anônimas são raras: o remetente real aparece na caixa de enviados e é ocultado somente na caixa do destinatário. Mensagens comuns são geradas na leitura e misturadas cronologicamente às mensagens persistidas.
 
+As perguntas enviadas pelo Personal Mail aparecem como mensagens recebidas na caixa do NPC. Respostas efetivamente enviadas são registradas na caixa do jogador e no arquivo do NPC, aparecendo no intervalo correspondente ao consultar a caixa invadida pelo Email Breaker. Se o NPC estiver morto, desaparecido ou deixar de poder responder antes do envio, nenhuma resposta é criada.
+
 ## Separação da classificação interna
 
 `case_id`, o outro participante por ID e `internal_relation` ficam em colunas privadas da tabela e em campos de backend que não são serializados. O cliente recebe somente ID da mensagem, data, serviço, remetente, destinatário, assunto e corpo. Não há rótulo, filtro, ordenação ou destaque que indique relação com crime; mensagens cotidianas convivem com as mensagens de caso conforme a [Regra 0002](../rules/0002-pistas-sem-sinalizacao.md).

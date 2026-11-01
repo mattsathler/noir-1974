@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { currentIdentity } from "../../../identity/api.js";
 import ComputerDesktop from "./ComputerDesktop.jsx";
 import { connectProxy, getCompanyWebsite, getCurrentWorld, requestFacilitySiteAccess } from "../../../world/api.js";
-import Telephone from "./Telephone.jsx";
 import CharacterConversation from "./CharacterConversation.jsx";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
 import { readDesktopPreferences, saveDesktopPreferences } from "./desktopPreferences.js";
@@ -57,7 +56,6 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerContext, setComputerContext] = useState(null);
   const [companyAccessAttemptId, setCompanyAccessAttemptId] = useState("");
-  const [telephoneOpen, setTelephoneOpen] = useState(false);
   const [conversationCharacter, setConversationCharacter] = useState("");
   const [notifications, setNotifications] = useState([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -195,7 +193,6 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           onOpenService={openPublicServiceWebsite}
           persistent
           onProxyConnected={connectToProxy}
-          onPrepareProxy={() => setTelephoneOpen(false)}
           onNotification={notify}
           notifications={notifications}
           notificationsOpen={notificationsOpen}
@@ -203,7 +200,6 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           onCloseNotifications={closeNotifications}
           snackbar={snackbar}
           onDismissSnackbar={() => setSnackbar(null)}
-          onOpenTelephone={() => setTelephoneOpen(true)}
           onOpenWhiteboard={() => window.open("/whiteboard", "_blank", "noopener,noreferrer")}
           accountUsername={accountUsername}
           character={playerCharacter}
@@ -215,7 +211,6 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           onLogout={onLogout}
         />
       )}
-      {telephoneOpen && <Telephone onClose={() => setTelephoneOpen(false)} onNotification={notify} />}
       {conversationCharacter && <CharacterConversation characterId={conversationCharacter} onClose={closeConversation} />}
     </main>
   );

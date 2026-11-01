@@ -6,7 +6,6 @@ import { Mail } from "pixelarticons/react/Mail";
 import { Map as MapIcon } from "pixelarticons/react/Map";
 import { Message } from "pixelarticons/react/Message";
 import { Note } from "pixelarticons/react/Note";
-import { Phone } from "pixelarticons/react/Phone";
 import { Printer } from "pixelarticons/react/Printer";
 import { User } from "pixelarticons/react/User";
 import { Users } from "pixelarticons/react/Users";
@@ -22,7 +21,7 @@ import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, crea
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
-import PlayerMailbox from "../../../mail/pages/inbox/PlayerMailbox.jsx";
+import PlayerMailbox, { NPCEmailComposer } from "../../../mail/pages/inbox/PlayerMailbox.jsx";
 import HospitalPatientSearch from "./HospitalPatientSearch.jsx";
 import HospitalPatientRecord from "./HospitalPatientRecord.jsx";
 import ResidentialSearchWindow from "./ResidentialSearchWindow.jsx";
@@ -91,6 +90,8 @@ const PERSONAL_PROGRAMS = [
   { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
 ];
 const WEB_BROWSER_PROGRAM = PERSONAL_PROGRAMS[0];
+const PERSONAL_MAIL_PROGRAM = PERSONAL_PROGRAMS.find((program) => program.id === "personal-mail");
+const EMAIL_COMPOSE_PROGRAM = { id: "mail-compose", label: "SEND EMAIL", Icon: Mail, state: "READY", available: true };
 const TERMINAL_PROGRAM = PERSONAL_PROGRAMS.find((program) => program.id === "terminal");
 const SETTINGS_PROGRAM = { id: "settings", label: "SETTINGS", Icon: Brush, state: "READY", available: true };
 const PROXY_PROGRAM = { id: "proxy", label: "ROGUE DNS", Icon: Wifi, state: "UNLISTED", available: true };
@@ -108,7 +109,7 @@ function localServiceLocationId(cityId, service) {
   const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
   return `service:${cityKey}/${service}`;
 }
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange"];
+const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "mail-compose"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -171,13 +172,13 @@ function institutionalVariant(programId) {
   if (programId === "bank-records") return "bank";
   if (programId === "gate-records") return "gate";
   if (programId === "city-records") return "civic";
-  if (programId === "personal-mail") return "mail";
+  if (["personal-mail", "mail-compose"].includes(programId)) return "mail";
   return "company";
 }
 
 function siteProviderIndex(programId) {
   if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports", "interpol", "person-search", "warrant-request"].includes(programId)) return 0;
-  if (["newspaper", "personal-mail", "emails", "hospital-website", "patient-search", "hospital-patient-record"].includes(programId)) return 1;
+  if (["newspaper", "personal-mail", "mail-compose", "emails", "hospital-website", "patient-search", "hospital-patient-record"].includes(programId)) return 1;
   if (["meridian-enterprises", "gate-records", "bank-records"].includes(programId)) return 2;
   return [...programId].reduce((total, character) => total + character.charCodeAt(0), 0) % 3;
 }
@@ -223,7 +224,7 @@ function browserAddress(program, facilityContext, cityId) {
   return networkSiteAddress(program, countryId, program.id);
 }
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onPrepareProxy, onNotification, notifications = [], notificationsOpen = false, onToggleNotifications = () => {}, onCloseNotifications = () => {}, snackbar, onDismissSnackbar = () => {}, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenTelephone, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, playerProgression = null, onProgressionChange = NOOP, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onNotification, notifications = [], notificationsOpen = false, onToggleNotifications = () => {}, onCloseNotifications = () => {}, snackbar, onDismissSnackbar = () => {}, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, playerProgression = null, onProgressionChange = NOOP, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange }) {
   const notifyNewPlayerMessage = useCallback((message) => onNotification?.({ type: "EMAIL", title: message.subject || "New email received", message: `From ${message.sender || "unknown sender"}.` }), [onNotification]);
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
@@ -720,7 +721,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             </div>
             {persistent && <nav className="computer-menubar__actions" aria-label="System controls">
                   <button type="button" onClick={() => launchProgram(PROXY_PROGRAM)}>ROGUE DNS</button>
-              <button type="button" onClick={onOpenTelephone}>TELEPHONE</button>
+              <button type="button" onClick={() => launchProgram(PERSONAL_MAIL_PROGRAM)}>PERSONAL MAIL</button>
               <button type="button" onClick={onOpenWhiteboard}>CASE BOARD</button>
             </nav>}
             {!persistent && <button ref={closeButtonRef} className="computer-modal__close" type="button" aria-label="Close computer" onClick={exitComputer}>×</button>}
@@ -871,7 +872,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                             : program.id === "emails"
                               ? <EmailInbox key={id} serverTime={serverTime} timeZone={timeZone} cityId={cityId} facilityLocationId={facilityContext?.locationId} accessAttemptId={accessAttemptId} onPrint={requestPrint} />
                               : program.id === "personal-mail"
-                                ? <PlayerMailbox key={id} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onMessageReceived={notifyNewPlayerMessage} hackedAccount={program.hackedAccount} />
+                                ? <PlayerMailbox key={id} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onMessageReceived={notifyNewPlayerMessage} onOpenCompose={() => launchProgram(EMAIL_COMPOSE_PROGRAM, id)} hackedAccount={program.hackedAccount} />
+                            : program.id === "mail-compose"
+                              ? <div className="email-compose-window institutional-site--mail"><NPCEmailComposer /></div>
                                 : program.id === "warrant-request"
                                     ? <ResidentialSearchWindow key={id} cityId={cityId} stationLocationId={facilityContext?.locationId} onClose={() => closeWindow(id)} />
                     : <WorldDirectory key={`${id}:${program.id}`} program={program.id} initialTargetNPC={program.hackedBankAccount} facilityLocationId={program.facilityLocationId || facilityContext?.locationId} accessAttemptId={program.accessAttemptId || accessAttemptId} cityId={cityId} countryName={countryName} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} onOpenCompany={onOpenCompany} onBeginCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, true) : undefined} onCancelCompanyNavigation={program.id === "company-portal" ? () => setWebsiteNavigationPending(id, false) : undefined} initialSearch={program.searchTerm} initialCompanies={program.searchResults} onNavigateCompanyWebsite={(site, searchState) => launchProgram({ id: "company-website", label: site.company.name, website: site, pageId: "home", state: "ONLINE", available: true }, id, { searchTerm: searchState.query, searchResults: searchState.companies })} />}
@@ -914,7 +917,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 <h2 id="start-menu-tools-title">SYSTEM TOOLS</h2>
                 <div>
                   <button type="button" onClick={() => { launchProgram(PROXY_PROGRAM); setStartMenuOpen(false); }}><Wifi aria-hidden="true" /><span>ROGUE DNS</span></button>
-                  <button type="button" onClick={() => { onOpenTelephone?.(); setStartMenuOpen(false); }}><Phone aria-hidden="true" /><span>TELEPHONE</span></button>
+                  <button type="button" onClick={() => { launchProgram(PERSONAL_MAIL_PROGRAM); setStartMenuOpen(false); }}><Mail aria-hidden="true" /><span>PERSONAL MAIL</span></button>
                   <button type="button" onClick={() => { onOpenWhiteboard?.(); setStartMenuOpen(false); }}><Files aria-hidden="true" /><span>CASE BOARD</span></button>
                 </div>
               </section>
@@ -956,7 +959,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             <section className="ghostkey__error-dialog" role="alertdialog" aria-modal="true" aria-labelledby="ghostkey-warning-title" aria-describedby="ghostkey-warning-message">
               <header className="ghostkey__error-titlebar"><span><i aria-hidden="true">!</i> MERID_OS — APPLICATION SECURITY</span><button type="button" aria-label="Close security warning" onClick={() => setGhostkeyWarningOpen(false)}>×</button></header>
               <div className="ghostkey__error-content"><strong id="ghostkey-warning-title">Application not authorized</strong><p id="ghostkey-warning-message">MeridOS cannot verify the publisher of {securityWarningProgram?.label || "this application"}. This application may bypass network access controls.</p></div>
-              <footer className="ghostkey__warning-actions"><button type="button" onClick={() => { setGhostkeyWarningOpen(false); setSecurityWarningProgram(null); }}>CANCEL</button><button type="button" autoFocus onClick={() => { const program = securityWarningProgram; setGhostkeyWarningOpen(false); setSecurityWarningProgram(null); if (program?.id === "proxy") onPrepareProxy?.(); launchProgram(program, null, null, true); }}>RUN ANYWAY</button></footer>
+              <footer className="ghostkey__warning-actions"><button type="button" onClick={() => { setGhostkeyWarningOpen(false); setSecurityWarningProgram(null); }}>CANCEL</button><button type="button" autoFocus onClick={() => { const program = securityWarningProgram; setGhostkeyWarningOpen(false); setSecurityWarningProgram(null); launchProgram(program, null, null, true); }}>RUN ANYWAY</button></footer>
             </section>
           </div>}
         </div>

@@ -232,11 +232,6 @@ async function requestCase(path, options) {
   return apiRequest(path, options);
 }
 
-export function lookupPhoneContact(number) {
-  const digits = String(number).replace(/\D/gu, "");
-  return requestCase(`/api/world/phone/${encodeURIComponent(digits)}`);
-}
-
 export async function getOpenCases() {
   const payload = await requestCase("/api/cases");
   return payload.results ?? [];
@@ -255,8 +250,12 @@ export function getCaseFile(caseId) {
   return requestCase(`/api/cases/${encodeURIComponent(caseId)}`);
 }
 
-export function getInterrogationAnswers(npcId) {
-  return requestCase(`/api/cases/interrogation/${encodeURIComponent(npcId)}`);
+export function sendNPCEmailQuestion(email, questionId, requestId) {
+  return requestCase("/api/player/emails/questions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, questionId, requestId }),
+  });
 }
 
 export function requestResidentialSearch(targetNpcId, stationLocationId) {
