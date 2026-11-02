@@ -202,12 +202,12 @@ export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPri
     {visibleMessages.map((message) => <div className="email-message-row" key={message.id}>
       <details className={`email-message${message.category === "spam" ? " email-message--spam" : ""}`}>
         <summary className="email-message__summary">
-          <span>{message.sender || "BILL BOUER"} → {hackedAccount ? message.recipient || hackedAccount.email : "PERSONAL ACCOUNT"} {message.category === "spam" ? "· SPAM" : ""}</span>
+          <span>{message.sender || "BILL BOUER"} → {hackedAccount ? message.recipient || hackedAccount.email : "PERSONAL ACCOUNT"}</span>
           <span>{message.subject}</span>
           <time dateTime={message.sentAt}>{displayDate(message.sentAt, timeZone)}</time>
         </summary>
         <div className="email-message__body">
-          <div className="email-message__header"><span>{message.category === "spam" ? "UNSOLICITED CIRCULAR · SPAM" : message.crimeType ? `CASE EVENT · ${message.crimeType.replaceAll("_", " ").toUpperCase()}` : message.caseId ? "CASE INQUIRY · PERSONAL MAIL" : "PERSONAL MAIL NOTICE"}</span><time dateTime={message.sentAt}>{displayDate(message.sentAt, timeZone)}</time></div>
+          <div className="email-message__header"><span>PERSONAL MAIL</span><time dateTime={message.sentAt}>{displayDate(message.sentAt, timeZone)}</time></div>
           <p>{message.body}</p>
           {!!message.attachments?.length && <section className="player-mail__attachments" aria-label="Recovered items">
             <h3 className="case-files__section-heading">RECOVERED AND SECURED · {message.attachments.length} ITEMS</h3>

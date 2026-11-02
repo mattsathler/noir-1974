@@ -81,7 +81,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
 
   useEffect(() => {
     function handlePointerDown(event) {
-      if (event.button === 0 && event.isPrimary !== false) playRetroSound("click");
+      if (event.button === 0 && event.isPrimary !== false && !event.target.closest?.("[data-silent-click-sound]")) playRetroSound("click");
     }
     function handleTyping(event) {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -99,7 +99,9 @@ export default function GamePage({ initialWorld = null, onLogout }) {
 
   useEffect(() => {
     const messageSelector = '[role="alert"], [role="alertdialog"]';
+    const dialogSelector = '[role="dialog"]';
     const lastMessages = new WeakMap();
+    const notifiedDialogs = new WeakSet();
     const readMessage = (element) => {
       if (element.getAttribute("role") === "alertdialog") {
         const describedBy = element.getAttribute("aria-describedby");
@@ -111,12 +113,16 @@ export default function GamePage({ initialWorld = null, onLogout }) {
       return copy.textContent.trim();
     };
     document.querySelectorAll(messageSelector).forEach((element) => lastMessages.set(element, readMessage(element)));
+    document.querySelectorAll(dialogSelector).forEach((element) => notifiedDialogs.add(element));
     const observer = new MutationObserver((records) => {
       const changedMessages = new Set();
+      const newDialogs = new Set();
       const collect = (node) => {
         if (!(node instanceof Element)) return;
         if (node.matches(messageSelector)) changedMessages.add(node);
         node.querySelectorAll(messageSelector).forEach((element) => changedMessages.add(element));
+        if (node.matches(dialogSelector)) newDialogs.add(node);
+        node.querySelectorAll(dialogSelector).forEach((element) => newDialogs.add(element));
       };
       records.forEach((record) => {
         const target = record.target instanceof Element ? record.target : record.target.parentElement;
@@ -127,8 +133,14 @@ export default function GamePage({ initialWorld = null, onLogout }) {
       });
       changedMessages.forEach((element) => {
         const message = readMessage(element);
-        if (message && lastMessages.get(element) !== message) playRetroSound("warning");
+        if (message && lastMessages.get(element) !== message && !element.closest(".stock-exchange")) playRetroSound("warning");
         lastMessages.set(element, message);
+      });
+      newDialogs.forEach((element) => {
+        if (notifiedDialogs.has(element)) return;
+        notifiedDialogs.add(element);
+        if (element.hasAttribute("data-notification-sound-manual")) return;
+        playRetroSound("notification");
       });
     });
     if (document.body) observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["role"] });

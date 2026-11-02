@@ -87,7 +87,7 @@ export default function TerminalApp({ onRun }) {
     setHistoryIndex(-1);
 
     if (entered.toLowerCase() === "help") {
-      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                 Show this command list", "  RUN GHOSTKEY.EXE     Start Ghostkey", "  RUN MAILBREAKER.EXE  Start Email Breaker", "  RUN BANKRUPT.EXE     Start Bankrupt · BLACKWIRE LEVEL 2", "  RUN BLACKWIRE.EXE    Open Blackwire in Web Browser", ""]);
+      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                 Show this command list", "  RUN GHOSTKEY.EXE     Start Ghostkey", "  RUN MAILBREAKER.EXE  Start Email Breaker", "  RUN BANKRUPT.EXE     Start Bankrupt", "  RUN BLACKWIRE.EXE    Open Blackwire in Web Browser", ""]);
       return;
     }
 

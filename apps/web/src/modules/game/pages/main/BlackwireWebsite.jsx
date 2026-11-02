@@ -70,13 +70,13 @@ export default function BlackwireWebsite({ onAccountChange = () => {} }) {
       <span className="blackwire-site__connection"><i aria-hidden="true" /> PRIVATE RELAY</span>
     </header>
     <nav className="blackwire-site__nav" aria-label="Blackwire sections">
-      <span aria-current="page">MARKET</span><span>ARCHIVE · RESTRICTED</span><span>SOFTWARE · {market.account?.unlockedApplications?.length || 0} AUTHORIZED</span>
+      <span aria-current="page">MARKET</span><span>ARCHIVE · RESTRICTED</span><span>SOFTWARE · {market.account?.unlockedApplications?.length || 0} AVAILABLE</span>
     </nav>
     {market.account && <section className="blackwire-site__account" aria-label="Blackwire hacker account">
       <div><span className="blackwire-site__eyebrow">ALTER EGO · OPERATOR</span><strong>{market.account.handle}</strong></div>
       <div><span className="blackwire-site__eyebrow">BLACKWIRE PROGRESSION</span><strong>LEVEL {market.account.level} · {market.account.reputation}{market.account.nextLevelReputation ? ` / ${market.account.nextLevelReputation} REP` : " REP · MAX"}</strong></div>
       <div><span className="blackwire-site__eyebrow">CRYPTO BALANCE</span><strong>{(market.account.cryptoCents / 100).toFixed(2)} CRYPTO</strong></div>
-      <div><span className="blackwire-site__eyebrow">AUTHORIZED SOFTWARE</span><strong>{market.account.unlockedApplications.map((application) => `${application.toUpperCase()}.EXE`).join(" · ")}</strong></div>
+      <div><span className="blackwire-site__eyebrow">AVAILABLE SOFTWARE</span><strong>{market.account.unlockedApplications.map((application) => `${application.toUpperCase()}.EXE`).join(" · ")}</strong></div>
     </section>}
     <section className="blackwire-site__welcome">
       <p className="blackwire-site__eyebrow">A MESSAGE FROM THE CROW</p>

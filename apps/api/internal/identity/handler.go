@@ -808,22 +808,6 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 	}
 	if source != "" {
 		locationID := strings.TrimSpace(r.URL.Query().Get("locationId"))
-		if source == "bank" {
-			blackwire, available := h.store.(blackwireStore)
-			if !available {
-				h.writeAPIError(w, r, http.StatusForbidden, "BLACKWIRE_LEVEL_REQUIRED", "reach the required Blackwire level before opening this application", nil)
-				return
-			}
-			profile, err := blackwire.blackwireProfile(r.Context(), current.ID, h.worldServerID)
-			if err != nil {
-				h.writeAPIError(w, r, http.StatusInternalServerError, "BLACKWIRE_PROFILE_FAILED", "could not verify Blackwire application access", err)
-				return
-			}
-			if !blackwireApplicationUnlocked(profile, "bankrupt") {
-				h.writeAPIError(w, r, http.StatusForbidden, "BLACKWIRE_LEVEL_REQUIRED", "reach Blackwire level 2 to use Bankrupt", nil)
-				return
-			}
-		}
 		if source == "bank" && locationID == "" {
 			reader, available := h.caseReader.(BankruptAccessReader)
 			if !available {
@@ -1072,20 +1056,6 @@ type bankruptRequestBody struct {
 func (h *Handler) requestBankruptAccess(w http.ResponseWriter, r *http.Request) {
 	current, ok := h.caseAccount(w, r)
 	if !ok {
-		return
-	}
-	blackwire, available := h.store.(blackwireStore)
-	if !available {
-		h.writeAPIError(w, r, http.StatusForbidden, "BLACKWIRE_LEVEL_REQUIRED", "reach the required Blackwire level before opening this application", nil)
-		return
-	}
-	profile, err := blackwire.blackwireProfile(r.Context(), current.ID, h.worldServerID)
-	if err != nil {
-		h.writeAPIError(w, r, http.StatusInternalServerError, "BLACKWIRE_PROFILE_FAILED", "could not verify Bankrupt access", err)
-		return
-	}
-	if !blackwireApplicationUnlocked(profile, "bankrupt") {
-		h.writeAPIError(w, r, http.StatusForbidden, "BLACKWIRE_LEVEL_REQUIRED", "reach Blackwire level 2 to use Bankrupt", nil)
 		return
 	}
 	var input bankruptRequestBody

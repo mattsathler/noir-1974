@@ -49,21 +49,8 @@ type blackwireStore interface {
 
 var blackwireLevelThresholds = []int64{0, 50, 150, 400, 900}
 
-func blackwireApplicationsForLevel(level int) []string {
-	apps := []string{"ghostkey", "email-breaker"}
-	if level >= 2 {
-		apps = append(apps, "bankrupt")
-	}
-	return apps
-}
-
-func blackwireApplicationUnlocked(account blackwireAccount, application string) bool {
-	for _, unlocked := range account.UnlockedApplications {
-		if unlocked == application {
-			return true
-		}
-	}
-	return false
+func blackwireApplications() []string {
+	return []string{"ghostkey", "email-breaker", "bankrupt"}
 }
 
 func blackwireReputationFor(category string) int64 {
@@ -120,7 +107,7 @@ func readBlackwireAccount(ctx context.Context, db querier, accountID, serverID s
 			break
 		}
 	}
-	result.UnlockedApplications = blackwireApplicationsForLevel(result.Level)
+	result.UnlockedApplications = blackwireApplications()
 	return result, nil
 }
 

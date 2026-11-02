@@ -729,9 +729,11 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
           .catch(() => setWhiteboardSaveState(draft.id, "save"));
         return;
       }
+      playRetroSound("notification", soundEffectsEnabledRef.current);
       setPrintDialog({ item: printableItem, boards: editableBoards, busy: false, error: "" });
     } catch (error) {
       const availableBoards = await getWhiteboards().catch(() => boards);
+      playRetroSound("notification", soundEffectsEnabledRef.current);
       setPrintDialog({ item: printableItem, boards: availableBoards.filter((board) => !board.lockedAt), busy: false, error: error.message || "COULD NOT OPEN CASE BOARDS" });
     }
   }
@@ -826,6 +828,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 <button
                   key={program.id}
                   className={`computer-program${windows.some((item) => item.program.id === program.id) ? " computer-program--selected" : ""}`}
+                  data-silent-click-sound={program.id === "stock-exchange" ? "true" : undefined}
                   type="button"
                   aria-label={`${program.label}${DESKTOP_APP_IDS.includes(program.id) ? " application" : " website"}, ${program.state}`}
                   disabled={!program.available}
@@ -881,11 +884,6 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
                     : program.id === "terminal"
                       ? <TerminalApp onRun={(programId) => {
-                        if (programId === "bankrupt" && !blackwireProfile?.unlockedApplications?.includes("bankrupt")) {
-                          return blackwireProfile
-                            ? "BLACKWIRE AUTHORIZATION DENIED · REACH LEVEL 2 TO INSTALL BANKRUPT.EXE."
-                            : "BLACKWIRE ACCOUNT UNAVAILABLE · CONNECT TO BLACKWIRE AND TRY AGAIN.";
-                        }
                         launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : programId === "bankrupt" ? BANKRUPT_PROGRAM : programId === "blackwire" ? BLACKWIRE_PROGRAM : EMAIL_BREAKER_PROGRAM);
                         return undefined;
                       }} />
@@ -988,7 +986,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 </div>
               </section>;
             })}
-            {printDialog && <section className="page-print-dialog" style={{ zIndex: Math.max(20, ...windows.map((item) => item.zIndex + 1)) }} role="dialog" aria-modal="true" aria-labelledby="page-print-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setPrintDialog(null); }}>
+            {printDialog && <section className="page-print-dialog" data-notification-sound-manual="true" style={{ zIndex: Math.max(20, ...windows.map((item) => item.zIndex + 1)) }} role="dialog" aria-modal="true" aria-labelledby="page-print-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setPrintDialog(null); }}>
               <div className="page-print-dialog__panel">
                 <header className="page-print-dialog__titlebar"><span><Printer aria-hidden="true" /> WEB BROWSER · PRINT</span><button type="button" aria-label="Close print dialog" onClick={() => setPrintDialog(null)}>×</button></header>
                 <div className="page-print-dialog__content">
@@ -1011,7 +1009,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               </header>
               <section className="computer-start-menu__programs" aria-labelledby="start-menu-programs-title">
                 <h2 id="start-menu-programs-title">PROGRAMS</h2>
-                {startMenuPrograms.map((program) => <button key={program.id} type="button" onClick={() => { launchProgram(program); setStartMenuOpen(false); }}>
+                {startMenuPrograms.map((program) => <button key={program.id} data-silent-click-sound={program.id === "stock-exchange" ? "true" : undefined} type="button" onClick={() => { launchProgram(program); setStartMenuOpen(false); }}>
                   <span className="computer-start-menu__icon" aria-hidden="true"><program.Icon /></span>
                   <span className="computer-start-menu__copy"><strong>{program.label}</strong><small>{START_MENU_DESCRIPTIONS[program.id] || "Open this system program"}</small></span>
                   <span className="computer-start-menu__arrow" aria-hidden="true">›</span>
