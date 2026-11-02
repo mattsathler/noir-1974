@@ -1,12 +1,12 @@
 # I08 — Busca por tipos de empresas no hub
 
-**Status:** Proposta
+**Status:** Implementada
 **Origem:** Meridian Global Company Directory
 **Escopo:** Curto
 
 ## Problema
 
-O hub permite localizar empresas por texto, mas não oferece uma busca dedicada por tipo de atividade.
+O hub permitia localizar empresas por nome, endereço ou site, mas não considerava seu tipo de atividade.
 
 ## Resultado esperado
 
@@ -14,14 +14,14 @@ O jogador consegue encontrar empresas do tipo desejado no hub, usando os tipos p
 
 ## Escopo
 
-- Permitir buscar ou filtrar empresas por tipo de atividade no Meridian Global Company Directory.
+- Permitir buscar empresas pelo ID, nome, categoria ou descrição do tipo de atividade no Meridian Global Company Directory.
 - Preservar a busca textual existente e a jurisdição atual do hub.
 
 ## Critérios de aceite
 
-- [ ] O jogador consegue selecionar ou pesquisar um tipo de empresa e ver as empresas correspondentes no hub.
-- [ ] A busca respeita o país e os resultados que já estão disponíveis no hub.
-- [ ] A busca textual atual continua funcionando.
+- [x] A busca por ID, nome, categoria ou descrição do tipo retorna empresas correspondentes no hub.
+- [x] A busca continua respeitando o país conectado e o limite atual de resultados.
+- [x] A busca por nome, endereço e site continua funcionando.
 
 ## Fora de escopo
 

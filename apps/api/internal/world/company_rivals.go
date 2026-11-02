@@ -57,7 +57,7 @@ func CompanyRivalGroups(countryID string, companies []Company) []CompanyRivalGro
 		})
 		for len(ids) >= 2 {
 			digest := sha256.Sum256([]byte("noir-company-rival-size-v1\x00" + countryID + "\x00" + industry + "\x00" + strings.Join(ids, "\x00")))
-			size := min(4, 2+int(digest[0]%3))
+			size := min(len(ids), 4, 2+int(digest[0]%3))
 			if len(ids)-size == 1 {
 				if size == 2 {
 					size = 3

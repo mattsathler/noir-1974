@@ -5,6 +5,7 @@ import { connectProxy, getCompanyWebsite, getCurrentWorld, requestFacilitySiteAc
 import CharacterConversation from "./CharacterConversation.jsx";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
 import { readDesktopPreferences, saveDesktopPreferences } from "./desktopPreferences.js";
+import { playRetroSound, readRetroSoundEnabled, setRetroSoundEnabled } from "./retroSoundEffects.js";
 
 function cityIdFromLocation(locationId = "") {
   const path = locationId.replace(/^service:/u, "").replace(/^location:/u, "");
@@ -53,6 +54,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [playerCharacter, setPlayerCharacter] = useState(null);
   const [playerProgression, setPlayerProgression] = useState(null);
   const [desktopPreferences, setDesktopPreferences] = useState(readDesktopPreferences);
+  const [soundEffectsEnabled, setSoundEffectsEnabled] = useState(readRetroSoundEnabled);
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerContext, setComputerContext] = useState(null);
   const [companyAccessAttemptId, setCompanyAccessAttemptId] = useState("");
@@ -72,9 +74,30 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     const item = { ...notification, id, time: new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date()) };
     setNotifications((current) => [item, ...current].slice(0, 40));
     setSnackbar(item);
+    playRetroSound("notification");
     window.clearTimeout(snackbarTimer.current);
     snackbarTimer.current = window.setTimeout(() => setSnackbar(null), 6000);
   }, []);
+
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (event.button === 0 && event.isPrimary !== false) playRetroSound("click");
+    }
+    function handleTyping(event) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      const acceptsText = target instanceof Element && (target.matches("input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]), textarea, [contenteditable='true']") || target.isContentEditable);
+      if (acceptsText && (event.key.length === 1 || ["Backspace", "Delete", "Enter", " "].includes(event.key))) playRetroSound("key");
+    }
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("keydown", handleTyping, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleTyping, true);
+    };
+  }, []);
+
+  useEffect(() => setRetroSoundEnabled(soundEffectsEnabled), [soundEffectsEnabled]);
 
   useEffect(() => () => window.clearTimeout(snackbarTimer.current), []);
 
@@ -235,6 +258,8 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           onProgressionChange={setPlayerProgression}
           desktopPreferences={desktopPreferences}
           onDesktopPreferencesChange={updateDesktopPreferences}
+          soundEffectsEnabled={soundEffectsEnabled}
+          onSoundEffectsChange={setSoundEffectsEnabled}
           onLogout={onLogout}
         />
       )}

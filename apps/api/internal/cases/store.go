@@ -3504,8 +3504,16 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 			return AccusationResult{}, err
 		}
 	}
-	chance := accusationChance(request.AccusedID == killerID && victimMatches, totalProofs, proofStrength)
-	accepted := accusationAccepted(serverID, accountID, request.CaseID, chance)
+	correctAccused := request.AccusedID == killerID && victimMatches
+	chance := accusationChance(correctAccused, totalProofs, proofStrength)
+	// The deterministic review roll is useful while the submitted material is
+	// inconclusive, but a board with several authenticated clues
+	// must not fail because its final roll happened to land on the 1% edge of
+	// the capped chance. Three strength points require corroboration across
+	// multiple case records (for example, a remittance, a related message, and a
+	// GATE entry) and still require the correct accused person and victim.
+	corroborated := correctAccused && proofStrength >= 3
+	accepted := corroborated || accusationAccepted(serverID, accountID, request.CaseID, chance)
 	outcome, subject, body := "insufficient", "Accusation review · Case decision", "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant."
 	if accepted {
 		outcome = "arrested"

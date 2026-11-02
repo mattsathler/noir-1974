@@ -1753,7 +1753,7 @@ func (store *PostgresStore) SearchCompaniesInCountry(ctx context.Context, server
 	companies := entry.companies
 	results, exact := make([]CompanyPortalRecord, 0), make([]CompanyPortalRecord, 0)
 	for _, record := range companies {
-		searchable := record.Company.Name + " " + record.Address.Name + " " + record.Address.Full + " " + record.WebsiteDomain + " " + record.WebsiteDescription
+		searchable := record.Company.Name + " " + record.Company.BusinessType.ID + " " + record.Company.BusinessType.Label + " " + record.Company.BusinessType.Category + " " + record.Company.BusinessType.Description + " " + record.Address.Name + " " + record.Address.Full + " " + record.WebsiteDomain + " " + record.WebsiteDescription
 		if strings.EqualFold(strings.TrimSpace(record.Company.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Name), query) || strings.EqualFold(strings.TrimSpace(record.Address.Full), query) || strings.EqualFold(strings.TrimSpace(record.WebsiteDomain), query) {
 			exact = append(exact, record)
 		} else if strings.Contains(strings.ToLower(searchable), query) {

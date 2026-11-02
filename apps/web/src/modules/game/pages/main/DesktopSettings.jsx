@@ -2,7 +2,7 @@ import { useState } from "react";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 import { DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
 
-export default function DesktopSettings({ preferences, onChange, accountUsername = "SYSTEM USER", character, characterPreviewVisual, location = "MERIDIAN CITY", progression = null, onEditCharacter, onLogout }) {
+export default function DesktopSettings({ preferences, onChange, soundEffectsEnabled = true, onSoundEffectsChange, accountUsername = "SYSTEM USER", character, characterPreviewVisual, location = "MERIDIAN CITY", progression = null, onEditCharacter, onLogout }) {
   const [activeTab, setActiveTab] = useState("desktop");
   const username = accountUsername || "SYSTEM USER";
   const characterName = character?.displayName || "NO USER PROFILE SELECTED";
@@ -69,6 +69,17 @@ export default function DesktopSettings({ preferences, onChange, accountUsername
             <span><strong>{theme.label}</strong><small>{theme.sample}</small></span>
           </button>)}
         </div>
+      </section>
+
+      <section className="desktop-settings__section desktop-settings__sound" aria-labelledby="desktop-sound-title">
+        <div className="desktop-settings__section-heading">
+          <h2 id="desktop-sound-title">System sounds</h2>
+          <span>8-BIT INTERFACE EFFECTS</span>
+        </div>
+        <label className="desktop-settings__sound-toggle">
+          <input type="checkbox" checked={soundEffectsEnabled} onChange={(event) => onSoundEffectsChange?.(event.target.checked)} />
+          <span><strong>Enable sound effects</strong><small>Keyboard, mouse and notification sounds.</small></span>
+        </label>
       </section>
 
     </div> : <div className="desktop-settings__panel desktop-settings__panel--account" id="desktop-settings-panel-account" role="tabpanel" aria-labelledby="desktop-settings-tab-account" tabIndex={0}>

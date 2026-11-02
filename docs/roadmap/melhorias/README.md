@@ -15,14 +15,15 @@ Cada melhoria deve explicar o problema observável, o resultado esperado, o esco
 | I04 | Nomes procedurais próprios para empresas | M24/M25 — websites e bolsa; gerador de empresas | Médio |
 | I05 | Tipos procedurais de empresas | M24/M25 — websites e bolsa; geração de empresas | Médio |
 | I06 | Widgets informativos no desktop | Computador pessoal, Union Mercantile Bank e Rogue DNS | Médio |
-| I07 | Balanceamento de exposição e avisos hacker | M33 — exposição hacker e defesas virtuais | Curto |
-| I08 | Busca por tipos de empresas no hub | Meridian Global Company Directory | Curto |
+| I07 | Balanceamento de exposição, hosts e segurança hacker | M33 — exposição hacker e defesas virtuais | Médio |
+| I09 | Remover lore do The Crow de emails de resposta | Correio gerado por ações do jogador | Curto |
 
 ## Melhorias implementadas
 
 | ID | Melhoria | Documento |
 | --- | --- | --- |
 | I03 | Minimizar janelas do computador | [I03](../achieved/I03-minimizar-janelas-computador.md) |
+| I08 | Busca por tipos de empresas no hub | [I08](../achieved/I08-busca-tipos-empresas-hub.md) |
 
 ## Triagem das milestones atuais
 

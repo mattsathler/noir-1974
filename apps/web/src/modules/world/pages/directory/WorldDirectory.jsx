@@ -173,7 +173,8 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
     setLocations([]);
     try {
       if (isPeopleSearch) {
-        const loadPeople = () => searchPeople(term);
+        const searchCityId = isGateRecords ? cityId : "";
+        const loadPeople = () => searchPeople(term, searchCityId);
         const results = await loadPeople();
         if (currentRequest !== requestId.current) return;
         setPeople(results);
@@ -231,9 +232,9 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
       </>}
       {isInterpol && <p className="world-directory__scope">SEARCH JURISDICTION · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</p>}
       {!isStaffDirectory && !selectedPerson && <form className={`world-directory__search${isCompanyPortal ? " world-directory__search--company-portal" : ""}`} onSubmit={submitSearch}>
-        <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isCompanyPortal ? "COMPANY, WEBSITE OR ADDRESS" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
+        <label className="world-directory__label" htmlFor="world-directory-query">{isStaffDirectory ? "COMPANY NAME" : isCompanyPortal ? "COMPANY, BUSINESS TYPE OR ADDRESS" : isPeopleSearch ? "PERSON NAME" : "COMPANY OR ADDRESS"}</label>
         <div className="world-directory__searchline">
-          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Type a name, then press Enter" : isCompanyPortal ? "Type a company, then press Enter" : isPeopleSearch ? "Type a name, then press Enter" : "Type a company, then press Enter"} aria-keyshortcuts="Enter" />
+          <input id="world-directory-query" autoComplete="off" maxLength="80" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isStaffDirectory ? "Type a name, then press Enter" : isCompanyPortal ? "Type a company or business type, then press Enter" : isPeopleSearch ? "Type a name, then press Enter" : "Type a company, then press Enter"} aria-keyshortcuts="Enter" />
           <button className="search-enter-submit" type="submit" disabled={busy} aria-label={busy ? "Searching" : "Press Enter to search"}>{busy ? "SEARCHING…" : "ENTER ↵"}</button>
         </div>
       </form>}

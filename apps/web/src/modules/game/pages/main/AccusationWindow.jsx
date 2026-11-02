@@ -10,12 +10,13 @@ function boardReadiness(board) {
 }
 
 export default function AccusationWindow({ cityId, onClose, standalone = false, publicSubmission = false }) {
+  const useOuterTitle = standalone && publicSubmission;
   const [boards, setBoards] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [message, setMessage] = useState(publicSubmission ? "SELECT AN INVESTIGATION BOARD TO FILE A POLICE REPORT." : "SELECT AN INVESTIGATION BOARD TO SUBMIT TO CORPORATE REVIEW.");
+  const [message, setMessage] = useState("");
   const selectedBoard = boards.find((board) => board.id === selectedId);
   const readiness = useMemo(() => boardReadiness(selectedBoard), [selectedBoard]);
 
@@ -29,7 +30,7 @@ export default function AccusationWindow({ cityId, onClose, standalone = false, 
       if (!active) return;
       setBoards(loaded);
       setSelectedId(loaded.find((board) => !board.lockedAt)?.id ?? loaded[0]?.id ?? "");
-      setMessage(loaded.length ? publicSubmission ? "SELECT A BOARD FOR YOUR POLICE REPORT." : "SELECT A BOARD FOR THE ACCUSATION REPORT." : "NO INVESTIGATION BOARDS ARE AVAILABLE.");
+      setMessage(loaded.length ? "" : "NO INVESTIGATION BOARDS ARE AVAILABLE.");
     }).catch((error) => { if (active) setMessage(error.message || "INVESTIGATION BOARDS COULD NOT BE LOADED."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -79,9 +80,9 @@ export default function AccusationWindow({ cityId, onClose, standalone = false, 
     } finally { setBusy(false); }
   }
 
-  const panel = <section className={`warrant-window__panel accusation-window__panel${standalone ? " police-restricted-app__panel" : ""}`}>
-      <header className="warrant-window__header"><div><p className="computer-window__eyebrow">{publicSubmission ? "MERIDIAN POLICE SERVICE · PUBLIC REPORT FORM" : "CORPORATE SECURITY OFFICE · FORM 74-C"}</p><h1 id="accusation-title">{publicSubmission ? "FILE A POLICE REPORT" : "SUBMIT CASE REVIEW"}</h1></div>{onClose && <button type="button" aria-label="Close accusation form" onClick={onClose}>×</button>}</header>
-      <p className="warrant-window__copy">{publicSubmission ? "Submit an investigation board naming one or more accused persons and supporting evidence. Identify a victim when the case involves one. The police service will review each person separately and send its decision to personal mail." : "Submit an investigation board naming one or more accused persons and supporting proof. Identify a victim when the case involves one. Each person is assessed separately; the decision will arrive by personal mail."}</p>
+  const panel = <section className={`warrant-window__panel accusation-window__panel${standalone ? " police-restricted-app__panel" : ""}`} aria-labelledby={useOuterTitle ? "police-report-title" : "accusation-title"}>
+      <header className="warrant-window__header"><div><p className="computer-window__eyebrow">{publicSubmission ? "MERIDIAN POLICE SERVICE · PUBLIC REPORT FORM" : "CORPORATE SECURITY OFFICE · FORM 74-C"}</p>{!useOuterTitle && <h1 id="accusation-title">{publicSubmission ? "FILE A POLICE REPORT" : "SUBMIT CASE REVIEW"}</h1>}</div>{onClose && <button type="button" aria-label="Close accusation form" onClick={onClose}>×</button>}</header>
+      <p className="warrant-window__copy">{publicSubmission ? "Police review each accused person separately and send the decision to personal mail." : "Corporate security reviews each accused person separately; the decision will arrive by personal mail."}</p>
       <form className="accusation-window__form" onSubmit={submit}>
         <label className="world-directory__label" htmlFor="accusation-board">INVESTIGATION BOARD</label>
         <select id="accusation-board" value={selectedId} disabled={loading || busy || submitted || boards.length === 0} onChange={(event) => setSelectedId(event.target.value)}>
@@ -95,9 +96,9 @@ export default function AccusationWindow({ cityId, onClose, standalone = false, 
           <li className={readiness.hasAccused ? "is-ready" : "is-missing"}>{readiness.hasAccused ? "✓" : "!"} {readiness.accusedCount} {readiness.accusedCount === 1 ? "PERSON" : "PEOPLE"} MARKED ACCUSED</li>
           <li className={readiness.hasVictim ? "is-ready" : "is-missing"}>{readiness.hasVictim ? "✓ VICTIM MARKED" : "VICTIM PIN REQUIRED FOR HOMICIDE · OPTIONAL OTHERWISE"}</li>
         </ul>}
-        {selectedBoard && !readiness.ready && <p className="accusation-window__warning" role="alert">Add at least one proof and mark at least one accused person. Homicide reports also require the victim to be marked.</p>}
+        {selectedBoard && !readiness.ready && <p className="accusation-window__warning" role="alert">This board is not ready. Add the missing items above. Homicide reports also require the victim to be marked.</p>}
         {selectedBoard?.lockedAt && <p className="accusation-window__warning" role="alert">This board is locked while its review is in progress. It will unlock when the decision is delivered.</p>}
-        <p className="world-directory__message" role="status" aria-live="polite">{loading ? "LOADING INVESTIGATION BOARDS…" : message}</p>
+        {(loading || busy || submitted || message) && <p className="world-directory__message" role="status" aria-live="polite">{loading ? "LOADING INVESTIGATION BOARDS…" : message}</p>}
         <footer className="warrant-window__actions"><button type="submit" disabled={loading || busy || submitted || selectedBoard?.lockedAt || !readiness.ready}>{busy ? "SUBMITTING…" : submitted ? "SUBMITTED" : publicSubmission ? "SUBMIT REPORT" : "SUBMIT ACCUSATION"}</button></footer>
       </form>
     </section>;

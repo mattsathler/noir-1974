@@ -1,0 +1,23 @@
+@media (hover: hover) and (pointer: fine) {
+  html, body { cursor: url("/cursors/noir-cursor.svg") 6 5, auto; }
+  :is(button, a, summary, select, [role="button"], [role="tab"], input[type="checkbox"], input[type="radio"]):not(:disabled):not([aria-disabled="true"]) { cursor: url("/cursors/noir-pointer.svg") 4 4, pointer !important; }
+  :is(input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"]) { cursor: url("/cursors/noir-text.svg") 12 12, text !important; }
+  :is(button, a, summary, [role="button"]):active { translate: 1px 1px; }
+}
+
+.notification-center__snackbar { animation: noir-notification-arrive 180ms steps(3, end) both; }
+@keyframes noir-notification-arrive {
+  from { opacity: 0; translate: 0 -0.35rem; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+.desktop-settings__sound { align-self: start; }
+.desktop-settings__sound-toggle { display: flex; min-height: 3.4rem; align-items: center; gap: 0.55rem; padding: 0.6rem; color: #292b26; background: #fff; border: 1px solid #aeb9bf; cursor: pointer; }
+.desktop-settings__sound-toggle input { width: 1rem; height: 1rem; accent-color: #315f50; }
+.desktop-settings__sound-toggle span { display: grid; gap: 0.2rem; }
+.desktop-settings__sound-toggle strong { font: bold 0.66rem Arial, sans-serif; }
+.desktop-settings__sound-toggle small { color: #59666c; font-size: 0.62rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-center__snackbar { animation: none; }
+}
