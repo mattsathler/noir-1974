@@ -308,7 +308,6 @@ type PublicCase struct {
 	LocationID       string                `json:"-"`
 	Status           string                `json:"status"`
 	CreatedAt        time.Time             `json:"createdAt"`
-	Crimes           []PublicCrime         `json:"crimes,omitempty"`
 }
 
 // PublicBlackwireExposure contains only a company's name and the public
@@ -349,20 +348,6 @@ func (store *PostgresStore) ListPublicBlackwireExposures(ctx context.Context, se
 		exposures = append(exposures, exposure)
 	}
 	return exposures, rows.Err()
-}
-
-// PublicCrime contains only occurred events made discoverable through case evidence.
-// It intentionally omits participant identities and internal event relations.
-type PublicCrime struct {
-	ID         string              `json:"id"`
-	Type       string              `json:"type"`
-	OccurredAt time.Time           `json:"occurredAt"`
-	Victims    []PublicCrimeVictim `json:"victims,omitempty"`
-}
-
-type PublicCrimeVictim struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
 }
 
 type MissingPerson struct {
@@ -2185,7 +2170,10 @@ func processSerialEvolutionJob(ctx context.Context, tx pgx.Tx, serverID string, 
 		}
 		for index, threat := range threats {
 			message := mail.CaseMessage(job.seed, job.worldVersion, job.caseID, target.ID, actor.ID, "Unknown sender", target.Name, threat.subject, threat.body, "anonymous_warning", job.scheduledAt.Add(time.Duration(index-len(threats)+1)*time.Hour))
-			message.ID += "-" + job.eventKey
+			// CaseMessage is stable per case, mailbox, and relation. A threat
+			// event contains several messages with the same relation, so include
+			// the event key and ordinal to keep their persisted IDs distinct.
+			message.ID += "-" + job.eventKey + "-" + strconv.Itoa(index+1)
 			message.Service, message.Sender, message.Recipient = "Meridian Global Correspondence Exchange", "Unknown sender", target.Name
 			encoded, err := json.Marshal(message)
 			if err != nil {
@@ -2814,59 +2802,6 @@ func (store *PostgresStore) GetPublicCase(ctx context.Context, serverID, caseID 
 		if organization, err := world.GenerateCompanyFromKey(worldSeed, generatorVersion, organizationKey); err == nil {
 			result.OrganizationName = organization.Name
 		}
-	}
-	result.Crimes = make([]PublicCrime, 0)
-	crimeRows, err := store.db.Query(ctx,
-		`SELECT crime.crime_id,crime.crime_type,crime.occurred_at
-		 FROM case_crimes crime
-		 WHERE crime.server_id=$1::uuid AND crime.case_id=$2 AND crime.occurred_at<=$3
-		   AND (crime.source_key='primary' OR EXISTS (
-		     SELECT 1 FROM case_evidence evidence
-		     WHERE evidence.server_id=crime.server_id AND evidence.case_id=crime.case_id AND evidence.crime_id=crime.crime_id
-		   ))
-		 ORDER BY crime.occurred_at,crime.crime_sequence`, serverID, caseID, time.Now().UTC(),
-	)
-	if err != nil {
-		return PublicCase{}, nil, err
-	}
-	for crimeRows.Next() {
-		var item PublicCrime
-		if err := crimeRows.Scan(&item.ID, &item.Type, &item.OccurredAt); err != nil {
-			crimeRows.Close()
-			return PublicCase{}, nil, err
-		}
-		result.Crimes = append(result.Crimes, item)
-	}
-	if err := crimeRows.Err(); err != nil {
-		crimeRows.Close()
-		return PublicCase{}, nil, err
-	}
-	crimeRows.Close()
-	for index := range result.Crimes {
-		victimRows, err := store.db.Query(ctx, `SELECT entity.entity_id,entity.generation_key FROM case_crime_participants participant
-			JOIN world_entities entity ON entity.server_id=participant.server_id AND entity.entity_id=participant.npc_entity_id AND entity.entity_type='npc'
-			WHERE participant.server_id=$1::uuid AND participant.crime_id=$2 AND participant.participant_role='victim' ORDER BY entity.entity_id`, serverID, result.Crimes[index].ID)
-		if err != nil {
-			return PublicCase{}, nil, err
-		}
-		result.Crimes[index].Victims = make([]PublicCrimeVictim, 0)
-		for victimRows.Next() {
-			var victim PublicCrimeVictim
-			var generationKey string
-			if err := victimRows.Scan(&victim.ID, &generationKey); err != nil {
-				victimRows.Close()
-				return PublicCase{}, nil, err
-			}
-			if generated, err := world.GenerateNPCFromKey(worldSeed, generatorVersion, generationKey); err == nil {
-				victim.Name = generated.Name
-			}
-			result.Crimes[index].Victims = append(result.Crimes[index].Victims, victim)
-		}
-		if err := victimRows.Err(); err != nil {
-			victimRows.Close()
-			return PublicCase{}, nil, err
-		}
-		victimRows.Close()
 	}
 	rows, err := store.db.Query(ctx,
 		`SELECT evidence.evidence_id,evidence.crime_id,crime.crime_type,COALESCE(evidence.location_entity_id,''),evidence.evidence_data

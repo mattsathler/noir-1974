@@ -2,6 +2,7 @@ package identity
 
 import (
 	"errors"
+	"log"
 	"net/http"
 )
 
@@ -33,10 +34,14 @@ func (h *Handler) sellBlackwireOffer(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusServiceUnavailable, "BLACKWIRE_UNAVAILABLE", "The information exchange is unavailable.", nil)
 		return
 	}
-	_, _, err := writer.sellBlackwireItem(r.Context(), current.ID, h.worldServerID, r.PathValue("boardID"), r.PathValue("itemID"))
+	offer, _, err := writer.sellBlackwireItem(r.Context(), current.ID, h.worldServerID, r.PathValue("boardID"), r.PathValue("itemID"))
 	if errors.Is(err, errBlackwireUnavailable) {
 		h.writeAPIError(w, r, http.StatusConflict, "BLACKWIRE_OFFER_UNAVAILABLE", "This information is no longer available for sale.", nil)
 		return
+	}
+	cityID := h.worldFor(r.Context(), current.ID).CityID
+	if err := h.recordHackerAction(r.Context(), current.ID, cityID, "blackwire_information_sale", "blackwire:"+offer.ItemID, exposureDeltaForBlackwire(offer.Category)); err != nil {
+		log.Printf("record hacker exposure for Blackwire item %s: %v", offer.ItemID, err)
 	}
 	if errors.Is(err, ErrNoCharacter) {
 		h.writeAPIError(w, r, http.StatusConflict, "PLAYER_ECONOMY_UNAVAILABLE", "The personal account is unavailable.", nil)

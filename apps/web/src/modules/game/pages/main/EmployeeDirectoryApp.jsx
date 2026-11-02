@@ -8,6 +8,7 @@ export default function EmployeeDirectoryApp({ companyRecord, onOpenCompanyStaff
   const [directory, setDirectory] = useState(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const [securityStatus, setSecurityStatus] = useState("");
   const company = companyRecord?.company || companyRecord?.Company;
   const address = companyRecord?.address || companyRecord?.Address;
 
@@ -20,14 +21,15 @@ export default function EmployeeDirectoryApp({ companyRecord, onOpenCompanyStaff
     }
     setBusy(true);
     setError("");
-    Promise.all([
-      getCompanyWebsite(company.id),
-      onOpenCompanyStaff?.({ company, address }),
-    ])
-      .then(([website, attempt]) => {
+    setSecurityStatus("");
+    getCompanyWebsite(company.id)
+      .then(async (website) => {
+        const protection = website?.cyberSecurity;
+        if (protection?.level > 0) setSecurityStatus(`${protection.provider.toUpperCase()} IS INSPECTING THE REMOTE REQUEST…`);
+        const attempt = await onOpenCompanyStaff?.({ company, address, onStatus: (message) => { if (active) setSecurityStatus(message); } });
         if (!active) return;
         if (!website || !attempt?.attemptId) throw new Error("EMPLOYEE DIRECTORY ACCESS WAS DENIED.");
-        setDirectory({ website, company, address, attemptId: String(attempt.attemptId) });
+        setDirectory({ website, company, address, attemptId: String(attempt.attemptId), sessionRestored: Boolean(attempt.sessionRestored), securityProvider: attempt.securityProvider || website.cyberSecurity?.provider });
       })
       .catch((cause) => { if (active) setError(cause.message || "THE EMPLOYEE DIRECTORY COULD NOT BE OPENED."); })
       .finally(() => { if (active) setBusy(false); });
@@ -36,6 +38,9 @@ export default function EmployeeDirectoryApp({ companyRecord, onOpenCompanyStaff
 
   if (directory) return (
     <CompanyWebsite site={directory.website} pageId="staff">
+      {directory.sessionRestored && <p className="company-website__security-event" role="status">
+        {directory.securityProvider?.toUpperCase() || "CORPORATE FIREWALL"} INTERRUPTED THE FIRST CONNECTION. A NEW SESSION IS ACTIVE.
+      </p>}
       <WorldDirectory
         key={`${directory.company.id}:${directory.attemptId}`}
         program="staff-directory"
@@ -54,7 +59,7 @@ export default function EmployeeDirectoryApp({ companyRecord, onOpenCompanyStaff
         <div><p>GHOSTKEY.EXE · REMOTE PERSONNEL FILES</p><h1>Employee Directory</h1><span>{company?.name || "Company site unavailable"}</span></div>
       </header>
       <p className="employee-directory-app__target">TARGET SITE · {companyRecord?.siteAddress || "HOST ADDRESS UNAVAILABLE"}</p>
-      {busy && <p className="employee-directory-app__status" role="status">CONNECTING TO {company?.name?.toUpperCase() || "TARGET SITE"} PERSONNEL FILES…</p>}
+      {busy && <p className="employee-directory-app__status" role="status">{securityStatus || `CONNECTING TO ${company?.name?.toUpperCase() || "TARGET SITE"} PERSONNEL FILES…`}</p>}
       {error && <p className="employee-directory-app__error" role="alert">{error}</p>}
     </main>
   );

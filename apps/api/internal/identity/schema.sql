@@ -114,6 +114,28 @@ CREATE TABLE IF NOT EXISTS player_blackwire_sales (
 );
 CREATE INDEX IF NOT EXISTS player_blackwire_sales_history_idx
     ON player_blackwire_sales(server_id, account_id, sold_at DESC);
+
+CREATE TABLE IF NOT EXISTS player_hacker_exposure (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    country_id text NOT NULL,
+    exposure integer NOT NULL DEFAULT 0 CHECK (exposure BETWEEN 0 AND 100),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, country_id)
+);
+
+CREATE TABLE IF NOT EXISTS player_hacker_exposure_events (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    event_id text NOT NULL CHECK (event_id <> ''),
+    country_id text NOT NULL,
+    action text NOT NULL,
+    exposure_delta integer NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, event_id)
+);
+CREATE INDEX IF NOT EXISTS player_hacker_exposure_events_history_idx
+    ON player_hacker_exposure_events(server_id, account_id, created_at DESC);
 ALTER TABLE player_characters ADD COLUMN IF NOT EXISTS visual_identity jsonb NOT NULL DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
 ALTER TABLE player_characters ALTER COLUMN visual_identity SET DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
 

@@ -341,11 +341,12 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
         ))}</div>
       </section>}
 
-      {isStaffDirectory && staffCompanies.map(({ company, address, employees, benefits = [] }) => (
+      {isStaffDirectory && staffCompanies.map(({ company, address, employees, benefits = [], cyberSecurity }) => (
         <article className="world-record" key={company.id}>
           <header className="world-record__header"><h2>{company.name}</h2><span>EMPLOYER FILE</span></header>
           {company.businessType?.label && <p>BUSINESS TYPE · {company.businessType.label.toUpperCase()} — {company.businessType.description}</p>}
           <p>HEADQUARTERS · {address.full}</p>
+          {cyberSecurity?.level > 0 && <p>NETWORK DEFENSE · {cyberSecurity.provider.toUpperCase()} — {cyberSecurity.notice}</p>}
           <section className="world-record__benefits" aria-label={`Declared staff benefits at ${company.name}`}>
             <h3>DECLARED STAFF BENEFITS</h3>
             {benefits.length ? <ul>{benefits.map((benefit) => <li key={benefit.code}>

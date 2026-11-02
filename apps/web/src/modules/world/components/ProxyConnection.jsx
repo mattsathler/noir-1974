@@ -13,6 +13,7 @@ export default function ProxyConnection({ world, onConnected, hasOpenBrowser = f
   const [error, setError] = useState(null);
   const [retry, setRetry] = useState(0);
   const [pendingNode, setPendingNode] = useState(null);
+  const [routeNotice, setRouteNotice] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -51,6 +52,11 @@ export default function ProxyConnection({ world, onConnected, hasOpenBrowser = f
         new Promise((resolve) => window.setTimeout(resolve, 2400)),
       ]);
       await onConnected?.(response);
+      setRouteNotice(response.traceReduced
+        ? "PREVIOUS ROUTE SIGNATURES PARTLY CLEARED. OLD LEAKS AND INVESTIGATIONS REMAIN."
+        : response.routeChanged
+          ? "NEW EXIT NODE ACTIVE. NO PRIOR ROUTE RECORD WAS FOUND TO CLEAR."
+          : "EXIT NODE RECONNECTED. ROUTE UNCHANGED.");
       if (node.id !== world?.cityId) onRouteChanged?.();
       setPendingNode(null);
     } catch (requestError) {
@@ -105,6 +111,7 @@ export default function ProxyConnection({ world, onConnected, hasOpenBrowser = f
           {busy ? "SWITCHING ROUTE…" : selectedNode?.id === world?.cityId ? "RECONNECT DNS" : "USE THIS NODE"}<span aria-hidden="true">→</span>
         </button>
       </footer>
+      {routeNotice && <p className="proxy-interface__route-notice" role="status">{routeNotice}</p>}
       {pendingNode && <div className="proxy-route-confirm__backdrop">
         <section className="proxy-route-confirm" role="alertdialog" aria-modal="true" aria-labelledby="proxy-route-confirm-title" aria-describedby="proxy-route-confirm-message" onKeyDown={(event) => { if (event.key === "Escape" && !busy) setPendingNode(null); }}>
           <p className="proxy-route-confirm__eyebrow">UNLISTED ROUTE CHANGE</p>

@@ -13,18 +13,38 @@ const CompanyWebsiteProfileVersion = 5
 // CompanyWebsite is the deterministic public website profile generated for one company.
 // Staff records are deliberately excluded and remain behind the existing access flow.
 type CompanyWebsite struct {
-	Version     int                   `json:"version"`
-	Company     Company               `json:"company"`
-	Address     Address               `json:"address"`
-	Domain      string                `json:"domain"`
-	SiteAddress string                `json:"siteAddress"`
-	Template    string                `json:"template"`
-	Theme       CompanyWebsiteTheme   `json:"theme"`
-	Advertising string                `json:"advertising"`
-	Tagline     string                `json:"tagline"`
-	About       string                `json:"about"`
-	Pages       []CompanyWebsitePage  `json:"pages"`
-	Account     CompanyWebsiteAccount `json:"account"`
+	Version       int                   `json:"version"`
+	Company       Company               `json:"company"`
+	Address       Address               `json:"address"`
+	Domain        string                `json:"domain"`
+	SiteAddress   string                `json:"siteAddress"`
+	Template      string                `json:"template"`
+	Theme         CompanyWebsiteTheme   `json:"theme"`
+	Advertising   string                `json:"advertising"`
+	Tagline       string                `json:"tagline"`
+	About         string                `json:"about"`
+	Pages         []CompanyWebsitePage  `json:"pages"`
+	Account       CompanyWebsiteAccount `json:"account"`
+	CyberSecurity CompanyCyberSecurity  `json:"cyberSecurity"`
+}
+
+// CompanyCyberSecurity is a deterministic security provider assigned per company and world seed.
+type CompanyCyberSecurity struct {
+	Level    int    `json:"level"`
+	Provider string `json:"provider"`
+	Notice   string `json:"notice"`
+}
+
+func CompanyCyberSecurityFor(seed string, generatorVersion int, companyID string) CompanyCyberSecurity {
+	digest := companyWebsiteDigest(seed, generatorVersion, "cyber-security:"+companyID)
+	level := int(digest[0] % 4)
+	profiles := [...]CompanyCyberSecurity{
+		{Level: 0, Provider: "NONE", Notice: "This company does not subscribe to a managed digital protection service."},
+		{Level: 1, Provider: "Aegis Data Bureau", Notice: "Routine perimeter monitoring is provided by Aegis Data Bureau."},
+		{Level: 2, Provider: "Northstar Shield", Notice: "Northstar Shield monitors remote access and protects selected personnel records."},
+		{Level: 3, Provider: "Meridian Web Security", Notice: "Meridian Web Security protects company systems and encrypts selected personnel records."},
+	}
+	return profiles[level]
 }
 
 type CompanyWebsiteTheme struct {
@@ -155,7 +175,8 @@ func GenerateCompanyWebsite(seed string, generatorVersion int, company CompanyPo
 				{Kind: "note", Heading: "CUSTOMER SIGN IN", Body: "Online account access is not available through the Meridian relay."},
 			}},
 		},
-		Account: CompanyWebsiteAccount{Available: false, Label: "CUSTOMER ACCOUNT", Message: "Online account access is not available through the Meridian relay."},
+		Account:       CompanyWebsiteAccount{Available: false, Label: "CUSTOMER ACCOUNT", Message: "Online account access is not available through the Meridian relay."},
+		CyberSecurity: CompanyCyberSecurityFor(seed, generatorVersion, company.Company.ID),
 	}
 }
 

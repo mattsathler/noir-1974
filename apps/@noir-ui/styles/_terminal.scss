@@ -195,6 +195,7 @@
 .proxy-interface--app .proxy-interface__footer p span { color: #c49a49; font-size: 0.52rem; }
 .proxy-interface--app .proxy-interface__footer > button { padding: 0.65rem 0.85rem; color: #fff0cf; background: linear-gradient(#7b4b2b, #58331f); border: 1px solid #a16e37; box-shadow: inset 1px 1px #ae7a46; font-size: 0.6rem; }
 .proxy-interface--app .proxy-interface__footer > button:hover:not(:disabled) { background: linear-gradient(#925d34, #694027); }
+.proxy-interface--app .proxy-interface__route-notice { margin: 0; padding: .6rem 1rem; color: #263c34; background: #e7e8d9; border-top: 1px solid #b8b99d; font-size: .58rem; letter-spacing: .04em; }
 .proxy-interface--app .proxy-interface__error { margin: 0 1rem 0.75rem; }
 .proxy-route-confirm__backdrop { position: absolute; z-index: 5; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(8 8 7 / 82%); }
 .proxy-route-confirm { width: min(27rem, 100%); padding: 1.1rem; color: #e9e1c8; background: #211f1a; border: 1px solid #a67a38; box-shadow: 0 0.8rem 2.5rem rgb(0 0 0 / 65%), inset 0 0 0 1px #403526; }
@@ -763,7 +764,7 @@
 .computer-frame--persistent .computer-window.computer-window--terminal { height: min(48vh, 30rem); max-height: calc(100% - 1rem); }
 .computer-window--terminal .computer-window__body { flex: 1 1 auto; overflow-y: auto; }
 .terminal-app { display: block; min-height: 100%; flex: 1 1 auto; padding: 0.6rem; color: #c0c0c0; background: #000; font: 0.9rem/1.35 "Lucida Console", "Courier New", monospace; }
-.terminal-app__output { color: #c0c0c0; text-align: left !important; white-space: pre-wrap; overflow-wrap: anywhere; }
+.terminal-app__output { color: #c0c0c0; text-align: left !important; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
 .terminal-app__command { color: var(--noir-success); text-align: left !important; }
 .terminal-app__highlight { color: var(--noir-brass-300); text-align: left !important; }
 .terminal-app__prompt { display: flex; align-items: baseline; gap: 0.35rem; margin: 0; text-align: left !important; }

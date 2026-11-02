@@ -44,6 +44,7 @@ function normalizedSite(site) {
     tagline: site.tagline || site.Tagline,
     pages: site.pages || site.Pages || [],
     account: site.account || site.Account,
+    cyberSecurity: site.cyberSecurity || site.CyberSecurity,
   };
 }
 
@@ -86,6 +87,9 @@ export default function CompanyWebsite({ site: sourceSite, pageId = "home", onNa
         >{item.title}</a>)}
         {isStaffPage && <span className="company-website__staff-link" aria-current="page">EMPLOYEE DIRECTORY</span>}
       </nav>
+      {site.cyberSecurity?.level > 0 && <aside className={`company-website__security company-website__security--${site.cyberSecurity.level}`}>
+        <span>DIGITAL PROTECTION · {site.cyberSecurity.provider}</span><p>{site.cyberSecurity.notice}</p>
+      </aside>}
       {(advertising === "standard" || advertising === "crowded") && ads[0] && <Advertisement ad={ads[0]} format="banner" />}
       {isStaffPage
         ? <section className="company-website__staff-page" aria-label={`${companyName} employee directory`}>{children}</section>

@@ -250,10 +250,6 @@ export function getCaseFile(caseId) {
   return requestCase(`/api/cases/${encodeURIComponent(caseId)}`);
 }
 
-export function getCaseCrimeTimeline(caseId) {
-  return requestCase(`/api/cases/${encodeURIComponent(caseId)}/crimes`);
-}
-
 export function sendNPCEmailQuestion(email, questionId, requestId) {
   return requestCase("/api/player/emails/questions", {
     method: "POST",
@@ -278,6 +274,7 @@ export function requestFacilitySiteAccess(facility) {
       locationId: facility.locationId,
       companyId: facility.companyId ?? "",
       facility: facility.kind,
+      reconnect: facility.reconnect === true,
     }),
   });
 }

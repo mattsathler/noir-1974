@@ -115,15 +115,40 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const openCompanyStaffDirectory = useCallback(async (site) => {
     const company = site.company || site.Company;
     const address = site.address || site.Address;
+    const onStatus = site.onStatus;
     const response = await connectProxy(cityIdFromLocation(address.locationId));
     setWorld(response.world);
     setServerTime(new Date(response.world.serverTime));
-    const attempt = await requestFacilitySiteAccess({
+    let attempt = await requestFacilitySiteAccess({
       kind: "company",
       companyId: company.id,
       locationId: address.locationId,
     });
     if (attempt.status !== "granted") throw new Error("Company directory access was denied.");
+    const inspectionDelay = Math.max(0, Number(attempt.inspectionDelayMs) || 0);
+    if (inspectionDelay) {
+      onStatus?.(`${attempt.securityProvider?.toUpperCase() || "CORPORATE SECURITY"} IS INSPECTING THE REMOTE REQUEST…`);
+      await new Promise((resolve) => window.setTimeout(resolve, inspectionDelay));
+    }
+    let sessionRestored = false;
+    if (attempt.sessionInterrupted) {
+      sessionRestored = true;
+      onStatus?.(`${attempt.securityProvider?.toUpperCase() || "CORPORATE SECURITY"} INTERRUPTED THE SESSION · RECONNECTING…`);
+      await new Promise((resolve) => window.setTimeout(resolve, 900));
+      attempt = await requestFacilitySiteAccess({
+        kind: "company",
+        companyId: company.id,
+        locationId: address.locationId,
+        reconnect: true,
+      });
+      if (attempt.status !== "granted") throw new Error("The company firewall closed the session. Retry the employee directory.");
+      const reconnectDelay = Math.max(0, Number(attempt.inspectionDelayMs) || 0);
+      if (reconnectDelay) {
+        onStatus?.(`${attempt.securityProvider?.toUpperCase() || "CORPORATE SECURITY"} IS CHECKING THE RECOVERED SESSION…`);
+        await new Promise((resolve) => window.setTimeout(resolve, reconnectDelay));
+      }
+    }
+    if (sessionRestored) attempt.sessionRestored = true;
     return attempt;
   }, []);
   const openPublicServiceWebsite = useCallback(async ({ address, kind }) => {

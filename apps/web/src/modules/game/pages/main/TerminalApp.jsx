@@ -43,6 +43,15 @@ const COMMANDS = {
   ] },
 };
 
+function decryptText(value) {
+  return [...value].map((character) => {
+    if (character >= "a" && character <= "z") return String.fromCharCode(97 + (character.charCodeAt(0) - 97 + 13) % 26);
+    if (character >= "A" && character <= "Z") return String.fromCharCode(65 + (character.charCodeAt(0) - 65 + 13) % 26);
+    if (character >= "0" && character <= "9") return String.fromCharCode(48 + (character.charCodeAt(0) - 48 + 5) % 10);
+    return character;
+  }).join("");
+}
+
 export default function TerminalApp({ onRun }) {
   const [command, setCommand] = useState("");
   const [history, setHistory] = useState([]);
@@ -79,6 +88,16 @@ export default function TerminalApp({ onRun }) {
 
     if (entered.toLowerCase() === "help") {
       setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                 Show this command list", "  RUN GHOSTKEY.EXE     Start Ghostkey", "  RUN MAILBREAKER.EXE  Start Email Breaker", "  RUN BANKRUPT.EXE     Start Bankrupt", "  RUN BLACKWIRE.EXE    Open Blackwire in Web Browser", ""]);
+      return;
+    }
+
+    const decryptMatch = entered.match(/^decrypt\s+(.+)$/is);
+    if (decryptMatch) {
+      let ciphertext = decryptMatch[1].trim();
+      if ((ciphertext.startsWith('"') && ciphertext.endsWith('"')) || (ciphertext.startsWith("'") && ciphertext.endsWith("'"))) {
+        ciphertext = ciphertext.slice(1, -1);
+      }
+      setOutput((previous) => [...previous, `> ${entered}`, decryptText(ciphertext), ""]);
       return;
     }
 
@@ -121,6 +140,7 @@ export default function TerminalApp({ onRun }) {
 
   return (
     <main className="terminal-app" aria-label="Meridian command terminal" onMouseDown={(event) => {
+      if (event.target.closest(".terminal-app__output")) return;
       const input = event.currentTarget.querySelector(".terminal-app__prompt input");
       window.requestAnimationFrame(() => input?.focus({ preventScroll: true }));
     }}>
@@ -129,7 +149,7 @@ export default function TerminalApp({ onRun }) {
       </section>
       <form className="terminal-app__prompt" onSubmit={submit}>
         <label htmlFor="meridian-terminal-command">&gt;</label>
-        <input id="meridian-terminal-command" autoComplete="off" spellCheck="false" placeholder="help" value={command} disabled={launchPending} onKeyDown={handleCommandKeyDown} onChange={(event) => setCommand(event.target.value)} aria-label="Enter a terminal command" />
+        <input id="meridian-terminal-command" autoFocus autoComplete="off" spellCheck="false" placeholder="help" value={command} disabled={launchPending} onKeyDown={handleCommandKeyDown} onChange={(event) => setCommand(event.target.value)} aria-label="Enter a terminal command" />
       </form>
     </main>
   );

@@ -1,6 +1,7 @@
 # M33 — Exposição hacker e defesas virtuais
 
-**Status:** Direção definida · escopo a implementar  
+**Status:** Em andamento · proteções e alertas implementados
+
 **Trilha:** Risco criminal, segurança corporativa e consequências narrativas  
 **Depende de:** M30 — Blackwire e venda de informações; M32 — conta e progressão do alter ego hacker
 
@@ -13,8 +14,8 @@ Fazer atividades ilegais exigirem cautela. Empresas protegem seus sistemas, aç�
 Empresas contratam proteção virtual de modo determinístico, vinculada à seed e estável para a mesma empresa naquele mundo. Há quatro níveis previstos:
 
 1. **Nenhuma proteção:** sistemas sem defesa adicional.
-2. **Proteção simples:** serviço de uma empresa fictícia de segurança digital ainda a nomear.
-3. **Proteção mediana:** serviço de outra empresa fictícia ainda a nomear, mais eficaz que o nível simples.
+2. **Proteção simples:** Aegis Data Bureau.
+3. **Proteção mediana:** Northstar Shield, mais eficaz que o nível simples.
 4. **Meridian Web Security (MWS):** proteção de maior nível no universo Noir.
 
 As proteções dificultam invasões de sites e sistemas empresariais. A dificuldade pode se expressar por efeitos diegéticos, como:
@@ -52,27 +53,43 @@ A intervenção de The Crow é uma consequência extrema, não uma punição aut
 
 ## Critérios de aceite
 
-- [ ] Cada empresa recebe deterministamente um dos quatro níveis de proteção e mantém esse nível na mesma seed.
-- [ ] A proteção muda de forma perceptível e graduada a experiência de invasão.
-- [ ] Efeitos de segurança fornecem sinais compreensíveis ao jogador e não bloqueiam silenciosamente requisitos essenciais de casos.
-- [ ] Ações ilegais aumentam exposição conforme sua natureza e gravidade; Bankrupt pesa mais que ações de menor risco.
-- [ ] O jogador recebe indícios narrativos crescentes sem visualizar o contador interno.
-- [ ] Trocar o Rogue DNS encerra alertas futuros relativos ao país anterior e reduz a exposição segundo uma regra consistente.
+- [x] Cada empresa recebe deterministamente um dos quatro níveis de proteção e mantém esse nível na mesma seed.
+- [x] A proteção muda de forma perceptível e graduada a experiência de invasão.
+- [x] Efeitos de segurança fornecem sinais compreensíveis ao jogador e não bloqueiam silenciosamente requisitos essenciais de casos.
+- [x] Ações ilegais aumentam exposição conforme sua natureza e gravidade; Bankrupt pesa mais que ações de menor risco.
+- [ ] O jogador recebe indícios narrativos crescentes sem visualizar o contador interno. (Emails graduais implementados; conversas e notícias pendentes.)
+- [x] Trocar o Rogue DNS encerra alertas futuros relativos ao país anterior e reduz a exposição segundo uma regra consistente.
 - [ ] Consequências já iniciadas não desaparecem apenas pela troca de proxy.
-- [ ] Exposição crítica pode provocar a intervenção e o banimento por The Crow após alertas graduais.
+- [ ] Exposição crítica pode provocar a intervenção e o banimento por The Crow após alertas graduais. (Aviso crítico implementado; banimento depende da conta hacker da M32.)
 - [ ] Perder a conta Blackwire afeta a progressão ilegal, não os Credits, a fama ou os dados legais do personagem.
 - [ ] A conta nova começa com progresso hacker separado, conforme as regras de M32.
 
 ## Decisões pendentes
 
-- Nomes, identidade e lore das empresas fictícias que oferecem proteção simples e mediana.
-- Distribuição dos níveis de proteção por ramo, porte ou perfil empresarial dentro da seed.
-- Pesos de exposição por ação, persistência, recuperação e limiares narrativos.
-- Até que ponto a troca de Rogue DNS reduz exposição e como modelar consequências pendentes.
+- Lore adicional dos provedores de proteção e a possibilidade de ponderar sua distribuição por ramo ou porte.
+- Balanceamento de exposição por ação, persistência, recuperação e frequência dos alertas.
 - Tipos, autoria e frequência de mensagens anônimas e conversas de NPCs.
 - Avisos finais e janela de reação antes de The Crow banir uma conta.
 - Efeitos exatos do banimento: Crypto restante, aplicativos, dados e possibilidade de criar nova conta.
 - Como evitar que a exposição torne inevitável a perda de conta durante o uso normal de ferramentas necessárias.
+
+## Implementação atual
+
+- Cada empresa recebe deterministicamente um nível de proteção por seed, versão do gerador e ID da empresa. O nível e o provedor permanecem iguais naquela seed.
+- Provedores: sem proteção, Aegis Data Bureau (simples), Northstar Shield (mediana) e Meridian Web Security (MWS).
+- O portal da empresa informa seu provedor. No diretório, Aegis mascara parte do email; Northstar oculta emails e números bancários; MWS também oculta os nomes dos funcionários.
+- A inspeção acrescenta 250 ms na Aegis, 650 ms na Northstar e 1.100 ms na MWS. Uma em cada três tentativas de diretório sob MWS sofre interrupção; o app reconecta automaticamente e avisa o jogador. A reconexão gera apenas um rastro adicional pequeno.
+- A exposição fica invisível e é armazenada por personagem/servidor/país. Pesos iniciais: 2–11 por tentativa de acesso corporativo via Ghostkey (conforme o provedor), 5 por consulta privilegiada via Ghostkey, 16 por invasão via Mailbreaker, 28 por Bankrupt e 3–32 por venda na Blackwire, conforme a gravidade classificada do item.
+- Emails anônimos chegam ao jogador ao cruzar 20, 45, 70 e 90 pontos. A mensagem de 90 pontos é um aviso de The Crow.
+- Ao trocar para outro nó no Rogue DNS, a exposição da jurisdição anterior cai 35%. O app confirma quando encontrou e reduziu rastros, sem mostrar um medidor. Avisos já recebidos e consequências já publicadas permanecem.
+- O sistema atual ainda não separa a conta hacker da legal como previsto na M32. Portanto, esta fatia não bane nem apaga progresso; o aviso de The Crow é o estágio crítico disponível até a progressão hacker isolada existir.
+
+## Escopo ainda pendente
+
+- Bloqueios e adulterações de registros além da interrupção recuperável da MWS; ampliar efeitos sem tornar dados essenciais inacessíveis.
+- Conversas de NPCs e notícias sobre vazamentos e investigações.
+- Limiares, recuperação e frequência dos rastros balanceados no jogo.
+- Banimento da conta Blackwire e perda somente do progresso hacker, dependentes da identidade separada da M32.
 
 ## Fora de escopo
 

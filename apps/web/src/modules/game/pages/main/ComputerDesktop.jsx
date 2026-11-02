@@ -806,12 +806,13 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 style={{ ...(position || {}), zIndex, ...(program.id === "character-appearance" ? { height: "min(48vh, 30rem)" } : {}) }}
                 aria-label={`${companySiteName} ${DESKTOP_APP_IDS.includes(program.id) ? "application" : "website"} window`}
                 onMouseDown={(event) => {
-                  const clickedControl = event.target.closest("input, textarea, select, button, a, label, [contenteditable='true']");
+                  const selectingTerminalOutput = program.id === "terminal" && event.target.closest(".terminal-app__output");
+                  const clickedControl = selectingTerminalOutput || event.target.closest("input, textarea, select, button, a, label, [contenteditable='true']");
                   focusWindow(id, !clickedControl);
-                  if (program.id === "terminal") window.requestAnimationFrame(() => windowRefs.current.get(id)?.querySelector(".terminal-app__prompt input")?.focus({ preventScroll: true }));
+                  if (program.id === "terminal" && !selectingTerminalOutput) window.requestAnimationFrame(() => windowRefs.current.get(id)?.querySelector(".terminal-app__prompt input")?.focus({ preventScroll: true }));
                 }}
-                onClickCapture={() => {
-                  if (program.id === "terminal") window.requestAnimationFrame(() => windowRefs.current.get(id)?.querySelector(".terminal-app__prompt input")?.focus({ preventScroll: true }));
+                onClickCapture={(event) => {
+                  if (program.id === "terminal" && !event.target.closest(".terminal-app__output")) window.requestAnimationFrame(() => windowRefs.current.get(id)?.querySelector(".terminal-app__prompt input")?.focus({ preventScroll: true }));
                 }}
               >
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>

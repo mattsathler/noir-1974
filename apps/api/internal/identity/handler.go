@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -317,7 +318,6 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 			mux.HandleFunc("GET /api/crime-reports", handler.crimeReports)
 		}
 		mux.HandleFunc("GET /api/cases/{caseID}", handler.getCase)
-		mux.HandleFunc("GET /api/cases/{caseID}/crimes", handler.caseCrimeTimeline)
 		mux.HandleFunc("POST /api/cases/{caseID}/progress", handler.saveCaseProgress)
 		if _, ok := caseReader.(CaseAccusationReader); ok {
 			mux.HandleFunc("POST /api/accusations", handler.submitAccusation)
@@ -432,6 +432,7 @@ type localAccessRequest struct {
 	LocationID string `json:"locationId"`
 	CompanyID  string `json:"companyId"`
 	Facility   string `json:"facility"`
+	Reconnect  bool   `json:"reconnect"`
 }
 
 func (h *Handler) requestLocalAccess(w http.ResponseWriter, r *http.Request) {
@@ -454,6 +455,8 @@ func (h *Handler) requestLocalAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	valid := input.LocationID != "" && state.CityID != ""
+	companySecurityLevel := 0
+	companySecurity := world.CompanyCyberSecurity{}
 	switch input.Facility {
 	case "company":
 		valid = valid && input.CompanyID != ""
@@ -477,6 +480,10 @@ func (h *Handler) requestLocalAccess(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		valid = valid && len(records) == 1
+		if len(records) == 1 {
+			companySecurityLevel = records[0].CyberSecurity.Level
+			companySecurity = records[0].CyberSecurity
+		}
 	case "police", "bank", "gate":
 		valid = valid && input.CompanyID == "" && input.LocationID == expectedServiceLocationID(state.CityID, input.Facility)
 	case "hospital":
@@ -493,7 +500,27 @@ func (h *Handler) requestLocalAccess(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "LOCAL_ACCESS_FAILED", "could not record local system access", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, attempt)
+	if input.Facility == "company" {
+		delta := 2 + companySecurityLevel*3
+		if input.Reconnect {
+			delta = 1
+		}
+		if !valid {
+			delta++
+		}
+		if err := h.recordHackerAction(r.Context(), current.ID, state.CityID, "ghostkey_company_access", fmt.Sprintf("company-access:%d", attempt.AttemptID), delta); err != nil {
+			h.writeAPIError(w, r, http.StatusInternalServerError, "HACKER_EXPOSURE_RECORD_FAILED", "could not update network activity records", err)
+			return
+		}
+	}
+	response := map[string]any{"attemptId": attempt.AttemptID, "status": attempt.Status, "attemptedAt": attempt.Attempted}
+	if input.Facility == "company" && valid && companySecurityLevel > 0 {
+		delay := []int{0, 250, 650, 1100}[companySecurityLevel]
+		response["securityProvider"] = companySecurity.Provider
+		response["inspectionDelayMs"] = delay
+		response["sessionInterrupted"] = companySecurityLevel == 3 && !input.Reconnect && attempt.AttemptID%3 == 0
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *Handler) requestResidentialSearch(w http.ResponseWriter, r *http.Request) {
@@ -698,6 +725,18 @@ func newRequestID() string {
 		return strconv.FormatInt(time.Now().UnixNano(), 16)
 	}
 	return base64.RawURLEncoding.EncodeToString(value)
+}
+
+func (h *Handler) recordHackerAction(ctx context.Context, accountID, cityID, action, eventID string, delta int) error {
+	writer, ok := h.store.(hackerExposureWriter)
+	if !ok {
+		return nil
+	}
+	city, exists := world.CityByID(cityID)
+	if !exists {
+		return nil
+	}
+	return writer.recordHackerAction(ctx, h.worldServerID, accountID, city.CountryID, action, eventID, delta)
 }
 
 func apiErrorCode(status int) string {
@@ -1050,6 +1089,10 @@ func (h *Handler) requestBankruptAccess(w http.ResponseWriter, r *http.Request) 
 		h.writeAPIError(w, r, http.StatusInternalServerError, "BANKRUPT_ACCESS_FAILED", "could not breach the bank account", err)
 		return
 	}
+	if err := h.recordHackerAction(r.Context(), current.ID, h.worldFor(r.Context(), current.ID).CityID, "bankrupt_breach", "bankrupt:"+newRequestID(), 28); err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "HACKER_EXPOSURE_RECORD_FAILED", "could not update network activity records", err)
+		return
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{"account": access})
 }
 
@@ -1127,6 +1170,10 @@ func (h *Handler) requestEmailBreaker(w http.ResponseWriter, r *http.Request) {
 	result, err := reader.RequestEmailBreaker(r.Context(), h.worldServerID, current.ID, employee, input.From, input.Through, hex.EncodeToString(key[:16]))
 	if err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "EMAIL_BREAKER_FAILED", "could not force the account breach", err)
+		return
+	}
+	if err := h.recordHackerAction(r.Context(), current.ID, h.worldFor(r.Context(), current.ID).CityID, "mailbreaker_breach", "mailbreaker:"+hex.EncodeToString(key[:16])+":"+input.From+":"+input.Through, 16); err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "HACKER_EXPOSURE_RECORD_FAILED", "could not update network activity records", err)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"request": result})
@@ -1338,27 +1385,6 @@ func (h *Handler) getCase(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, caseDetailResponse{Case: publicCase, Evidence: evidence, Progress: progress})
 }
 
-func (h *Handler) caseCrimeTimeline(w http.ResponseWriter, r *http.Request) {
-	_, cityID, ok := h.caseAccountAndCity(w, r)
-	if !ok {
-		return
-	}
-	publicCase, _, err := h.caseReader.GetPublicCase(r.Context(), h.worldServerID, r.PathValue("caseID"))
-	if errors.Is(err, cases.ErrCaseNotFound) {
-		http.NotFound(w, r)
-		return
-	}
-	if err != nil {
-		http.Error(w, "could not retrieve case timeline", http.StatusInternalServerError)
-		return
-	}
-	if publicCase.CityID != cityID {
-		h.writeAPIError(w, r, http.StatusConflict, "CASE_CITY_MISMATCH", "connect to the case's city before opening its timeline", nil)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"caseId": publicCase.ID, "crimes": publicCase.Crimes})
-}
-
 func (h *Handler) validateNPCCity(w http.ResponseWriter, r *http.Request, accountID, npcID string) bool {
 	return h.validateNPCInCity(w, r, h.worldFor(r.Context(), accountID).CityID, npcID)
 }
@@ -1415,6 +1441,10 @@ func (h *Handler) requireLocalAccessAttemptInCity(w http.ResponseWriter, r *http
 	}
 	if !valid {
 		h.writeAPIError(w, r, http.StatusForbidden, "LOCAL_ACCESS_REQUIRED", "connect to the institution's website before requesting these records", nil)
+		return false
+	}
+	if err := h.recordHackerAction(r.Context(), accountID, cityID, "ghostkey_"+facility+"_records", "ghostkey-records:"+newRequestID(), 5); err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "HACKER_EXPOSURE_RECORD_FAILED", "could not update network activity records", err)
 		return false
 	}
 	return true
@@ -2329,9 +2359,22 @@ func (h *Handler) proxyConnect(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusBadRequest, "UNKNOWN_PROXY_NODE", "The selected proxy node is not available.", nil)
 		return
 	}
+	previousLocation, _ := h.store.playerLocation(r.Context(), current.ID)
+	previousCity, hadPreviousCity := world.CityForLocation(previousLocation)
+	routeChanged := hadPreviousCity && previousCity.ID != node.ID
 	if err := h.store.setPlayerLocation(r.Context(), current.ID, node.ID); err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "PROXY_CONNECTION_FAILED", "The selected proxy route could not be saved.", err)
 		return
+	}
+	traceReduced := false
+	if routeChanged {
+		if writer, supported := h.store.(hackerExposureWriter); supported {
+			var err error
+			traceReduced, err = writer.reduceHackerExposure(r.Context(), h.worldServerID, current.ID, previousCity.CountryID)
+			if err != nil {
+				log.Printf("reduce hacker exposure after proxy switch for account %s: %v", current.ID, err)
+			}
+		}
 	}
 	state := h.worldAt()
 	state.CityID = node.ID
@@ -2340,7 +2383,7 @@ func (h *Handler) proxyConnect(w http.ResponseWriter, r *http.Request) {
 	state.TimeZone = node.TimeZone
 	state.LocationID = node.ID
 	state.PlaceName = ""
-	writeJSON(w, http.StatusOK, map[string]any{"node": node, "world": state})
+	writeJSON(w, http.StatusOK, map[string]any{"node": node, "world": state, "routeChanged": routeChanged, "traceReduced": traceReduced})
 }
 
 func (h *Handler) gateTravel(w http.ResponseWriter, r *http.Request) {

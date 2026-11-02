@@ -203,10 +203,11 @@ type Address struct {
 }
 
 type CompanyRecord struct {
-	Company   Company           `json:"company"`
-	Address   Address           `json:"address"`
-	Employees []CompanyEmployee `json:"employees"`
-	Benefits  []CompanyBenefit  `json:"benefits,omitempty"`
+	Company       Company              `json:"company"`
+	Address       Address              `json:"address"`
+	Employees     []CompanyEmployee    `json:"employees"`
+	Benefits      []CompanyBenefit     `json:"benefits,omitempty"`
+	CyberSecurity CompanyCyberSecurity `json:"cyberSecurity,omitempty"`
 }
 
 type CompanyPortalRecord struct {
@@ -1798,7 +1799,15 @@ func (store *PostgresStore) CompanyWebsite(ctx context.Context, serverID, countr
 	}
 	for _, company := range entry.companies {
 		if company.Company.ID == companyID {
-			site := GenerateCompanyWebsite(entry.seed, entry.version, company)
+			version := entry.version
+			if city, exists := CityForLocation(company.Address.LocationID); exists {
+				if cityVersion, err := store.cityGeneratorVersion(ctx, serverID, city.ID, version); err != nil {
+					return CompanyWebsite{}, err
+				} else {
+					version = cityVersion
+				}
+			}
+			site := GenerateCompanyWebsite(entry.seed, version, company)
 			site.SiteAddress = company.SiteAddress
 			return site, nil
 		}
@@ -1977,7 +1986,9 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 				return nil, fmt.Errorf("index company staff email addresses: %w", err)
 			}
 			benefits := CompanyBenefits(entry.seed, cityVersion, company.Company.ID)
-			return []CompanyRecord{{Company: company.Company, Address: company.Address, Employees: employees, Benefits: benefits}}, nil
+			security := CompanyCyberSecurityFor(entry.seed, cityVersion, company.Company.ID)
+			applyCompanyCyberProtection(employees, security.Level)
+			return []CompanyRecord{{Company: company.Company, Address: company.Address, Employees: employees, Benefits: benefits, CyberSecurity: security}}, nil
 		}
 		store.observeCache("company_directory_index", false)
 	}
@@ -2008,12 +2019,50 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 		applyCompanySalary(employees)
 		applyBankAccountNumbers(seed, version, employees)
 		record.Benefits = CompanyBenefits(seed, version, companyID)
+		record.CyberSecurity = CompanyCyberSecurityFor(seed, version, companyID)
 		if err := store.indexStaffEmailAddresses(ctx, serverID, employees); err != nil {
 			return nil, fmt.Errorf("index company staff email addresses: %w", err)
 		}
+		applyCompanyCyberProtection(employees, record.CyberSecurity.Level)
+		record.Employees = employees
 		return []CompanyRecord{record}, nil
 	}
 	return []CompanyRecord{}, nil
+}
+
+func applyCompanyCyberProtection(employees []CompanyEmployee, level int) {
+	for index := range employees {
+		switch level {
+		case 1:
+			if local, domain, found := strings.Cut(employees[index].Email, "@"); found && len(local) > 2 {
+				employees[index].Email = local[:2] + "…@" + domain
+			}
+		case 2:
+			employees[index].Email = simpleCipher(employees[index].Email)
+			employees[index].BankAccount = simpleCipher(employees[index].BankAccount)
+		case 3:
+			employees[index].Name = simpleCipher(employees[index].Name)
+			employees[index].Email = simpleCipher(employees[index].Email)
+			employees[index].BankAccount = simpleCipher(employees[index].BankAccount)
+		}
+	}
+}
+
+// simpleCipher applies the terminal's fixed ROT13/ROT5 transform to protected
+// personnel fields. It is an in-game puzzle cipher, not security-grade encryption.
+func simpleCipher(value string) string {
+	return strings.Map(func(character rune) rune {
+		switch {
+		case character >= 'a' && character <= 'z':
+			return 'a' + (character-'a'+13)%26
+		case character >= 'A' && character <= 'Z':
+			return 'A' + (character-'A'+13)%26
+		case character >= '0' && character <= '9':
+			return '0' + (character-'0'+5)%10
+		default:
+			return character
+		}
+	}, value)
 }
 
 // CompanySiteAtLocation validates a site against the current country index without loading employee data.
@@ -2026,7 +2075,13 @@ func (store *PostgresStore) CompanySiteAtLocation(ctx context.Context, serverID,
 		for _, company := range entry.companies {
 			if company.Address.LocationID == locationID && company.Company.ID == companyID {
 				store.observeCache("company_site_index", true)
-				return []CompanyRecord{{Company: company.Company, Address: company.Address}}, nil
+				version := entry.version
+				if cityVersion, err := store.cityGeneratorVersion(ctx, serverID, city.ID, version); err != nil {
+					return nil, err
+				} else {
+					version = cityVersion
+				}
+				return []CompanyRecord{{Company: company.Company, Address: company.Address, CyberSecurity: CompanyCyberSecurityFor(entry.seed, version, company.Company.ID)}}, nil
 			}
 		}
 		store.observeCache("company_site_index", false)

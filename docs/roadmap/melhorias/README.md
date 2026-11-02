@@ -15,6 +15,8 @@ Cada melhoria deve explicar o problema observável, o resultado esperado, o esco
 | I04 | Nomes procedurais próprios para empresas | M24/M25 — websites e bolsa; gerador de empresas | Médio |
 | I05 | Tipos procedurais de empresas | M24/M25 — websites e bolsa; geração de empresas | Médio |
 | I06 | Widgets informativos no desktop | Computador pessoal, Union Mercantile Bank e Rogue DNS | Médio |
+| I07 | Balanceamento de exposição e avisos hacker | M33 — exposição hacker e defesas virtuais | Curto |
+| I08 | Busca por tipos de empresas no hub | Meridian Global Company Directory | Curto |
 
 ## Melhorias implementadas
 

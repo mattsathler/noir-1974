@@ -34,6 +34,8 @@ Quando alguém consulta uma pessoa, o sistema:
 
 Para listar funcionários, o banco procura os vínculos da empresa e o sistema reconstrói somente as pessoas encontradas. Ele não precisa recriar toda a população.
 
+Empresas também recebem um perfil determinístico de segurança. Conforme o nível, a consulta ao diretório mascara ou cifra campos do cadastro funcional. O terminal aceita `decrypt <texto>` e reverte a cifra ROT13/ROT5 usada nesses campos; é uma mecânica de investigação, não uma proteção criptográfica real.
+
 ## Por que a versão do gerador importa
 
 Alterações nas regras de geração podem mudar o mundo. Por isso, cada mundo guarda a versão usada na criação. As versões 1 a 4 estabelecem a cidade, a sociedade, os nomes regionais e a identidade visual modular; a versão 5 gera 20 bairros por cidade e calibra aparências por idade; as versões 6 e 7 acrescentam compatibilidade visual e bairros comerciais; a versão 8 adiciona distribuições regionais sintéticas de tons de pele e detalhes faciais. Manter as versões permite reconstruir mundos antigos sem aplicar regras novas por engano.

@@ -39,6 +39,11 @@
 .company-website__nav a,.company-website__staff-link { padding: .45rem .7rem; color: var(--company-accent); border-right: 1px solid var(--company-accent); font-size: .66rem; }
 .company-website__nav a[aria-current="page"] { color: var(--company-paper); background: var(--company-accent); }
 .company-website__staff-link { margin-left: auto; background: transparent; border-top: 0; border-bottom: 0; border-left: 0; cursor: pointer; }
+.company-website__security { padding: .5rem 1rem; color: var(--company-ink); background: color-mix(in srgb, var(--company-accent) 8%, var(--company-paper)); border-bottom: 1px solid color-mix(in srgb, var(--company-accent) 35%, var(--company-paper)); font-size: .68rem; }
+.company-website__security span { font-weight: 700; letter-spacing: .06em; }
+.company-website__security p { margin: .15rem 0 0; }
+.company-website__security--3 { border-bottom-width: 2px; }
+.company-website__security-event { margin: 0; padding: .55rem 1rem; color: var(--company-ink); background: color-mix(in srgb, var(--company-accent) 16%, var(--company-paper)); border-bottom: 1px dashed var(--company-accent); font-size: .68rem; font-weight: 700; letter-spacing: .04em; }
 .company-website__nav :focus-visible,.company-website__account :focus-visible { outline: 2px solid var(--company-accent); outline-offset: 2px; }
 .company-website__feature { max-width: 72rem; min-height: 18rem; margin: 0 auto; padding: 1.4rem 2rem; }
 .company-website__staff-page { max-width: 72rem; min-height: 18rem; margin: 0 auto; padding: 1.4rem 2rem; }
