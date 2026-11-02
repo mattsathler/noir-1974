@@ -928,6 +928,7 @@ func splitSQLStatements(sql string) []string {
 }
 
 const DefaultAsyncRequestDelay = 3 * time.Minute
+const DefaultAccusationReviewDelay = 30 * time.Second
 
 // RequestResidentialSearch queues a police search. Its inventory is delivered after review.
 // NPC status is deliberately not checked here: a deceased person's residence remains searchable.
@@ -3349,7 +3350,7 @@ func (store *PostgresStore) SubmitAccusation(ctx context.Context, serverID, acco
 	if err != nil {
 		return AccusationResult{}, err
 	}
-	job, err := enqueueAsyncRequest(ctx, tx, serverID, accountID, "accusation", requestKey, payloadData, DefaultAsyncRequestDelay)
+	job, err := enqueueAsyncRequest(ctx, tx, serverID, accountID, "accusation", requestKey, payloadData, DefaultAccusationReviewDelay)
 	if err != nil {
 		return AccusationResult{}, err
 	}
