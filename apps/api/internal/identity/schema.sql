@@ -37,6 +37,23 @@ CREATE TABLE IF NOT EXISTS player_economy (
     PRIMARY KEY (server_id, account_id)
 );
 
+CREATE TABLE IF NOT EXISTS player_blackwire_accounts (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL,
+    handle text NOT NULL CHECK (handle <> ''),
+    crypto_cents bigint NOT NULL DEFAULT 0 CHECK (crypto_cents >= 0),
+    reputation bigint NOT NULL DEFAULT 0 CHECK (reputation >= 0),
+    level integer NOT NULL DEFAULT 1 CHECK (level >= 1),
+    legacy_sales_migrated boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id),
+    UNIQUE (server_id, handle),
+    FOREIGN KEY (server_id, account_id)
+        REFERENCES player_economy(server_id, account_id) ON DELETE CASCADE
+);
+ALTER TABLE player_blackwire_accounts ADD COLUMN IF NOT EXISTS legacy_sales_migrated boolean NOT NULL DEFAULT true;
+
 CREATE TABLE IF NOT EXISTS player_stock_positions (
     server_id uuid NOT NULL,
     account_id uuid NOT NULL,
@@ -114,6 +131,42 @@ CREATE TABLE IF NOT EXISTS player_blackwire_sales (
 );
 CREATE INDEX IF NOT EXISTS player_blackwire_sales_history_idx
     ON player_blackwire_sales(server_id, account_id, sold_at DESC);
+
+WITH legacy_sales AS (
+    SELECT server_id, account_id, SUM(price_cents)::bigint AS crypto_cents,
+        SUM(CASE category
+            WHEN 'CASE INFORMATION' THEN 10
+            WHEN 'CORPORATE LEADERSHIP' THEN 25
+            WHEN 'FINANCIAL / CORPORATE EVIDENCE' THEN 50
+            WHEN 'POLITICAL INFORMATION' THEN 60
+            WHEN 'EXECUTIVE FINANCIAL EVIDENCE' THEN 75
+            WHEN 'POLITICAL / EXECUTIVE EVIDENCE' THEN 100
+            ELSE 1 END)::bigint AS reputation
+    FROM player_blackwire_sales
+    GROUP BY server_id, account_id
+)
+INSERT INTO player_blackwire_accounts(server_id,account_id,handle,crypto_cents,reputation,level,legacy_sales_migrated)
+SELECT legacy.server_id,legacy.account_id,
+    'BW-'||upper(substr(md5(legacy.server_id::text||':'||legacy.account_id::text),1,8)),
+    LEAST(legacy.crypto_cents,economy.credits_cents),legacy.reputation,
+    CASE WHEN legacy.reputation>=900 THEN 5 WHEN legacy.reputation>=400 THEN 4
+        WHEN legacy.reputation>=150 THEN 3 WHEN legacy.reputation>=50 THEN 2 ELSE 1 END,
+    false
+FROM legacy_sales legacy
+JOIN player_economy economy USING(server_id,account_id)
+ON CONFLICT(server_id,account_id) DO NOTHING;
+
+WITH migrated AS (
+    UPDATE player_blackwire_accounts
+    SET legacy_sales_migrated=true, updated_at=now()
+    WHERE legacy_sales_migrated=false
+    RETURNING server_id,account_id,crypto_cents
+)
+UPDATE player_economy economy
+SET credits_cents=GREATEST(0,economy.credits_cents-LEAST(economy.credits_cents,migrated.crypto_cents)),
+    updated_at=now()
+FROM migrated
+WHERE economy.server_id=migrated.server_id AND economy.account_id=migrated.account_id;
 
 CREATE TABLE IF NOT EXISTS player_hacker_exposure (
     server_id uuid NOT NULL,

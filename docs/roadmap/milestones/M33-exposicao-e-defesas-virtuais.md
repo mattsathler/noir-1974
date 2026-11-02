@@ -60,7 +60,7 @@ A intervenção de The Crow é uma consequência extrema, não uma punição aut
 - [ ] O jogador recebe indícios narrativos crescentes sem visualizar o contador interno. (Emails graduais implementados; conversas e notícias pendentes.)
 - [x] Trocar o Rogue DNS encerra alertas futuros relativos ao país anterior e reduz a exposição segundo uma regra consistente.
 - [ ] Consequências já iniciadas não desaparecem apenas pela troca de proxy.
-- [ ] Exposição crítica pode provocar a intervenção e o banimento por The Crow após alertas graduais. (Aviso crítico implementado; banimento depende da conta hacker da M32.)
+- [ ] Exposição crítica pode provocar a intervenção e o banimento por The Crow após alertas graduais. (A conta hacker separada e seu progresso agora existem na M32.)
 - [ ] Perder a conta Blackwire afeta a progressão ilegal, não os Credits, a fama ou os dados legais do personagem.
 - [ ] A conta nova começa com progresso hacker separado, conforme as regras de M32.
 
@@ -82,14 +82,14 @@ A intervenção de The Crow é uma consequência extrema, não uma punição aut
 - A exposição fica invisível e é armazenada por personagem/servidor/país. Pesos iniciais: 2–11 por tentativa de acesso corporativo via Ghostkey (conforme o provedor), 5 por consulta privilegiada via Ghostkey, 16 por invasão via Mailbreaker, 28 por Bankrupt e 3–32 por venda na Blackwire, conforme a gravidade classificada do item.
 - Emails anônimos chegam ao jogador ao cruzar 20, 45, 70 e 90 pontos. A mensagem de 90 pontos é um aviso de The Crow.
 - Ao trocar para outro nó no Rogue DNS, a exposição da jurisdição anterior cai 35%. O app confirma quando encontrou e reduziu rastros, sem mostrar um medidor. Avisos já recebidos e consequências já publicadas permanecem.
-- O sistema atual ainda não separa a conta hacker da legal como previsto na M32. Portanto, esta fatia não bane nem apaga progresso; o aviso de The Crow é o estágio crítico disponível até a progressão hacker isolada existir.
+- A identidade hacker da M32 fornece o escopo para que esta milestone implemente banimento e perda da progressão ilegal sem atingir o personagem legal.
 
 ## Escopo ainda pendente
 
 - Bloqueios e adulterações de registros além da interrupção recuperável da MWS; ampliar efeitos sem tornar dados essenciais inacessíveis.
 - Conversas de NPCs e notícias sobre vazamentos e investigações.
 - Limiares, recuperação e frequência dos rastros balanceados no jogo.
-- Banimento da conta Blackwire e perda somente do progresso hacker, dependentes da identidade separada da M32.
+- Implementar o banimento da conta Blackwire e a perda somente do progresso hacker.
 
 ## Fora de escopo
 

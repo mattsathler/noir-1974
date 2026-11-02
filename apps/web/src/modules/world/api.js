@@ -319,6 +319,10 @@ export async function getBlackwireMarket() {
   return whiteboardRequest("/api/blackwire/market");
 }
 
+export async function getBlackwireProfile() {
+  return whiteboardRequest("/api/blackwire/profile");
+}
+
 export async function sellBlackwireItem(boardId, itemId) {
   return whiteboardRequest(`/api/blackwire/market/${encodeURIComponent(boardId)}/${encodeURIComponent(itemId)}/sell`, { method: "POST", pendingCursor: false });
 }

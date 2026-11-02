@@ -87,7 +87,7 @@ export default function TerminalApp({ onRun }) {
     setHistoryIndex(-1);
 
     if (entered.toLowerCase() === "help") {
-      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                 Show this command list", "  RUN GHOSTKEY.EXE     Start Ghostkey", "  RUN MAILBREAKER.EXE  Start Email Breaker", "  RUN BANKRUPT.EXE     Start Bankrupt", "  RUN BLACKWIRE.EXE    Open Blackwire in Web Browser", ""]);
+      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                 Show this command list", "  RUN GHOSTKEY.EXE     Start Ghostkey", "  RUN MAILBREAKER.EXE  Start Email Breaker", "  RUN BANKRUPT.EXE     Start Bankrupt · BLACKWIRE LEVEL 2", "  RUN BLACKWIRE.EXE    Open Blackwire in Web Browser", ""]);
       return;
     }
 
@@ -111,7 +111,8 @@ export default function TerminalApp({ onRun }) {
     setOutput((previous) => [...previous, `> ${entered}`, `Starting ${program.label}...`, ...program.art, ""]);
     setLaunchPending(true);
     launchTimer.current = window.setTimeout(() => {
-      onRun(program.id);
+      const result = onRun(program.id);
+      if (typeof result === "string" && result) setOutput((previous) => [...previous, result, ""]);
       setLaunchPending(false);
       launchTimer.current = null;
     }, 1600);

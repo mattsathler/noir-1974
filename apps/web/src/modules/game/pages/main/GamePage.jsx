@@ -97,6 +97,44 @@ export default function GamePage({ initialWorld = null, onLogout }) {
     };
   }, []);
 
+  useEffect(() => {
+    const messageSelector = '[role="alert"], [role="alertdialog"]';
+    const lastMessages = new WeakMap();
+    const readMessage = (element) => {
+      if (element.getAttribute("role") === "alertdialog") {
+        const describedBy = element.getAttribute("aria-describedby");
+        const description = describedBy && document.getElementById(describedBy);
+        if (description) return description.textContent.trim();
+      }
+      const copy = element.cloneNode(true);
+      copy.querySelectorAll("button, [role='button'], [aria-hidden='true']").forEach((control) => control.remove());
+      return copy.textContent.trim();
+    };
+    document.querySelectorAll(messageSelector).forEach((element) => lastMessages.set(element, readMessage(element)));
+    const observer = new MutationObserver((records) => {
+      const changedMessages = new Set();
+      const collect = (node) => {
+        if (!(node instanceof Element)) return;
+        if (node.matches(messageSelector)) changedMessages.add(node);
+        node.querySelectorAll(messageSelector).forEach((element) => changedMessages.add(element));
+      };
+      records.forEach((record) => {
+        const target = record.target instanceof Element ? record.target : record.target.parentElement;
+        const alertContainer = target?.closest(messageSelector);
+        if (alertContainer) changedMessages.add(alertContainer);
+        record.addedNodes.forEach(collect);
+        if (record.type === "attributes") collect(record.target);
+      });
+      changedMessages.forEach((element) => {
+        const message = readMessage(element);
+        if (message && lastMessages.get(element) !== message) playRetroSound("warning");
+        lastMessages.set(element, message);
+      });
+    });
+    if (document.body) observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["role"] });
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => setRetroSoundEnabled(soundEffectsEnabled), [soundEffectsEnabled]);
 
   useEffect(() => () => window.clearTimeout(snackbarTimer.current), []);

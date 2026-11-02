@@ -15,7 +15,7 @@ Adicionar widgets compactos no canto superior direito do desktop do computador p
 ## Escopo
 
 - Criar um widget de identidade com retrato do jogador e nome do personagem.
-- Reservar espaço nesse widget para exibir futuramente o pseudônimo hacker do alter ego, sem mostrá-lo antes da implementação da identidade Blackwire.
+- Reservar espaço nesse widget para o pseudônimo hacker do alter ego; a M32 agora o preenche com o handle da conta Blackwire.
 - Criar um widget financeiro conectado ao saldo atual de Credits no Union Mercantile Bank.
 - Criar um widget de rede mostrando o local associado à rota ativa do Rogue DNS e o horário local desse local.
 - Manter os widgets no canto superior direito da área de trabalho, sem cobrir a barra do sistema nem competir com o conteúdo das janelas abertas.
@@ -28,7 +28,7 @@ Adicionar widgets compactos no canto superior direito do desktop do computador p
 
 - [ ] Os três widgets aparecem no canto superior direito do desktop pessoal.
 - [ ] O widget de identidade mostra o retrato e nome atuais do personagem.
-- [ ] Há espaço reservado para o futuro pseudônimo hacker, sem apresentar dado inexistente.
+- [x] Há espaço para a identidade do alter ego, preenchida quando a conta Blackwire da M32 é provisionada.
 - [ ] O widget do Union Mercantile Bank mostra o saldo atual de Credits e reflete alterações de saldo sem recarregar o jogo.
 - [ ] O widget de Rogue DNS mostra a rota ativa, e não apenas a localização física do personagem.
 - [ ] O relógio usa o fuso horário local do destino/país da rota ativa e muda após uma troca de Proxy.
@@ -39,7 +39,7 @@ Adicionar widgets compactos no canto superior direito do desktop do computador p
 
 ## Fora de escopo
 
-- Exibir pseudônimo hacker antes da criação da identidade Blackwire prevista na M32.
+- Exibir Crypto dentro do widget bancário de Credits; o saldo Blackwire aparece junto à identidade hacker.
 - Misturar Credits com Crypto ou mostrar saldo da Blackwire como parte do widget bancário.
 - Permitir movimentações financeiras diretamente pelo widget; ações bancárias continuam nos aplicativos próprios.
 - Mostrar histórico completo de transações, cotações ou detalhes técnicos da conexão do Proxy.

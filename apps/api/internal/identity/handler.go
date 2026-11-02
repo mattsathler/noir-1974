@@ -363,6 +363,7 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("POST /api/whiteboards/{boardID}/connections", handler.connectWhiteboardPins)
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/connections/{fromID}/{toID}", handler.disconnectWhiteboardPins)
 		if _, ok := handler.store.(blackwireStore); ok {
+			mux.HandleFunc("GET /api/blackwire/profile", handler.blackwireProfile)
 			mux.HandleFunc("GET /api/blackwire/market", handler.blackwireMarket)
 			mux.HandleFunc("POST /api/blackwire/market/{boardID}/{itemID}/sell", handler.sellBlackwireOffer)
 		}
@@ -807,6 +808,22 @@ func (h *Handler) npcRecords(w http.ResponseWriter, r *http.Request) {
 	}
 	if source != "" {
 		locationID := strings.TrimSpace(r.URL.Query().Get("locationId"))
+		if source == "bank" {
+			blackwire, available := h.store.(blackwireStore)
+			if !available {
+				h.writeAPIError(w, r, http.StatusForbidden, "BLACKWIRE_LEVEL_REQUIRED", "reach the required Blackwire level before opening this application", nil)
+				return
+			}
+			profile, err := blackwire.blackwireProfile(r.Context(), current.ID, h.worldServerID)
+			if err != nil {
+				h.writeAPIError(w, r, http.StatusInternalServerError, "BLACKWIRE_PROFILE_FAILED", "could not verify Blackwire application access", err)
+				return
+			}
+			if !blackwireApplicationUnlocked(profile, "bankrupt") {
+				h.writeAPIError(w, r, http.StatusForbidden, "BLACKWIRE_LEVEL_REQUIRED", "reach Blackwire level 2 to use Bankrupt", nil)
+				return
+			}
+		}
 		if source == "bank" && locationID == "" {
 			reader, available := h.caseReader.(BankruptAccessReader)
 			if !available {
@@ -1055,6 +1072,20 @@ type bankruptRequestBody struct {
 func (h *Handler) requestBankruptAccess(w http.ResponseWriter, r *http.Request) {
 	current, ok := h.caseAccount(w, r)
 	if !ok {
+		return
+	}
+	blackwire, available := h.store.(blackwireStore)
+	if !available {
+		h.writeAPIError(w, r, http.StatusForbidden, "BLACKWIRE_LEVEL_REQUIRED", "reach the required Blackwire level before opening this application", nil)
+		return
+	}
+	profile, err := blackwire.blackwireProfile(r.Context(), current.ID, h.worldServerID)
+	if err != nil {
+		h.writeAPIError(w, r, http.StatusInternalServerError, "BLACKWIRE_PROFILE_FAILED", "could not verify Bankrupt access", err)
+		return
+	}
+	if !blackwireApplicationUnlocked(profile, "bankrupt") {
+		h.writeAPIError(w, r, http.StatusForbidden, "BLACKWIRE_LEVEL_REQUIRED", "reach Blackwire level 2 to use Bankrupt", nil)
 		return
 	}
 	var input bankruptRequestBody

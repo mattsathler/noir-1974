@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { getBlackwireMarket, markWhiteboardItemSold, sellBlackwireItem } from "../../../world/api.js";
 import "./BlackwireWebsite.css";
 
-export default function BlackwireWebsite() {
+export default function BlackwireWebsite({ onAccountChange = () => {} }) {
   const siteRef = useRef(null);
   const [market, setMarket] = useState({ offers: [] });
   const [boardFilter, setBoardFilter] = useState("all");
@@ -32,18 +32,26 @@ export default function BlackwireWebsite() {
 
   useEffect(() => {
     let active = true;
-    getBlackwireMarket().then((result) => { if (active) setMarket(result); })
+    getBlackwireMarket().then((result) => {
+      if (!active) return;
+      setMarket(result);
+      onAccountChange(result.account || null);
+    })
       .catch(() => { if (active) setError("The exchange could not load your investigation boards."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [onAccountChange]);
 
   async function confirmSale() {
     if (!selected || selling) return;
     setSelling(true);
     setError("");
     try {
-      await sellBlackwireItem(selected.boardId, selected.itemId);
+      const result = await sellBlackwireItem(selected.boardId, selected.itemId);
+      if (result?.account) {
+        setMarket((current) => ({ ...current, account: result.account }));
+        onAccountChange(result.account);
+      }
       markWhiteboardItemSold(selected.itemId);
       setMarket((current) => ({ ...current, offers: current.offers.filter((offer) => offer.itemId !== selected.itemId) }));
       setMessage("SALE COMPLETE. CHECK PERSONAL MAIL FOR THE SETTLEMENT AND AMOUNT RECEIVED.");
@@ -62,8 +70,14 @@ export default function BlackwireWebsite() {
       <span className="blackwire-site__connection"><i aria-hidden="true" /> PRIVATE RELAY</span>
     </header>
     <nav className="blackwire-site__nav" aria-label="Blackwire sections">
-      <span aria-current="page">MARKET</span><span>ARCHIVE · RESTRICTED</span><span>SOFTWARE · RESTRICTED</span>
+      <span aria-current="page">MARKET</span><span>ARCHIVE · RESTRICTED</span><span>SOFTWARE · {market.account?.unlockedApplications?.length || 0} AUTHORIZED</span>
     </nav>
+    {market.account && <section className="blackwire-site__account" aria-label="Blackwire hacker account">
+      <div><span className="blackwire-site__eyebrow">ALTER EGO · OPERATOR</span><strong>{market.account.handle}</strong></div>
+      <div><span className="blackwire-site__eyebrow">BLACKWIRE PROGRESSION</span><strong>LEVEL {market.account.level} · {market.account.reputation}{market.account.nextLevelReputation ? ` / ${market.account.nextLevelReputation} REP` : " REP · MAX"}</strong></div>
+      <div><span className="blackwire-site__eyebrow">CRYPTO BALANCE</span><strong>{(market.account.cryptoCents / 100).toFixed(2)} CRYPTO</strong></div>
+      <div><span className="blackwire-site__eyebrow">AUTHORIZED SOFTWARE</span><strong>{market.account.unlockedApplications.map((application) => `${application.toUpperCase()}.EXE`).join(" · ")}</strong></div>
+    </section>}
     <section className="blackwire-site__welcome">
       <p className="blackwire-site__eyebrow">A MESSAGE FROM THE CROW</p>
       <h2>Information has a price.</h2>

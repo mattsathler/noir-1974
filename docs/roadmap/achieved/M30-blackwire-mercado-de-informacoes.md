@@ -2,13 +2,13 @@
 
 **Status:** Concluída
 **Trilha:** Progressão criminosa, lore e economia de informações  
-**Depende de:** Whiteboard e post-its persistidos; Credits por personagem/servidor; M25/M26 — bolsa e flutuação empresarial
+**Depende de:** Whiteboard e post-its persistidos; M25/M26 — bolsa e flutuação empresarial
 
 ## Objetivo
 
 Apresentar a Blackwire, uma rede clandestina criada por The Crow, como espaço para o jogador assumir um papel criminoso. O jogador poderá descobrir novos aplicativos, acessar arquivos confidenciais de lore e, principalmente, vender informações que reuniu durante a investigação.
 
-A Blackwire deve criar uma escolha com consequência entre preservar evidências e cooperar com a resolução de casos ou vender informações por Credits. O jogador é hacker, mas suas ações não precisam servir ao Estado nem ao bem comum.
+A Blackwire deve criar uma escolha com consequência entre preservar evidências e cooperar com a resolução de casos ou vender informações. O jogador é hacker, mas suas ações não precisam servir ao Estado nem ao bem comum. A M32 substitui a recompensa original em Credits por Crypto e cria uma progressão hacker separada.
 
 ## Direção definida
 
@@ -22,7 +22,7 @@ A Blackwire deve criar uma escolha com consequência entre preservar evidências
 - Provas relevantes para casos devem ter valores mais atraentes. Evidências financeiras ou relacionadas a funcionários de alto escalão podem ter valor e impacto especialmente altos, em conexão com a bolsa de valores.
 - O valor da oferta é oculto ao jogador durante a navegação e confirmação. Após a venda, a Blackwire apenas anuncia sua conclusão; o valor recebido chega em um email de liquidação na caixa pessoal.
 - A venda é definitiva: o post-it vendido torna-se inutilizável como prova e não pode ser usado para acusação ou progressão investigativa. A interface deve deixar claro o efeito antes da confirmação.
-- A recompensa é Credits fictício e deve ser creditada ao personagem/servidor atual de maneira autoritativa e idempotente.
+- A recompensa é a moeda da progressão ilegal e deve ser creditada no escopo personagem/servidor atual de maneira autoritativa e idempotente. A moeda vigente é Crypto, definida pela M32.
 - A venda de uma informação afeta fortemente a flutuação da empresa relacionada, atuando como multiplicador sobre o change que a bolsa já receberia quando a empresa sofre consequências de um caso criminal.
 - A origem e a exposição de dados devem ser apresentadas de forma diegética; impactos suficientemente graves podem chegar ao jornal.
 - A relação determinística entre grupos rivais de empresas e seus movimentos opostos pertence à M31. A M30 prepara o evento de exposição de informações sem assumir que essa mecânica já existe.
@@ -33,7 +33,7 @@ A Blackwire deve criar uma escolha com consequência entre preservar evidências
 - Listar post-its elegíveis dos whiteboards do personagem e exibir conteúdo e quadro, sem revelar preço nem classificação de origem.
 - Agrupar os itens por whiteboard e permitir filtrar por quadro, sem exibir categorias que revelem se pertencem à investigação ou à rotina.
 - Permitir selecionar qualquer post-it elegível, revisar a consequência irreversível em um modal que escurece a janela do navegador e confirmar a venda sem exibir o valor.
-- Ao confirmar, creditar Credits uma única vez e marcar a anotação como vendida, bloqueando seu uso posterior como prova.
+- Ao confirmar, creditar a moeda vigente da Blackwire uma única vez e marcar a anotação como vendida, bloqueando seu uso posterior como prova.
 - Enviar um email de confirmação idempotente com o valor recebido; a tela da Blackwire apenas anuncia que a venda foi concluída.
 - Propagar a exposição para a empresa ou caso associado, quando houver vínculo, usando os sistemas existentes de mercado e notícias.
 - Oferecer uma consequência de preço adequada a informações sem vínculo empresarial ou criminal, sem forçar associação artificial.
@@ -57,9 +57,9 @@ A exposição não deve transformar qualquer venda em choque de mercado. A magni
 - [x] A listagem e a confirmação ocultam o valor, e explicam a perda permanente do uso probatório.
 - [x] Os itens aparecem por whiteboard com filtro, sem rótulos de rotina, caso ou origem.
 - [x] Após a venda, a Blackwire apenas anuncia a conclusão e envia um email com o valor recebido.
-- [x] Uma venda concluída não pode ser repetida para duplicar Credits.
+- [x] Uma venda concluída não pode ser repetida para duplicar a recompensa.
 - [x] Um post-it vendido não pode ser apresentado como prova, usado para acusação ou reaproveitado em fluxos de caso.
-- [x] Credits e vendas são persistidos no escopo do personagem/servidor e validados pelo backend.
+- [x] Recompensa e vendas são persistidas no escopo do personagem/servidor e validadas pelo backend.
 - [x] A venda de informação associada a uma empresa amplia o impacto de mercado previsto para a empresa, com intensidade proporcional à gravidade.
 - [x] Exposições graves podem gerar cobertura jornalística diegética; dados triviais não causam repercussão exagerada.
 - [x] A venda continua disponível para dados sem vínculo empresarial, sem produzir flutuação artificial de uma companhia.

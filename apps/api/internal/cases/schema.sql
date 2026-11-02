@@ -395,6 +395,18 @@ CREATE TABLE IF NOT EXISTS player_inbox_messages (
         REFERENCES player_search_warrants(server_id, account_id, warrant_id) ON DELETE CASCADE,
     FOREIGN KEY (server_id, case_id) REFERENCES cases(server_id, case_id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS player_spam_mail_schedule (
+    server_id uuid NOT NULL REFERENCES worlds(server_id) ON DELETE CASCADE,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    sequence bigint NOT NULL DEFAULT 3 CHECK (sequence >= 3),
+    next_delivery_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id)
+);
+UPDATE player_inbox_messages
+SET body=replace(body,'Credits received: CR ','Crypto received: ')
+WHERE message_id LIKE 'blackwire-sale:%' AND body LIKE '%Credits received: CR %';
 ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS case_id text;
 ALTER TABLE player_inbox_messages ADD COLUMN IF NOT EXISTS crime_id text;
 ALTER TABLE player_inbox_messages DROP CONSTRAINT IF EXISTS player_inbox_messages_server_id_case_id_fkey;

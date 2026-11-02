@@ -18,7 +18,7 @@ import { BatteryFull } from "pixelarticons/react/BatteryFull";
 import { Terminal } from "pixelarticons/react/Terminal";
 import { Bomb } from "pixelarticons/react/Bomb";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
-import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, requestFacilitySiteAccess, setWhiteboardSaveState } from "../../../world/api.js";
+import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getBlackwireProfile, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, requestFacilitySiteAccess, setWhiteboardSaveState } from "../../../world/api.js";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
@@ -52,6 +52,7 @@ import NotificationCenter from "./NotificationCenter.jsx";
 import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 import { DEFAULT_DESKTOP_PREFERENCES, DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
+import { playRetroSound } from "./retroSoundEffects.js";
 
 const BOOT_LINES = [
   "PhoenixBIOS Meridian Systems 4.1 Release",
@@ -248,6 +249,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const [securityWarningProgram, setSecurityWarningProgram] = useState(null);
   const [proxyBoot, setProxyBoot] = useState({ active: false, target: "" });
   const [characterPreviewVisual, setCharacterPreviewVisual] = useState(character?.visual);
+  const [blackwireProfile, setBlackwireProfile] = useState(null);
   const [accessAttemptId, setAccessAttemptId] = useState(initialAccessAttemptId);
   const [windows, setWindows] = useState(() => {
     try {
@@ -276,6 +278,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const [showMeridianLogo, setShowMeridianLogo] = useState(false);
   const [printDialog, setPrintDialog] = useState(null);
   const printDialogRef = useRef(printDialog);
+  const soundEffectsEnabledRef = useRef(soundEffectsEnabled);
+  const bootWelcomePlayedRef = useRef(false);
   const modalRef = useRef(null);
   const closeButtonRef = useRef(null);
   const windowRefs = useRef(new Map());
@@ -285,11 +289,21 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const routedFacilityAccessRef = useRef("");
   const windowsStateRef = useRef(windows);
   printDialogRef.current = printDialog;
+  soundEffectsEnabledRef.current = soundEffectsEnabled;
   windowsStateRef.current = windows;
 
   useEffect(() => {
     return () => window.clearTimeout(bootTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!persistent || isCompanyComputer) return undefined;
+    let active = true;
+    getBlackwireProfile().then((response) => {
+      if (active) setBlackwireProfile(response.account || null);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [persistent, isCompanyComputer]);
 
   useEffect(() => {
     if (!booting) return undefined;
@@ -298,6 +312,10 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     if (reducedMotion) {
       setBootLinesVisible(BOOT_LINES.length);
       setShowMeridianLogo(true);
+      if (!bootWelcomePlayedRef.current) {
+        bootWelcomePlayedRef.current = true;
+        playRetroSound("boot", soundEffectsEnabledRef.current);
+      }
       bootTimerRef.current = window.setTimeout(finishBoot, 4300);
       return () => window.clearTimeout(bootTimerRef.current);
     }
@@ -310,6 +328,10 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       } else {
         bootTimerRef.current = window.setTimeout(() => {
           setShowMeridianLogo(true);
+          if (!bootWelcomePlayedRef.current) {
+            bootWelcomePlayedRef.current = true;
+            playRetroSound("boot", soundEffectsEnabledRef.current);
+          }
           bootTimerRef.current = window.setTimeout(finishBoot, 4300);
         }, 450);
       }
@@ -782,13 +804,16 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
             {persistent && !isCompanyComputer && <aside className="desktop-status-widgets" aria-label="Personal desktop status">
               <section className="desktop-status-widget desktop-status-widget--identity" aria-label="Player identity">
                 <div className="desktop-status-widget__portrait">{character?.visual && <ModularFace visual={character.visual} name={character.displayName || accountUsername || "Player"} />}</div>
-                <div className="desktop-status-widget__details"><span>ACCOUNT HOLDER</span><strong>{character?.displayName || accountUsername || "PLAYER"}</strong></div>
+                <div className="desktop-status-widget__details"><span>ACCOUNT HOLDER</span><strong>{character?.displayName || accountUsername || "PLAYER"}</strong>
+                  {blackwireProfile && <small>ALTER EGO · {blackwireProfile.handle}</small>}
+                </div>
               </section>
               <section className="desktop-status-widget" aria-label="Union Mercantile Bank balance">
                 <span className="desktop-status-widget__label">UNION MERCANTILE BANK</span>
                 {Number.isFinite(playerProgression?.creditsCents)
                   ? <strong className="desktop-status-widget__value">CR {(playerProgression.creditsCents / 100).toFixed(2)}</strong>
                   : <span className="desktop-status-widget__pending" role="status">BALANCE UNAVAILABLE</span>}
+                {blackwireProfile && <small className="desktop-status-widget__crypto"><span>CRYPTO BALANCE</span><strong>{(blackwireProfile.cryptoCents / 100).toFixed(2)} CRYPTO</strong></small>}
               </section>
               <section className="desktop-status-widget" aria-label="Rogue DNS route and local time">
                 <span className="desktop-status-widget__label">ROGUE DNS · ACTIVE EXIT</span>
@@ -855,7 +880,15 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "character-appearance"
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
                     : program.id === "terminal"
-                      ? <TerminalApp onRun={(programId) => launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : programId === "bankrupt" ? BANKRUPT_PROGRAM : programId === "blackwire" ? BLACKWIRE_PROGRAM : EMAIL_BREAKER_PROGRAM)} />
+                      ? <TerminalApp onRun={(programId) => {
+                        if (programId === "bankrupt" && !blackwireProfile?.unlockedApplications?.includes("bankrupt")) {
+                          return blackwireProfile
+                            ? "BLACKWIRE AUTHORIZATION DENIED · REACH LEVEL 2 TO INSTALL BANKRUPT.EXE."
+                            : "BLACKWIRE ACCOUNT UNAVAILABLE · CONNECT TO BLACKWIRE AND TRY AGAIN.";
+                        }
+                        launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : programId === "bankrupt" ? BANKRUPT_PROGRAM : programId === "blackwire" ? BLACKWIRE_PROGRAM : EMAIL_BREAKER_PROGRAM);
+                        return undefined;
+                      }} />
                     : program.id === "ghostkey"
                       ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => openPatientSearchFromGhost(siteAddress, id)} onOpenGateRecords={(siteAddress) => openGateRecordsFromGhost(siteAddress, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
                       : program.id === "email-breaker"
@@ -871,7 +904,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "minesweeper"
                       ? <MinesweeperApp />
                     : program.id === "blackwire"
-                      ? <BlackwireWebsite />
+                      ? <BlackwireWebsite onAccountChange={setBlackwireProfile} />
                     : program.id === "proxy"
                     ? <ProxyConnection
                         world={{ city: location?.split(",")[0], cityId, country: countryName }}

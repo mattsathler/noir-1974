@@ -28,12 +28,107 @@ type blackwireOffer struct {
 }
 
 type blackwireMarketplace struct {
-	Offers []blackwireOffer `json:"offers"`
+	Offers  []blackwireOffer `json:"offers"`
+	Account blackwireAccount `json:"account"`
+}
+
+type blackwireAccount struct {
+	Handle               string   `json:"handle"`
+	CryptoCents          int64    `json:"cryptoCents"`
+	Reputation           int64    `json:"reputation"`
+	Level                int      `json:"level"`
+	NextLevelReputation  int64    `json:"nextLevelReputation"`
+	UnlockedApplications []string `json:"unlockedApplications"`
 }
 
 type blackwireStore interface {
 	blackwireOffers(context.Context, string, string) (blackwireMarketplace, error)
-	sellBlackwireItem(context.Context, string, string, string, string) (blackwireOffer, int64, error)
+	blackwireProfile(context.Context, string, string) (blackwireAccount, error)
+	sellBlackwireItem(context.Context, string, string, string, string) (blackwireOffer, blackwireAccount, error)
+}
+
+var blackwireLevelThresholds = []int64{0, 50, 150, 400, 900}
+
+func blackwireApplicationsForLevel(level int) []string {
+	apps := []string{"ghostkey", "email-breaker"}
+	if level >= 2 {
+		apps = append(apps, "bankrupt")
+	}
+	return apps
+}
+
+func blackwireApplicationUnlocked(account blackwireAccount, application string) bool {
+	for _, unlocked := range account.UnlockedApplications {
+		if unlocked == application {
+			return true
+		}
+	}
+	return false
+}
+
+func blackwireReputationFor(category string) int64 {
+	switch category {
+	case "CASE INFORMATION":
+		return 10
+	case "CORPORATE LEADERSHIP":
+		return 25
+	case "FINANCIAL / CORPORATE EVIDENCE":
+		return 50
+	case "POLITICAL INFORMATION":
+		return 60
+	case "EXECUTIVE FINANCIAL EVIDENCE":
+		return 75
+	case "POLITICAL / EXECUTIVE EVIDENCE":
+		return 100
+	default:
+		return 1
+	}
+}
+
+func ensureBlackwireAccount(ctx context.Context, db querier, accountID, serverID string) error {
+	tag, err := db.Exec(ctx, `INSERT INTO player_economy(server_id,account_id)
+		SELECT $1::uuid,account_id FROM player_characters WHERE account_id=$2::uuid
+		ON CONFLICT(server_id,account_id) DO NOTHING`, serverID, accountID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		var exists bool
+		if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM player_economy WHERE server_id=$1::uuid AND account_id=$2::uuid)`, serverID, accountID).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			return ErrNoCharacter
+		}
+	}
+	_, err = db.Exec(ctx, `INSERT INTO player_blackwire_accounts(server_id,account_id,handle)
+		VALUES($1::uuid,$2::uuid,'BW-'||upper(substr(md5($1::text||':'||$2::text),1,8)))
+		ON CONFLICT(server_id,account_id) DO NOTHING`, serverID, accountID)
+	return err
+}
+
+func readBlackwireAccount(ctx context.Context, db querier, accountID, serverID string) (blackwireAccount, error) {
+	var result blackwireAccount
+	err := db.QueryRow(ctx, `SELECT handle,crypto_cents,reputation,level FROM player_blackwire_accounts
+		WHERE server_id=$1::uuid AND account_id=$2::uuid`, serverID, accountID).Scan(&result.Handle, &result.CryptoCents, &result.Reputation, &result.Level)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	for _, threshold := range blackwireLevelThresholds {
+		if result.Reputation < threshold {
+			result.NextLevelReputation = threshold
+			break
+		}
+	}
+	result.UnlockedApplications = blackwireApplicationsForLevel(result.Level)
+	return result, nil
+}
+
+func (s *postgresStore) blackwireProfile(ctx context.Context, accountID, serverID string) (blackwireAccount, error) {
+	if err := ensureBlackwireAccount(ctx, s.db, accountID, serverID); err != nil {
+		return blackwireAccount{}, err
+	}
+	return readBlackwireAccount(ctx, s.db, accountID, serverID)
 }
 
 func classifyBlackwireOffer(item map[string]any) (int64, string, string) {
@@ -99,6 +194,9 @@ func classifyBlackwireOffer(item map[string]any) (int64, string, string) {
 }
 
 func (s *postgresStore) blackwireOffers(ctx context.Context, accountID, serverID string) (blackwireMarketplace, error) {
+	if err := ensureBlackwireAccount(ctx, s.db, accountID, serverID); err != nil {
+		return blackwireMarketplace{}, err
+	}
 	queryer, ok := s.db.(interface {
 		Query(context.Context, string, ...any) (pgx.Rows, error)
 	})
@@ -150,21 +248,28 @@ func (s *postgresStore) blackwireOffers(ctx context.Context, accountID, serverID
 	if err := rows.Err(); err != nil {
 		return blackwireMarketplace{}, err
 	}
+	result.Account, err = readBlackwireAccount(ctx, s.db, accountID, serverID)
+	if err != nil {
+		return blackwireMarketplace{}, err
+	}
 	return result, nil
 }
 
-func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, serverID, boardID, itemID string) (blackwireOffer, int64, error) {
+func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, serverID, boardID, itemID string) (blackwireOffer, blackwireAccount, error) {
 	transactional, ok := s.db.(interface {
 		Begin(context.Context) (pgx.Tx, error)
 	})
 	if !ok {
-		return blackwireOffer{}, 0, errors.New("blackwire transactions are unavailable")
+		return blackwireOffer{}, blackwireAccount{}, errors.New("blackwire transactions are unavailable")
 	}
 	tx, err := transactional.Begin(ctx)
 	if err != nil {
-		return blackwireOffer{}, 0, err
+		return blackwireOffer{}, blackwireAccount{}, err
 	}
 	defer tx.Rollback(ctx)
+	if err := ensureBlackwireAccount(ctx, tx, accountID, serverID); err != nil {
+		return blackwireOffer{}, blackwireAccount{}, err
+	}
 	var boardTitle string
 	var raw []byte
 	err = tx.QueryRow(ctx, `SELECT board.title, item.item_data
@@ -189,14 +294,14 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 			)
 		FOR UPDATE OF item`, serverID, accountID, boardID, itemID).Scan(&boardTitle, &raw)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return blackwireOffer{}, 0, errBlackwireUnavailable
+		return blackwireOffer{}, blackwireAccount{}, errBlackwireUnavailable
 	}
 	if err != nil {
-		return blackwireOffer{}, 0, err
+		return blackwireOffer{}, blackwireAccount{}, err
 	}
 	var item map[string]any
 	if err := json.Unmarshal(raw, &item); err != nil {
-		return blackwireOffer{}, 0, fmt.Errorf("decode discovered information: %w", err)
+		return blackwireOffer{}, blackwireAccount{}, fmt.Errorf("decode discovered information: %w", err)
 	}
 	price, category, companyID := classifyBlackwireOffer(item)
 	marketDelta := blackwireMarketDelta(category)
@@ -209,7 +314,7 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 			FROM worlds w LEFT JOIN world_city_generators city ON city.server_id=w.server_id
 			AND city.city_id=split_part(split_part($2,':',2),'/companies/',1)
 			WHERE w.server_id=$1::uuid`, serverID, companyID).Scan(&seed, &version); err != nil {
-			return blackwireOffer{}, 0, err
+			return blackwireOffer{}, blackwireAccount{}, err
 		}
 		if group, groupErr := world.CompanyRivalGroupFor(seed, version, companyID); groupErr == nil {
 			rivalIDs = make([]string, 0, len(group.CompanyIDs))
@@ -220,51 +325,58 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 			}
 		}
 	}
-	var balance int64
-	err = tx.QueryRow(ctx, `UPDATE player_economy SET credits_cents=credits_cents+$3, updated_at=now()
-		WHERE server_id=$1::uuid AND account_id=$2::uuid RETURNING credits_cents`, serverID, accountID, price).Scan(&balance)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return blackwireOffer{}, 0, ErrNoCharacter
-	}
+	_, err = tx.Exec(ctx, `UPDATE player_blackwire_accounts SET crypto_cents=crypto_cents+$3,
+		reputation=reputation+$4, updated_at=now() WHERE server_id=$1::uuid AND account_id=$2::uuid`,
+		serverID, accountID, price, blackwireReputationFor(category))
 	if err != nil {
-		return blackwireOffer{}, 0, err
+		return blackwireOffer{}, blackwireAccount{}, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE player_blackwire_accounts SET level=CASE
+		WHEN reputation>=900 THEN 5 WHEN reputation>=400 THEN 4 WHEN reputation>=150 THEN 3
+		WHEN reputation>=50 THEN 2 ELSE 1 END
+		WHERE server_id=$1::uuid AND account_id=$2::uuid`, serverID, accountID); err != nil {
+		return blackwireOffer{}, blackwireAccount{}, err
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO player_blackwire_sales(server_id,account_id,item_id,whiteboard_id,price_cents,category,company_id)
 		VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,NULLIF($7,''))`, serverID, accountID, itemID, boardID, price, category, companyID)
 	if err != nil {
-		return blackwireOffer{}, 0, err
+		return blackwireOffer{}, blackwireAccount{}, err
 	}
 	messageID := "blackwire-sale:" + itemID
 	title, _ := item["title"].(string)
-	body := fmt.Sprintf("The Blackwire exchange has completed the sale of %q. Credits received: CR %d.%02d. The information has been withdrawn from your boards and cannot be used as case evidence.",
+	body := fmt.Sprintf("The Blackwire exchange has completed the sale of %q. Crypto received: %d.%02d. The information has been withdrawn from your boards and cannot be used as case evidence.",
 		title, price/100, price%100)
 	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,sent_at,sender,message_category,subject,body,attachments)
 		VALUES($1::uuid,$2::uuid,$3,now(),'Blackwire Exchange','official','Blackwire sale · Settlement complete',$4,'[]'::jsonb)
 		ON CONFLICT(server_id,account_id,message_id) DO NOTHING`, serverID, accountID, messageID, body); err != nil {
-		return blackwireOffer{}, 0, err
+		return blackwireOffer{}, blackwireAccount{}, err
 	}
 	if companyID != "" && marketDelta != 0 {
 		if err := market.ApplyCompanyImpact(ctx, tx, serverID, marketEventID, companyID, "blackwire_leak", marketDelta, time.Now().UTC(), rivalIDs); err != nil {
-			return blackwireOffer{}, 0, err
+			return blackwireOffer{}, blackwireAccount{}, err
 		}
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM player_whiteboard_pins WHERE server_id=$1::uuid AND account_id=$2::uuid AND item_id=$3`, serverID, accountID, itemID); err != nil {
-		return blackwireOffer{}, 0, err
+		return blackwireOffer{}, blackwireAccount{}, err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM player_whiteboard_connections WHERE server_id=$1::uuid AND account_id=$2::uuid AND (from_item_id=$3 OR to_item_id=$3)`, serverID, accountID, itemID); err != nil {
-		return blackwireOffer{}, 0, err
+		return blackwireOffer{}, blackwireAccount{}, err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE player_discovered_items SET item_data=item_data || '{"blackwireSold":true}'::jsonb WHERE server_id=$1::uuid AND account_id=$2::uuid AND item_id=$3`, serverID, accountID, itemID); err != nil {
-		return blackwireOffer{}, 0, err
+		return blackwireOffer{}, blackwireAccount{}, err
+	}
+	updatedAccount, err := readBlackwireAccount(ctx, tx, accountID, serverID)
+	if err != nil {
+		return blackwireOffer{}, blackwireAccount{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return blackwireOffer{}, 0, err
+		return blackwireOffer{}, blackwireAccount{}, err
 	}
 	offer := blackwireOffer{BoardID: boardID, BoardTitle: boardTitle, ItemID: itemID, PriceCents: price, Category: category, CompanyID: companyID}
 	offer.Source, _ = item["source"].(string)
 	offer.Title, _ = item["title"].(string)
 	offer.Content, _ = item["content"].(string)
-	return offer, balance, nil
+	return offer, updatedAccount, nil
 }
 
 func blackwireMarketDelta(category string) int {
