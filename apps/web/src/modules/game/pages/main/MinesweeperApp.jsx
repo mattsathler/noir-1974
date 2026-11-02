@@ -3,11 +3,13 @@ import { Bomb } from "pixelarticons/react/Bomb";
 import { Flag } from "pixelarticons/react/Flag";
 import "./MinesweeperApp.css";
 
-const SIZE = 9;
-const MINES = 10;
+export const MINESWEEPER_SIZE = 9;
+export const MINESWEEPER_MINES = 10;
+const SIZE = MINESWEEPER_SIZE;
+const MINES = MINESWEEPER_MINES;
 const emptyBoard = () => Array.from({ length: SIZE * SIZE }, () => ({ revealed: false, flagged: false, mine: false, adjacent: 0 }));
 
-function buildBoard(safeIndex) {
+export function buildBoard(safeIndex) {
   const board = emptyBoard();
   const candidates = board.map((_, index) => index).filter((index) => index !== safeIndex);
   for (let index = candidates.length - 1; index > 0; index -= 1) {
@@ -22,7 +24,7 @@ function buildBoard(safeIndex) {
   return board;
 }
 
-function neighbors(index) {
+export function neighbors(index) {
   const row = Math.floor(index / SIZE);
   const col = index % SIZE;
   const result = [];
@@ -35,7 +37,7 @@ function neighbors(index) {
   return result;
 }
 
-function revealArea(board, startIndex) {
+export function revealArea(board, startIndex) {
   const next = board.map((cell) => ({ ...cell }));
   const pending = [startIndex];
   const visited = new Set();
@@ -139,6 +141,7 @@ export default function MinesweeperApp() {
           onKeyDown={(event) => {
             if (event.key.startsWith("Arrow")) { event.preventDefault(); moveFocus(index, event.key); }
             else if (event.key.toLowerCase() === "f") { event.preventDefault(); toggleFlag(index); }
+            else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); reveal(index); }
           }}
         >{cell.flagged ? <Flag className="minesweeper-app__flag" aria-hidden="true" /> : cell.revealed ? cell.mine ? <Bomb className="minesweeper-app__bomb" aria-hidden="true" /> : cell.adjacent || "" : ""}</button>;
       })}

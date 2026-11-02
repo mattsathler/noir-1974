@@ -1,6 +1,6 @@
 import InstitutionalWebsiteFrame from "./InstitutionalWebsiteFrame.jsx";
 
-export default function MeridianEnterprisesWebsite({ location, countryName }) {
+export default function MeridianEnterprisesWebsite({ location, countryName, onOpenLoreBlog }) {
   return (
     <InstitutionalWebsiteFrame variant="gate" footerContent={<>Meridian Enterprises · {location || countryName || "National Relay"} · Corporate information service</>}>
       <main className="meridian-enterprises">
@@ -11,7 +11,7 @@ export default function MeridianEnterprisesWebsite({ location, countryName }) {
         <div className="meridian-enterprises__columns">
           <section className="meridian-enterprises__divisions" aria-labelledby="enterprise-divisions-title">
             <h2 id="enterprise-divisions-title">Our divisions</h2>
-            <article><p>TRANSIT NETWORK</p><h3>GATE</h3><span>The General Access Transit Exchange links cities through Meridian relay stations. Access logs require an authorized terminal application.</span></article>
+            <article><p>TRANSIT NETWORK</p><h3>GATE</h3><span>The General Access Transit Exchange links cities through Meridian relay stations. Access logs require an authorized terminal application.</span><button type="button" onClick={onOpenLoreBlog}>Read the Meridian Transit Journal »</button></article>
             <article><p>PERSONAL COMPUTING</p><h3>Meridian OS</h3><span>The operating environment used by homes, offices and public terminals across the connected world.</span></article>
             <article><p>GLOBAL INFRASTRUCTURE</p><h3>Meridian Relay</h3><span>Postal, records and information services delivered through a dependable national network.</span></article>
           </section>

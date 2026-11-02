@@ -30,6 +30,8 @@ import AccusationWindow from "./AccusationWindow.jsx";
 import LegacyCountryPortal from "./LegacyCountryPortal.jsx";
 import PoliceWebsite from "./PoliceWebsite.jsx";
 import InstitutionalWebsiteFrame from "./InstitutionalWebsiteFrame.jsx";
+import LoreBlogWebsite from "./LoreBlogWebsite.jsx";
+import { loreProgramForSite } from "./lorePublications.js";
 import HospitalWebsite from "./HospitalWebsite.jsx";
 import BankWebsite from "./BankWebsite.jsx";
 import StockExchangeApp from "./StockExchangeApp.jsx";
@@ -170,6 +172,7 @@ function programsFor(facilityContext) {
 function institutionalVariant(programId) {
   if (programId === "person-search") return "police";
   if (programId === "meridian-enterprises") return "gate";
+  if (programId.startsWith("lore-")) return "lore";
   if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports", "interpol", "emails", "warrant-request"].includes(programId)) return "police";
   if (programId === "patient-search") return "hospital";
   if (programId === "hospital-patient-record") return "hospital";
@@ -183,6 +186,7 @@ function institutionalVariant(programId) {
 }
 
 function siteProviderIndex(programId) {
+  if (programId.startsWith("lore-")) return 2;
   if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports", "interpol", "person-search", "warrant-request"].includes(programId)) return 0;
   if (["newspaper", "personal-mail", "mail-compose", "emails", "hospital-website", "patient-search", "hospital-patient-record"].includes(programId)) return 1;
   if (["meridian-enterprises", "gate-records", "bank-records"].includes(programId)) return 2;
@@ -200,7 +204,8 @@ function networkSiteAddress(program, countryId, path = "") {
   const countryHash = [...(countryId || "fr")].reduce((total, character) => total + character.charCodeAt(0), 0);
   const ip = `123.223.${40 + (countryHash % 180)}.${providerIndex * 2 + 1}`;
   const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
-  return `merid//${providerHosts[providerIndex]}.${ip}:4000/${normalizedPath}`;
+  const siteHost = program.id.startsWith("lore-") ? program.siteSlug || program.id.replace("lore-", "") : providerHosts[providerIndex];
+  return `merid//${siteHost}.${ip}:4000/${normalizedPath}`;
 }
 
 function browserAddress(program, facilityContext, cityId) {
@@ -208,6 +213,7 @@ function browserAddress(program, facilityContext, cityId) {
   if (program.id === "web-browser") return networkSiteAddress(program, countryId, `portal/${countryId}`);
   if (program.id === "newspaper") return networkSiteAddress(program, countryId);
   if (program.id === "meridian-enterprises") return networkSiteAddress(program, countryId);
+  if (program.id.startsWith("lore-")) return networkSiteAddress(program, countryId, `web-logs/${program.siteSlug || program.id.replace("lore-", "")}`);
   if (program.id === "gate-records") return networkSiteAddress(program, countryId, "gate/access-logs");
   if (program.id === "deep-link") return networkSiteAddress(program, countryId, program.linkId || "");
   if (["hospital-website", "patient-search", "hospital-patient-record"].includes(program.id)) {
@@ -638,6 +644,25 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
     setWindows((previous) => [...previous, { id, program, zIndex, position }]);
   }
 
+  function navigateLoreLink(target, sourceWindowId) {
+    const destination = target === "hub"
+      ? WEB_BROWSER_PROGRAM
+      : loreProgramForSite(target) || programs.find((item) => item.id === target) || { id: target, label: target.replaceAll("-", " ").toUpperCase(), state: "ONLINE", available: true };
+    if (persistent) {
+      launchProgram(destination, sourceWindowId);
+      return;
+    }
+    const current = windows.find((item) => item.id === sourceWindowId);
+    if (!current) {
+      launchProgram(destination, sourceWindowId);
+      return;
+    }
+    const zIndex = nextZIndexRef.current++;
+    setWindows((previous) => previous.map((item) => item.id === sourceWindowId
+      ? { ...item, program: destination, zIndex, history: [...(item.history || []), item.program] }
+      : item));
+  }
+
   function goBackInBrowser(windowId) {
     const current = windows.find((item) => item.id === windowId);
     const previousProgram = current?.history?.at(-1) || WEB_BROWSER_PROGRAM;
@@ -874,7 +899,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                       : program.id === "newspaper"
                         ? <NewspaperWindow cityId={cityId} issueDay={issueDay} embedded />
                       : program.id === "meridian-enterprises"
-                        ? <MeridianEnterprisesWebsite location={location} countryName={countryName} />
+                        ? <MeridianEnterprisesWebsite location={location} countryName={countryName} onOpenLoreBlog={() => navigateLoreLink("lore-gate-journal", id)} />
+                      : program.id.startsWith("lore-")
+                        ? <LoreBlogWebsite blogId={program.blogId} onNavigate={(target) => navigateLoreLink(target, id)} />
                       : program.id === "hospital-website"
                         ? <HospitalWebsite service={program.service} onConnect={onOpenService} />
                       : program.id === "bank-website"

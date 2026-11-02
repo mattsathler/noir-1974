@@ -52,6 +52,15 @@ describe("ComputerDesktop boot sequence", () => {
 });
 
 describe("ComputerDesktop window minimization", () => {
+  it("opens Minesweeper as a personal desktop app with an accessible board", async () => {
+    sessionStorage.setItem("noir:computer:booted-this-login", "true");
+    render(<ComputerDesktop persistent facilityContext={{ kind: "personal", label: "MERID_OS PERSONAL COMPUTER" }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "MINESWEEPER application, READY" }));
+    expect(await screen.findByRole("grid", { name: "Minesweeper board, 9 rows by 9 columns" })).toBeInTheDocument();
+    expect(screen.getByRole("gridcell", { name: "Row 1, column 1: Covered" })).toHaveAttribute("tabindex", "0");
+  });
+
   it("keeps a window mounted and restores its content and position; closing stays in the window", async () => {
     sessionStorage.setItem("noir:computer:booted-this-login", "true");
     sessionStorage.setItem("noir:computer:windows", JSON.stringify({

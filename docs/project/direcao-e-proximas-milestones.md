@@ -45,9 +45,9 @@ O modelo de personagem por mundo/servidor ainda precisa de decisão formal. Ante
 
 ## Direção para as próximas milestones
 
-As próximas milestones devem desenvolver a lore do universo e apresentá-la ao jogador por sistemas que já fazem parte da rotina — principalmente emails, diálogos, casos, jornal, websites e relações com NPCs. Explorar deve ser recompensante: fuçar páginas, sistemas e conteúdo opcional pode revelar lore, contexto investigativo e recompensas da economia do jogo. Essas recompensas devem refletir o mundo e respeitar o saldo isolado por personagem/servidor, sem transformar a investigação numa sequência de acusações idênticas.
+As próximas milestones devem desenvolver a lore do universo e apresentá-la ao jogador por sistemas que já fazem parte da rotina — principalmente emails, diálogos, casos, jornal, websites e relações com NPCs. Sites secundários serão conteúdo opcional de lore: vão contar a criação do GATE, apresentar melhor os personagens principais e aprofundar Adrian Voss, sem conceder Credits ou progresso mecânico.
 
-A M29 inicia essa direção com atividades opcionais nos websites e Campo Minado no computador pessoal. Seu escopo base usa Credits fictícios e surveys diegéticos sem coleta externa; pagamentos em dinheiro real, anúncios de terceiros ou surveys comerciais exigem decisão e escopo separados antes de qualquer implementação.
+A M29 segue essa direção com 20 sites fixos e independentes espalhados pela web, como blogs e publicações com vozes próprias. Eles contam partes diferentes da lore e se conectam ao hub do diretório nacional por deeplinks, sem concentrar tudo em um portal único. Campo Minado permanece opcional, sem recompensas econômicas ou progresso de caso.
 
 A M30 introduz a Blackwire, rede clandestina criada por The Crow. A primeira etapa será vender post-its dos whiteboards por Credits. A venda inutiliza permanentemente a anotação como prova; dados triviais valem muito pouco, enquanto evidências de casos, finanças e liderança corporativa podem valer mais e provocar exposição pública, impacto na bolsa e cobertura jornalística conforme a gravidade.
 

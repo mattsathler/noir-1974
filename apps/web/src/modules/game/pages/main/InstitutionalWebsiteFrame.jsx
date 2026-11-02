@@ -5,6 +5,7 @@ const SITE_IDENTITIES = {
   gate: { title: "Meridian Enterprises", short: "MERIDIAN ENTERPRISES", subtitle: "GLOBAL SYSTEMS · TRANSIT · COMPUTING", symbol: "ME", status: "NATIONAL TECHNOLOGY NETWORK" },
   civic: { title: "Office of Civic Services", short: "CITY SERVICES", subtitle: "RESIDENT INFORMATION · MUNICIPAL OFFICES", symbol: "C", status: "MUNICIPAL INFORMATION EXCHANGE" },
   company: { title: "Meridian Global", short: "CORPORATE DIRECTORY", subtitle: "COMPANY INFORMATION · EMPLOYMENT", symbol: "MG", status: "NATIONAL BUSINESS NETWORK" },
+  lore: { title: "Meridian Historical Archive", short: "HISTORICAL ARCHIVE", subtitle: "TRANSPORT · PUBLIC FIGURES · THE MODERN WORLD", symbol: "A", status: "PUBLIC REFERENCE COLLECTION" },
   mail: { title: "Meridian Personal Mail", short: "MAIL SERVICE", subtitle: "PRIVATE CORRESPONDENCE · ACCOUNT SERVICES", symbol: "✉", status: "PRIVATE MAIL SERVICE" },
 };
 
@@ -12,6 +13,10 @@ export function identityForWebsite(variant, organizationName = "") {
   const identity = SITE_IDENTITIES[variant] || SITE_IDENTITIES.company;
   if (variant === "hospital" && organizationName) {
     return { ...identity, title: organizationName, short: "HOSPITAL", status: "CITY MEDICAL NETWORK" };
+  }
+  if (variant === "lore" && organizationName) {
+    const symbol = organizationName.split(/\s+/u).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+    return { ...identity, title: organizationName, short: organizationName.toUpperCase(), symbol, status: "INDEPENDENT PUBLICATION" };
   }
   return variant === "company" && organizationName
     ? { ...identity, title: organizationName, short: "COMPANY WEBSITE", status: "PUBLIC COMPANY INFORMATION" }
@@ -25,7 +30,7 @@ export default function InstitutionalWebsiteFrame({ variant, organizationName = 
       <header className="institutional-site__masthead">
         <span className="institutional-site__symbol" aria-hidden="true">{identity.symbol}</span>
         <span className="institutional-site__identity"><strong>{identity.title}</strong><small>{identity.subtitle}</small></span>
-        <span className="institutional-site__status">{identity.status}<br />Established 1948 · National Relay</span>
+        <span className="institutional-site__status">{identity.status}<br />{variant === "lore" ? "Public web publication · National Relay" : "Established 1948 · National Relay"}</span>
       </header>
       <nav className="institutional-site__nav" aria-label={`${identity.title} website sections`}>
         <a href={variant === "hospital" ? "#hospital-home" : "#institutional-content"} onClick={onHome ? (event) => { event.preventDefault(); onHome(); } : undefined}>HOME</a>

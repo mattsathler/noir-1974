@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { searchNationalCompanies } from "../../../world/api.js";
+import { LORE_PUBLICATIONS, chooseLorePublications, loreProgramForSite } from "./lorePublications.js";
 
 const PORTAL_INTRO = "NATIONAL DIRECTORY · MERIDIAN RELAY";
 
@@ -10,6 +11,7 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
   const [searchMessage, setSearchMessage] = useState(initialCompanies.length ? "COMPANY LISTINGS RESTORED" : "");
   const [searching, setSearching] = useState(false);
   const [openingCompanyId, setOpeningCompanyId] = useState("");
+  const [readingDesk] = useState(() => chooseLorePublications(LORE_PUBLICATIONS, 3));
   const cityName = location?.split(",")[0]?.trim() || "Connected City";
   const serviceCityId = cityId === "fr/lyon" ? "lyon" : cityId;
   const policeProgram = programs.find((site) => site.id === "police-website") || { id: "police-website", Icon: null, state: "ONLINE", available: true };
@@ -38,9 +40,12 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
     available: true,
   };
   const emailSite = { ...emailProgram, label: "MERIDIAN EMAIL", available: true };
-  const directorySites = [hospitalSite, policeSite, bankSite, enterpriseSite, emailSite];
+  const coreDirectorySites = [hospitalSite, policeSite, bankSite, enterpriseSite, emailSite];
+  const directorySites = coreDirectorySites;
   const openSite = (site) => navigate(site);
-  const visibleDirectorySites = directorySites.filter((site) => `${site.label} ${portalDescription(site.id)}`.toLocaleLowerCase().includes(appliedSearch.trim().toLocaleLowerCase()));
+  const matchesDirectorySearch = (site) => `${site.label} ${site.description || portalDescription(site.id)}`.toLocaleLowerCase().includes(appliedSearch.trim().toLocaleLowerCase());
+  const visibleCoreSites = coreDirectorySites.filter(matchesDirectorySearch);
+  const visibleDirectorySites = visibleCoreSites;
 
   async function submitSearch(event) {
     event.preventDefault();
@@ -86,21 +91,21 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
         <div className="legacy-site__masthead-note"><strong>{countryName || "COUNTRY PORTAL"}</strong><br />{location || "RELAY REGION NOT SET"}<br />Updated Thursday, 29 October</div>
       </header>
       <nav className="legacy-site__toplinks" aria-label="Portal sections">
-        <span>HOME</span><a href="#sites">NATIONAL DIRECTORY</a><a href="#health">HOSPITALS &amp; CARE</a><a href="#notices">NOTICES</a><a href="#help">HELP</a>
+        <span>HOME</span><a href="#sites">NATIONAL DIRECTORY</a><a href="#reading-desk">FROM THE RELAY</a><a href="#health">HOSPITALS &amp; CARE</a><a href="#notices">NOTICES</a><a href="#help">HELP</a>
       </nav>
       <div className="legacy-site__layout">
         <aside className="legacy-site__sidebar">
-          <section><h2>QUICK LINKS</h2><ul>{directorySites.map((site) => <li key={site.id}><button type="button" onClick={() => openSite(site)}>{site.label}</button></li>)}</ul></section>
+          <section><h2>QUICK LINKS</h2><ul>{coreDirectorySites.map((site) => <li key={site.id}><button type="button" onClick={() => openSite(site)}>{site.label}</button></li>)}</ul></section>
           <section className="legacy-site__ad legacy-site__ad--small"><b>LECLERC<br />TYPEWRITER CO.</b><span>New ribbons in stock.<br />Ask for the detective's discount.</span><small>ADVERTISEMENT · 14</small></section>
           <section><h2>ON THIS PAGE</h2><ul><li><a href="#notices">Notices</a></li><li><a href="#services">Government</a></li><li><a href="#help">Contact the directory</a></li></ul></section>
         </aside>
         <div className="legacy-site__main-column">
           <section className="legacy-site__welcome">
             <div><p className="legacy-site__eyebrow">{PORTAL_INTRO}</p><h1>Welcome to {countryName || "the national network"}</h1><p>Find national companies, city institutions, records and services connected through the Meridian relay.</p></div>
-            <div className="legacy-site__welcome-links"><b>NATIONAL WEBSITES</b>{directorySites.map((site) => <button key={site.id} type="button" onClick={() => openSite(site)}>{site.label}</button>)}</div>
+            <div className="legacy-site__welcome-links"><b>NATIONAL WEBSITES</b>{coreDirectorySites.map((site) => <button key={site.id} type="button" onClick={() => openSite(site)}>{site.label}</button>)}<a href="#reading-desk">From the relay »</a></div>
           </section>
           <section className="legacy-site__section" id="sites"><h2>National directory</h2><p className="legacy-site__section-lead">Browse institutions and businesses by category. Protected records require an authorized connection.</p>
-            <div className="legacy-portal__directory">{visibleDirectorySites.map((site) => <article id={site.id === "hospital-website" ? "health" : undefined} key={site.id} className="legacy-portal__listing"><h3><button type="button" onClick={() => openSite(site)}>{site.label} »</button></h3><p>{portalDescription(site.id)}</p></article>)}</div>
+            <div className="legacy-portal__directory">{visibleCoreSites.map((site) => <article id={site.id === "hospital-website" ? "health" : undefined} key={site.id} className="legacy-portal__listing"><h3><button type="button" onClick={() => openSite(site)}>{site.label} »</button></h3><p>{portalDescription(site.id)}</p></article>)}</div>
             {searchMessage && <p className="legacy-portal__search-status" role="status" aria-live="polite">{searchMessage}</p>}
             {companyResults.length > 0 && <div className="legacy-portal__company-results" aria-label="National company websites">
               {companyResults.map((record) => <article className="legacy-portal__company-result" key={record.company.id}>
@@ -112,6 +117,21 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
               </article>)}
             </div>}
             {!searching && appliedSearch.trim() && !companyResults.length && !visibleDirectorySites.length && searchMessage.startsWith("NO MATCHING") && <p className="legacy-portal__no-results">No directory listings match “{appliedSearch}”.</p>}
+          </section>
+          <section className="legacy-site__section legacy-portal__reading-desk" id="reading-desk">
+            <p className="legacy-site__eyebrow">FROM THE NATIONAL RELAY</p>
+            <h2>Reading desk</h2>
+            <p className="legacy-site__section-lead">Notes and opinions currently making their way across the network.</p>
+            <div className="legacy-portal__reading-grid">
+              {readingDesk.map((publication) => (
+                <article className="legacy-portal__reading-card" key={publication.id}>
+                  <small>{publication.name} · {publication.category}</small>
+                  <h3>{publication.headline}</h3>
+                  <p>{publication.articles[0].text[0]}</p>
+                  <a href={`#${publication.slug}`} onClick={(event) => { event.preventDefault(); openSite(loreProgramForSite(publication.id)); }}>Read the article »</a>
+                </article>
+              ))}
+            </div>
           </section>
           <div className="legacy-site__columns">
             <section id="notices" className="legacy-site__notice"><h2>Bulletin board</h2><ul><li><b>29 Oct</b> — Regional relay maintenance is scheduled after midnight.</li><li><b>28 Oct</b> — Municipal offices will observe the Armistice Day schedule.</li><li><b>24 Oct</b> — Police department publishes updated public records guidance.</li></ul><button type="button" onClick={() => policeSite && openSite(policeSite)}>Read department announcements »</button></section>
