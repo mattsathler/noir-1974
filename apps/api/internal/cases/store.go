@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"sort"
@@ -3367,6 +3368,7 @@ WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3`
 // resolveAccusation delivers the delayed review based on the immutable board snapshot.
 func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, accountID, requestID string, request accusationPayload, now time.Time) (AccusationResult, error) {
 	if err := store.validateAccusationCrimeSnapshot(ctx, serverID, request, now); err != nil {
+		log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q case_id=%q stage=validate_snapshot error=%q", requestID, serverID, accountID, request.BoardID, request.CaseID, err.Error())
 		return AccusationResult{}, err
 	}
 	if len(request.AccusedIDs) > 0 {
@@ -3384,6 +3386,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 	}
 	const genericFailure = "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant."
 	if request.CaseID == "" {
+		log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q stage=case_match result=no_matching_case accused_id=%q accused_ids=%q victim_id=%q proof_ids=%q", requestID, serverID, accountID, request.BoardID, request.AccusedID, request.AccusedIDs, request.VictimID, request.ProofIDs)
 		messageID := "accusation:" + requestID
 		if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
 			VALUES($1::uuid,$2::uuid,$3,NULL,$4,'Accusation review · Case decision',$5,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, messageID, now.UTC(), genericFailure+billDispatchPostscript(requestID)); err != nil {
@@ -3426,6 +3429,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		return AccusationResult{}, err
 	}
 	if caseStatus != "open" {
+		log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q case_id=%q stage=case_state case_status=%q result=case_not_open", requestID, serverID, accountID, request.BoardID, request.CaseID, caseStatus)
 		if _, err := tx.Exec(ctx, `INSERT INTO player_case_accusations(server_id,account_id,case_id,accused_npc_entity_id,board_id,crime_ids,accepted,outcome,created_at)
 			VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,false,'insufficient',$7) ON CONFLICT(server_id,account_id,case_id,accused_npc_entity_id) DO UPDATE SET board_id=EXCLUDED.board_id,crime_ids=EXCLUDED.crime_ids,accepted=false,outcome='insufficient',created_at=EXCLUDED.created_at`, serverID, accountID, request.CaseID, request.AccusedID, request.BoardID, request.CrimeIDs, now.UTC()); err != nil {
 			return AccusationResult{}, err
@@ -3442,54 +3446,64 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		}
 		return AccusationResult{Status: "completed"}, nil
 	}
-	var killerID, victimID string
-	if err := tx.QueryRow(ctx, `SELECT killer_entity_id,victim_entity_id FROM cases WHERE server_id=$1::uuid AND case_id=$2`, serverID, request.CaseID).Scan(&killerID, &victimID); err != nil {
+	var killerID, victimID, caseType, archetypeID string
+	var generatorVersion int
+	if err := tx.QueryRow(ctx, `SELECT killer_entity_id,victim_entity_id,case_type,archetype_id,generator_version FROM cases WHERE server_id=$1::uuid AND case_id=$2`, serverID, request.CaseID).Scan(&killerID, &victimID, &caseType, &archetypeID, &generatorVersion); err != nil {
 		return AccusationResult{}, err
 	}
 	var totalProofs int
 	var proofStrength float64
-	if err := tx.QueryRow(ctx, `SELECT count(*),
-		COALESCE(sum(CASE
-			WHEN EXISTS (
-				SELECT 1 FROM case_activity_records a JOIN cases c USING(server_id,case_id)
+	var proofBreakdown []byte
+	if err := tx.QueryRow(ctx, `WITH proof_flags AS (
+		SELECT proof.item_id,
+			EXISTS (SELECT 1 FROM case_activity_records a JOIN cases c USING(server_id,case_id)
 				WHERE a.server_id=$1::uuid AND a.case_id=$2 AND a.record_id=proof.item_id
 				  AND ((a.source='bank' AND a.internal_relation='extortion_payment')
 				    OR (a.source='gate' AND a.internal_relation IN ('scene-victim','scene-killer','scene-killer-exit'))
-				    OR (c.generator_version<4 AND c.archetype_id='financial_extortion' AND a.internal_relation IN ('extortion_payment','precrime_route')))
-			) THEN 1.0
-			WHEN EXISTS (
-				SELECT 1 FROM cases c JOIN player_search_warrants w ON w.server_id=c.server_id AND w.city_id=c.city_id AND w.target_npc_id=c.killer_entity_id
+				    OR (c.generator_version<4 AND c.archetype_id='financial_extortion' AND a.internal_relation IN ('extortion_payment','precrime_route')))) AS extortion_or_scene_activity,
+			EXISTS (SELECT 1 FROM cases c JOIN player_search_warrants w ON w.server_id=c.server_id AND w.city_id=c.city_id AND w.target_npc_id=c.killer_entity_id
 				JOIN player_inbox_messages m ON m.server_id=w.server_id AND m.account_id=w.account_id AND m.warrant_id=w.warrant_id
 				CROSS JOIN LATERAL jsonb_array_elements(m.attachments) AS attachment(item)
 				WHERE c.server_id=$1::uuid AND c.case_id=$2 AND m.account_id=$3::uuid AND attachment.item->>'id'=proof.item_id
-				  AND attachment.item->>'kind'='weapon'
-			) THEN 0.75
-			WHEN EXISTS (
-				SELECT 1 FROM case_activity_records a
-				WHERE a.server_id=$1::uuid AND a.case_id=$2 AND a.record_id=proof.item_id
-				  AND a.source='gate' AND a.internal_relation IN ('affair-victim','affair-paramour')
-			) THEN 0.75
-			WHEN EXISTS (
-				SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
+				  AND attachment.item->>'kind'='weapon') AS weapon_attachment,
+			EXISTS (SELECT 1 FROM case_activity_records a WHERE a.server_id=$1::uuid AND a.case_id=$2 AND a.record_id=proof.item_id
+				AND a.source='gate' AND a.internal_relation IN ('affair-victim','affair-paramour')) AS affair_gate_activity,
+			EXISTS (SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
 				WHERE e.server_id=$1::uuid AND e.case_id=$2 AND e.evidence_id=proof.item_id
 				  AND ((c.archetype_id IN ('workplace_conflict','serial_killer') AND e.evidence_type='office_log')
-				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='travel_register'))
-			) THEN 1.0
-			WHEN EXISTS (
-				SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
+				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='travel_register'))) AS strong_case_evidence,
+			EXISTS (SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
 				WHERE e.server_id=$1::uuid AND e.case_id=$2 AND e.evidence_id=proof.item_id
 				  AND ((c.archetype_id='workplace_conflict' AND e.evidence_type='meeting_minutes')
 				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='account_record')
-				    OR (c.archetype_id IN ('jealousy','serial_killer') AND e.evidence_type IN ('letter_fragment','witness_statement')))
-			) THEN 0.75
-			WHEN EXISTS (
-				SELECT 1 FROM case_mail_messages m JOIN cases c USING(server_id,case_id)
+				    OR (c.archetype_id IN ('jealousy','serial_killer') AND e.evidence_type IN ('letter_fragment','witness_statement')))) AS supporting_case_evidence,
+			EXISTS (SELECT 1 FROM case_mail_messages m JOIN cases c USING(server_id,case_id)
 				WHERE m.server_id=$1::uuid AND m.case_id=$2 AND m.message_id=proof.item_id
-				  AND m.internal_relation IN ('anonymous_warning','anonymous_followup','killer_remorse','jealousy_exchange','case_correspondence')
-			) THEN CASE WHEN EXISTS (SELECT 1 FROM cases WHERE server_id=$1::uuid AND case_id=$2 AND generator_version>=4) THEN 0.75 ELSE 0.25 END
-			ELSE 0.0
-		END),0)::float8
-		FROM unnest($4::text[]) AS proof(item_id)`, serverID, request.CaseID, accountID, request.ProofIDs).Scan(&totalProofs, &proofStrength); err != nil {
+				  AND m.internal_relation IN ('anonymous_warning','anonymous_followup','killer_remorse','jealousy_exchange','case_correspondence')) AS case_correspondence,
+			EXISTS (SELECT 1 FROM cases WHERE server_id=$1::uuid AND case_id=$2 AND generator_version>=4) AS current_generator
+		FROM unnest($4::text[]) AS proof(item_id)
+	), proof_evaluations AS (
+		SELECT item_id,
+			CASE WHEN extortion_or_scene_activity THEN 1.0
+				WHEN weapon_attachment THEN 0.75
+				WHEN affair_gate_activity THEN 0.75
+				WHEN strong_case_evidence THEN 1.0
+				WHEN supporting_case_evidence THEN 0.75
+				WHEN case_correspondence AND current_generator THEN 0.75
+				WHEN case_correspondence THEN 0.25
+				ELSE 0.0 END AS strength,
+			CASE WHEN extortion_or_scene_activity THEN 'case_activity_record'
+				WHEN weapon_attachment THEN 'weapon_attachment'
+				WHEN affair_gate_activity THEN 'affair_gate_activity'
+				WHEN strong_case_evidence THEN 'strong_case_evidence'
+				WHEN supporting_case_evidence THEN 'supporting_case_evidence'
+				WHEN case_correspondence THEN 'case_correspondence'
+				ELSE 'unmatched_or_context_only' END AS classification
+		FROM proof_flags
+	)
+	SELECT count(*)::integer, COALESCE(sum(strength),0)::float8,
+		COALESCE(jsonb_agg(jsonb_build_object('item_id',item_id,'classification',classification,'strength',strength) ORDER BY item_id),'[]'::jsonb)
+	FROM proof_evaluations`, serverID, request.CaseID, accountID, request.ProofIDs).Scan(&totalProofs, &proofStrength, &proofBreakdown); err != nil {
 		return AccusationResult{}, err
 	}
 	// Authenticated case evidence has different probative strength. Context-only pins
@@ -3507,13 +3521,13 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 	correctAccused := request.AccusedID == killerID && victimMatches
 	chance := accusationChance(correctAccused, totalProofs, proofStrength)
 	// The deterministic review roll is useful while the submitted material is
-	// inconclusive, but a board with several authenticated clues
-	// must not fail because its final roll happened to land on the 1% edge of
-	// the capped chance. Three strength points require corroboration across
-	// multiple case records (for example, a remittance, a related message, and a
-	// GATE entry) and still require the correct accused person and victim.
-	corroborated := correctAccused && proofStrength >= 3
+	// inconclusive, but a board with authenticated financial and scene records
+	// plus a related case message has met the corroboration threshold. This
+	// combination is worth 2.75 points (1 + 1 + 0.75) and still requires the
+	// correct accused person and victim.
+	corroborated := correctAccused && proofStrength >= 2.75
 	accepted := corroborated || accusationAccepted(serverID, accountID, request.CaseID, chance)
+	log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q case_id=%q case_status=%q case_type=%q archetype_id=%q generator_version=%d accused_id=%q killer_id=%q accused_matches_killer=%t victim_id=%q expected_victim_id=%q victim_matches=%t crime_ids=%q proof_count=%d proof_strength=%.2f chance=%d corroborated=%t accepted=%t proof_breakdown=%s", requestID, serverID, accountID, request.BoardID, request.CaseID, caseStatus, caseType, archetypeID, generatorVersion, request.AccusedID, killerID, request.AccusedID == killerID, request.VictimID, victimID, victimMatches, request.CrimeIDs, totalProofs, proofStrength, chance, corroborated, accepted, proofBreakdown)
 	outcome, subject, body := "insufficient", "Accusation review · Case decision", "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant."
 	if accepted {
 		outcome = "arrested"
@@ -3606,6 +3620,7 @@ func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, se
 		return AccusationResult{}, err
 	}
 	if caseStatus != "open" {
+		log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q case_id=%q case_status=%q route=participant result=case_not_open", requestID, serverID, accountID, request.BoardID, request.CaseID, caseStatus)
 		return complete("The case file is no longer open for further accusations. No additional arrest was made.", false)
 	}
 	uniqueIDs := make([]string, 0, len(request.AccusedIDs))
@@ -3621,6 +3636,7 @@ func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, se
 		uniqueIDs = append(uniqueIDs, npcID)
 	}
 	if len(uniqueIDs) == 0 || len(request.ProofIDs) == 0 {
+		log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q case_id=%q route=participant result=missing_accused_or_proof accused_ids=%q proof_ids=%q", requestID, serverID, accountID, request.BoardID, request.CaseID, uniqueIDs, request.ProofIDs)
 		return complete("The corporate review has concluded. The available material did not meet the standard for an arrest.", false)
 	}
 	var principalID string
@@ -3686,6 +3702,7 @@ func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, se
 		// authorize an arrest.
 		accepted := participantAccusationEligible(correctParticipant, alreadyArrested, relevantProofs) &&
 			(alreadyArrested || accusationAcceptedForParticipant(serverID, accountID, request.CaseID, npcID, chance))
+		log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q case_id=%q route=participant case_type=%q accused_id=%q principal_id=%q participant_role=%q correct_participant=%t victim_id=%q initial_victim_id=%q victim_matches=%t proof_ids=%q relevant_proofs=%d proof_strength=%.2f chance=%d already_arrested=%t accepted=%t", requestID, serverID, accountID, request.BoardID, request.CaseID, caseType, npcID, principalID, participantRole, correctParticipant, request.VictimID, initialVictimID, victimMatches, request.ProofIDs, relevantProofs, proofStrength, chance, alreadyArrested, accepted)
 		outcome := "insufficient"
 		if accepted {
 			outcome = "arrested"

@@ -96,9 +96,13 @@ func (store *PostgresStore) ProcessNextAsyncRequest(ctx context.Context, serverI
 		var payload accusationPayload
 		if err := json.Unmarshal(request.Payload, &payload); err != nil {
 			processingErr = err
+			log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q stage=decode_request error=%q", request.RequestID, serverID, request.AccountID, err.Error())
 		} else {
 			var result AccusationResult
 			result, processingErr = store.resolveAccusation(ctx, serverID, request.AccountID, request.RequestID, payload, time.Now().UTC())
+			if processingErr != nil {
+				log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q case_id=%q stage=resolve error=%q", request.RequestID, serverID, request.AccountID, payload.BoardID, payload.CaseID, processingErr.Error())
+			}
 			if processingErr == nil && result.Accepted && onAccusationAccepted != nil {
 				onAccusationAccepted(payload.CityID)
 			}
