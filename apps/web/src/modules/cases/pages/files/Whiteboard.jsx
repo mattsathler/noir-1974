@@ -132,6 +132,11 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
     function handleExternalBoardUpdate(event) {
       if (!board || event.detail?.boardId !== board.id) return;
       if (event.detail.status === "deleted") return;
+      if (event.detail.status === "sold") {
+        const itemID = event.detail.itemId;
+        if (itemID) setBoard((current) => current ? { ...current, pins: current.pins.filter((pin) => pin.id !== itemID), connections: current.connections.filter((edge) => edge.fromId !== itemID && edge.toId !== itemID) } : current);
+        return;
+      }
       if (event.detail.status) setSaveState(event.detail.status);
       const cached = getCachedWhiteboard(board.id);
       if (cached) setBoard((current) => {

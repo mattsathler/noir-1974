@@ -28,6 +28,9 @@ type arrestReader interface {
 type bodyDiscoveryReader interface {
 	ListPublicBodyDiscoveries(context.Context, string, string, time.Time) ([]cases.PublicBodyDiscovery, error)
 }
+type blackwireExposureReader interface {
+	ListPublicBlackwireExposures(context.Context, string, string) ([]cases.PublicBlackwireExposure, error)
+}
 
 type Service struct {
 	worlds worldReader
@@ -188,6 +191,30 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 		}
 		discoveries = openDiscoveries
 		articles = append(bodyArticles, articles...)
+	}
+	if reader, ok := service.cases.(blackwireExposureReader); ok {
+		exposures, err := reader.ListPublicBlackwireExposures(ctx, serverID, cityID)
+		if err != nil {
+			return Issue{}, fmt.Errorf("query severe information leaks for city %s: %w", cityID, err)
+		}
+		seenCompanies := make(map[string]bool)
+		for _, exposure := range exposures {
+			if seenCompanies[exposure.CompanyID] {
+				continue
+			}
+			seenCompanies[exposure.CompanyID] = true
+			name := "a local company"
+			for _, company := range local.Companies {
+				if company.ID == exposure.CompanyID {
+					name = company.Name
+					break
+				}
+			}
+			headline := fmt.Sprintf("Confidential records from %s appear on private network", name)
+			summary := fmt.Sprintf("Sensitive %s material linked to %s has surfaced through an illicit information exchange. The company has not confirmed the extent of the disclosure.", strings.ToLower(exposure.Category), name)
+			id := fmt.Sprintf("blackwire-leak-%s-%d", dateKey, exposure.OccurredAt.Unix())
+			articles = append([]Article{{ID: id, Section: "BUSINESS & COMMERCE", Headline: headline, Summary: summary}}, articles...)
+		}
 	}
 	activeCase, activeErr := service.cases.LatestPublicCase(ctx, serverID, cityID)
 	if activeErr != nil && !errors.Is(activeErr, cases.ErrCaseNotFound) {

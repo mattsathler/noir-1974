@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS company_market_events (
     server_id uuid NOT NULL,
     event_id text NOT NULL CHECK (event_id <> ''),
     company_id text NOT NULL CHECK (company_id <> ''),
-    event_type text NOT NULL CHECK (event_type IN ('workplace_conflict', 'financial_extortion')),
+    event_type text NOT NULL CHECK (event_type IN ('workplace_conflict', 'financial_extortion', 'blackwire_leak')),
     score_delta integer NOT NULL,
     score_before integer NOT NULL CHECK (score_before BETWEEN 500 AND 1500),
     score_after integer NOT NULL CHECK (score_after BETWEEN 500 AND 1500),
@@ -88,8 +88,26 @@ CREATE TABLE IF NOT EXISTS company_market_events (
     FOREIGN KEY (server_id, company_id)
         REFERENCES company_market_scores(server_id, company_id) ON DELETE CASCADE
 );
+ALTER TABLE company_market_events DROP CONSTRAINT IF EXISTS company_market_events_event_type_check;
+ALTER TABLE company_market_events ADD CONSTRAINT company_market_events_event_type_check
+    CHECK (event_type IN ('workplace_conflict', 'financial_extortion', 'blackwire_leak'));
 CREATE INDEX IF NOT EXISTS company_market_events_history_idx
     ON company_market_events(server_id, company_id, recorded_at DESC, event_id);
+
+CREATE TABLE IF NOT EXISTS player_blackwire_sales (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL REFERENCES player_accounts(id) ON DELETE CASCADE,
+    item_id text NOT NULL CHECK (item_id <> ''),
+    whiteboard_id text NOT NULL CHECK (whiteboard_id <> ''),
+    price_cents bigint NOT NULL CHECK (price_cents > 0),
+    category text NOT NULL CHECK (category <> ''),
+    company_id text,
+    sold_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, item_id),
+    FOREIGN KEY (server_id, account_id) REFERENCES player_economy(server_id, account_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS player_blackwire_sales_history_idx
+    ON player_blackwire_sales(server_id, account_id, sold_at DESC);
 ALTER TABLE player_characters ADD COLUMN IF NOT EXISTS visual_identity jsonb NOT NULL DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
 ALTER TABLE player_characters ALTER COLUMN visual_identity SET DEFAULT '{"hairId":"hair_short_brown","skinId":"skin_white","eyesId":"eyes_brown","faceId":"","beardId":"","accessoryIds":[]}'::jsonb;
 

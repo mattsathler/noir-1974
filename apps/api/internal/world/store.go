@@ -380,13 +380,14 @@ func (store *PostgresStore) Materialize(ctx context.Context, serverID, seed stri
 	for _, relationship := range generated.EmploymentRelationships {
 		employmentArgs = append(employmentArgs, []any{serverID, relationship.ID, relationship.EmployeeNPCID, relationship.EmployerCompanyID, relationship.Role})
 	}
+	// Company business-type catalog updates can revise generated job titles while
+	// keeping the deterministic employee/company relationship itself unchanged.
 	employmentIndex, err := execConsistentBatch(ctx, tx,
 		`INSERT INTO employment_relationships (server_id, relationship_id, employee_npc_id, employer_company_id, role)
 		 VALUES ($1::uuid, $2, $3, $4, $5)
 		 ON CONFLICT (server_id, relationship_id) DO UPDATE SET role = EXCLUDED.role
 		 WHERE employment_relationships.employee_npc_id = EXCLUDED.employee_npc_id
-		   AND employment_relationships.employer_company_id = EXCLUDED.employer_company_id
-		   AND employment_relationships.role IS NOT DISTINCT FROM EXCLUDED.role`, employmentArgs)
+		   AND employment_relationships.employer_company_id = EXCLUDED.employer_company_id`, employmentArgs)
 	if err != nil {
 		return fmt.Errorf("persist employment relationship %q: %w", generated.EmploymentRelationships[max(employmentIndex, 0)].ID, err)
 	}

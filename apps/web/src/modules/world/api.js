@@ -318,6 +318,14 @@ async function whiteboardRequest(path, options) {
   return apiRequest(path, options);
 }
 
+export async function getBlackwireMarket() {
+  return whiteboardRequest("/api/blackwire/market");
+}
+
+export async function sellBlackwireItem(boardId, itemId) {
+  return whiteboardRequest(`/api/blackwire/market/${encodeURIComponent(boardId)}/${encodeURIComponent(itemId)}/sell`, { method: "POST", pendingCursor: false });
+}
+
 const whiteboardCacheVersions = new Map();
 function readWhiteboardCache(key) {
   try {
@@ -354,7 +362,7 @@ function getWhiteboardSyncChannel() {
 }
 function announceWhiteboardUpdate(boardId, status) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("noir:whiteboard-updated", { detail: { boardId, status } }));
-  if (status === "saved" || status === "deleted" || status === "locked") {
+  if (status === "saved" || status === "deleted" || status === "locked" || status === "sold") {
     try { getWhiteboardSyncChannel()?.postMessage({ boardId, status }); } catch { /* Cross-tab sync is an enhancement; the API remains authoritative. */ }
   }
 }
@@ -362,7 +370,7 @@ export function subscribeWhiteboardUpdates(listener) {
   const channel = getWhiteboardSyncChannel();
   if (!channel) return () => {};
   const handleMessage = (event) => {
-    if (event.data?.boardId && ["saved", "deleted", "locked"].includes(event.data.status)) listener(event.data);
+    if (event.data?.boardId && ["saved", "deleted", "locked", "sold"].includes(event.data.status)) listener(event.data);
   };
   channel.addEventListener("message", handleMessage);
   return () => channel.removeEventListener("message", handleMessage);
@@ -372,6 +380,21 @@ function updateWhiteboardCache(boardId, update) {
   if (board) {
     writeWhiteboardCache(boardId, update(board));
     setWhiteboardSaveState(boardId, "saved");
+  }
+}
+
+export function markWhiteboardItemSold(itemId) {
+  const boards = readWhiteboardCache("list") ?? [];
+  for (const board of boards) {
+    const cached = readWhiteboardCache(board.id);
+    if (!cached?.pins?.some((pin) => pin.id === itemId)) continue;
+    writeWhiteboardCache(board.id, {
+      ...cached,
+      pins: cached.pins.filter((pin) => pin.id !== itemId),
+      connections: (cached.connections ?? []).filter((edge) => edge.fromId !== itemId && edge.toId !== itemId),
+    });
+    window.dispatchEvent(new CustomEvent("noir:whiteboard-updated", { detail: { boardId: board.id, status: "sold", itemId } }));
+    try { getWhiteboardSyncChannel()?.postMessage({ boardId: board.id, status: "sold", itemId }); } catch { /* Local API response remains authoritative. */ }
   }
 }
 

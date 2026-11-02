@@ -362,6 +362,10 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/pins/{itemID}", handler.removeWhiteboardPin)
 		mux.HandleFunc("POST /api/whiteboards/{boardID}/connections", handler.connectWhiteboardPins)
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/connections/{fromID}/{toID}", handler.disconnectWhiteboardPins)
+		if _, ok := handler.store.(blackwireStore); ok {
+			mux.HandleFunc("GET /api/blackwire/market", handler.blackwireMarket)
+			mux.HandleFunc("POST /api/blackwire/market/{boardID}/{itemID}/sell", handler.sellBlackwireOffer)
+		}
 	}
 	mux.HandleFunc("POST /api/characters", handler.createCharacter)
 	mux.HandleFunc("PUT /api/characters/appearance", handler.updateCharacterAppearance)

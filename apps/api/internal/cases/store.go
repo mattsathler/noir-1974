@@ -310,6 +310,39 @@ type PublicCase struct {
 	Crimes           []PublicCrime         `json:"crimes,omitempty"`
 }
 
+// PublicBlackwireExposure contains only a company's name and the public
+// consequences of a severe data leak; it never identifies the seller or source.
+type PublicBlackwireExposure struct {
+	CompanyID  string
+	Category   string
+	OccurredAt time.Time
+}
+
+func (store *PostgresStore) ListPublicBlackwireExposures(ctx context.Context, serverID, cityID string) ([]PublicBlackwireExposure, error) {
+	rows, err := store.db.Query(ctx, `SELECT DISTINCT event.company_id, sale.category, event.occurred_at
+		FROM company_market_events event
+		JOIN player_blackwire_sales sale ON sale.server_id=event.server_id
+			AND event.event_id='blackwire:' || sale.account_id::text || ':' || sale.item_id
+		WHERE event.server_id=$1::uuid AND event.event_type='blackwire_leak'
+			AND event.company_id LIKE '%' || $2 || '%'
+			AND event.recorded_at >= now() - interval '24 hours' AND event.recorded_at <= now()
+			AND sale.category IN ('FINANCIAL / CORPORATE EVIDENCE','EXECUTIVE FINANCIAL EVIDENCE','CORPORATE LEADERSHIP')
+		ORDER BY event.recorded_at DESC LIMIT 6`, serverID, cityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var exposures []PublicBlackwireExposure
+	for rows.Next() {
+		var exposure PublicBlackwireExposure
+		if err := rows.Scan(&exposure.CompanyID, &exposure.Category, &exposure.OccurredAt); err != nil {
+			return nil, err
+		}
+		exposures = append(exposures, exposure)
+	}
+	return exposures, rows.Err()
+}
+
 // PublicCrime contains only occurred events made discoverable through case evidence.
 // It intentionally omits participant identities and internal event relations.
 type PublicCrime struct {
@@ -3107,6 +3140,7 @@ func (store *PostgresStore) RecordDiscoveredItems(ctx context.Context, serverID,
 		`INSERT INTO player_discovered_items (server_id, account_id, item_id, item_source, item_data)
 		 SELECT $1::uuid, $2::uuid, item->>'id', item->>'source', item
 		 FROM jsonb_array_elements($3::jsonb) AS items(item)
+		 WHERE NOT EXISTS (SELECT 1 FROM player_blackwire_sales sale WHERE sale.server_id=$1::uuid AND sale.account_id=$2::uuid AND sale.item_id=item->>'id')
 		 ON CONFLICT (server_id, account_id, item_id) DO UPDATE
 		 SET item_source = EXCLUDED.item_source, item_data = EXCLUDED.item_data`,
 		serverID, accountID, string(data)); err != nil {
@@ -3189,7 +3223,9 @@ func (store *PostgresStore) GetWhiteboard(ctx context.Context, serverID, account
 		                           ORDER BY pin.pinned_at, pin.item_id)
 		          FROM player_whiteboard_pins pin
 		          JOIN player_discovered_items item USING (server_id, account_id, item_id)
+			          LEFT JOIN player_blackwire_sales sale USING (server_id, account_id, item_id)
 		          WHERE pin.server_id = board.server_id AND pin.account_id = board.account_id AND pin.whiteboard_id = board.whiteboard_id
+			            AND sale.item_id IS NULL
 		        ), '[]'::jsonb),
 		        COALESCE((
 		          SELECT jsonb_agg(jsonb_build_object('fromId', edge.from_item_id, 'toId', edge.to_item_id)
@@ -3769,6 +3805,7 @@ func (store *PostgresStore) PinDiscoveredItem(ctx context.Context, serverID, acc
 		`SELECT EXISTS (SELECT 1 FROM player_whiteboards WHERE server_id = $1::uuid AND account_id = $2::uuid AND whiteboard_id = $3),
 		        COALESCE((SELECT item_id FROM player_discovered_items
 		                  WHERE server_id = $1::uuid AND account_id = $2::uuid AND item_id = ANY($4::text[])
+		                    AND NOT EXISTS (SELECT 1 FROM player_blackwire_sales sale WHERE sale.server_id=$1::uuid AND sale.account_id=$2::uuid AND sale.item_id=player_discovered_items.item_id)
 		                  ORDER BY CASE WHEN item_id = $5 THEN 0 ELSE 1 END LIMIT 1), '')`,
 		serverID, accountID, boardID, itemIDs, itemID).Scan(&boardExists, &discoveredItemID); err != nil {
 		return err

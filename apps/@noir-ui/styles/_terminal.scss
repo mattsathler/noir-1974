@@ -2447,6 +2447,7 @@
   .stock-exchange__account-strip > div:nth-child(2) { border-right: 0; }
   .stock-exchange__table { min-width: 36rem; }
   .stock-exchange__table--market { min-width: 54rem; }
+  .stock-exchange__table--portfolio { min-width: 46rem; }
   .stock-exchange__pagination { align-items: flex-start; flex-direction: column; }
   .stock-exchange__search-form { width: 100%; margin-left: 0; }
   .stock-exchange__orders .stock-exchange__search { width: auto; min-width: 0; flex: 1; }

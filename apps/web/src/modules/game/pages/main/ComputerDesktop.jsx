@@ -33,6 +33,7 @@ import InstitutionalWebsiteFrame from "./InstitutionalWebsiteFrame.jsx";
 import HospitalWebsite from "./HospitalWebsite.jsx";
 import BankWebsite from "./BankWebsite.jsx";
 import StockExchangeApp from "./StockExchangeApp.jsx";
+import BlackwireWebsite from "./BlackwireWebsite.jsx";
 import MeridianEnterprisesWebsite from "./MeridianEnterprisesWebsite.jsx";
 import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx";
 import DeepLinkWebsite from "./DeepLinkWebsite.jsx";
@@ -102,6 +103,7 @@ const PROXY_PROGRAM = { id: "proxy", label: "ROGUE DNS", Icon: Wifi, state: "UNL
 const GHOSTKEY_PROGRAM = { id: "ghostkey", label: "GHOSTKEY.EXE", Icon: Bug, state: "READY", available: true };
 const EMAIL_BREAKER_PROGRAM = { id: "email-breaker", label: "EMAIL_BREAKER.EXE", Icon: Mail, state: "UNSIGNED", available: true };
 const BANKRUPT_PROGRAM = { id: "bankrupt", label: "BANKRUPT.EXE", Icon: Dollar, state: "UNSIGNED", available: true };
+const BLACKWIRE_PROGRAM = { id: "blackwire", label: "BLACKWIRE · INFORMATION MARKET", Icon: Wifi, state: "ONLINE", available: true, siteAddress: "merid/blackwire.local/market" };
 const PERSON_SEARCH_PROGRAM = { id: "person-search", label: "PERSON_SEARCH_APP.EXE", Icon: User, state: "PRIVILEGED", available: true };
 const PATIENT_SEARCH_PROGRAM = { id: "patient-search", label: "PATIENT_SEARCH_APP.EXE", Icon: Cross, state: "PRIVILEGED", available: true };
 const GATE_RECORDS_PROGRAM = { id: "gate-records", label: "GATE_ACCESS_LOG_APP.EXE", Icon: MapIcon, state: "PRIVILEGED", available: true };
@@ -827,7 +829,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "character-appearance"
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
                     : program.id === "terminal"
-                      ? <TerminalApp onRun={(programId) => launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : programId === "bankrupt" ? BANKRUPT_PROGRAM : EMAIL_BREAKER_PROGRAM)} />
+                      ? <TerminalApp onRun={(programId) => launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : programId === "bankrupt" ? BANKRUPT_PROGRAM : programId === "blackwire" ? BLACKWIRE_PROGRAM : EMAIL_BREAKER_PROGRAM)} />
                     : program.id === "ghostkey"
                       ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => openPatientSearchFromGhost(siteAddress, id)} onOpenGateRecords={(siteAddress) => openGateRecordsFromGhost(siteAddress, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
                       : program.id === "email-breaker"
@@ -842,6 +844,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                       ? <StockExchangeApp countryId={cityId?.split("/")[0] || ""} onProgressionChange={onProgressionChange} />
                     : program.id === "minesweeper"
                       ? <MinesweeperApp />
+                    : program.id === "blackwire"
+                      ? <BlackwireWebsite />
                     : program.id === "proxy"
                     ? <ProxyConnection
                         world={{ city: location?.split(",")[0], cityId, country: countryName }}

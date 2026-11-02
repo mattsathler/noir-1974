@@ -38,6 +38,9 @@ const COMMANDS = {
   "bankrupt.exe": { id: "bankrupt", label: "BANKRUPT.EXE", art: [
     "      .----------.", "   .--|  UNION   |--.", "  /   |  .----.  |   /", " |    |  |####|  |    |", " |    |  '----'  |    |", "  '---'----||----'---'", "   '------LOCK------'", "       BANK BREACH",
   ] },
+  "blackwire.exe": { id: "blackwire", label: "BLACKWIRE", art: [
+    "       .-----------.", "   .---| BLACKWIRE |---.", "  /    '-----+-----'    /", "       .----/ \\----.", "       |  .-----  |", "       '---+-----'", "          /", "      PRIVATE NETWORK",
+  ] },
 };
 
 export default function TerminalApp({ onRun }) {
@@ -75,7 +78,7 @@ export default function TerminalApp({ onRun }) {
     setHistoryIndex(-1);
 
     if (entered.toLowerCase() === "help") {
-      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                 Show this command list", "  RUN GHOSTKEY.EXE     Start Ghostkey", "  RUN MAILBREAKER.EXE  Start Email Breaker", "  RUN BANKRUPT.EXE     Start Bankrupt", ""]);
+      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                 Show this command list", "  RUN GHOSTKEY.EXE     Start Ghostkey", "  RUN MAILBREAKER.EXE  Start Email Breaker", "  RUN BANKRUPT.EXE     Start Bankrupt", "  RUN BLACKWIRE.EXE    Open Blackwire in Web Browser", ""]);
       return;
     }
 
