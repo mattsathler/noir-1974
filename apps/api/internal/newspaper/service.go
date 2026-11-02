@@ -203,16 +203,20 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 				continue
 			}
 			seenCompanies[exposure.CompanyID] = true
-			name := "a local company"
-			for _, company := range local.Companies {
-				if company.ID == exposure.CompanyID {
-					name = company.Name
-					break
+			headline := "Sensitive political papers circulate on a private network"
+			summary := "A collection of confidential correspondence has surfaced through an illicit exchange. Its authenticity is under review, and the source of the disclosure remains unknown."
+			if exposure.CompanyID != "" {
+				name := "a local company"
+				for _, company := range local.Companies {
+					if company.ID == exposure.CompanyID {
+						name = company.Name
+						break
+					}
 				}
+				headline = fmt.Sprintf("Confidential records from %s appear on private network", name)
+				summary = fmt.Sprintf("Sensitive %s material linked to %s has surfaced through an illicit information exchange. The company has not confirmed the extent of the disclosure.", strings.ToLower(exposure.Category), name)
 			}
-			headline := fmt.Sprintf("Confidential records from %s appear on private network", name)
-			summary := fmt.Sprintf("Sensitive %s material linked to %s has surfaced through an illicit information exchange. The company has not confirmed the extent of the disclosure.", strings.ToLower(exposure.Category), name)
-			id := fmt.Sprintf("blackwire-leak-%s-%d", dateKey, exposure.OccurredAt.Unix())
+			id := fmt.Sprintf("blackwire-leak-%s-%d-%s", dateKey, exposure.OccurredAt.Unix(), exposure.CompanyID)
 			articles = append([]Article{{ID: id, Section: "BUSINESS & COMMERCE", Headline: headline, Summary: summary}}, articles...)
 		}
 	}

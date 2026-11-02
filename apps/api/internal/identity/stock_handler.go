@@ -3,10 +3,12 @@ package identity
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"noir-1974/apps/api/internal/world"
@@ -21,7 +23,7 @@ type stockOrderWriter interface {
 }
 
 type marketSnapshotReader interface {
-	companyMarketSnapshots(context.Context, string, []string) (map[string]companyMarketSnapshot, error)
+	companyMarketSnapshots(context.Context, string, []string, map[string]marketMovement) (map[string]companyMarketSnapshot, error)
 }
 
 type marketHistoryReader interface {
@@ -66,6 +68,8 @@ func (h *Handler) stockMarket(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "MARKET_LIST_FAILED", "National company listings could not be loaded.", err)
 		return
 	}
+	rivalGroups := world.CompanyRivalGroups(city.CountryID, companyRecords(companies))
+	movements := rivalMarketMovements(h.worldServerID, rivalGroups, time.Now().UTC())
 	if query != "" {
 		filtered := companies[:0]
 		for _, record := range companies {
@@ -88,7 +92,7 @@ func (h *Handler) stockMarket(w http.ResponseWriter, r *http.Request) {
 	}
 	snapshots := map[string]companyMarketSnapshot{}
 	if marketReader, ok := h.store.(marketSnapshotReader); ok {
-		snapshots, err = marketReader.companyMarketSnapshots(r.Context(), h.worldServerID, companyIDs)
+		snapshots, err = marketReader.companyMarketSnapshots(r.Context(), h.worldServerID, companyIDs, movements)
 		if err != nil {
 			h.writeAPIError(w, r, http.StatusInternalServerError, "MARKET_QUOTE_FAILED", "Current market quotations could not be loaded.", err)
 			return
@@ -105,6 +109,8 @@ func (h *Handler) stockMarket(w http.ResponseWriter, r *http.Request) {
 			CountryID: city.CountryID, CityName: record.Address.City,
 			PriceCents:  applyMarketFactor(stockQuoteCents(city.CountryID, record.Company.ID, snapshot.Score), snapshot.MarketFactorBps),
 			MarketScore: applyMarketScoreFactor(snapshot.Score, snapshot.MarketFactorBps), ChangeBps: snapshot.ChangeBps, LastEventAt: snapshot.LastEventAt,
+			MarketFactorBps: snapshot.MarketFactorBps, MarketChangeBps: snapshot.MarketChangeBps,
+			MarketSourceCompanyID: snapshot.SourceCompanyID,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -233,6 +239,7 @@ func (h *Handler) stockPortfolio(w http.ResponseWriter, r *http.Request) {
 			countries[position.CountryID] = struct{}{}
 		}
 		companyNames := make(map[string]string, len(positions))
+		movements := make(map[string]marketMovement, len(positions))
 		for countryID := range countries {
 			companies, loadErr := index.CompanySitesInCountry(r.Context(), h.worldServerID, countryID)
 			if loadErr != nil {
@@ -242,8 +249,20 @@ func (h *Handler) stockPortfolio(w http.ResponseWriter, r *http.Request) {
 			for _, company := range companies {
 				companyNames[company.Company.ID] = company.Company.Name
 			}
+			countryMovements := rivalMarketMovements(h.worldServerID, world.CompanyRivalGroups(countryID, companyRecords(companies)), time.Now().UTC())
+			for companyID, movement := range countryMovements {
+				movements[companyID] = movement
+			}
 		}
 		for positionIndex := range positions {
+			movement := movements[positions[positionIndex].CompanyID].forAnchor(positions[positionIndex].CompanyID, positions[positionIndex].MarketSourceCompanyID)
+			baseScore := positions[positionIndex].MarketScore
+			positions[positionIndex].ChangeBps = combineMarketChanges(positions[positionIndex].ChangeBps, movement.changeBps)
+			positions[positionIndex].MarketScore = applyMarketScoreFactor(baseScore, movement.factorBps)
+			positions[positionIndex].PriceCents = applyMarketFactor(stockQuoteCents(positions[positionIndex].CountryID, positions[positionIndex].CompanyID, baseScore), movement.factorBps)
+			if positions[positionIndex].Shares <= math.MaxInt64/positions[positionIndex].PriceCents {
+				positions[positionIndex].MarketValueCents = positions[positionIndex].Shares * positions[positionIndex].PriceCents
+			}
 			if name := companyNames[positions[positionIndex].CompanyID]; name != "" {
 				positions[positionIndex].CompanyName = name
 			}
@@ -285,6 +304,7 @@ func (h *Handler) stockOrder(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "MARKET_LIST_FAILED", "National company listings could not be loaded.", err)
 		return
 	}
+	movements := rivalMarketMovements(h.worldServerID, world.CompanyRivalGroups(city.CountryID, companyRecords(companies)), time.Now().UTC())
 	var listing stockListing
 	for _, record := range companies {
 		if record.Company.ID == input.CompanyID {
@@ -301,7 +321,7 @@ func (h *Handler) stockOrder(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusServiceUnavailable, "MARKET_QUOTE_UNAVAILABLE", "Current market quotations are temporarily unavailable.", nil)
 		return
 	}
-	snapshots, err := marketReader.companyMarketSnapshots(r.Context(), h.worldServerID, []string{listing.CompanyID})
+	snapshots, err := marketReader.companyMarketSnapshots(r.Context(), h.worldServerID, []string{listing.CompanyID}, movements)
 	if err != nil {
 		h.writeAPIError(w, r, http.StatusInternalServerError, "MARKET_QUOTE_FAILED", "The latest company quotation could not be loaded.", err)
 		return
@@ -312,6 +332,9 @@ func (h *Handler) stockOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	listing.MarketScore, listing.ChangeBps, listing.LastEventAt = applyMarketScoreFactor(snapshot.Score, snapshot.MarketFactorBps), snapshot.ChangeBps, snapshot.LastEventAt
 	listing.PriceCents = applyMarketFactor(stockQuoteCents(city.CountryID, listing.CompanyID, snapshot.Score), snapshot.MarketFactorBps)
+	listing.MarketFactorBps = snapshot.MarketFactorBps
+	listing.MarketChangeBps = snapshot.MarketChangeBps
+	listing.MarketSourceCompanyID = snapshot.SourceCompanyID
 	writer, ok := h.store.(stockOrderWriter)
 	if !ok {
 		h.writeAPIError(w, r, http.StatusServiceUnavailable, "STOCK_TRADING_UNAVAILABLE", "Stock trading is temporarily unavailable.", nil)
@@ -345,4 +368,12 @@ func (h *Handler) stockOrder(w http.ResponseWriter, r *http.Request) {
 		"lastEventAt":  listing.LastEventAt,
 		"order":        map[string]any{"companyId": listing.CompanyID, "side": input.Side, "shares": input.Shares, "priceCents": listing.PriceCents, "totalCents": listing.PriceCents * input.Shares},
 	})
+}
+
+func companyRecords(records []world.CompanyPortalRecord) []world.Company {
+	companies := make([]world.Company, len(records))
+	for index, record := range records {
+		companies[index] = record.Company
+	}
+	return companies
 }

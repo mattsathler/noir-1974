@@ -6,8 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"noir-1974/apps/api/internal/market"
+	"noir-1974/apps/api/internal/world"
 )
 
 var errBlackwireUnavailable = errors.New("blackwire information is unavailable")
@@ -40,16 +43,17 @@ func classifyBlackwireOffer(item map[string]any) (int64, string, string) {
 	metadata, _ := item["metadata"].(map[string]any)
 	text := strings.ToLower(strings.Join([]string{title, content, source}, " "))
 	companyID := ""
+	explicitCompanyID := false
 	if metadata != nil {
-		for _, key := range []string{"companyId", "employerCompanyId"} {
-			if value, ok := metadata[key].(string); ok && value != "" {
-				companyID = value
-				break
-			}
+		if value, ok := metadata["companyId"].(string); ok && value != "" {
+			companyID, explicitCompanyID = value, true
+		}
+		if companyID == "" {
+			companyID, _ = metadata["employerCompanyId"].(string)
 		}
 		if company, ok := metadata["company"].(map[string]any); ok {
 			if value, ok := company["id"].(string); ok && companyID == "" {
-				companyID = value
+				companyID, explicitCompanyID = value, true
 			}
 		}
 	}
@@ -62,9 +66,23 @@ func classifyBlackwireOffer(item map[string]any) (int64, string, string) {
 			}
 		}
 	}
-	financial := strings.Contains(text, "fraud") || strings.Contains(text, "extortion") || strings.Contains(text, "embezzle") || strings.Contains(text, "payroll") || strings.Contains(text, "accounting") || strings.Contains(text, "financial") || strings.Contains(text, "bank account") || strings.Contains(text, "transfer")
+	financial := strings.Contains(text, "fraud") || strings.Contains(text, "extortion") || strings.Contains(text, "embezzle") || strings.Contains(text, "payroll fraud") || strings.Contains(text, "false account") || strings.Contains(text, "accounting manipulation") || strings.Contains(text, "misappropriat") || strings.Contains(text, "kickback") || strings.Contains(text, "bribery") || strings.Contains(text, "concealed payment")
 	executive := strings.Contains(text, "director") || strings.Contains(text, "chief executive") || strings.Contains(text, "president") || strings.Contains(text, "board member") || strings.Contains(text, "managing partner")
+	political := false
+	for _, term := range []string{"minister", "parliament", "state contract", "government tender", "public tender", "cabinet", "state secretary", "national commission", "campaign fund", "political contribution", "government procurement", "bribery"} {
+		if strings.Contains(text, term) {
+			political = true
+			break
+		}
+	}
+	if metadata != nil {
+		political = political || metadata["politicalSensitivity"] == true
+	}
 	switch {
+	case political && (executive || financial):
+		category, price = "POLITICAL / EXECUTIVE EVIDENCE", 125000
+	case political:
+		category, price = "POLITICAL INFORMATION", 50000
 	case financial && executive:
 		category, price = "EXECUTIVE FINANCIAL EVIDENCE", 75000
 	case financial:
@@ -73,6 +91,9 @@ func classifyBlackwireOffer(item map[string]any) (int64, string, string) {
 		category, price = "CORPORATE LEADERSHIP", 20000
 	case category == "CASE INFORMATION":
 		price = 5000
+	}
+	if !explicitCompanyID && !financial && !executive {
+		companyID = ""
 	}
 	return price, category, companyID
 }
@@ -178,6 +199,27 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 		return blackwireOffer{}, 0, fmt.Errorf("decode discovered information: %w", err)
 	}
 	price, category, companyID := classifyBlackwireOffer(item)
+	marketDelta := blackwireMarketDelta(category)
+	marketEventID := "blackwire:" + accountID + ":" + itemID
+	var rivalIDs []string
+	if companyID != "" && marketDelta != 0 {
+		var seed string
+		var version int
+		if err := tx.QueryRow(ctx, `SELECT w.world_seed,COALESCE(city.generator_version,w.generator_version)
+			FROM worlds w LEFT JOIN world_city_generators city ON city.server_id=w.server_id
+			AND city.city_id=split_part(split_part($2,':',2),'/companies/',1)
+			WHERE w.server_id=$1::uuid`, serverID, companyID).Scan(&seed, &version); err != nil {
+			return blackwireOffer{}, 0, err
+		}
+		if group, groupErr := world.CompanyRivalGroupFor(seed, version, companyID); groupErr == nil {
+			rivalIDs = make([]string, 0, len(group.CompanyIDs))
+			for _, rivalID := range group.CompanyIDs {
+				if rivalID != companyID {
+					rivalIDs = append(rivalIDs, rivalID)
+				}
+			}
+		}
+	}
 	var balance int64
 	err = tx.QueryRow(ctx, `UPDATE player_economy SET credits_cents=credits_cents+$3, updated_at=now()
 		WHERE server_id=$1::uuid AND account_id=$2::uuid RETURNING credits_cents`, serverID, accountID, price).Scan(&balance)
@@ -201,28 +243,9 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 		ON CONFLICT(server_id,account_id,message_id) DO NOTHING`, serverID, accountID, messageID, body); err != nil {
 		return blackwireOffer{}, 0, err
 	}
-	if companyID != "" {
-		delta := blackwireMarketDelta(category)
-		if delta != 0 {
-			if _, err := tx.Exec(ctx, `INSERT INTO company_market_scores(server_id,company_id) VALUES($1::uuid,$2) ON CONFLICT DO NOTHING`, serverID, companyID); err != nil {
-				return blackwireOffer{}, 0, err
-			}
-			var before int
-			if err := tx.QueryRow(ctx, `SELECT CASE WHEN score < 1000 THEN LEAST(1000, score + FLOOR(EXTRACT(EPOCH FROM (now()-updated_at))/86400)::integer) ELSE score END FROM company_market_scores WHERE server_id=$1::uuid AND company_id=$2 FOR UPDATE`, serverID, companyID).Scan(&before); err != nil {
-				return blackwireOffer{}, 0, err
-			}
-			after := max(500, before+delta)
-			eventID := "blackwire:" + accountID + ":" + itemID
-			result, err := tx.Exec(ctx, `INSERT INTO company_market_events(server_id,event_id,company_id,event_type,score_delta,score_before,score_after,occurred_at)
-				VALUES($1::uuid,$2,$3,'blackwire_leak',$4,$5,$6,now()) ON CONFLICT(server_id,event_id) DO NOTHING`, serverID, eventID, companyID, delta, before, after)
-			if err != nil {
-				return blackwireOffer{}, 0, err
-			}
-			if result.RowsAffected() > 0 {
-				if _, err := tx.Exec(ctx, `UPDATE company_market_scores SET score=$3,updated_at=now() WHERE server_id=$1::uuid AND company_id=$2`, serverID, companyID, after); err != nil {
-					return blackwireOffer{}, 0, err
-				}
-			}
+	if companyID != "" && marketDelta != 0 {
+		if err := market.ApplyCompanyImpact(ctx, tx, serverID, marketEventID, companyID, "blackwire_leak", marketDelta, time.Now().UTC(), rivalIDs); err != nil {
+			return blackwireOffer{}, 0, err
 		}
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM player_whiteboard_pins WHERE server_id=$1::uuid AND account_id=$2::uuid AND item_id=$3`, serverID, accountID, itemID); err != nil {
@@ -246,6 +269,10 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 
 func blackwireMarketDelta(category string) int {
 	switch category {
+	case "POLITICAL / EXECUTIVE EVIDENCE":
+		return -240
+	case "POLITICAL INFORMATION":
+		return -120
 	case "EXECUTIVE FINANCIAL EVIDENCE":
 		return -150
 	case "FINANCIAL / CORPORATE EVIDENCE":
@@ -253,7 +280,7 @@ func blackwireMarketDelta(category string) int {
 	case "CORPORATE LEADERSHIP":
 		return -60
 	case "CASE INFORMATION":
-		return -35
+		return -15
 	default:
 		return 0
 	}

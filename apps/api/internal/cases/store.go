@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"noir-1974/apps/api/internal/mail"
+	"noir-1974/apps/api/internal/market"
 	"noir-1974/apps/api/internal/records"
 	"noir-1974/apps/api/internal/world"
 )
@@ -319,15 +320,22 @@ type PublicBlackwireExposure struct {
 }
 
 func (store *PostgresStore) ListPublicBlackwireExposures(ctx context.Context, serverID, cityID string) ([]PublicBlackwireExposure, error) {
-	rows, err := store.db.Query(ctx, `SELECT DISTINCT event.company_id, sale.category, event.occurred_at
-		FROM company_market_events event
-		JOIN player_blackwire_sales sale ON sale.server_id=event.server_id
-			AND event.event_id='blackwire:' || sale.account_id::text || ':' || sale.item_id
-		WHERE event.server_id=$1::uuid AND event.event_type='blackwire_leak'
-			AND event.company_id LIKE '%' || $2 || '%'
-			AND event.recorded_at >= now() - interval '24 hours' AND event.recorded_at <= now()
-			AND sale.category IN ('FINANCIAL / CORPORATE EVIDENCE','EXECUTIVE FINANCIAL EVIDENCE','CORPORATE LEADERSHIP')
-		ORDER BY event.recorded_at DESC LIMIT 6`, serverID, cityID)
+	rows, err := store.db.Query(ctx, `SELECT company_id,category,occurred_at FROM (
+			SELECT DISTINCT event.company_id,sale.category,event.occurred_at
+			FROM company_market_events event
+			JOIN player_blackwire_sales sale ON sale.server_id=event.server_id
+				AND event.event_id='blackwire:' || sale.account_id::text || ':' || sale.item_id
+			WHERE event.server_id=$1::uuid AND event.event_type='blackwire_leak'
+				AND event.company_id LIKE '%' || $2 || '%'
+				AND event.recorded_at >= now() - interval '24 hours' AND event.recorded_at <= now()
+				AND sale.category IN ('FINANCIAL / CORPORATE EVIDENCE','EXECUTIVE FINANCIAL EVIDENCE','CORPORATE LEADERSHIP','POLITICAL / EXECUTIVE EVIDENCE','POLITICAL INFORMATION')
+			UNION ALL
+			SELECT ''::text,sale.category,sale.sold_at
+			FROM player_blackwire_sales sale
+			WHERE sale.server_id=$1::uuid AND sale.company_id IS NULL
+				AND sale.category IN ('POLITICAL / EXECUTIVE EVIDENCE','POLITICAL INFORMATION')
+				AND sale.sold_at >= now() - interval '24 hours' AND sale.sold_at <= now()
+		) exposure ORDER BY occurred_at DESC LIMIT 6`, serverID, cityID)
 	if err != nil {
 		return nil, err
 	}
@@ -1551,6 +1559,13 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("check existing case: %w", err)
 	}
+	rivalIDs := []string(nil)
+	if definition.CompanyID != "" && (definition.ArchetypeID == "workplace_conflict" || definition.ArchetypeID == "financial_extortion") {
+		rivalIDs, err = store.companyRivalIDs(ctx, serverID, definition.CompanyID)
+		if err != nil {
+			return fmt.Errorf("resolve company market rivals: %w", err)
+		}
+	}
 	participants := definition.Participants
 	if len(participants) == 0 {
 		participants = []CaseParticipant{{NPCID: definition.KillerID, Role: "principal"}}
@@ -1637,7 +1652,7 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 			return fmt.Errorf("persist initial crime participant: %w", err)
 		}
 	}
-	if err := applyCorporateMarketImpact(ctx, tx, serverID, definition); err != nil {
+	if err := applyCorporateMarketImpact(ctx, tx, serverID, definition, rivalIDs); err != nil {
 		return fmt.Errorf("apply corporate market impact: %w", err)
 	}
 	for _, relation := range definition.Relationships {
@@ -2303,7 +2318,7 @@ func caseSceneIsResidential(base world.World, locationID string) bool {
 	return false
 }
 
-func applyCorporateMarketImpact(ctx context.Context, tx pgx.Tx, serverID string, definition Definition) error {
+func applyCorporateMarketImpact(ctx context.Context, tx pgx.Tx, serverID string, definition Definition, rivalIDs []string) error {
 	delta := 0
 	switch definition.ArchetypeID {
 	case "workplace_conflict":
@@ -2316,31 +2331,37 @@ func applyCorporateMarketImpact(ctx context.Context, tx pgx.Tx, serverID string,
 	if definition.CompanyID == "" {
 		return nil
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO company_market_scores(server_id, company_id) VALUES($1::uuid, $2) ON CONFLICT DO NOTHING`, serverID, definition.CompanyID); err != nil {
-		return err
-	}
-	var scoreBefore int
-	if err := tx.QueryRow(ctx, `SELECT CASE WHEN score < 1000 THEN LEAST(1000, score + FLOOR(EXTRACT(EPOCH FROM (now()-updated_at))/86400)::integer) ELSE score END
-		FROM company_market_scores WHERE server_id=$1::uuid AND company_id=$2 FOR UPDATE`, serverID, definition.CompanyID).Scan(&scoreBefore); err != nil {
-		return err
-	}
-	scoreAfter := max(500, scoreBefore+delta)
 	occurredAt := definition.CrimeAt
 	if occurredAt.IsZero() {
 		occurredAt = time.Now().UTC()
 	}
-	result, err := tx.Exec(ctx, `INSERT INTO company_market_events
-		(server_id, event_id, company_id, event_type, score_delta, score_before, score_after, occurred_at)
-		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (server_id, event_id) DO NOTHING`,
-		serverID, definition.ID, definition.CompanyID, definition.ArchetypeID, delta, scoreBefore, scoreAfter, occurredAt.UTC())
+	return market.ApplyCompanyImpact(ctx, tx, serverID, definition.ID, definition.CompanyID, definition.ArchetypeID, delta, occurredAt.UTC(), rivalIDs)
+}
+
+func (store *PostgresStore) companyRivalIDs(ctx context.Context, serverID, companyID string) ([]string, error) {
+	var seed string
+	var version int
+	err := store.db.QueryRow(ctx, `SELECT w.world_seed,COALESCE(city.generator_version,w.generator_version)
+		FROM worlds w LEFT JOIN world_city_generators city ON city.server_id=w.server_id
+		AND city.city_id=split_part(split_part($2,':',2),'/companies/',1)
+		WHERE w.server_id=$1::uuid`, serverID, companyID).Scan(&seed, &version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, world.ErrEntityNotFound
+	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if result.RowsAffected() == 0 {
-		return nil
+	group, err := world.CompanyRivalGroupFor(seed, version, companyID)
+	if err != nil {
+		return nil, nil
 	}
-	_, err = tx.Exec(ctx, `UPDATE company_market_scores SET score=$3, updated_at=now() WHERE server_id=$1::uuid AND company_id=$2`, serverID, definition.CompanyID, scoreAfter)
-	return err
+	rivalIDs := make([]string, 0, len(group.CompanyIDs))
+	for _, rivalID := range group.CompanyIDs {
+		if rivalID != companyID {
+			rivalIDs = append(rivalIDs, rivalID)
+		}
+	}
+	return rivalIDs, nil
 }
 
 func persistCaseEmails(ctx context.Context, tx pgx.Tx, serverID string, definition Definition) error {

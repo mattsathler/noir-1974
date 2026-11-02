@@ -84,15 +84,21 @@ CREATE TABLE IF NOT EXISTS company_market_events (
     score_after integer NOT NULL CHECK (score_after BETWEEN 500 AND 1500),
     occurred_at timestamptz NOT NULL,
     recorded_at timestamptz NOT NULL DEFAULT now(),
+    correlation_id text NOT NULL DEFAULT '',
+    source_company_id text NOT NULL DEFAULT '',
     PRIMARY KEY (server_id, event_id),
     FOREIGN KEY (server_id, company_id)
         REFERENCES company_market_scores(server_id, company_id) ON DELETE CASCADE
 );
 ALTER TABLE company_market_events DROP CONSTRAINT IF EXISTS company_market_events_event_type_check;
+ALTER TABLE company_market_events ADD COLUMN IF NOT EXISTS correlation_id text NOT NULL DEFAULT '';
+ALTER TABLE company_market_events ADD COLUMN IF NOT EXISTS source_company_id text NOT NULL DEFAULT '';
 ALTER TABLE company_market_events ADD CONSTRAINT company_market_events_event_type_check
-    CHECK (event_type IN ('workplace_conflict', 'financial_extortion', 'blackwire_leak'));
+    CHECK (event_type IN ('workplace_conflict', 'financial_extortion', 'blackwire_leak', 'rival_market_movement'));
 CREATE INDEX IF NOT EXISTS company_market_events_history_idx
     ON company_market_events(server_id, company_id, recorded_at DESC, event_id);
+CREATE INDEX IF NOT EXISTS company_market_events_correlation_idx
+    ON company_market_events(server_id, correlation_id, company_id);
 
 CREATE TABLE IF NOT EXISTS player_blackwire_sales (
     server_id uuid NOT NULL,
