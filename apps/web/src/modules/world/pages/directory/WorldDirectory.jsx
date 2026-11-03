@@ -62,7 +62,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
   const [locations, setLocations] = useState([]);
   const isStaffDirectory = program === "staff-directory";
   const isCompanyPortal = program === "company-portal";
-  const [message, setMessage] = useState(isStaffDirectory ? "Connecting to the company employee directory…" : isCompanyPortal ? initialCompanies.length ? "NATIONAL COMPANY LISTINGS RETRIEVED" : "Search national company websites in the connected country." : program === "interpol" ? "Enter a name to search countrywide personnel files." : "Enter a name or address to search the city records.");
+  const [message, setMessage] = useState(isStaffDirectory ? "Connecting to the company employee directory…" : isCompanyPortal ? initialCompanies.length ? "NATIONAL COMPANY LISTINGS RETRIEVED" : "Search national company websites in the connected country." : program === "interpol" ? "Enter a name to search public person records across the connected country." : "Enter a name or address to search the city records.");
   const [busy, setBusy] = useState(false);
   const [connectingCompanyId, setConnectingCompanyId] = useState("");
   const [recordRange, setRecordRange] = useState(() => {
@@ -178,7 +178,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
         const results = await loadPeople();
         if (currentRequest !== requestId.current) return;
         setPeople(results);
-        setMessage(results.length ? "PERSONNEL FILES RETRIEVED" : "NO MATCHING PERSONNEL FILES");
+        setMessage(results.length ? "PUBLIC PERSON RECORDS RETRIEVED" : "NO MATCHING PERSON RECORDS");
       } else if (isCompanyPortal) {
         const results = await searchNationalCompanies(term);
         if (currentRequest !== requestId.current) return;
@@ -227,8 +227,8 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
         <div><p className="computer-window__eyebrow">MERIDIAN GLOBAL · NATIONAL COMPANY PORTAL</p><h1>Company websites</h1><span>Find registered businesses and visit their public company pages.</span></div>
         <aside><small>CONNECTED COUNTRY</small><strong>{countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</strong><span>NATIONAL LISTINGS</span></aside>
       </header> : <>
-        <p className="computer-window__eyebrow">{isInterpol ? `CORPORATE SECURITY OFFICE · ${countryName ? `${countryName.toUpperCase()} ` : "COUNTRYWIDE "}PERSONNEL SEARCH` : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "UNION MERCANTILE BANK · ACCOUNT SERVICES" : "MERIDIAN ENTERPRISES · GATE CONTROL ARCHIVE · AUTHORIZED SESSION"}</p>
-        <h1>{isInterpol ? "COUNTRYWIDE PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "ACCOUNT STATEMENT" : "GATE ACCESS LOGS"}</h1>
+        <p className="computer-window__eyebrow">{isInterpol ? "MERIDIAN POLICE SERVICE · PUBLIC RECORDS" : isStaffDirectory ? "MERIDIAN GLOBAL · EMPLOYEE DIRECTORY" : isCityRecords ? "LYON MUNICIPAL ARCHIVE · PUBLIC INDEX" : isBankRecords ? "UNION MERCANTILE BANK · ACCOUNT SERVICES" : "MERIDIAN ENTERPRISES · GATE CONTROL ARCHIVE · AUTHORIZED SESSION"}</p>
+        <h1>{isInterpol ? "PERSON SEARCH" : isStaffDirectory ? "STAFF DIRECTORY" : isCityRecords ? "CITY RECORDS SEARCH" : isBankRecords ? "ACCOUNT STATEMENT" : "GATE ACCESS LOGS"}</h1>
       </>}
       {isInterpol && <p className="world-directory__scope">SEARCH JURISDICTION · {countryName ? countryName.toUpperCase() : "CURRENT COUNTRY"}</p>}
       {!isStaffDirectory && !selectedPerson && <form className={`world-directory__search${isCompanyPortal ? " world-directory__search--company-portal" : ""}`} onSubmit={submitSearch}>
@@ -240,13 +240,13 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
       </form>}
       {!selectedPerson && <p className="world-directory__message" role="status" aria-live="polite">{message}</p>}
 
-      {isInterpol && !selectedPerson && people.length > 0 && <p className="world-directory__person-count">{people.length} PERSONNEL FILE{people.length === 1 ? "" : "S"} FOUND · SELECT A FILE</p>}
+      {isInterpol && !selectedPerson && people.length > 0 && <p className="world-directory__person-count">{people.length} PERSON RECORD{people.length === 1 ? "" : "S"} FOUND · SELECT A RECORD</p>}
       {isPeopleSearch && !selectedPerson && people.length > 0 && <div className="world-directory__person-list" aria-label="People found">
         {people.map((record) => {
           const { npc } = record;
           return <article className="world-directory__person-listing" key={npc.id}>
-            <p>{isInterpol ? "PERSONNEL FILE" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"} · {npc.status?.toUpperCase() || "STATUS UNKNOWN"}</p>
-            <button className="world-directory__person-link" type="button" aria-label={`${npc.name} · ${isInterpol ? "PERSONNEL FILE" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"}`} onClick={() => {
+            <p>{isInterpol ? "PUBLIC PERSON RECORD" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"} · {npc.status?.toUpperCase() || "STATUS UNKNOWN"}</p>
+            <button className="world-directory__person-link" type="button" aria-label={`${npc.name} · ${isInterpol ? "PUBLIC PERSON RECORD" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"}`} onClick={() => {
               activityRequestId.current++;
               setActivity([]);
               setActivityMessage("");
@@ -261,7 +261,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
         const { npc, workplaces = [], maritalStatus, reportedScene } = selectedPerson;
         const employment = workplaces.length ? workplaces.map(({ company, address }) => `${company} — ${address}`).join("; ") : "NOT LISTED";
         return <section className="world-person-file" aria-label={`${npc.name} details`}>
-          <header className="world-person-file__toolbar">{!initialTargetNPC?.id && <button type="button" onClick={() => { activityRequestId.current++; setActivity([]); setActivityMessage(""); setSelectedPerson(null); }}>← BACK TO RESULTS</button>}<span>{isInterpol ? "PERSONNEL FILE" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"}</span></header>
+          <header className="world-person-file__toolbar">{!initialTargetNPC?.id && <button type="button" onClick={() => { activityRequestId.current++; setActivity([]); setActivityMessage(""); setSelectedPerson(null); }}>← BACK TO RESULTS</button>}<span>{isInterpol ? "PUBLIC PERSON RECORD" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"}</span></header>
           <div className="world-person-file__identity">
             <figure className="world-directory__person-portrait"><ModularFace visual={npc.visual ?? FALLBACK_NPC_VISUAL} name={npc.name} /></figure>
             <div><h2>{npc.name}</h2><p>{npc.status?.toUpperCase() || "STATUS UNKNOWN"}{npc.age ? ` · ${npc.age} YEARS` : ""}</p></div>
@@ -280,7 +280,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               <div><dt>MARITAL STATUS</dt><dd>{maritalStatus?.toUpperCase() || "UNKNOWN"}</dd></div>
               {reportedScene && <div><dt>REPORTED SCENE</dt><dd>{reportedScene.address}</dd></div>}
             </dl>
-            <button className="page-print-button" type="button" aria-label={`Print personnel file for ${npc.name}`} title="Print file" onClick={() => onPrint?.({
+            <button className="page-print-button" type="button" aria-label={`Print person record for ${npc.name}`} title="Print record" onClick={() => onPrint?.({
               id: `person:${npc.id}`, source: "person", title: npc.name,
               content: [`AGE · ${npc.age} YEARS`, `STATUS · ${npc.status?.toUpperCase() || "UNKNOWN"}`, `DESCRIPTION · ${npc.appearance || "NOT RECORDED"}`, `EMPLOYMENT · ${employment}`, `MARITAL STATUS · ${maritalStatus?.toUpperCase() || "UNKNOWN"}`, ...(reportedScene ? [`REPORTED SCENE · ${reportedScene.address}`] : [])].join("\n"),
               metadata: selectedPerson,

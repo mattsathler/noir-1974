@@ -2,6 +2,7 @@ import { useState } from "react";
 import { deepLinkPage } from "./DeepLinkWebsite.jsx";
 
 const CRIME_REPORTS_PAGE = { id: "crime-reports", label: "CRIME REPORTS", available: true };
+const PERSON_SEARCH_PAGE = { id: "person-search", label: "PERSON SEARCH", available: true };
 const POLICE_COMPLAINTS_PAGE = { id: "police-complaints", label: "FILE A REPORT", available: true };
 const POLICE_NOTICES_PAGE = { id: "police-notices", label: "PUBLIC NOTICES", available: true };
 const POLICE_ABOUT_PAGE = { id: "police-about", label: "ABOUT THE DEPARTMENT", available: true };
@@ -9,7 +10,7 @@ const POLICE_BUREAUS_PAGE = { id: "police-bureaus", label: "DISTRICT BUREAUS", a
 const POLICE_POLICIES_PAGE = { id: "police-policies", label: "PUBLICATION POLICIES", available: true };
 const POLICE_CONTACT_PAGE = { id: "police-contact", label: "CONTACT THE POLICE SERVICE", available: true };
 
-export { CRIME_REPORTS_PAGE, POLICE_COMPLAINTS_PAGE, POLICE_NOTICES_PAGE, POLICE_ABOUT_PAGE, POLICE_BUREAUS_PAGE, POLICE_POLICIES_PAGE, POLICE_CONTACT_PAGE };
+export { CRIME_REPORTS_PAGE, PERSON_SEARCH_PAGE, POLICE_COMPLAINTS_PAGE, POLICE_NOTICES_PAGE, POLICE_ABOUT_PAGE, POLICE_BUREAUS_PAGE, POLICE_POLICIES_PAGE, POLICE_CONTACT_PAGE };
 
 export default function PoliceWebsite({ page = "police-website", navigate, children, searchId = "police-site-search" }) {
   const [search, setSearch] = useState("");
@@ -27,6 +28,7 @@ export default function PoliceWebsite({ page = "police-website", navigate, child
       </header>
       <nav className="legacy-site__toplinks" aria-label="Police website sections">
         <button type="button" onClick={() => navigate({ id: "police-website", label: "MERIDIAN POLICE", available: true })}>HOME</button>
+        <button type="button" onClick={() => navigate(PERSON_SEARCH_PAGE)}>PERSON SEARCH</button>
         <button type="button" onClick={() => navigate(CRIME_REPORTS_PAGE)}>CRIME REPORTS</button>
         <button type="button" onClick={() => navigate(POLICE_COMPLAINTS_PAGE)}>FILE A REPORT</button>
         <button type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}>PUBLIC NOTICES</button>
@@ -38,6 +40,7 @@ export default function PoliceWebsite({ page = "police-website", navigate, child
           <section className="legacy-police__date"><b>THURSDAY</b><strong>29</strong><span>OCTOBER</span></section>
           <section><h2>POLICE DESK</h2><ul>
             <li><button type="button" onClick={() => navigate(CRIME_REPORTS_PAGE)}>Published crime reports</button></li>
+            <li><button type="button" onClick={() => navigate(PERSON_SEARCH_PAGE)}>Public person search</button></li>
             <li><button type="button" onClick={() => navigate(POLICE_COMPLAINTS_PAGE)}>File a police report</button></li>
             <li><button type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}>Department notices</button></li>
             <li><button type="button" onClick={() => navigate(POLICE_ABOUT_PAGE)}>About this service</button></li>
@@ -48,9 +51,9 @@ export default function PoliceWebsite({ page = "police-website", navigate, child
         </aside>
         <div className="legacy-site__main-column">
           {page === "police-website" && <>
-            <section className="legacy-police__hero"><div><p>MERIDIAN POLICE · PUBLIC INFORMATION</p><h1>Working together for a safer Meridian.</h1><span>News, services and public records from your city police department.</span><button type="button" onClick={() => navigate(CRIME_REPORTS_PAGE)}>SEARCH CRIME REPORTS »</button><button type="button" onClick={() => navigate(POLICE_COMPLAINTS_PAGE)}>FILE A REPORT »</button></div><aside><b>ON THE BEAT</b><span>PUBLIC SAFETY<br />CITY RECORDS<br />COMMUNITY NEWS</span><small>29 OCT</small></aside></section>
+            <section className="legacy-police__hero"><div><p>MERIDIAN POLICE · PUBLIC INFORMATION</p><h1>Working together for a safer Meridian.</h1><span>News, services and public records from your city police department.</span><button type="button" onClick={() => navigate(CRIME_REPORTS_PAGE)}>SEARCH CRIME REPORTS »</button><button type="button" onClick={() => navigate(PERSON_SEARCH_PAGE)}>PERSON SEARCH »</button><button type="button" onClick={() => navigate(POLICE_COMPLAINTS_PAGE)}>FILE A REPORT »</button></div><aside><b>ON THE BEAT</b><span>PUBLIC SAFETY<br />CITY RECORDS<br />COMMUNITY NEWS</span><small>29 OCT</small></aside></section>
             <div className="legacy-site__columns">
-              <section className="legacy-site__section legacy-police__reports"><h2>Records and services</h2><ul className="legacy-police__link-list"><li><div><button type="button" onClick={() => navigate(CRIME_REPORTS_PAGE)}><b>Crime reports »</b></button><span>Search incident reports released for public review.</span></div></li><li><div><button type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}><b>Department notices »</b></button><span>Read recent announcements and public safety notices.</span></div></li><li><div><button type="button" onClick={() => navigate(POLICE_ABOUT_PAGE)}><b>About the department »</b></button><span>Learn how this office maintains public records.</span></div></li></ul></section>
+              <section className="legacy-site__section legacy-police__reports"><h2>Records and services</h2><ul className="legacy-police__link-list"><li><div><button type="button" onClick={() => navigate(CRIME_REPORTS_PAGE)}><b>Crime reports »</b></button><span>Search incident reports released for public review.</span></div></li><li><div><button type="button" onClick={() => navigate(PERSON_SEARCH_PAGE)}><b>Person search »</b></button><span>Search public person records across the connected country.</span></div></li><li><div><button type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}><b>Department notices »</b></button><span>Read recent announcements and public safety notices.</span></div></li><li><div><button type="button" onClick={() => navigate(POLICE_ABOUT_PAGE)}><b>About the department »</b></button><span>Learn how this office maintains public records.</span></div></li></ul></section>
               <aside className="legacy-police__news"><h2>Latest announcements</h2><article><time>29 OCT</time><h3>Public records office hours</h3><p>Requests are received at the central desk from 9:00 AM to 5:00 PM.</p><button type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}>More notices »</button></article><article><time>24 OCT</time><h3>Winter road safety</h3><p>Drivers are asked to keep the river approaches clear after dusk.</p></article></aside>
             </div>
             <section className="legacy-police__categories"><h2>Explore the department</h2><div><button type="button" onClick={() => navigate(POLICE_BUREAUS_PAGE)}><b>BUREAUS</b><span>District offices and department divisions »</span></button><button type="button" onClick={() => navigate(CRIME_REPORTS_PAGE)}><b>SERVICES</b><span>Public records and community assistance »</span></button><button type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}><b>MEDIA</b><span>News releases and department notices »</span></button><button type="button" onClick={() => navigate(POLICE_POLICIES_PAGE)}><b>POLICIES</b><span>Public information and records guidance »</span></button></div></section>
@@ -63,7 +66,8 @@ export default function PoliceWebsite({ page = "police-website", navigate, child
           {page === "police-contact" && <section className="legacy-site__section legacy-police__article"><p className="legacy-site__eyebrow">POLICE DESK / CONTACT</p><h1>Contact the Meridian Police Service</h1><p>For urgent assistance, visit the nearest police station. For routine matters, write to the local records office and include your district.</p><h2>Public information office</h2><p>Records and directory enquiries are received Monday through Saturday, 9:00 AM to 5:00 PM. Please include a return address with written requests.</p><button className="legacy-site__text-link" type="button" onClick={() => navigate(POLICE_NOTICES_PAGE)}>View office hours and notices »</button></section>}
           {page === "police-complaints" && <section className="legacy-site__section legacy-police__article"><p className="legacy-site__eyebrow">POLICE DESK / PUBLIC REPORTS</p><h1 id="police-report-title">File a police report</h1><p>Anyone may file information directly with the police service.</p>{children}</section>}
           {page === "crime-reports" && <section className="legacy-police__crime-reports"><p className="legacy-site__eyebrow">POLICE DESK / PUBLIC RECORDS</p><h1>Published crime reports</h1><p>Search incidents released by the connected city police office.</p>{children}</section>}
-          {["person-search", "warrant-request"].includes(page) && <section className="legacy-site__section legacy-police__article legacy-police__restricted">{children}</section>}
+          {page === "person-search" && <section className="legacy-site__section legacy-police__article"><p className="legacy-site__eyebrow">POLICE DESK / PUBLIC RECORDS · COUNTRYWIDE SEARCH</p>{children}</section>}
+          {page === "warrant-request" && <section className="legacy-site__section legacy-police__article legacy-police__restricted">{children}</section>}
           <footer id="contact" className="legacy-site__directory-footer"><b>Meridian Police Service</b><span>Public Information Office · National relay directory</span><span>Emergency: 17 · Non-emergency: consult your local exchange</span></footer>
         </div>
       </div>

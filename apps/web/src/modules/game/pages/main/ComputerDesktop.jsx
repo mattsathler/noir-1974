@@ -77,7 +77,7 @@ const GHOSTKEY_PROGRAM = { id: "ghostkey", label: "GHOSTKEY.EXE", Icon: Bug, sta
 const EMAIL_BREAKER_PROGRAM = { id: "email-breaker", label: "EMAIL_BREAKER.EXE", Icon: Mail, state: "UNSIGNED", available: true };
 const BANKRUPT_PROGRAM = { id: "bankrupt", label: "BANKRUPT.EXE", Icon: Dollar, state: "UNSIGNED", available: true };
 const BLACKWIRE_PROGRAM = { id: "blackwire", label: "BLACKWIRE · INFORMATION MARKET", Icon: Wifi, state: "ONLINE", available: true, siteAddress: "merid/blackwire.local/market" };
-const PERSON_SEARCH_PROGRAM = { id: "person-search", label: "PERSON_SEARCH_APP.EXE", Icon: User, state: "PRIVILEGED", available: true };
+const PERSON_SEARCH_PROGRAM = { id: "person-search", label: "PERSON SEARCH", Icon: User, available: true };
 const PATIENT_SEARCH_PROGRAM = { id: "patient-search", label: "PATIENT_SEARCH_APP.EXE", Icon: Cross, state: "PRIVILEGED", available: true };
 const GATE_RECORDS_PROGRAM = { id: "gate-records", label: "GATE_ACCESS_LOG_APP.EXE", Icon: MapIcon, state: "PRIVILEGED", available: true };
 const EMPLOYEE_DIRECTORY_PROGRAM = { id: "employee-directory", label: "EMPLOYEE_DIRECTORY_APP.EXE", Icon: Users, state: "PRIVILEGED", available: true };
@@ -88,7 +88,7 @@ function localServiceLocationId(cityId, service) {
   const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
   return `service:${cityKey}/${service}`;
 }
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "person-search", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "minesweeper", "mail-compose"];
+const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "minesweeper", "mail-compose"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -199,8 +199,8 @@ function browserAddress(program, facilityContext, cityId) {
     return networkSiteAddress(program, countryId, `hospital/${slug}${recordPath}`);
   }
   if (program.id === "company-website") return networkSiteAddress(program, countryId, `${program.website?.domain || "company"}${program.pageId && program.pageId !== "home" ? `/${program.pageId}` : ""}`);
-  if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports"].includes(program.id)) {
-    const paths = { "police-notices": "/notices", "police-about": "/about", "police-bureaus": "/district-bureaus", "police-policies": "/records-policy", "police-contact": "/contact", "police-complaints": "/public-reports", "crime-reports": "/public-records/crime-reports" };
+  if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports", "person-search"].includes(program.id)) {
+    const paths = { "police-notices": "/notices", "police-about": "/about", "police-bureaus": "/district-bureaus", "police-policies": "/records-policy", "police-contact": "/contact", "police-complaints": "/public-reports", "crime-reports": "/public-records/crime-reports", "person-search": "/public-records/person-search" };
     return networkSiteAddress(program, countryId, paths[program.id] || "");
   }
   if (program.id === "personal-mail") return networkSiteAddress(program, countryId);
@@ -858,7 +858,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                         return undefined;
                       }} />
                     : program.id === "ghostkey"
-                      ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPersonSearch={(siteAddress) => launchProgram({ ...PERSON_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} onOpenPatientSearch={(siteAddress) => openPatientSearchFromGhost(siteAddress, id)} onOpenGateRecords={(siteAddress) => openGateRecordsFromGhost(siteAddress, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
+                      ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPatientSearch={(siteAddress) => openPatientSearchFromGhost(siteAddress, id)} onOpenGateRecords={(siteAddress) => openGateRecordsFromGhost(siteAddress, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
                       : program.id === "email-breaker"
                         ? <EmailBreakerApp serverTime={serverTime} onOpenHackedMailbox={openHackedMailbox} />
                       : program.id === "bankrupt"
