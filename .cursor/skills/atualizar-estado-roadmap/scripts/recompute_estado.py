@@ -130,7 +130,7 @@ def normalize_status(raw: str) -> str:
     return aliases[value]
 
 
-def parse_milestone(path: Path) -> dict:
+def parse_milestone(path: Path, roadmap_dir: Path) -> dict:
     text = path.read_text(encoding="utf-8")
     heading = HEADING_RE.search(text)
     status = STATUS_RE.search(text)
@@ -143,12 +143,19 @@ def parse_milestone(path: Path) -> dict:
         "title": heading.group(3).strip(),
         "status": normalize_status(status.group(1)),
         "filename": path.name,
+        "path": path.relative_to(roadmap_dir).as_posix(),
     }
 
 
-def load_path_milestones(milestones_dir: Path) -> list[dict]:
-    files = sorted(milestones_dir.glob("M*.md"))
-    items = [parse_milestone(path) for path in files]
+def load_path_milestones(roadmap_dir: Path) -> list[dict]:
+    files = sorted(
+        path
+        for folder in ("milestones", "achieved")
+        for path in (roadmap_dir / folder).glob("M*.md")
+        if (match := re.match(r"^M(\d+)-", path.name))
+        and int(match.group(1)) <= CRIME_FLOW_THROUGH
+    )
+    items = [parse_milestone(path, roadmap_dir) for path in files]
     path_items = [m for m in items if m["number"] <= CRIME_FLOW_THROUGH]
     path_items.sort(key=lambda m: m["number"])
     expected = list(range(0, CRIME_FLOW_THROUGH + 1))
@@ -237,7 +244,7 @@ def render(milestones: list[dict], today: date) -> str:
         elif item["status"] == STATUS_EM_CURSO:
             status_cell = "Em curso"
         label = TABLE_LABELS.get(item["number"], item["title"])
-        link = f"[{item['id']}](milestones/{item['filename']}) {label}"
+        link = f"[{item['id']}]({item['path']}) {label}"
         rows.append(f"| {link} | {weight} | {status_cell} | {cumulative_cell} |")
 
     table = "\n".join(
@@ -294,9 +301,9 @@ Fórmula: `milestones_aceitos_M00_a_M{CRIME_FLOW_THROUGH:02d} / {CRIME_FLOW_THRO
 
 def main() -> None:
     root = repo_root()
-    milestones_dir = root / "docs" / "roadmap" / "milestones"
-    estado_path = root / "docs" / "roadmap" / "estado.md"
-    milestones = load_path_milestones(milestones_dir)
+    roadmap_dir = root / "docs" / "roadmap"
+    estado_path = roadmap_dir / "estado.md"
+    milestones = load_path_milestones(roadmap_dir)
     estado_path.write_text(render(milestones, date.today()), encoding="utf-8")
     accepted = sum(1 for m in milestones if m["status"] == STATUS_ACEITO)
     playtest_status = "pronto" if any(

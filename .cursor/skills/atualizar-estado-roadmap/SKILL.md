@@ -10,7 +10,7 @@ description: >-
 
 # Atualizar estado do roadmap
 
-Não editar a barra nem a porcentagem de `docs/roadmap/estado.md` à mão. A fonte de verdade do status é o campo `**Status:**` em cada arquivo de `docs/roadmap/milestones/`.
+Não editar a barra nem a porcentagem de `docs/roadmap/estado.md` à mão. A fonte de verdade do status é o campo `**Status:**` nos arquivos M00–M13 em `docs/roadmap/milestones/` ou `docs/roadmap/achieved/`, conforme a localização atual da milestone.
 
 ## Quando
 
@@ -20,7 +20,7 @@ Não editar a barra nem a porcentagem de `docs/roadmap/estado.md` à mão. A fon
 
 ## Passos
 
-1. Confirmar o `**Status:**` de cada `docs/roadmap/milestones/M*.md` (valores: `Aceito`, `Em curso`, `Não iniciado`). Aceite só com os checkboxes de critério preenchidos.
+1. Confirmar o `**Status:**` de cada milestone M00–M13 nos diretórios `milestones/` e `achieved/` (valores: `Aceito`, `Em curso`, `Não iniciado`). Aceite só com os checkboxes de critério preenchidos.
 2. Na raiz do repo, executar:
 
 ```bash
