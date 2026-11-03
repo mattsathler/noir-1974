@@ -1,35 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import IntroductionPage, { LocationIntroductionPage } from "../modules/prologue/pages/introduction/IntroductionPage.jsx";
+import { useCallback, useEffect, useState } from "react";
 import LoginPage from "../modules/identity/pages/login/LoginPage.jsx";
 import RegisterPage from "../modules/identity/pages/register/RegisterPage.jsx";
 import CharacterCreationPage from "../modules/identity/pages/character-creation/CharacterCreationPage.jsx";
-import ArchivePage from "../modules/identity/pages/archive/ArchivePage.jsx";
 import GamePage from "../modules/game/pages/main/GamePage.jsx";
 import Whiteboard from "../modules/cases/pages/files/Whiteboard.jsx";
+import ComputerAccessShell from "../modules/identity/components/ComputerAccessShell.jsx";
+import WorkstationStartup from "../modules/identity/components/WorkstationStartup.jsx";
+import { clearBootedThisLogin } from "../modules/game/pages/main/computerBoot.js";
 import { currentIdentity, logoutAccount } from "../modules/identity/api.js";
 import { clearWorldLocationCache } from "../modules/world/api.js";
 
-const COMPLETION_TRANSITION_DELAY = 2500;
-
 function pageFromPath(pathname) {
+  if (pathname === "/") return "startup";
   if (/^\/whiteboard(?:\/[^/]+)?\/?$/.test(pathname)) return "whiteboard";
   if (pathname === "/login") return "login";
   if (pathname === "/register") return "register";
   if (pathname === "/character/new") return "character";
-  if (pathname === "/archive") return "archive";
-  if (pathname === "/arrival") return "arrival";
-  if (pathname === "/game") return "game";
+  if (["/game", "/archive", "/arrival"].includes(pathname)) return "game";
+  if (pathname === "/loading") return "loading";
   if (pathname === "/logout") return "logout";
-  return "intro";
+  return "login";
+}
+
+function needsSession(page) {
+  return ["game", "character", "loading", "whiteboard"].includes(page);
 }
 
 export default function App() {
   const [page, setPage] = useState(() => pageFromPath(window.location.pathname));
   const [world, setWorld] = useState(null);
-  const [identity, setIdentity] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(() => ["intro", "login", "whiteboard"].includes(pageFromPath(window.location.pathname)));
+  const [checkingSession, setCheckingSession] = useState(() => needsSession(pageFromPath(window.location.pathname)));
   const [sessionCheckCount, setSessionCheckCount] = useState(0);
-  const completionTimer = useRef(null);
+  const [loadingDestination, setLoadingDestination] = useState("game");
 
   useEffect(() => {
     if (!checkingSession) return undefined;
@@ -40,7 +42,6 @@ export default function App() {
     currentIdentity()
       .then((current) => {
         if (!active) return;
-        setIdentity(current);
         setWorld(current.world ?? null);
         const returnTo = new URLSearchParams(window.location.search).get("returnTo");
         if (requestedPage === "whiteboard" || requestedPage === "login" && returnTo && pageFromPath(returnTo) === "whiteboard") {
@@ -49,15 +50,20 @@ export default function App() {
           setPage("whiteboard");
           return;
         }
-        const nextPage = current.character ? "archive" : "character";
-        const nextPath = current.character ? "/archive" : "/character/new";
+        const nextPage = current.character ? "game" : "character";
+        const nextPath = current.character ? "/game" : "/character/new";
         window.history.replaceState({}, "", nextPath);
         setPage(nextPage);
       })
       .catch(() => {
-        if (!active || requestedPage !== "whiteboard") return;
-        window.history.replaceState({}, "", `/login?returnTo=${encodeURIComponent(requestedPath)}`);
-        setPage("login");
+        if (!active) return;
+        if (requestedPage === "whiteboard") {
+          window.history.replaceState({}, "", `/login?returnTo=${encodeURIComponent(requestedPath)}`);
+          setPage("login");
+        } else if (requestedPage !== "login") {
+          window.history.replaceState({}, "", "/login");
+          setPage("login");
+        }
       })
       .finally(() => {
         if (active) setCheckingSession(false);
@@ -70,7 +76,7 @@ export default function App() {
     const handlePopState = () => {
       const nextPage = pageFromPath(window.location.pathname);
       setPage(nextPage);
-      if (["intro", "login", "whiteboard"].includes(nextPage)) {
+      if (needsSession(nextPage)) {
         setCheckingSession(true);
         setSessionCheckCount((count) => count + 1);
       }
@@ -80,45 +86,47 @@ export default function App() {
   }, []);
 
   const navigate = useCallback((path, nextPage, nextData = null) => {
-    window.clearTimeout(completionTimer.current);
-    completionTimer.current = null;
     window.history.pushState({}, "", path);
-    if (["intro", "login"].includes(nextPage) || nextPage === "whiteboard" && !nextData) {
+    if (nextPage === "whiteboard" && !nextData) {
       setCheckingSession(true);
       setSessionCheckCount((count) => count + 1);
     }
-    if (nextPage === "archive") setIdentity(nextData);
-    if (nextPage === "whiteboard" && nextData) setIdentity(nextData);
-    if ((nextPage === "arrival" || nextPage === "game") && nextData) setWorld(nextData);
+    if (["character", "game", "loading"].includes(nextPage)) {
+      if (nextData) {
+        setWorld(nextData.world ?? nextData);
+      }
+    }
     setPage(nextPage);
   }, []);
 
   useEffect(() => {
     if (page !== "logout") return undefined;
     let active = true;
-    setIdentity(null);
     setWorld(null);
-    try { sessionStorage.removeItem("noir:computer:booted-this-login"); }
-    catch { /* Storage may be disabled by the browser. */ }
+    clearBootedThisLogin();
     logoutAccount().catch(() => {}).finally(() => {
-      if (active) navigate("/login", "login");
+      if (active) navigate("/", "startup");
     });
     return () => { active = false; };
   }, [navigate, page]);
 
-  const navigateAfterCompletion = useCallback((path, nextPage, nextData = null) => {
-    window.clearTimeout(completionTimer.current);
-    completionTimer.current = window.setTimeout(() => {
-      completionTimer.current = null;
-      navigate(path, nextPage, nextData);
-    }, COMPLETION_TRANSITION_DELAY);
-  }, [navigate]);
-
-  useEffect(() => () => window.clearTimeout(completionTimer.current), []);
+  useEffect(() => {
+    if (page !== "loading") return undefined;
+    const timer = window.setTimeout(() => navigate(`/${loadingDestination}`, loadingDestination), 850);
+    return () => window.clearTimeout(timer);
+  }, [loadingDestination, navigate, page]);
 
   if (checkingSession) {
-    return <main className="min-h-screen bg-deep" aria-label="Checking session" aria-busy="true" />;
+    return <ComputerAccessShell title="Checking user session" labelledBy="session-check-title" busy>
+      <section className="m-auto text-primary" aria-labelledby="session-check-title">
+        <p className="text-xs tracking-wide uppercase text-success m-0 mb-3">MERID_OS · AUTHENTICATION SERVICE</p>
+        <h1 id="session-check-title" className="text-xl m-0">Checking session</h1>
+        <p className="text-sm text-secondary" role="status">Verifying this workstation account…</p>
+      </section>
+    </ComputerAccessShell>;
   }
+
+  if (page === "startup") return <WorkstationStartup onComplete={() => navigate("/login", "login")} />;
 
   if (page === "login") {
     return (
@@ -128,27 +136,33 @@ export default function App() {
           clearWorldLocationCache();
           const returnTo = new URLSearchParams(window.location.search).get("returnTo");
           if (returnTo && pageFromPath(returnTo) === "whiteboard") return navigate(returnTo, "whiteboard", authenticatedIdentity);
-          return navigate(
-            authenticatedIdentity.character ? "/archive" : "/character/new",
-            authenticatedIdentity.character ? "archive" : "character",
-            authenticatedIdentity.character ? authenticatedIdentity : null,
-          );
+          if (authenticatedIdentity.character) {
+            setLoadingDestination("game");
+            return navigate("/loading", "loading", authenticatedIdentity);
+          }
+          return navigate("/character/new", "character", authenticatedIdentity);
         }}
       />
     );
   }
   if (page === "register") {
-    return <RegisterPage onLogin={() => navigate("/login", "login")} onAccountCreated={() => navigateAfterCompletion("/character/new", "character")} />;
+    return <RegisterPage onLogin={() => navigate("/login", "login")} onAccountCreated={() => navigate("/character/new", "character")} />;
   }
-  if (page === "character") return <CharacterCreationPage onComplete={() => navigateAfterCompletion("/archive", "archive")} />;
-  if (page === "archive") return <ArchivePage initialIdentity={identity} onLoaded={(loadedWorld) => navigateAfterCompletion("/arrival", "arrival", loadedWorld)} />;
-  if (page === "arrival") return <LocationIntroductionPage world={world} onComplete={(loadedWorld) => navigateAfterCompletion("/game", "game", loadedWorld)} />;
+  if (page === "character") return <CharacterCreationPage onComplete={() => { setLoadingDestination("game"); navigate("/loading", "loading"); }} />;
+  if (page === "loading") return <ComputerAccessShell title="Loading computer" labelledBy="workstation-loading-title" variant="login" busy>
+    <section className="computer-access-loading" aria-labelledby="workstation-loading-title" role="status">
+      <strong className="computer-sequence__brand"><span>M</span><span>OS</span></strong>
+      <h1 id="workstation-loading-title">Starting</h1>
+    </section>
+  </ComputerAccessShell>;
   if (page === "game") return <GamePage initialWorld={world} onLogout={() => navigate("/logout", "logout")} />;
   if (page === "whiteboard") {
     const boardPath = window.location.pathname.match(/^\/whiteboard(?:\/([^/]+))?\/?$/);
     const boardId = boardPath?.[1] ? decodeURIComponent(boardPath[1]) : undefined;
     return <main className="whiteboard-standalone"><Whiteboard initialBoardId={boardId} standalone focusBoard={(nextBoardId) => window.history.replaceState({}, "", `/whiteboard/${encodeURIComponent(nextBoardId)}`)} /></main>;
   }
-  if (page === "logout") return <main className="min-h-screen bg-deep" aria-label="Ending session" aria-busy="true" />;
-  return <IntroductionPage onComplete={() => navigateAfterCompletion("/login", "login")} />;
+  if (page === "logout") return <ComputerAccessShell title="Ending user session" labelledBy="session-end-title" busy>
+    <section className="m-auto text-primary" aria-labelledby="session-end-title"><h1 id="session-end-title" className="text-xl m-0">Ending session</h1><p className="text-sm text-secondary">Closing this workstation account…</p></section>
+  </ComputerAccessShell>;
+  return <LoginPage onRegister={() => navigate("/register", "register")} onAuthenticated={(authenticatedIdentity) => navigate(authenticatedIdentity.character ? "/game" : "/character/new", authenticatedIdentity.character ? "game" : "character", authenticatedIdentity)} />;
 }

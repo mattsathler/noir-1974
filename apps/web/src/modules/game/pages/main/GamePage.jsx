@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { currentIdentity } from "../../../identity/api.js";
 import ComputerDesktop from "./ComputerDesktop.jsx";
 import { connectProxy, getCompanyWebsite, getCurrentWorld, requestFacilitySiteAccess } from "../../../world/api.js";
-import CharacterConversation from "./CharacterConversation.jsx";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
+import ComputerAccessShell from "../../../identity/components/ComputerAccessShell.jsx";
 import { readDesktopPreferences, saveDesktopPreferences } from "./desktopPreferences.js";
 import { playRetroSound, readRetroSoundEnabled, setRetroSoundEnabled } from "./retroSoundEffects.js";
 
@@ -270,6 +270,15 @@ export default function GamePage({ initialWorld = null, onLogout }) {
 
   useEffect(() => { saveDesktopPreferences(desktopPreferences); }, [desktopPreferences]);
 
+  if (!world && error) {
+    return <ComputerAccessShell title="Workstation connection error" labelledBy="workstation-error-title">
+      <section className="w-full max-w-xl m-auto text-primary" aria-labelledby="workstation-error-title">
+        <h1 id="workstation-error-title" className="text-xl m-0 mb-4">Workstation unavailable</h1>
+        <APIErrorNotice error={error.cause ?? error} onRetry={error.retry} retryLabel={error.retryLabel} className="text-sm text-danger" />
+      </section>
+    </ComputerAccessShell>;
+  }
+
   return (
     <main className="game-screen pos-relative min-h-screen overflow-hidden bg-atmosphere text-primary" aria-label="Detective computer desktop">
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">Proxy jurisdiction: {location || "not connected"}</p>
@@ -311,9 +320,10 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           soundEffectsEnabled={soundEffectsEnabled}
           onSoundEffectsChange={setSoundEffectsEnabled}
           onLogout={onLogout}
+          conversationCharacter={conversationCharacter}
+          onCloseConversation={closeConversation}
         />
       )}
-      {conversationCharacter && <CharacterConversation characterId={conversationCharacter} onClose={closeConversation} />}
     </main>
   );
 }

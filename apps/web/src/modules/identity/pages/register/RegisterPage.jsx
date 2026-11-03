@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { registerAccount } from "../../api.js";
+import ComputerAccessShell from "../../components/ComputerAccessShell.jsx";
 
 export default function RegisterPage({ onLogin, onAccountCreated }) {
   const [passwordMismatch, setPasswordMismatch] = useState(false);
@@ -50,22 +51,20 @@ export default function RegisterPage({ onLogin, onAccountCreated }) {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-atmosphere text-primary">
-      <div className="pd-backdrop pos-absolute inset-0" aria-hidden="true" />
-      <div className="pos-relative w-full max-w-sm">
-        <img className="brand-mark" src="/images/logo.png" alt="NOIR 1974" />
-        <section className="w-full p-6 surface shadow-panel" aria-labelledby="register-title">
-          <h1 id="register-title" className="text-2xl m-0 mb-8">Create account</h1>
+    <ComputerAccessShell title="Create account" labelledBy="register-title" variant="login">
+      <section className="w-full max-w-sm m-auto text-primary" aria-labelledby="register-title">
+          <div className="computer-access-shell__app-icon" aria-hidden="true"><strong className="computer-sequence__brand"><span>M</span><span>OS</span></strong></div>
+          <h1 id="register-title" className="text-2xl m-0 mb-5 text-center">Create account</h1>
           <form className="grid gap-3" onSubmit={handleSubmit} noValidate>
             <label className="text-sm text-secondary mt-2" htmlFor="register-username">Username</label>
-            <input className="w-full min-h-11 p-3 border bg-base text-primary focus-ring" id="register-username" name="username" type="text" autoComplete="username" minLength={3} maxLength={24} pattern="[A-Za-z0-9_-]{3,24}" aria-describedby="register-username-hint" required />
+            <input className="computer-access-shell__input" id="register-username" name="username" type="text" autoComplete="username" minLength={3} maxLength={24} pattern="[A-Za-z0-9_-]{3,24}" aria-describedby="register-username-hint" required />
             <label className="text-sm text-secondary mt-2" htmlFor="register-email">Email</label>
-            <input className="w-full min-h-11 p-3 border bg-base text-primary focus-ring" id="register-email" name="email" type="email" autoComplete="email" maxLength={254} aria-describedby="register-email-hint" required />
+            <input className="computer-access-shell__input" id="register-email" name="email" type="email" autoComplete="email" maxLength={254} aria-describedby="register-email-hint" required />
             <label className="text-sm text-secondary mt-2" htmlFor="register-password">Password</label>
-            <input className="w-full min-h-11 p-3 border bg-base text-primary focus-ring" id="register-password" name="password" type="password" autoComplete="new-password" aria-describedby="register-password-hint" required />
+            <input className="computer-access-shell__input" id="register-password" name="password" type="password" autoComplete="new-password" aria-describedby="register-password-hint" required />
             <label className="text-sm text-secondary mt-2" htmlFor="register-confirm-password">Confirm password</label>
             <input
-              className="w-full min-h-11 p-3 border bg-base text-primary focus-ring"
+              className="computer-access-shell__input"
               id="register-confirm-password"
               name="confirmPassword"
               type="password"
@@ -84,8 +83,7 @@ export default function RegisterPage({ onLogin, onAccountCreated }) {
               Sign in
             </button>
           </p>
-        </section>
-      </div>
-    </main>
+      </section>
+    </ComputerAccessShell>
   );
 }

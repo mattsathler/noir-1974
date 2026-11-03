@@ -1748,6 +1748,38 @@
   background: var(--noir-desktop-wallpaper);
 }
 .computer-shell { display: grid; place-items: center; background: radial-gradient(ellipse at center, #1a201b, #080a08 80%); }
+.computer-access-shell { --noir-brass-400: #00b8d1; --noir-brass-300: #42d7e7; --noir-success: #00b8d1; width: 100%; min-height: 100svh; color: #202a30; background: #07100f; }
+.computer-access-shell__screen { position: relative; display: flex; width: 100%; min-height: 100svh; flex-direction: column; margin: 0; overflow: hidden; background: radial-gradient(ellipse at 78% 32%, rgb(18 91 80 / 34%), transparent 38%), radial-gradient(ellipse at 76% 35%, rgb(14 58 73 / 45%), transparent 62%), linear-gradient(135deg, #061217, #07100f 58%, #0d1714); }
+.computer-access-shell__desktop { display: grid; min-height: 0; flex: 1 1 auto; place-items: center; padding: clamp(1rem, 4vw, 3rem); overflow: auto; background-image: radial-gradient(ellipse at 52% 43%, rgb(0 184 209 / 9%), transparent 38%), linear-gradient(135deg, transparent 0 48%, rgb(10 17 12 / 16%) 48% 49%, transparent 49%), repeating-linear-gradient(0deg, transparent 0 3rem, rgb(255 255 255 / 2%) 3.03rem 3.08rem); }
+.computer-access-shell__window { width: min(100%, 43rem); max-height: calc(100svh - 4rem); overflow: hidden; color: #28312a; background: #e6e7dc; border: 1px solid #758073; box-shadow: 0.3rem 0.4rem 1.4rem rgb(0 0 0 / 40%), inset 1px 1px #fff; }
+.computer-access-shell__titlebar { display: flex; min-height: 2rem; align-items: center; gap: 1rem; padding: 0.35rem 0.7rem; color: #edf0e5; background: linear-gradient(#566958, #34463a); border-bottom: 1px solid #25352b; font: 600 0.65rem/1.2 Arial, sans-serif; letter-spacing: 0.04em; }
+.computer-access-shell__titlebar > span:first-child { display: flex; align-items: center; gap: 0.45rem; }
+.computer-access-shell__titlebar .computer-status-light { display: inline-block; width: 0.55rem; height: 0.55rem; background: #00b8d1; border: 1px solid #83e9f4; border-radius: 50%; }
+.computer-access-shell__content { max-height: calc(100svh - 6rem); padding: clamp(0.8rem, 2.5vw, 1.5rem); overflow: auto; }
+.computer-access-shell__app-icon { display: grid; place-items: center; margin: 0 auto 1.25rem; }
+.computer-access-shell__app-icon .computer-sequence__brand span:first-child { font-size: 3.8rem; }
+.computer-access-shell__app-icon .computer-sequence__brand span:last-child { margin-top: 0.2rem; font-size: 1.25rem; }
+.computer-access-shell__input { box-sizing: border-box; width: 100%; min-height: 2.6rem; padding: 0.5rem 0.6rem; color: #263746; background: #fff; border: 1px solid #aebbc8; border-radius: 0; font: 0.82rem Arial, sans-serif; }
+.computer-access-shell__input:focus-visible { outline: 2px solid #00b8d1; outline-offset: 1px; }
+.computer-access-shell__input[aria-invalid="true"] { border-color: #a63d3d; }
+.computer-access-shell .text-primary { color: #202a30; }
+.computer-access-shell .text-secondary { color: #46555b; }
+.computer-access-shell button.text-accent { color: #00b8d1; }
+.computer-access-shell form > button[type="submit"] { min-height: 2.7rem; padding: 0.5rem 1rem; color: #000; background: #00b8d1; border: 1px solid #00b8d1; font: inherit; font-size: 0.72rem; letter-spacing: 0.1em; cursor: pointer; }
+.computer-access-shell form > button[type="submit"]:hover { background: #42d7e7; border-color: #42d7e7; }
+.computer-access-shell__scanlines { position: absolute; z-index: 3; inset: 0; pointer-events: none; opacity: 0.12; background: repeating-linear-gradient(0deg, transparent 0 6px, rgb(0 0 0 / 45%) 7px 8px); mix-blend-mode: multiply; }
+.computer-access-shell--login .computer-access-shell__screen { background: linear-gradient(145deg, #e7eeea, #cbd9d5); }
+.computer-access-shell--login .computer-access-shell__desktop { background-color: #dce7e3; background-image: radial-gradient(ellipse at 50% 42%, rgb(0 184 209 / 14%), transparent 46%), repeating-linear-gradient(0deg, transparent 0 3rem, rgb(13 56 62 / 3%) 3.03rem 3.08rem); }
+.computer-startup { width: 100%; min-height: 100svh; color: #d4d7d2; background: #050505; font-family: "Courier New", monospace; }
+.computer-startup__screen { position: relative; min-height: 100svh; overflow: hidden; }
+.computer-startup__bios { min-height: 100svh; box-sizing: border-box; }
+.computer-startup__screen--intro { display: grid; place-items: center; color: #202a30; background: #f3f1e8; }
+.computer-startup__brand { display: grid; justify-items: center; gap: 1.3rem; text-align: center; animation: computer-startup-appear 0.7s ease-out both; }
+.computer-startup__brand p { margin: 0; color: #202a30; font: 600 0.68rem/1.2 var(--noir-font-mono); letter-spacing: 0.18em; }
+.computer-access-loading { display: grid; justify-items: center; gap: 1rem; }
+.computer-access-loading .computer-sequence__brand { transform: scale(0.55); transform-origin: center; }
+.computer-access-loading h1 { margin: -1.2rem 0 0; color: #202a30; font: 600 0.7rem/1.2 var(--noir-font-mono); letter-spacing: 0.15em; text-transform: uppercase; }
+@keyframes computer-startup-appear { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
 .computer-frame--persistent {
   box-sizing: border-box;
   width: 100%;

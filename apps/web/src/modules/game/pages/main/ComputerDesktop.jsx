@@ -51,41 +51,11 @@ import EmployeeDirectoryApp from "./EmployeeDirectoryApp.jsx";
 import NotificationCenter from "./NotificationCenter.jsx";
 import CharacterAppearanceEditor from "../../../identity/components/CharacterAppearanceEditor.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
+import CharacterConversation from "./CharacterConversation.jsx";
 import { DEFAULT_DESKTOP_PREFERENCES, DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
 import { playRetroSound } from "./retroSoundEffects.js";
-
-const BOOT_LINES = [
-  "PhoenixBIOS Meridian Systems 4.1 Release",
-  "Copyright 1974-1984 Meridian Enterprises",
-  "All Rights Reserved",
-  "BIOS version 4.1.74",
-  "System ID = M_OS-00250850",
-  "Build Time: 10/18/74 09:09:52",
-  "CPU: Meridian 16-bit Processor 1066 MHz",
-  "640K System RAM Passed",
-  "254M Extended RAM Passed",
-  "512K Cache SRAM Passed",
-  "System BIOS shadowed",
-  "Video BIOS shadowed",
-  "Detecting primary IDE controller… OK",
-  "Checking local file system… OK",
-  "Initializing Meridian network stack…",
-  "Private relay connection established",
-  "Loading Meridian OS workstation services…",
-  "System startup complete.",
-];
-const LOGIN_BOOT_STORAGE_KEY = "noir:computer:booted-this-login";
+import { COMPUTER_BOOT_LINES as BOOT_LINES, hasBootedThisLogin, markBootedThisLogin } from "./computerBoot.js";
 const NOOP = () => {};
-
-function hasBootedThisLogin() {
-  try { return sessionStorage.getItem(LOGIN_BOOT_STORAGE_KEY) === "true"; }
-  catch { return false; }
-}
-
-function markBootedThisLogin() {
-  try { sessionStorage.setItem(LOGIN_BOOT_STORAGE_KEY, "true"); }
-  catch { /* Boot remains available when browser storage is disabled. */ }
-}
 const PERSONAL_PROGRAMS = [
   { id: "web-browser", label: "WEB BROWSER", Icon: Target, state: "ONLINE", available: true },
   { id: "terminal", label: "TERMINAL", Icon: Terminal, state: "READY", available: true },
@@ -237,7 +207,7 @@ function browserAddress(program, facilityContext, cityId) {
   return networkSiteAddress(program, countryId, program.id);
 }
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onNotification, notifications = [], notificationsOpen = false, onToggleNotifications = () => {}, onCloseNotifications = () => {}, onDeleteNotification = () => {}, snackbar, onDismissSnackbar = () => {}, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, playerProgression = null, onProgressionChange = NOOP, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange, soundEffectsEnabled = true, onSoundEffectsChange }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onNotification, notifications = [], notificationsOpen = false, onToggleNotifications = () => {}, onCloseNotifications = () => {}, onDeleteNotification = () => {}, snackbar, onDismissSnackbar = () => {}, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, playerProgression = null, onProgressionChange = NOOP, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange, soundEffectsEnabled = true, onSoundEffectsChange, conversationCharacter, onCloseConversation }) {
   const notifyNewPlayerMessage = useCallback((message) => onNotification?.({ type: "EMAIL", title: message.subject || "New email received", message: `From ${message.sender || "unknown sender"}.` }), [onNotification]);
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
@@ -1064,6 +1034,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               <footer className="ghostkey__warning-actions"><button type="button" onClick={() => { setGhostkeyWarningOpen(false); setSecurityWarningProgram(null); }}>CANCEL</button><button type="button" autoFocus onClick={() => { const program = securityWarningProgram; setGhostkeyWarningOpen(false); setSecurityWarningProgram(null); launchProgram(program, null, null, true); }}>RUN ANYWAY</button></footer>
             </section>
           </div>}
+          {conversationCharacter && <CharacterConversation characterId={conversationCharacter} onClose={onCloseConversation} />}
         </div>
       </div>
       {!persistent && <div className="computer-indicator" aria-hidden="true"><span /> POWER</div>}

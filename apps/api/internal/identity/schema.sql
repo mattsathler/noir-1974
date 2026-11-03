@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS player_blackwire_accounts (
     crypto_cents bigint NOT NULL DEFAULT 0 CHECK (crypto_cents >= 0),
     reputation bigint NOT NULL DEFAULT 0 CHECK (reputation >= 0),
     level integer NOT NULL DEFAULT 1 CHECK (level >= 1),
+    identity_generation integer NOT NULL DEFAULT 1 CHECK (identity_generation >= 1),
+    banned_at timestamptz,
     legacy_sales_migrated boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -53,6 +55,8 @@ CREATE TABLE IF NOT EXISTS player_blackwire_accounts (
         REFERENCES player_economy(server_id, account_id) ON DELETE CASCADE
 );
 ALTER TABLE player_blackwire_accounts ADD COLUMN IF NOT EXISTS legacy_sales_migrated boolean NOT NULL DEFAULT true;
+ALTER TABLE player_blackwire_accounts ADD COLUMN IF NOT EXISTS identity_generation integer NOT NULL DEFAULT 1;
+ALTER TABLE player_blackwire_accounts ADD COLUMN IF NOT EXISTS banned_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS player_stock_positions (
     server_id uuid NOT NULL,

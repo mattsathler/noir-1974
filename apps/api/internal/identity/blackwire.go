@@ -14,6 +14,8 @@ import (
 )
 
 var errBlackwireUnavailable = errors.New("blackwire information is unavailable")
+var errBlackwireBanned = errors.New("blackwire identity has been burned")
+var errBlackwireIdentityNotBanned = errors.New("blackwire identity is not eligible for replacement")
 
 type blackwireOffer struct {
 	BoardID    string `json:"boardId"`
@@ -37,6 +39,7 @@ type blackwireAccount struct {
 	CryptoCents          int64    `json:"cryptoCents"`
 	Reputation           int64    `json:"reputation"`
 	Level                int      `json:"level"`
+	Banned               bool     `json:"banned"`
 	NextLevelReputation  int64    `json:"nextLevelReputation"`
 	UnlockedApplications []string `json:"unlockedApplications"`
 }
@@ -45,6 +48,10 @@ type blackwireStore interface {
 	blackwireOffers(context.Context, string, string) (blackwireMarketplace, error)
 	blackwireProfile(context.Context, string, string) (blackwireAccount, error)
 	sellBlackwireItem(context.Context, string, string, string, string) (blackwireOffer, blackwireAccount, error)
+}
+
+type blackwireIdentityRegistrar interface {
+	registerNewBlackwireIdentity(context.Context, string, string) (blackwireAccount, error)
 }
 
 var blackwireLevelThresholds = []int64{0, 50, 150, 400, 900}
@@ -96,8 +103,8 @@ func ensureBlackwireAccount(ctx context.Context, db querier, accountID, serverID
 
 func readBlackwireAccount(ctx context.Context, db querier, accountID, serverID string) (blackwireAccount, error) {
 	var result blackwireAccount
-	err := db.QueryRow(ctx, `SELECT handle,crypto_cents,reputation,level FROM player_blackwire_accounts
-		WHERE server_id=$1::uuid AND account_id=$2::uuid`, serverID, accountID).Scan(&result.Handle, &result.CryptoCents, &result.Reputation, &result.Level)
+	err := db.QueryRow(ctx, `SELECT handle,crypto_cents,reputation,level,banned_at IS NOT NULL FROM player_blackwire_accounts
+		WHERE server_id=$1::uuid AND account_id=$2::uuid`, serverID, accountID).Scan(&result.Handle, &result.CryptoCents, &result.Reputation, &result.Level, &result.Banned)
 	if err != nil {
 		return blackwireAccount{}, err
 	}
@@ -116,6 +123,46 @@ func (s *postgresStore) blackwireProfile(ctx context.Context, accountID, serverI
 		return blackwireAccount{}, err
 	}
 	return readBlackwireAccount(ctx, s.db, accountID, serverID)
+}
+
+func (s *postgresStore) registerNewBlackwireIdentity(ctx context.Context, accountID, serverID string) (blackwireAccount, error) {
+	transactional, ok := s.db.(interface {
+		Begin(context.Context) (pgx.Tx, error)
+	})
+	if !ok {
+		return blackwireAccount{}, errors.New("blackwire identity transactions are unavailable")
+	}
+	tx, err := transactional.Begin(ctx)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := ensureBlackwireAccount(ctx, tx, accountID, serverID); err != nil {
+		return blackwireAccount{}, err
+	}
+	result, err := tx.Exec(ctx, `UPDATE player_blackwire_accounts
+		SET identity_generation=identity_generation+1,
+			handle='BW-'||upper(substr(md5(server_id::text||':'||account_id::text||':'||(identity_generation+1)::text),1,8)),
+			crypto_cents=0,reputation=0,level=1,banned_at=NULL,updated_at=now()
+		WHERE server_id=$1::uuid AND account_id=$2::uuid AND banned_at IS NOT NULL`, serverID, accountID)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	if result.RowsAffected() == 0 {
+		return blackwireAccount{}, errBlackwireIdentityNotBanned
+	}
+	if _, err := tx.Exec(ctx, `UPDATE player_hacker_exposure SET exposure=0,updated_at=now()
+		WHERE server_id=$1::uuid AND account_id=$2::uuid`, serverID, accountID); err != nil {
+		return blackwireAccount{}, err
+	}
+	profile, err := readBlackwireAccount(ctx, tx, accountID, serverID)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return blackwireAccount{}, err
+	}
+	return profile, nil
 }
 
 func classifyBlackwireOffer(item map[string]any) (int64, string, string) {
@@ -184,6 +231,13 @@ func (s *postgresStore) blackwireOffers(ctx context.Context, accountID, serverID
 	if err := ensureBlackwireAccount(ctx, s.db, accountID, serverID); err != nil {
 		return blackwireMarketplace{}, err
 	}
+	profile, err := readBlackwireAccount(ctx, s.db, accountID, serverID)
+	if err != nil {
+		return blackwireMarketplace{}, err
+	}
+	if profile.Banned {
+		return blackwireMarketplace{Offers: []blackwireOffer{}, Account: profile}, nil
+	}
 	queryer, ok := s.db.(interface {
 		Query(context.Context, string, ...any) (pgx.Rows, error)
 	})
@@ -235,10 +289,7 @@ func (s *postgresStore) blackwireOffers(ctx context.Context, accountID, serverID
 	if err := rows.Err(); err != nil {
 		return blackwireMarketplace{}, err
 	}
-	result.Account, err = readBlackwireAccount(ctx, s.db, accountID, serverID)
-	if err != nil {
-		return blackwireMarketplace{}, err
-	}
+	result.Account = profile
 	return result, nil
 }
 
@@ -256,6 +307,14 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 	defer tx.Rollback(ctx)
 	if err := ensureBlackwireAccount(ctx, tx, accountID, serverID); err != nil {
 		return blackwireOffer{}, blackwireAccount{}, err
+	}
+	var banned bool
+	if err := tx.QueryRow(ctx, `SELECT banned_at IS NOT NULL FROM player_blackwire_accounts
+		WHERE server_id=$1::uuid AND account_id=$2::uuid FOR UPDATE`, serverID, accountID).Scan(&banned); err != nil {
+		return blackwireOffer{}, blackwireAccount{}, err
+	}
+	if banned {
+		return blackwireOffer{}, blackwireAccount{}, errBlackwireBanned
 	}
 	var boardTitle string
 	var raw []byte

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getBlackwireMarket, markWhiteboardItemSold, sellBlackwireItem } from "../../../world/api.js";
+import { getBlackwireMarket, markWhiteboardItemSold, registerNewBlackwireIdentity, sellBlackwireItem } from "../../../world/api.js";
 import "./BlackwireWebsite.css";
 
 export default function BlackwireWebsite({ onAccountChange = () => {} }) {
@@ -11,6 +11,7 @@ export default function BlackwireWebsite({ onAccountChange = () => {} }) {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selling, setSelling] = useState(false);
+  const [registering, setRegistering] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -63,6 +64,22 @@ export default function BlackwireWebsite({ onAccountChange = () => {} }) {
     }
   }
 
+  async function createNewIdentity() {
+    if (registering) return;
+    setRegistering(true);
+    setError("");
+    try {
+      const result = await registerNewBlackwireIdentity();
+      setMarket((current) => ({ ...current, account: result.account, offers: [] }));
+      onAccountChange(result.account || null);
+      setMessage("NEW IDENTITY REGISTERED. YOUR PREVIOUS REPUTATION AND CRYPTO ARE GONE.");
+    } catch {
+      setError("A NEW IDENTITY COULD NOT BE REGISTERED. RELOAD THE RELAY AND TRY AGAIN.");
+    } finally {
+      setRegistering(false);
+    }
+  }
+
   return <main className="blackwire-site" ref={siteRef} aria-label="Blackwire clandestine network">
     <header className="blackwire-site__masthead">
       <div className="blackwire-site__mark" aria-hidden="true">BW</div>
@@ -86,7 +103,8 @@ export default function BlackwireWebsite({ onAccountChange = () => {} }) {
     <section className="blackwire-site__market" aria-labelledby="blackwire-market-title">
       <header><div><p className="blackwire-site__eyebrow">BLACKWIRE EXCHANGE</p><h2 id="blackwire-market-title">INFORMATION MARKET</h2></div><span>PRIVATE SETTLEMENT · PERSONAL MAIL</span></header>
       <p className="blackwire-site__market-copy">Sell information pinned to your investigation boards. Every sale is final: the note is removed from your boards and can no longer support a case.</p>
-      {loading ? <p className="blackwire-site__market-status" role="status">SCANNING INVESTIGATION BOARDS…</p>
+      {market.account?.banned ? <div className="blackwire-site__ban-notice" role="alert"><p className="blackwire-site__eyebrow">RELAY ACCESS REVOKED · THE CROW</p><h3>This identity has been burned.</h3><p>Your previous Crypto and Blackwire reputation have been erased. Your personal account, Credits, and legal records remain untouched. You may register a new handle and begin again.</p><button type="button" disabled={registering} onClick={createNewIdentity}>{registering ? "REGISTERING…" : "REGISTER NEW IDENTITY ↵"}</button></div>
+        : loading ? <p className="blackwire-site__market-status" role="status">SCANNING INVESTIGATION BOARDS…</p>
         : error && market.offers.length === 0 ? <p className="blackwire-site__market-status" role="alert">{error}</p>
           : market.offers.length === 0 ? <p className="blackwire-site__market-status" role="status">NO INFORMATION PINNED · ADD NOTES OR RECORDS TO AN INVESTIGATION BOARD</p>
             : <>

@@ -1,6 +1,6 @@
 # M33 — Exposição hacker e defesas virtuais
 
-**Status:** Em andamento · proteções e alertas implementados
+**Status:** Em andamento · proteções, alertas e banimento da identidade implementados
 
 **Trilha:** Risco criminal, segurança corporativa e consequências narrativas  
 **Depende de:** M30 — Blackwire e venda de informações; M32 — conta e progressão do alter ego hacker
@@ -59,18 +59,16 @@ A intervenção de The Crow é uma consequência extrema, não uma punição aut
 - [x] Ações ilegais aumentam exposição conforme sua natureza e gravidade; Bankrupt pesa mais que ações de menor risco.
 - [ ] O jogador recebe indícios narrativos crescentes sem visualizar o contador interno. (Emails graduais implementados; conversas e notícias pendentes.)
 - [x] Trocar o Rogue DNS encerra alertas futuros relativos ao país anterior e reduz a exposição segundo uma regra consistente.
-- [ ] Consequências já iniciadas não desaparecem apenas pela troca de proxy.
-- [ ] Exposição crítica pode provocar a intervenção e o banimento por The Crow após alertas graduais. (A conta hacker separada e seu progresso agora existem na M32.)
-- [ ] Perder a conta Blackwire afeta a progressão ilegal, não os Credits, a fama ou os dados legais do personagem.
-- [ ] A conta nova começa com progresso hacker separado, conforme as regras de M32.
+- [x] Consequências já iniciadas não desaparecem apenas pela troca de proxy.
+- [x] Exposição crítica pode provocar a intervenção e o banimento por The Crow após alertas graduais. (A conta hacker separada e seu progresso agora existem na M32.)
+- [x] Perder a conta Blackwire afeta a progressão ilegal, não os Credits, a fama ou os dados legais do personagem.
+- [x] A conta nova começa com progresso hacker separado, conforme as regras de M32.
 
 ## Decisões pendentes
 
 - Lore adicional dos provedores de proteção e a possibilidade de ponderar sua distribuição por ramo ou porte.
 - Balanceamento de exposição por ação, persistência, recuperação e frequência dos alertas.
 - Tipos, autoria e frequência de mensagens anônimas e conversas de NPCs.
-- Avisos finais e janela de reação antes de The Crow banir uma conta.
-- Efeitos exatos do banimento: Crypto restante, aplicativos, dados e possibilidade de criar nova conta.
 - Como evitar que a exposição torne inevitável a perda de conta durante o uso normal de ferramentas necessárias.
 
 ## Implementação atual
@@ -83,13 +81,14 @@ A intervenção de The Crow é uma consequência extrema, não uma punição aut
 - Emails anônimos chegam ao jogador ao cruzar 20, 45, 70 e 90 pontos. A mensagem de 90 pontos é um aviso de The Crow.
 - Ao trocar para outro nó no Rogue DNS, a exposição da jurisdição anterior cai 35%. O app confirma quando encontrou e reduziu rastros, sem mostrar um medidor. Avisos já recebidos e consequências já publicadas permanecem.
 - A identidade hacker da M32 fornece o escopo para que esta milestone implemente banimento e perda da progressão ilegal sem atingir o personagem legal.
+- Um novo ato ilegal após o aviso de 90, enquanto a exposição permanece crítica, permite que The Crow queime a identidade. O banco zera Crypto e reputação, mantém Credits, fama e histórico de vendas, e exige o cadastro de um novo handle.
+- O novo handle recebe um identificador de geração distinto, começa no nível 1 e reinicia a exposição acumulada; os eventos de exposição e as consequências já entregues permanecem registrados.
 
 ## Escopo ainda pendente
 
 - Bloqueios e adulterações de registros além da interrupção recuperável da MWS; ampliar efeitos sem tornar dados essenciais inacessíveis.
 - Conversas de NPCs e notícias sobre vazamentos e investigações.
 - Limiares, recuperação e frequência dos rastros balanceados no jogo.
-- Implementar o banimento da conta Blackwire e a perda somente do progresso hacker.
 
 ## Fora de escopo
 

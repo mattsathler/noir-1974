@@ -367,6 +367,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 			mux.HandleFunc("GET /api/blackwire/market", handler.blackwireMarket)
 			mux.HandleFunc("POST /api/blackwire/market/{boardID}/{itemID}/sell", handler.sellBlackwireOffer)
 		}
+		if _, ok := handler.store.(blackwireIdentityRegistrar); ok {
+			mux.HandleFunc("POST /api/blackwire/identity", handler.registerNewBlackwireIdentity)
+		}
 	}
 	mux.HandleFunc("POST /api/characters", handler.createCharacter)
 	mux.HandleFunc("PUT /api/characters/appearance", handler.updateCharacterAppearance)

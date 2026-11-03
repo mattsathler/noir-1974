@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { currentIdentity, loginAccount } from "../../api.js";
+import ComputerAccessShell from "../../components/ComputerAccessShell.jsx";
 
 export default function LoginPage({ onRegister, onAuthenticated }) {
   const [error, setError] = useState("");
@@ -38,30 +39,25 @@ export default function LoginPage({ onRegister, onAuthenticated }) {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center overflow-hidden pos-relative p-6 bg-deep text-primary">
-      <div className="pd-backdrop pos-absolute inset-0" aria-hidden="true" />
-      <div className="texture-scanlines pos-absolute inset-0 pointer-events-none opacity-10" aria-hidden="true" />
-      <div className="pos-relative w-full max-w-sm">
-        <img className="brand-mark" src="/images/logo.png" alt="NOIR 1974" />
-        <section className="w-full p-6 surface shadow-panel" aria-labelledby="login-title">
-          <p className="text-xs tracking-wide uppercase text-success m-0 mb-3">INTERPOL · LYON</p>
-          <h1 id="login-title" className="text-2xl m-0 mb-4">Access the files</h1>
-          <form className="grid gap-3" onSubmit={handleSubmit} noValidate>
-            <label className="text-sm text-secondary mt-2" htmlFor="agent-email">Email</label>
-            <input className="w-full min-h-11 p-3 border bg-base text-primary focus-ring" id="agent-email" name="email" type="email" autoComplete="email" maxLength={254} aria-describedby="login-email-hint" required />
-            <label className="text-sm text-secondary mt-2" htmlFor="agent-password">Password</label>
-            <input className="w-full min-h-11 p-3 border bg-base text-primary focus-ring" id="agent-password" name="password" type="password" autoComplete="current-password" aria-describedby="login-password-hint" required />
-            {error && <p className="text-sm text-danger m-0" role="alert">{error}</p>}
-            <button className="min-h-11 mt-4 justify-self-end border-0 bg-transparent text-accent tracking-wide uppercase transition" type="submit" disabled={submitting}>{submitting ? "Verifying…" : "Sign in"}</button>
-          </form>
-          <p className="text-sm text-secondary text-center mt-6 mb-0">
-            Need access?{" "}
-            <button className="border-0 bg-transparent text-accent underline" type="button" onClick={onRegister}>
-              Create account
-            </button>
-          </p>
-        </section>
-      </div>
-    </main>
+    <ComputerAccessShell title="User sign-in" labelledBy="login-title" variant="login">
+      <section className="w-full max-w-sm m-auto text-primary" aria-labelledby="login-title">
+        <div className="computer-access-shell__app-icon" aria-hidden="true"><strong className="computer-sequence__brand"><span>M</span><span>OS</span></strong></div>
+        <h1 id="login-title" className="text-2xl m-0 mb-5 text-center">Sign in</h1>
+        <form className="grid gap-3" onSubmit={handleSubmit} noValidate>
+          <label className="text-sm text-secondary mt-2" htmlFor="agent-email">Email</label>
+          <input className="computer-access-shell__input" id="agent-email" name="email" type="email" autoComplete="email" maxLength={254} required />
+          <label className="text-sm text-secondary mt-2" htmlFor="agent-password">Password</label>
+          <input className="computer-access-shell__input" id="agent-password" name="password" type="password" autoComplete="current-password" required />
+          {error && <p className="text-sm text-danger m-0" role="alert">{error}</p>}
+          <button className="min-h-11 mt-4 justify-self-end border-0 bg-transparent text-accent tracking-wide uppercase transition" type="submit" disabled={submitting}>{submitting ? "Verifying…" : "Sign in"}</button>
+        </form>
+        <p className="text-sm text-secondary text-center mt-6 mb-0">
+          Need a user account?{" "}
+          <button className="border-0 bg-transparent text-accent underline" type="button" onClick={onRegister}>
+            Create account
+          </button>
+        </p>
+      </section>
+    </ComputerAccessShell>
   );
 }
