@@ -282,7 +282,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
             </dl>
             <button className="page-print-button" type="button" aria-label={`Print person record for ${npc.name}`} title="Print record" onClick={() => onPrint?.({
               id: `person:${npc.id}`, source: "person", title: npc.name,
-              content: [`AGE · ${npc.age} YEARS`, `STATUS · ${npc.status?.toUpperCase() || "UNKNOWN"}`, `DESCRIPTION · ${npc.appearance || "NOT RECORDED"}`, `EMPLOYMENT · ${employment}`, `MARITAL STATUS · ${maritalStatus?.toUpperCase() || "UNKNOWN"}`, ...(reportedScene ? [`REPORTED SCENE · ${reportedScene.address}`] : [])].join("\n"),
+              content: [`AGE · ${npc.age} YEARS`, `STATUS · ${npc.status?.toUpperCase() || "UNKNOWN"}`, `DESCRIPTION · ${npc.appearance || "NOT RECORDED"}`, `EMPLOYMENT · ${employment}`, `MARITAL STATUS · ${maritalStatus?.toUpperCase() || "UNKNOWN"}`, ...(npc.personalData ? [`SEX · ${npc.personalData.sex}`, `BIRTHDAY · ${npc.personalData.birthDay} ${npc.personalData.birthMonth}`, `NATIONALITY · ${npc.personalData.nationality}`, `BIRTHPLACE · ${npc.personalData.birthplace}`, `LANGUAGE · ${npc.personalData.primaryLanguage}`, `IDENTIFICATION · ${npc.personalData.fictionalId}`, `SIGNATURE · ${npc.personalData.signature}`, `BLOOD TYPE · ${npc.personalData.bloodType}`, `BUILD · ${npc.personalData.bodyType}`, `HEIGHT · ${npc.personalData.heightCm} CM`, `WEIGHT · ${npc.personalData.weightKg} KG`, `DOMINANT HAND · ${npc.personalData.dominantHand}`, `TEMPERAMENT · ${npc.personalData.temperament}`, `HOBBIES · ${npc.personalData.hobbies?.join(", ")}`, ...(npc.personalData.religion ? [`RELIGION · ${npc.personalData.religion}`] : [])] : []), ...(reportedScene ? [`REPORTED SCENE · ${reportedScene.address}`] : [])].join("\n"),
               metadata: selectedPerson,
             })}><Printer aria-hidden="true" /></button>
           </>}
@@ -362,7 +362,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               <figure className="world-record__staff-portrait">
                 <ModularFace visual={employee.visual ?? FALLBACK_NPC_VISUAL} name={employee.name} />
               </figure>
-              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span><small>DAILY WAGE · {Number(employee.dailySalaryCredits || 0).toLocaleString("en-US")} CREDITS</small><small>BANK ACCOUNT · {employee.bankAccountNumber || "NOT LISTED"}</small><small>EMAIL · {employee.email}</small></div>
+              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span><small>DAILY WAGE · {Number(employee.dailySalaryCredits || 0).toLocaleString("en-US")} CREDITS</small><small>EMAIL · {employee.email}</small></div>
             </article>)}
           </div>
         </article>

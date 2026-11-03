@@ -178,12 +178,13 @@ type PersonSearchScene struct {
 }
 
 type PersonSearchNPC struct {
-	ID         string          `json:"id"`
-	Name       string          `json:"name"`
-	Age        int             `json:"age"`
-	Appearance string          `json:"appearance"`
-	Status     string          `json:"status"`
-	Visual     *VisualIdentity `json:"visual,omitempty"`
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Age          int             `json:"age"`
+	Appearance   string          `json:"appearance"`
+	Status       string          `json:"status"`
+	Visual       *VisualIdentity `json:"visual,omitempty"`
+	PersonalData NPCPersonalData `json:"personalData"`
 }
 
 type PersonSearchWorkplace struct {
@@ -1557,7 +1558,7 @@ func personSearchRecords(base World, matches []NPC) []PersonSearchRecord {
 			maritalStatus = "single"
 		}
 		results = append(results, PersonSearchRecord{
-			NPC:        PersonSearchNPC{ID: npc.ID, Name: npc.Name, Age: npc.Age, Appearance: npc.Appearance, Status: npc.Status, Visual: npc.Visual},
+			NPC:        PersonSearchNPC{ID: npc.ID, Name: npc.Name, Age: npc.Age, Appearance: npc.Appearance, Status: npc.Status, Visual: npc.Visual, PersonalData: npc.PersonalData},
 			Workplaces: workplaces, MaritalStatus: maritalStatus,
 		})
 	}
@@ -1988,6 +1989,9 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 			benefits := CompanyBenefits(entry.seed, cityVersion, company.Company.ID)
 			security := CompanyCyberSecurityFor(entry.seed, cityVersion, company.Company.ID)
 			applyCompanyCyberProtection(employees, security.Level)
+			for index := range employees {
+				employees[index].BankAccount = ""
+			}
 			return []CompanyRecord{{Company: company.Company, Address: company.Address, Employees: employees, Benefits: benefits, CyberSecurity: security}}, nil
 		}
 		store.observeCache("company_directory_index", false)
@@ -2024,6 +2028,9 @@ func (store *PostgresStore) CompanyDirectoryAtLocation(ctx context.Context, serv
 			return nil, fmt.Errorf("index company staff email addresses: %w", err)
 		}
 		applyCompanyCyberProtection(employees, record.CyberSecurity.Level)
+		for index := range employees {
+			employees[index].BankAccount = ""
+		}
 		record.Employees = employees
 		return []CompanyRecord{record}, nil
 	}

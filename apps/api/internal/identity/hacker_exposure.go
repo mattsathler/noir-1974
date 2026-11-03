@@ -22,9 +22,9 @@ var hackerExposureWarnings = []struct {
 	threshold int
 	message   hackerExposureMessage
 }{
-	{20, hackerExposureMessage{"Unusual traffic on the company relay", "Someone has noticed the traffic. Change your route while you still can."}},
-	{45, hackerExposureMessage{"A warning from an unknown sender", "‘Several offices are comparing records of recent intrusions. Stop using this route before they connect the incidents.’"}},
-	{70, hackerExposureMessage{"Corporate security is asking questions", "‘The security desks are sharing more than they should. Your last few visits were not as quiet as you think.’"}},
+	{30, hackerExposureMessage{"Unusual traffic on the company relay", "Someone has noticed the traffic. Change your route while you still can."}},
+	{55, hackerExposureMessage{"A warning from an unknown sender", "‘Several offices are comparing records of recent intrusions. Stop using this route before they connect the incidents.’"}},
+	{75, hackerExposureMessage{"Corporate security is asking questions", "‘The security desks are sharing more than they should. Your last few visits were not as quiet as you think.’"}},
 	{90, hackerExposureMessage{"The Crow has seen the reports", "An encrypted note from The Crow: ‘You have one chance to disappear from this route. Change proxies now. I cannot keep them off you forever.’"}},
 }
 

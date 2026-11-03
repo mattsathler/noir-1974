@@ -1317,6 +1317,7 @@ func (store *PostgresStore) QueueNPCEmailQuestion(ctx context.Context, serverID,
 		}
 		digest := sha256.Sum256([]byte(serverID + "/" + accountID + "/" + employee.ID + "/" + requestID + "/" + questionID))
 		answer = pool[binary.BigEndian.Uint64(digest[:8])%uint64(len(pool))]
+		answer = stripCrowLoreFromReply(answer)
 	} else {
 		// Persist the accepted request for idempotency, but mark it consumed without creating a reply.
 		deliveredAt = now
@@ -1340,6 +1341,24 @@ func (store *PostgresStore) QueueNPCEmailQuestion(ctx context.Context, serverID,
 		return PlayerEmailQuestionRequest{}, ErrPersistedConflict
 	}
 	return result, nil
+}
+
+func stripCrowLoreFromReply(value string) string {
+	parts := strings.FieldsFunc(value, func(r rune) bool { return r == '.' || r == '!' || r == '?' })
+	kept := make([]string, 0, len(parts))
+	for _, part := range parts {
+		lower := strings.ToLower(part)
+		if strings.Contains(lower, "the crow") || strings.Contains(lower, "bill bouer") || strings.Contains(lower, "skull") {
+			continue
+		}
+		if sentence := strings.TrimSpace(part); sentence != "" {
+			kept = append(kept, sentence)
+		}
+	}
+	if len(kept) == 0 {
+		return "I have answered what I can about your question."
+	}
+	return strings.Join(kept, ". ") + "."
 }
 
 func (store *PostgresStore) deliverNPCEmailReplies(ctx context.Context, serverID, accountID string) error {

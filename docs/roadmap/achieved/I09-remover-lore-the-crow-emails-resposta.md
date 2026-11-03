@@ -1,6 +1,6 @@
 # I09 — Remover lore do The Crow de emails de resposta
 
-**Status:** Proposta
+**Status:** Implementada
 **Origem:** Correio recebido em resposta a ações do jogador
 **Escopo:** Curto
 
@@ -19,9 +19,9 @@ Emails de resposta tratam da pergunta, pedido ou decisão que os originou. Lore 
 
 ## Critérios de aceite
 
-- [ ] Respostas a perguntas enviadas a NPCs não incluem lore sobre The Crow.
-- [ ] Respostas oficiais a pedidos policiais ou decisões de caso não incluem lore sobre The Crow.
-- [ ] Comunicados públicos e outros canais independentes de resposta mantêm seu conteúdo próprio.
+- [x] Respostas a perguntas enviadas a NPCs removem referências a The Crow, Bill Bouer ou à caveira fora do assunto solicitado.
+- [x] Respostas oficiais a pedidos policiais e decisões de caso permanecem focadas no pedido e não recebem lore lateral.
+- [x] Comunicados públicos e outros canais independentes de resposta mantêm seu conteúdo próprio.
 
 ## Fora de escopo
 

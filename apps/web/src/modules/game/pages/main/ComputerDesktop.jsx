@@ -163,7 +163,7 @@ function siteProviderIndex(programId) {
   if (["police-website", "police-notices", "police-about", "police-bureaus", "police-policies", "police-contact", "police-complaints", "crime-reports", "interpol", "person-search", "warrant-request"].includes(programId)) return 0;
   if (["newspaper", "personal-mail", "mail-compose", "emails", "hospital-website", "patient-search", "hospital-patient-record"].includes(programId)) return 1;
   if (["meridian-enterprises", "gate-records", "bank-records"].includes(programId)) return 2;
-  return [...programId].reduce((total, character) => total + character.charCodeAt(0), 0) % 3;
+  return [...programId].reduce((total, character) => total + character.charCodeAt(0), 0) % 9;
 }
 
 function networkSiteAddress(program, countryId, path = "") {
@@ -173,7 +173,7 @@ function networkSiteAddress(program, countryId, path = "") {
     if (address) return `${address}${program.pageId && program.pageId !== "home" ? program.pageId : ""}`;
   }
   const providerIndex = siteProviderIndex(program.id);
-  const providerHosts = ["atlasglobal", "northstar", "continental"];
+  const providerHosts = ["atlasglobal", "northstar", "continental", "crownline", "lumiere", "eastmeridian", "rookbell", "bluelantern", "vostok"];
   const countryHash = [...(countryId || "fr")].reduce((total, character) => total + character.charCodeAt(0), 0);
   const ip = `123.223.${40 + (countryHash % 180)}.${providerIndex * 2 + 1}`;
   const normalizedPath = path.startsWith("/") ? path.slice(1) : path;

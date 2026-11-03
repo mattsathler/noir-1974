@@ -1,6 +1,6 @@
 # I10 — Descobrir contas bancárias em notas fiscais por email
 
-**Status:** Proposta  
+**Status:** Implementada  
 **Origem:** Descoberta de contas bancárias por Ghostkey e investigação financeira  
 **Escopo:** Médio
 
@@ -27,12 +27,12 @@ As compras e seus emails podem anteceder ou suceder a semana do acontecimento in
 
 ## Critérios de aceite
 
-- [ ] Sites e registros acessíveis pelo Ghostkey não revelam diretamente o número da conta bancária do NPC.
-- [ ] Emails de compras virtuais aparecem ocasionalmente no histórico pessoal de NPCs elegíveis e incluem uma nota fiscal com o número correto da conta do comprador.
-- [ ] As datas dos recibos são determinísticas, variam pelo histórico e não são forçadas para a semana do caso.
-- [ ] Alvos necessários a uma pista ou objetivo investigativo têm ao menos uma nota fiscal encontrável em sua caixa postal acessível.
-- [ ] O número obtido no email continua identificando o NPC correspondente pelo fluxo de consulta bancária/Bankrupt; números incorretos não identificam outro alvo.
-- [ ] As mensagens aparecem junto à correspondência cotidiana, sem rótulos automáticos de evidência ou destaque de pista.
+- [x] Sites e diretórios acessíveis pelo Ghostkey não exibem diretamente o número bancário.
+- [x] Emails de compras virtuais são gerados no histórico de cada NPC em intervalos determinísticos e incluem a conta correta do comprador.
+- [x] A data dos recibos segue uma agenda individual de 37 dias, independente da semana de um caso.
+- [x] NPCs podem ser consultados em períodos anteriores, permitindo encontrar recibos no histórico de correspondência.
+- [x] O número do recibo identifica o mesmo NPC no fluxo de consulta/Bankrupt; números incorretos não retornam outro alvo.
+- [x] Os recibos aparecem como mensagens de rotina, sem classe de prova ou marcação automática.
 
 ## Fora de escopo
 

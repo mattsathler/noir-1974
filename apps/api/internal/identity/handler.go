@@ -1455,9 +1455,11 @@ func (h *Handler) requireLocalAccessAttemptInCity(w http.ResponseWriter, r *http
 		h.writeAPIError(w, r, http.StatusForbidden, "LOCAL_ACCESS_REQUIRED", "connect to the institution's website before requesting these records", nil)
 		return false
 	}
-	if err := h.recordHackerAction(r.Context(), accountID, cityID, "ghostkey_"+facility+"_records", "ghostkey-records:"+newRequestID(), 5); err != nil {
-		h.writeAPIError(w, r, http.StatusInternalServerError, "HACKER_EXPOSURE_RECORD_FAILED", "could not update network activity records", err)
-		return false
+	if facility == "bank" {
+		if err := h.recordHackerAction(r.Context(), accountID, cityID, "ghostkey_union_records", "ghostkey-records:"+newRequestID(), 5); err != nil {
+			h.writeAPIError(w, r, http.StatusInternalServerError, "HACKER_EXPOSURE_RECORD_FAILED", "could not update network activity records", err)
+			return false
+		}
 	}
 	return true
 }
@@ -2318,7 +2320,8 @@ func (h *Handler) networkProviders(w http.ResponseWriter, r *http.Request) {
 		h.writeAPIError(w, r, http.StatusBadRequest, "UNKNOWN_PROVIDER_COUNTRY", "The selected provider country is not available.", nil)
 		return
 	}
-	if r.URL.Query().Get("providerId") == "northstar" {
+	providerID := strings.TrimSpace(r.URL.Query().Get("providerId"))
+	if providerID != "" {
 		reader, ok := h.worldReader.(companySiteIndexReader)
 		if !ok {
 			h.writeAPIError(w, r, http.StatusServiceUnavailable, "PROVIDER_INDEX_UNAVAILABLE", "The company provider directory is temporarily unavailable.", nil)
@@ -2330,23 +2333,36 @@ func (h *Handler) networkProviders(w http.ResponseWriter, r *http.Request) {
 			h.writeAPIError(w, r, http.StatusConflict, "PROXY_JURISDICTION_UNAVAILABLE", "Connect a proxy in this country before opening its provider directory.", nil)
 			return
 		}
-		hospitalDirectory := &providers[1].Directories[0]
-		citySlug := strings.TrimPrefix(city.ID, countryID+"/")
-		hospitalDirectory.SiteName = city.Name + " Hospital"
-		hospitalDirectory.SiteAddress = hospitalDirectory.Address + "hospital/" + citySlug
-		hospitalDirectory.Files = []world.ProviderFile{{ID: "patient-search", Name: "patient_search_app.exe", Kind: "patient-search"}}
+		if providerID == "northstar" {
+			hospitalDirectory := &providers[1].Directories[0]
+			citySlug := strings.TrimPrefix(city.ID, countryID+"/")
+			hospitalDirectory.SiteName = city.Name + " Hospital"
+			hospitalDirectory.SiteAddress = hospitalDirectory.Address + "hospital/" + citySlug
+			hospitalDirectory.Files = []world.ProviderFile{{ID: "patient-search", Name: "patient_search_app.exe", Kind: "patient-search"}}
+		}
 		companies, err := reader.CompanySitesInCountry(r.Context(), h.worldServerID, countryID)
 		if err != nil {
 			h.writeAPIError(w, r, http.StatusInternalServerError, "PROVIDER_INDEX_FAILED", "The company provider directory could not be loaded.", err)
 			return
 		}
 		for _, company := range companies {
-			ip := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(company.SiteAddress, "merid//"), "northstar."), ":4000/")
-			providers[1].Directories = append(providers[1].Directories, world.ProviderDirectory{
-				ID: ip, Name: ip, IP: ip, Address: company.SiteAddress, SiteName: company.Company.Name,
-				Company: &company.Company, CompanyAddress: &company.Address,
-				Files: []world.ProviderFile{{ID: "employee-directory", Name: "employee_directory_app.exe", Kind: "employee-directory"}},
-			})
+			hostAndIP := strings.TrimPrefix(company.SiteAddress, "merid//")
+			host, ip, found := strings.Cut(hostAndIP, ".")
+			if !found || strings.TrimSuffix(ip, ":4000/") == "" {
+				continue
+			}
+			ip = strings.TrimSuffix(ip, ":4000/")
+			for providerIndex := range providers {
+				if providers[providerIndex].Host != host {
+					continue
+				}
+				providers[providerIndex].Directories = append(providers[providerIndex].Directories, world.ProviderDirectory{
+					ID: ip, Name: ip, IP: ip, Address: company.SiteAddress, SiteName: company.Company.Name,
+					Company: &company.Company, CompanyAddress: &company.Address,
+					Files: []world.ProviderFile{{ID: "employee-directory", Name: "employee_directory_app.exe", Kind: "employee-directory"}},
+				})
+				break
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{

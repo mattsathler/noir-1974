@@ -186,7 +186,7 @@ export default function GhostkeyExplorer({ countryId, countryName, onOpenPatient
     setSelectedCompany(null);
     setPath([]);
     try {
-      const loadedProviders = await getHostingProviders(countryId, provider.id === "northstar" ? provider.id : "");
+      const loadedProviders = await getHostingProviders(countryId, provider.id);
       setProviders(loadedProviders);
       setProviderId(provider.id);
     } catch (cause) {

@@ -37,7 +37,15 @@ type CompanyCyberSecurity struct {
 
 func CompanyCyberSecurityFor(seed string, generatorVersion int, companyID string) CompanyCyberSecurity {
 	digest := companyWebsiteDigest(seed, generatorVersion, "cyber-security:"+companyID)
+	// Use the stock exchange's deterministic base quote as a market value proxy.
+	marketValueCents := companyBaseMarketValueCents(companyID)
 	level := int(digest[0] % 4)
+	if marketValueCents < 60000 && level == 3 {
+		level = 1 + int(digest[1]%2)
+	}
+	if marketValueCents < 25000 && level == 2 {
+		level = 1
+	}
 	profiles := [...]CompanyCyberSecurity{
 		{Level: 0, Provider: "NONE", Notice: "This company does not subscribe to a managed digital protection service."},
 		{Level: 1, Provider: "Aegis Data Bureau", Notice: "Routine perimeter monitoring is provided by Aegis Data Bureau."},
@@ -45,6 +53,13 @@ func CompanyCyberSecurityFor(seed string, generatorVersion int, companyID string
 		{Level: 3, Provider: "Meridian Web Security", Notice: "Meridian Web Security protects company systems and encrypts selected personnel records."},
 	}
 	return profiles[level]
+}
+
+func companyBaseMarketValueCents(companyID string) int64 {
+	location := strings.TrimPrefix(companyID, "company:")
+	countryID := strings.SplitN(location, "/", 2)[0]
+	digest := sha256.Sum256([]byte("noir-stock-quote-v1\x00" + countryID + "\x00" + companyID))
+	return 5000 + int64(binary.BigEndian.Uint64(digest[:8])%95001)
 }
 
 type CompanyWebsiteTheme struct {

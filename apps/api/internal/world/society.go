@@ -2,6 +2,7 @@ package world
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -32,6 +33,27 @@ type NPC struct {
 	Status          string             `json:"status"`
 	StatusChangedAt time.Time          `json:"-"`
 	MaritalStatus   string             `json:"-"`
+	PersonalData    NPCPersonalData    `json:"personalData,omitempty"`
+}
+
+// NPCPersonalData is a stable, fictional identity record shown only in a person's profile.
+type NPCPersonalData struct {
+	Sex             string   `json:"sex"`
+	BirthDay        int      `json:"birthDay"`
+	BirthMonth      string   `json:"birthMonth"`
+	Nationality     string   `json:"nationality"`
+	Birthplace      string   `json:"birthplace"`
+	PrimaryLanguage string   `json:"primaryLanguage"`
+	Religion        string   `json:"religion,omitempty"`
+	FictionalID     string   `json:"fictionalId"`
+	Signature       string   `json:"signature"`
+	BloodType       string   `json:"bloodType"`
+	BodyType        string   `json:"bodyType"`
+	HeightCM        int      `json:"heightCm"`
+	WeightKG        int      `json:"weightKg"`
+	DominantHand    string   `json:"dominantHand"`
+	Temperament     string   `json:"temperament"`
+	Hobbies         []string `json:"hobbies"`
 }
 
 type Company struct {
@@ -714,6 +736,7 @@ func npcFor(seed string, version int, regionID, generationKey string, name perso
 		Status:        "alive",
 		MaritalStatus: maritalStatus,
 	}
+	npc.PersonalData = npcPersonalDataFor(seed, version, generationKey, regionID, npc.Name, npc.Age, npc.Presentation)
 	if version >= GeneratorVersion4 {
 		if version >= GeneratorVersion6 {
 			presentationStream := newStream(seed, version, "npc/presentation/"+generationKey)
@@ -728,6 +751,74 @@ func npcFor(seed string, version int, regionID, generationKey string, name perso
 		npc.Appearance = generatedAppearanceDescription(visual)
 	}
 	return npc
+}
+
+func npcPersonalDataFor(seed string, version int, generationKey, regionID, fullName string, age int, presentation VisualPresentation) NPCPersonalData {
+	stream := newStream(seed, version, "npc/personal-record/"+generationKey)
+	months := [...]string{"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
+	sex := "female"
+	if stream.intn(2) == 1 {
+		sex = "male"
+	}
+	monthIndex := stream.intn(len(months))
+	daysInMonth := [...]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	day := 1 + stream.intn(daysInMonth[monthIndex])
+	countryID := strings.SplitN(regionID, "/", 2)[0]
+	cityID := strings.SplitN(regionID, "/district/", 2)[0]
+	if stream.intn(5) == 0 && len(worldCities) > 0 {
+		birthCity := worldCities[stream.intn(len(worldCities))]
+		cityID, countryID = birthCity.ID, birthCity.CountryID
+	}
+	countryNames := map[string]string{"fr": "France", "cn": "China", "ru": "Russia", "us": "United States", "gb": "United Kingdom", "de": "Germany", "jp": "Japan", "in": "India", "kr": "South Korea", "ca": "Canada", "br": "Brazil", "it": "Italy", "au": "Australia", "es": "Spain", "tr": "Turkey", "mx": "Mexico", "eg": "Egypt", "sa": "Saudi Arabia"}
+	languages := map[string]string{"fr": "French", "cn": "Mandarin", "ru": "Russian", "us": "English", "gb": "English", "de": "German", "jp": "Japanese", "in": "Hindi", "kr": "Korean", "ca": "English", "br": "Portuguese", "it": "Italian", "au": "English", "es": "Spanish", "tr": "Turkish", "mx": "Spanish", "eg": "Arabic", "sa": "Arabic"}
+	country := countryNames[countryID]
+	if country == "" {
+		country = "Unlisted"
+	}
+	language := languages[countryID]
+	if language == "" {
+		language = "Unlisted"
+	}
+	birthplace := "Unlisted city, " + country
+	if city, ok := CityByID(cityID); ok {
+		country = city.Country
+		birthplace = city.Name + ", " + country
+	}
+	digest := sha256.Sum256([]byte("noir-fictional-person-id/v1/" + seed + "/" + generationKey))
+	bodyTypes := [...]string{"slim", "average", "broad", "athletic"}
+	body := bodyTypes[stream.intn(len(bodyTypes))]
+	height := 150 + stream.intn(41)
+	bmiFloor, bmiRange := 21, 5
+	switch body {
+	case "slim":
+		bmiFloor, bmiRange = 18, 4
+	case "broad":
+		bmiFloor, bmiRange = 26, 5
+	case "athletic":
+		bmiFloor, bmiRange = 21, 7
+	}
+	weight := height * height * (bmiFloor + stream.intn(bmiRange)) / 10000
+	religions := [...]string{"", "unknown", "not declared", "Catholic", "Protestant", "Jewish", "Muslim", "Buddhist"}
+	religion := religions[stream.intn(len(religions))]
+	hobbies := [...]string{"reading", "gardening", "chess", "radio repair", "walking", "cooking", "music", "cycling", "woodwork", "cinema"}
+	first := strings.Fields(fullName)
+	signature := ""
+	if len(first) > 0 {
+		signature = first[0]
+	}
+	if len(first) > 1 {
+		signature += " " + first[len(first)-1]
+	}
+	return NPCPersonalData{
+		Sex: sex, BirthDay: day, BirthMonth: months[monthIndex], Nationality: country,
+		Birthplace: birthplace, PrimaryLanguage: language, Religion: religion,
+		FictionalID: fmt.Sprintf("FIC-%08X", binary.BigEndian.Uint32(digest[:4])), Signature: signature,
+		BloodType: [...]string{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"}[stream.intn(8)],
+		BodyType:  body, HeightCM: height, WeightKG: weight,
+		DominantHand: [...]string{"right", "left", "ambidextrous"}[stream.intn(3)],
+		Temperament:  personalities[stream.intn(len(personalities))],
+		Hobbies:      []string{hobbies[stream.intn(len(hobbies))], hobbies[stream.intn(len(hobbies))]},
+	}
 }
 
 func visualIdentityForNPC(seed string, version int, generationKey, regionID string, age int, presentation VisualPresentation) VisualIdentity {

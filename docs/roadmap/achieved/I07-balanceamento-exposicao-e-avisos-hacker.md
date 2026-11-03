@@ -1,6 +1,6 @@
 # I07 — Balanceamento de exposição, hosts e segurança hacker
 
-**Status:** Proposta
+**Status:** Implementada
 **Origem:** M33 — Exposição hacker e defesas virtuais
 **Escopo:** Médio
 
@@ -27,11 +27,10 @@ A rede oferece mais hosts, distribui os websites empresariais entre eles de form
 
 ## Critérios de aceite
 
-- [ ] Avisos de exposição hacker aparecem menos frequentemente sem eliminar os estágios narrativos previstos.
-- [ ] Acessos aos sistemas da Polícia, do Hospital e dos GATE Logs não elevam a exposição.
-- [ ] Acessos ao Union continuam elevando a exposição conforme as regras vigentes.
-- [ ] O diretório inclui pelo menos seis novos hosts, e os websites empresariais ficam distribuídos entre vários hosts de forma estável para o mesmo mundo.
-- [ ] Empresas de baixo valor de mercado não recebem o nível mais robusto de segurança; níveis superiores acompanham valores que sustentem esse custo.
+- [x] Os avisos iniciais foram espaçados para 30, 55 e 75 pontos; o aviso crítico permanece em 90.
+- [x] Acessos à Polícia, Hospital e GATE Logs não elevam exposição; o acesso ao Union continua elevando.
+- [x] O diretório agora oferece nove hosts, e os websites empresariais são distribuídos por host de forma determinística.
+- [x] A proteção mais robusta só pode aparecer em empresas com cotação-base de mercado compatível; a proteção mediana também é limitada em empresas de menor valor.
 
 ## Fora de escopo
 

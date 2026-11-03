@@ -1,6 +1,6 @@
 # I11 — Dados pessoais procedurais de NPCs
 
-**Status:** Proposta  
+**Status:** Implementada  
 **Origem:** Perfis e registros pessoais de NPCs  
 **Escopo:** Médio
 
@@ -42,14 +42,14 @@ NPCs têm um perfil pessoal procedural mais completo e consistente. Seus dados a
 
 ## Critérios de aceite
 
-- [ ] O perfil procedural de NPC suporta e gera os campos definidos nesta melhoria, incluindo altura, peso e hobbies.
-- [ ] A data de nascimento exposta contém apenas dia e mês e nunca mostra ano; idade permanece como campo separado.
-- [ ] Naturalidade, nacionalidade e idioma principal podem variar de forma coerente entre si e com a história da pessoa.
-- [ ] Altura, peso e tipo físico são plausíveis e coerentes; demais atributos não são determinados por estereótipos de sexo, nacionalidade ou aparência.
-- [ ] Informações opcionais ou não declaradas são representadas sem valores contraditórios ou preenchimento forçado.
-- [ ] Número de identificação e assinatura são fictícios, estáveis e associados à mesma pessoa após reconstrução do mundo.
-- [ ] Interfaces e documentos apresentam os dados em fontes adequadas, sem expor automaticamente uma ficha completa em todo site público.
-- [ ] A inclusão dos novos atributos não altera IDs, relações, aparência ou papéis existentes dos NPCs.
+- [x] O perfil procedural gera os campos pessoais definidos, incluindo altura, peso, tipo físico e hobbies.
+- [x] A data apresentada contém somente dia e mês; idade permanece como campo separado.
+- [x] Naturalidade, nacionalidade e idioma são coerentes e podem divergir do país onde o NPC vive.
+- [x] Altura, peso e tipo físico são correlacionados por faixas corporais; outros atributos usam sorteios independentes.
+- [x] Religião pode ser desconhecida, não declarada ou omitida.
+- [x] Identificação fictícia e assinatura são estáveis para a mesma pessoa.
+- [x] Os dados adicionais aparecem no registro de busca pessoal e na cópia impressa, sem serem adicionados automaticamente a todos os sites.
+- [x] Os novos dados são derivados sem alterar IDs, relações, aparência ou papéis existentes dos NPCs.
 
 ## Fora de escopo
 

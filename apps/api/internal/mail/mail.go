@@ -5,6 +5,7 @@ package mail
 import (
 	"crypto/sha256"
 	_ "embed"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -46,6 +47,7 @@ type Message struct {
 
 type Context struct {
 	NPCName        string
+	BankAccount    string
 	Employer       string
 	EmploymentRole string
 	DeathAt        time.Time
@@ -131,6 +133,10 @@ func Generate(seed string, worldVersion int, npcID string, context Context, from
 	result := make([]Message, 0)
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
 		rng := newStream(seed, worldVersion, npcID, date)
+		if context.BankAccount != "" && invoiceDay(seed, worldVersion, npcID, date) {
+			invoice := virtualPurchaseInvoice(seed, worldVersion, npcID, context.NPCName, context.BankAccount, date)
+			result = append(result, invoice)
+		}
 		if context.Employer != "" && rng.pick(2) == 0 {
 			item := templates.Workplace[rng.pick(len(templates.Workplace))]
 			item = personalize(item, context, &rng)
@@ -175,6 +181,26 @@ func Generate(seed string, worldVersion int, npcID string, context Context, from
 	}
 	SortMessages(result)
 	return result, nil
+}
+
+func invoiceDay(seed string, worldVersion int, npcID string, date time.Time) bool {
+	digest := sha256.Sum256([]byte(fmt.Sprintf("%s/%d/%s/virtual-invoice-schedule", seed, worldVersion, npcID)))
+	dayOffset := int(binary.BigEndian.Uint32(digest[:4]) % 37)
+	day := date.UTC().Unix() / int64(24*time.Hour/time.Second)
+	return int((day%37+37)%37) == dayOffset
+}
+
+func virtualPurchaseInvoice(seed string, worldVersion int, npcID, recipient, account string, date time.Time) Message {
+	digest := sha256.Sum256([]byte(fmt.Sprintf("%s/%d/%s/invoice/%s", seed, worldVersion, npcID, date.Format("2006-01-02"))))
+	shops := [...]string{"Maison des Radios", "Union Household Supply", "Rue Neuve Provisioners", "Crown & Bell Catalogue"}
+	items := [...]string{"replacement receiver valves", "a household linen set", "a table lamp and fittings", "winter shoes and repair service"}
+	amount := 8 + int(digest[2])%74
+	return Message{
+		ID: stableID(seed, worldVersion, npcID, date) + ":invoice", SentAt: date.Add(time.Duration(8*60+int(digest[3])%600) * time.Minute),
+		Service: "Meridian Global Correspondence Exchange", Sender: shops[int(digest[0])%len(shops)], Recipient: recipient,
+		Subject: "Purchase confirmation and receipt", Body: fmt.Sprintf("Your order for %s has been paid. Total charged: %d Credits. Payment account: %s. Keep this receipt for your records.", items[int(digest[1])%len(items)], amount, account),
+		MailboxNPCID: npcID,
+	}
 }
 
 func civicBulletin(seed string, worldVersion int, npcID, recipient string, date time.Time) (Message, bool) {

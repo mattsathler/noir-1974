@@ -41,9 +41,13 @@ var providerIdentities = []providerIdentity{
 	{name: "Atlas Global Telecommunications", host: "atlasglobal"},
 	{name: "Northstar Communications Group", host: "northstar"},
 	{name: "Continental Data Systems", host: "continental"},
+	{name: "Crownline Network Services", host: "crownline"},
+	{name: "Lumière Relay Cooperative", host: "lumiere"},
+	{name: "Eastern Meridian Exchange", host: "eastmeridian"},
+	{name: "Rook & Bell Data Works", host: "rookbell"},
+	{name: "Blue Lantern Communications", host: "bluelantern"},
+	{name: "Vostok International Relay", host: "vostok"},
 }
-
-const companySiteProviderHost = "northstar"
 
 // CompanySiteIP assigns collision-free addresses by stable position in the seeded country index.
 func CompanySiteIP(seed, countryID string, ordinal int) string {
@@ -55,7 +59,9 @@ func CompanySiteIP(seed, countryID string, ordinal int) string {
 }
 
 func CompanySiteAddress(seed, countryID string, ordinal int) string {
-	return fmt.Sprintf("merid//%s.%s:4000/", companySiteProviderHost, CompanySiteIP(seed, countryID, ordinal))
+	hash := sha256.Sum256([]byte(fmt.Sprintf("company-host/%s/%s/%d", seed, countryID, ordinal)))
+	provider := providerIdentities[int(hash[0])%len(providerIdentities)]
+	return fmt.Sprintf("merid//%s.%s:4000/", provider.host, CompanySiteIP(seed, countryID, ordinal))
 }
 
 // HostingProviders returns the provider directory available in one country.

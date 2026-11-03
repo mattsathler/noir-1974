@@ -15,10 +15,6 @@ Cada melhoria deve explicar o problema observável, o resultado esperado, o esco
 | I04 | Nomes procedurais próprios para empresas | M24/M25 — websites e bolsa; gerador de empresas | Médio |
 | I05 | Tipos procedurais de empresas | M24/M25 — websites e bolsa; geração de empresas | Médio |
 | I06 | Widgets informativos no desktop | Computador pessoal, Union Mercantile Bank e Rogue DNS | Médio |
-| I07 | Balanceamento de exposição, hosts e segurança hacker | M33 — exposição hacker e defesas virtuais | Médio |
-| I09 | Remover lore do The Crow de emails de resposta | Correio gerado por ações do jogador | Curto |
-| I10 | Descobrir contas bancárias em notas fiscais por email | Ghostkey e investigação financeira | Médio |
-| I11 | Dados pessoais procedurais de NPCs | Perfis e registros pessoais | Médio |
 
 ## Melhorias implementadas
 
@@ -26,6 +22,10 @@ Cada melhoria deve explicar o problema observável, o resultado esperado, o esco
 | --- | --- | --- |
 | I03 | Minimizar janelas do computador | [I03](../achieved/I03-minimizar-janelas-computador.md) |
 | I08 | Busca por tipos de empresas no hub | [I08](../achieved/I08-busca-tipos-empresas-hub.md) |
+| I07 | Balanceamento de exposição, hosts e segurança hacker | [I07](../achieved/I07-balanceamento-exposicao-e-avisos-hacker.md) |
+| I09 | Remover lore do The Crow de emails de resposta | [I09](../achieved/I09-remover-lore-the-crow-emails-resposta.md) |
+| I10 | Descobrir contas bancárias em notas fiscais por email | [I10](../achieved/I10-contas-bancarias-em-notas-fiscais-email.md) |
+| I11 | Dados pessoais procedurais de NPCs | [I11](../achieved/I11-dados-pessoais-procedurais-npcs.md) |
 
 ## Triagem das milestones atuais
 

@@ -83,6 +83,7 @@ func (service *Service) NPCEmails(ctx context.Context, serverID, npcID string, f
 		return nil, err
 	} else {
 		mailboxContext = Context{NPCName: profile.NPC.Name}
+		mailboxContext.BankAccount = world.BankAccountNumberForNPC(seed, version, npcID)
 		mailboxContext.DeathAt = npcDeathDeadline(profile.NPC)
 		if len(profile.Employment) > 0 {
 			mailboxContext.Employer = profile.Employment[0].Company.Name
@@ -98,6 +99,9 @@ func (service *Service) NPCEmails(ctx context.Context, serverID, npcID string, f
 				DeathAt: npcDeathDeadline(relation.NPC), RelationshipType: relation.RelationshipType,
 			})
 		}
+	}
+	if mailboxContext.BankAccount == "" {
+		mailboxContext.BankAccount = world.BankAccountNumberForNPC(seed, version, npcID)
 	}
 	type linkedResult struct {
 		messages []Message
