@@ -42,6 +42,7 @@ import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx"
 import DeepLinkWebsite from "./DeepLinkWebsite.jsx";
 import CompanyWebsite from "./CompanyWebsite.jsx";
 import DesktopSettings from "./DesktopSettings.jsx";
+import AccountSettings from "./AccountSettings.jsx";
 import ProxyConnection from "../../../world/components/ProxyConnection.jsx";
 import GhostkeyExplorer from "./GhostkeyExplorer.jsx";
 import EmailBreakerApp from "./EmailBreakerApp.jsx";
@@ -54,7 +55,7 @@ import CharacterAppearanceEditor from "../../../identity/components/CharacterApp
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 import CharacterConversation from "./CharacterConversation.jsx";
 import { DEFAULT_DESKTOP_PREFERENCES, DESKTOP_WALLPAPERS } from "./desktopPreferences.js";
-import { playRetroSound } from "./retroSoundEffects.js";
+import { playRetroSound, unlockRetroAudio } from "./retroSoundEffects.js";
 import { COMPUTER_BOOT_LINES as BOOT_LINES, hasBootedThisLogin, markBootedThisLogin } from "./computerBoot.js";
 const NOOP = () => {};
 const PERSONAL_PROGRAMS = [
@@ -66,13 +67,13 @@ const PERSONAL_PROGRAMS = [
   { id: "company-portal", label: "COMPANY PORTAL", Icon: MapIcon, state: "ONLINE", available: true },
   { id: "stock-exchange", label: "STOCK EXCHANGE", Icon: Dollar, state: "ONLINE", available: true },
   { id: "minesweeper", label: "MINESWEEPER", Icon: Bomb, state: "READY", available: true },
-  { id: "city-records", label: "CITY RECORDS", Icon: MapIcon, state: "ONLINE", available: true },
 ];
 const WEB_BROWSER_PROGRAM = PERSONAL_PROGRAMS[0];
 const PERSONAL_MAIL_PROGRAM = PERSONAL_PROGRAMS.find((program) => program.id === "personal-mail");
 const EMAIL_COMPOSE_PROGRAM = { id: "mail-compose", label: "SEND EMAIL", Icon: Mail, state: "READY", available: true };
 const TERMINAL_PROGRAM = PERSONAL_PROGRAMS.find((program) => program.id === "terminal");
 const SETTINGS_PROGRAM = { id: "settings", label: "SETTINGS", Icon: Brush, state: "READY", available: true };
+const ACCOUNT_SETTINGS_PROGRAM = { id: "account-settings", label: "ACCOUNT SETTINGS", Icon: User, state: "READY", available: true };
 const PROXY_PROGRAM = { id: "proxy", label: "ROGUE DNS", Icon: Wifi, state: "UNLISTED", available: true };
 const GHOSTKEY_PROGRAM = { id: "ghostkey", label: "GHOSTKEY.EXE", Icon: Bug, state: "READY", available: true };
 const EMAIL_BREAKER_PROGRAM = { id: "email-breaker", label: "EMAIL_BREAKER.EXE", Icon: Mail, state: "UNSIGNED", available: true };
@@ -90,7 +91,7 @@ function localServiceLocationId(cityId, service) {
   const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
   return `service:${cityKey}/${service}`;
 }
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "deadletter", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "minesweeper", "mail-compose"];
+const DESKTOP_APP_IDS = ["newspaper", "settings", "account-settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "deadletter", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "minesweeper", "mail-compose"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -107,7 +108,6 @@ const START_MENU_DESCRIPTIONS = {
   "personal-mail": "Private correspondence",
   "company-portal": "National business directory",
   "stock-exchange": "Trade national company shares and manage your portfolio",
-  "city-records": "People and places index",
   settings: "Desktop and account settings",
   "interpol": "Personnel search",
   emails: "Institutional mail archive",
@@ -153,7 +153,6 @@ function institutionalVariant(programId) {
   if (programId === "bank-website") return "bank";
   if (programId === "bank-records") return "bank";
   if (programId === "gate-records") return "gate";
-  if (programId === "city-records") return "civic";
   if (["personal-mail", "mail-compose"].includes(programId)) return "mail";
   return "company";
 }
@@ -233,6 +232,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
         if (persistent && [GHOSTKEY_PROGRAM.id, "email-breaker", PATIENT_SEARCH_PROGRAM.id].includes(item.programId)) return [];
         const program = item.programId === SETTINGS_PROGRAM.id && persistent
           ? SETTINGS_PROGRAM
+          : item.programId === ACCOUNT_SETTINGS_PROGRAM.id && persistent
+            ? ACCOUNT_SETTINGS_PROGRAM
           : item.programId === PROXY_PROGRAM.id && persistent
             ? PROXY_PROGRAM
             : item.programId === GHOSTKEY_PROGRAM.id && persistent
@@ -288,6 +289,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       setShowMeridianLogo(true);
       if (!bootWelcomePlayedRef.current) {
         bootWelcomePlayedRef.current = true;
+        unlockRetroAudio();
         playRetroSound("boot", soundEffectsEnabledRef.current);
       }
       bootTimerRef.current = window.setTimeout(finishBoot, 4300);
@@ -304,6 +306,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
           setShowMeridianLogo(true);
           if (!bootWelcomePlayedRef.current) {
             bootWelcomePlayedRef.current = true;
+            unlockRetroAudio();
             playRetroSound("boot", soundEffectsEnabledRef.current);
           }
           bootTimerRef.current = window.setTimeout(finishBoot, 4300);
@@ -778,12 +781,12 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               <span>PRIVATE LINE · ACCOUNT CHARGED</span>
             </div>
             {persistent && !isCompanyComputer && <aside className="desktop-status-widgets" aria-label="Personal desktop status">
-              <section className="desktop-status-widget desktop-status-widget--identity" aria-label="Player identity">
+              <button type="button" className="desktop-status-widget desktop-status-widget--identity" aria-label="Open account settings" onClick={() => launchProgram(ACCOUNT_SETTINGS_PROGRAM)}>
                 <div className="desktop-status-widget__portrait">{character?.visual && <ModularFace visual={character.visual} name={character.displayName || accountUsername || "Player"} />}</div>
                 <div className="desktop-status-widget__details"><span>ACCOUNT HOLDER</span><strong>{character?.displayName || accountUsername || "PLAYER"}</strong>
                   {blackwireProfile?.profileComplete && <small className="desktop-status-widget__blackwire-handle"><span className="desktop-status-widget__blackwire-portrait"><ModularFace visual={blackwirePortrait.visual} name={blackwirePortrait.name} /></span>BLACKWIRE · {blackwireProfile.handle}</small>}
                 </div>
-              </section>
+              </button>
               <section className="desktop-status-widget" aria-label="Union Mercantile Bank balance">
                 <span className="desktop-status-widget__label">UNION MERCANTILE BANK</span>
                 {Number.isFinite(playerProgression?.creditsCents)
@@ -824,7 +827,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 : program.label;
               return <section
                 ref={(element) => { if (element) windowRefs.current.set(id, element); else windowRefs.current.delete(id); }}
-                className={`computer-window${desktopWindow.minimized ? " computer-window--minimized" : ""}${position ? " computer-window--positioned" : ""}${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window--website" : ""}${persistent && DESKTOP_APP_IDS.includes(program.id) ? " computer-window--app" : ""}${program.id === "ghostkey" ? " computer-window--ghostkey" : ""}${program.id === "terminal" ? " computer-window--terminal" : ""}${program.accessedViaGhost ? " computer-window--ghost-compromised" : ""}${program.id === "settings" ? " computer-window--settings" : ""}${program.id === "character-appearance" ? " computer-window--character-appearance" : ""}${program.id === "proxy" ? " computer-window--proxy" : ""}`}
+                className={`computer-window${desktopWindow.minimized ? " computer-window--minimized" : ""}${position ? " computer-window--positioned" : ""}${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window--website" : ""}${persistent && DESKTOP_APP_IDS.includes(program.id) ? " computer-window--app" : ""}${program.id === "ghostkey" ? " computer-window--ghostkey" : ""}${program.id === "terminal" ? " computer-window--terminal" : ""}${program.accessedViaGhost ? " computer-window--ghost-compromised" : ""}${program.id === "settings" || program.id === "account-settings" ? " computer-window--settings" : ""}${program.id === "character-appearance" ? " computer-window--character-appearance" : ""}${program.id === "proxy" ? " computer-window--proxy" : ""}`}
                 data-site-variant={institutionalVariant(program.id)}
                 data-window-id={id}
                 key={id}
@@ -843,17 +846,19 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 }}
               >
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
-                  <span>{persistent && !["web-browser", ...DESKTOP_APP_IDS].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "WEB BROWSER" : program.id === "settings" ? "MERID_OS SETTINGS" : program.id === "proxy" ? "ROGUE DNS" : companySiteName}</span>
+                  <span>{persistent && !["web-browser", ...DESKTOP_APP_IDS].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "WEB BROWSER" : program.id === "settings" ? "MERID_OS SETTINGS" : program.id === "account-settings" ? "MERID_OS ACCOUNT" : program.id === "proxy" ? "ROGUE DNS" : companySiteName}</span>
                   <span className="computer-window__titlebar-actions">
                     <button type="button" className="computer-window__minimize" aria-label={`Minimize ${companySiteName}`} title={`Minimize ${companySiteName}`} onClick={() => minimizeWindow(id)}>−</button>
                     <button type="button" className="computer-window__close" aria-label={`Close ${companySiteName}`} onClick={() => closeWindow(id)}>×</button>
                   </span>
                 </header>
-                <div className={`computer-browser-address${DESKTOP_APP_IDS.includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : program.id === "proxy" ? "control://rogue-dns" : program.id === "ghostkey" ? "control://ghostkey" : program.id === "terminal" ? "control://terminal" : program.id === "stock-exchange" ? "control://stock-exchange" : browserAddress(program, facilityContext, cityId)}</span><span className="computer-browser-address__secure">{program.id === "proxy" ? "UNLISTED NETWORK" : "PRIVATE RELAY"}</span></div>
+                <div className={`computer-browser-address${DESKTOP_APP_IDS.includes(program.id) ? " computer-browser-address--app" : ""}`} aria-label="Website address"><span aria-hidden="true">▣</span><span>{program.id === "settings" ? "control://desktop" : program.id === "account-settings" ? "control://account" : program.id === "proxy" ? "control://rogue-dns" : program.id === "ghostkey" ? "control://ghostkey" : program.id === "terminal" ? "control://terminal" : program.id === "stock-exchange" ? "control://stock-exchange" : browserAddress(program, facilityContext, cityId)}</span><span className="computer-browser-address__secure">{program.id === "proxy" ? "UNLISTED NETWORK" : "PRIVATE RELAY"}</span></div>
                 <div className={`computer-window__body${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window__body--website" : ""}${desktopWindow.loading || desktopWindow.navigationPending ? " computer-window__body--loading" : ""}`} aria-busy={desktopWindow.loading || desktopWindow.navigationPending}>
                   {desktopWindow.loading ? <div className="computer-browser-loading" role="status" aria-label="Loading webpage" /> : <>
                   {program.id === "settings"
-                    ? <DesktopSettings preferences={desktopPreferences} soundEffectsEnabled={soundEffectsEnabled} onSoundEffectsChange={onSoundEffectsChange} accountUsername={accountUsername} character={character} characterPreviewVisual={characterPreviewVisual} location={location} progression={playerProgression} onEditCharacter={() => launchProgram(CHARACTER_APPEARANCE_PROGRAM)} onChange={(patch) => onDesktopPreferencesChange?.(patch)} onLogout={onLogout} />
+                    ? <DesktopSettings preferences={desktopPreferences} soundEffectsEnabled={soundEffectsEnabled} onSoundEffectsChange={onSoundEffectsChange} onChange={(patch) => onDesktopPreferencesChange?.(patch)} />
+                    : program.id === "account-settings"
+                    ? <AccountSettings accountUsername={accountUsername} character={character} characterPreviewVisual={characterPreviewVisual} location={location} progression={playerProgression} onEditCharacter={() => launchProgram(CHARACTER_APPEARANCE_PROGRAM)} />
                     : program.id === "character-appearance"
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
                     : program.id === "terminal"
@@ -1018,6 +1023,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                   <button type="button" onClick={() => { launchProgram(PROXY_PROGRAM); setStartMenuOpen(false); }}><Wifi aria-hidden="true" /><span>ROGUE DNS</span></button>
                   <button type="button" onClick={() => { launchProgram(PERSONAL_MAIL_PROGRAM); setStartMenuOpen(false); }}><Mail aria-hidden="true" /><span>PERSONAL MAIL</span></button>
                   <button type="button" onClick={() => { onOpenWhiteboard?.(); setStartMenuOpen(false); }}><Files aria-hidden="true" /><span>CASE BOARD</span></button>
+                  <button type="button" onClick={() => { setStartMenuOpen(false); onLogout?.(); }}><span aria-hidden="true">↗</span><span>LOG OUT</span></button>
                 </div>
               </section>
             </nav>}

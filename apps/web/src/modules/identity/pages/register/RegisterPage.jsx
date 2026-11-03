@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { registerAccount } from "../../api.js";
 import ComputerAccessShell from "../../components/ComputerAccessShell.jsx";
+import { unlockRetroAudio } from "../../../game/pages/main/retroSoundEffects.js";
 
 export default function RegisterPage({ onLogin, onAccountCreated }) {
   const [passwordMismatch, setPasswordMismatch] = useState(false);
@@ -40,6 +41,7 @@ export default function RegisterPage({ onLogin, onAccountCreated }) {
     setError("");
     submissionLocked.current = true;
     setSubmitting(true);
+    unlockRetroAudio();
     try {
       const account = await registerAccount({ username, email, password });
       onAccountCreated(account);

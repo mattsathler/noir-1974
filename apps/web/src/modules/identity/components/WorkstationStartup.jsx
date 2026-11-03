@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { COMPUTER_BOOT_LINES, markBootedThisLogin } from "../../game/pages/main/computerBoot.js";
+import { playRetroSound, readRetroSoundEnabled } from "../../game/pages/main/retroSoundEffects.js";
 
 export default function WorkstationStartup({ onComplete }) {
   const [phase, setPhase] = useState("boot");
@@ -27,6 +28,7 @@ export default function WorkstationStartup({ onComplete }) {
 
   useEffect(() => {
     if (phase !== "intro") return undefined;
+    playRetroSound("boot", readRetroSoundEnabled());
     const timer = window.setTimeout(() => {
       markBootedThisLogin();
       onComplete();

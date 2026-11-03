@@ -80,24 +80,6 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   }, []);
 
   useEffect(() => {
-    function handlePointerDown(event) {
-      if (event.button === 0 && event.isPrimary !== false && !event.target.closest?.("[data-silent-click-sound]")) playRetroSound("click");
-    }
-    function handleTyping(event) {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target;
-      const acceptsText = target instanceof Element && (target.matches("input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]), textarea, [contenteditable='true']") || target.isContentEditable);
-      if (acceptsText && (event.key.length === 1 || ["Backspace", "Delete", "Enter", " "].includes(event.key))) playRetroSound("key");
-    }
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    document.addEventListener("keydown", handleTyping, true);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true);
-      document.removeEventListener("keydown", handleTyping, true);
-    };
-  }, []);
-
-  useEffect(() => {
     const messageSelector = '[role="alert"], [role="alertdialog"]';
     const dialogSelector = '[role="dialog"]';
     const lastMessages = new WeakMap();

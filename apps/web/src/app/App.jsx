@@ -9,9 +9,11 @@ import WorkstationStartup from "../modules/identity/components/WorkstationStartu
 import { clearBootedThisLogin } from "../modules/game/pages/main/computerBoot.js";
 import { currentIdentity, logoutAccount } from "../modules/identity/api.js";
 import { clearWorldLocationCache } from "../modules/world/api.js";
+import { playRetroSound, readRetroSoundEnabled, setRetroSoundEnabled } from "../modules/game/pages/main/retroSoundEffects.js";
 
 function pageFromPath(pathname) {
-  if (pathname === "/") return "startup";
+  if (pathname === "/") return "login";
+  if (pathname === "/startup") return "startup";
   if (/^\/whiteboard(?:\/[^/]+)?\/?$/.test(pathname)) return "whiteboard";
   if (pathname === "/login") return "login";
   if (pathname === "/register") return "register";
@@ -32,6 +34,26 @@ export default function App() {
   const [checkingSession, setCheckingSession] = useState(() => needsSession(pageFromPath(window.location.pathname)));
   const [sessionCheckCount, setSessionCheckCount] = useState(0);
   const [loadingDestination, setLoadingDestination] = useState("game");
+  const [startupDestination, setStartupDestination] = useState(null);
+
+  useEffect(() => {
+    setRetroSoundEnabled(readRetroSoundEnabled());
+    function handlePointerDown(event) {
+      if (event.button === 0 && event.isPrimary !== false && !event.target.closest?.("[data-silent-click-sound]")) playRetroSound("click");
+    }
+    function handleTyping(event) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      const acceptsText = target instanceof Element && (target.matches("input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]), textarea, [contenteditable='true']") || target.isContentEditable);
+      if (acceptsText && (event.key.length === 1 || ["Backspace", "Delete", "Enter", " "].includes(event.key))) playRetroSound("key");
+    }
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("keydown", handleTyping, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleTyping, true);
+    };
+  }, []);
 
   useEffect(() => {
     if (!checkingSession) return undefined;
@@ -103,9 +125,10 @@ export default function App() {
     if (page !== "logout") return undefined;
     let active = true;
     setWorld(null);
+    setStartupDestination(null);
     clearBootedThisLogin();
     logoutAccount().catch(() => {}).finally(() => {
-      if (active) navigate("/", "startup");
+      if (active) navigate("/login", "login");
     });
     return () => { active = false; };
   }, [navigate, page]);
@@ -126,7 +149,14 @@ export default function App() {
     </ComputerAccessShell>;
   }
 
-  if (page === "startup") return <WorkstationStartup onComplete={() => navigate("/login", "login")} />;
+  if (page === "startup") return <WorkstationStartup onComplete={() => {
+    if (startupDestination?.character) {
+      setLoadingDestination("game");
+      navigate("/loading", "loading", startupDestination);
+    } else {
+      navigate("/character/new", "character", startupDestination);
+    }
+  }} />;
 
   if (page === "login") {
     return (
@@ -137,10 +167,11 @@ export default function App() {
           const returnTo = new URLSearchParams(window.location.search).get("returnTo");
           if (returnTo && pageFromPath(returnTo) === "whiteboard") return navigate(returnTo, "whiteboard", authenticatedIdentity);
           if (authenticatedIdentity.character) {
-            setLoadingDestination("game");
-            return navigate("/loading", "loading", authenticatedIdentity);
+            setStartupDestination(authenticatedIdentity);
+            return navigate("/startup", "startup", authenticatedIdentity);
           }
-          return navigate("/character/new", "character", authenticatedIdentity);
+          setStartupDestination(authenticatedIdentity);
+          return navigate("/startup", "startup", authenticatedIdentity);
         }}
       />
     );

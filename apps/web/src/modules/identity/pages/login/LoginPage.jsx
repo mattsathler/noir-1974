@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { currentIdentity, loginAccount } from "../../api.js";
 import ComputerAccessShell from "../../components/ComputerAccessShell.jsx";
+import { unlockRetroAudio } from "../../../game/pages/main/retroSoundEffects.js";
 
 export default function LoginPage({ onRegister, onAuthenticated }) {
   const [error, setError] = useState("");
@@ -25,6 +26,7 @@ export default function LoginPage({ onRegister, onAuthenticated }) {
     setError("");
     submissionLocked.current = true;
     setSubmitting(true);
+    unlockRetroAudio();
     try {
       const loginIdentity = await loginAccount({ email, password });
       const identity = loginIdentity.character || loginIdentity.world?.serverTime

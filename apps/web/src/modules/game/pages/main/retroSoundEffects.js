@@ -22,6 +22,16 @@ export function setRetroSoundEnabled(enabled) {
   }
 }
 
+export function unlockRetroAudio() {
+  if (!readRetroSoundEnabled()) return;
+  try {
+    const context = getAudioContext();
+    if (context?.state === "suspended") context.resume().catch(() => {});
+  } catch {
+    // Audio unlock must never block sign-in or account creation.
+  }
+}
+
 function getAudioContext() {
   if (typeof window === "undefined") return null;
   const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
@@ -99,8 +109,8 @@ export function playRetroSound(kind = "click", enabled = soundEnabled) {
     const compose = () => {
       const startAt = context.currentTime + 0.01;
       if (kind === "boot") {
-        [[261.6, 0], [329.6, 0.12], [392, 0.24], [523.3, 0.39]].forEach(([frequency, offset]) => {
-          playTone(context, frequency, startAt + offset, 0.24, 0.15, frequency * 0.985, "triangle");
+        [[261.6, 0], [329.6, 0.15], [392, 0.3], [523.3, 0.48]].forEach(([frequency, offset]) => {
+          playTone(context, frequency, startAt + offset, 0.34, 0.34, frequency * 0.985, "triangle");
         });
         return;
       }

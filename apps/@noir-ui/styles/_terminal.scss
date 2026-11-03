@@ -2763,7 +2763,7 @@
 .computer-start-menu__programs > button:hover .computer-start-menu__copy small,.computer-start-menu__programs > button:focus-visible .computer-start-menu__copy small { color: #d7e5d9; }
 .computer-start-menu__arrow { color: #65776a; font: 1.2rem Arial, sans-serif; }
 .computer-start-menu__tools { padding: 0.55rem 0.65rem 0.65rem; background: #d4d9cf; border-top: 1px solid #a9b1a6; }
-.computer-start-menu__tools > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
+.computer-start-menu__tools > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem; }
 .computer-start-menu__tools button { display: grid; min-height: 3rem; justify-items: center; align-content: center; gap: 0.22rem; padding: 0.3rem 0.15rem; color: #34453b; background: #e9ece4; border: 1px solid #a2ada0; box-shadow: inset 1px 1px #fff; cursor: pointer; font: bold 0.5rem var(--noir-font-mono); }
 .computer-start-menu__tools button:hover,.computer-start-menu__tools button:focus-visible { color: #fff; background: #315b49; border-color: #254637; outline: 0; }
 .computer-start-menu__tools button svg { width: 1.2rem; height: 1.2rem; fill: currentColor; }
@@ -3058,7 +3058,8 @@
   box-shadow: 2px 2px 0 rgb(0 0 0 / 18%);
   text-align: left;
 }
-.desktop-status-widget--identity { grid-template-columns: 2.75rem minmax(0, 1fr); align-items: center; gap: 0.55rem; }
+.desktop-status-widget--identity { grid-template-columns: 2.75rem minmax(0, 1fr); align-items: center; gap: 0.55rem; cursor: pointer; font: inherit; }
+.desktop-status-widget--identity:hover,.desktop-status-widget--identity:focus-visible { border-color: #436c58; box-shadow: 2px 2px 0 rgb(0 0 0 / 18%), inset 0 0 0 1px #436c58; outline: 0; }
 .desktop-status-widget__portrait { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; overflow: hidden; background: #dce1d5; border: 1px solid #a3aa9c; }
 .desktop-status-widget__portrait .modular-face { width: 100%; height: 100%; }
 .desktop-status-widget__details { display: grid; min-width: 0; gap: 0.25rem; }
