@@ -60,13 +60,13 @@ import { COMPUTER_BOOT_LINES as BOOT_LINES, hasBootedThisLogin, markBootedThisLo
 const NOOP = () => {};
 const PERSONAL_PROGRAMS = [
   { id: "web-browser", label: "WEB BROWSER", Icon: Target, state: "ONLINE", available: true },
-  { id: "terminal", label: "TERMINAL", Icon: Terminal, state: "READY", available: true },
-  { id: "police-website", label: "MERIDIAN POLICE", Icon: Files, state: "ONLINE", available: true },
   { id: "newspaper", label: "THE EVENING COURIER", Icon: Note, state: "ONLINE", available: true },
   { id: "personal-mail", label: "PERSONAL MAIL", Icon: Mail, state: "ONLINE", available: true },
+  { id: "police-website", label: "MERIDIAN POLICE", Icon: Files, state: "ONLINE", available: true },
   { id: "company-portal", label: "COMPANY PORTAL", Icon: MapIcon, state: "ONLINE", available: true },
   { id: "stock-exchange", label: "STOCK EXCHANGE", Icon: Dollar, state: "ONLINE", available: true },
   { id: "minesweeper", label: "MINESWEEPER", Icon: Bomb, state: "READY", available: true },
+  { id: "terminal", label: "TERMINAL", Icon: Terminal, state: "READY", available: true },
 ];
 const WEB_BROWSER_PROGRAM = PERSONAL_PROGRAMS[0];
 const PERSONAL_MAIL_PROGRAM = PERSONAL_PROGRAMS.find((program) => program.id === "personal-mail");
@@ -95,8 +95,9 @@ const DESKTOP_APP_IDS = ["newspaper", "settings", "account-settings", "character
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
+  ...PERSONAL_PROGRAMS.filter((program) => !["web-browser", "newspaper", "terminal"].includes(program.id)),
+  TERMINAL_PROGRAM,
   SETTINGS_PROGRAM,
-  ...PERSONAL_PROGRAMS.filter((program) => !["web-browser", "newspaper"].includes(program.id)),
 ];
 const CHARACTER_APPEARANCE_PROGRAM = { id: "character-appearance", label: "USER APPEARANCE", Icon: User, state: "READY", available: true };
 const MERIDIAN_ENTERPRISES_PROGRAM = { id: "meridian-enterprises", label: "MERIDIAN ENTERPRISES", Icon: MapIcon, state: "ONLINE", available: true };
@@ -213,7 +214,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
   const selectedWallpaper = DESKTOP_WALLPAPERS.find((wallpaper) => wallpaper.id === desktopPreferences.wallpaper) || DESKTOP_WALLPAPERS[0];
-  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PROXY_PROGRAM, TERMINAL_PROGRAM, ...(!isCompanyComputer ? [PERSONAL_PROGRAMS.find((program) => program.id === "stock-exchange"), PERSONAL_PROGRAMS.find((program) => program.id === "minesweeper")] : []), PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
+  const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [PERSONAL_PROGRAMS.find((program) => program.id === "stock-exchange"), PROXY_PROGRAM, TERMINAL_PROGRAM, SETTINGS_PROGRAM] : [PROXY_PROGRAM, TERMINAL_PROGRAM])] : programs;
   const startMenuPrograms = persistent ? PERSONAL_START_MENU_PROGRAMS : programs;
   const facilityAccessGranted = !isCompanyComputer || initialFacilityAccessGranted;
   const [startMenuOpen, setStartMenuOpen] = useState(false);
