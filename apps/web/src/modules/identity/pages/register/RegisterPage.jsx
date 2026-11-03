@@ -19,7 +19,7 @@ export default function RegisterPage({ onLogin, onAccountCreated }) {
     const confirmation = String(fields.get("confirmPassword"));
 
     if (!/^[a-zA-Z0-9_-]{3,24}$/.test(username)) {
-      setError("Username must be 3–24 characters: letters, numbers, _ or -.");
+      setError("Username must be 3–24 symbols: letters, numbers, _ or -.");
       return;
     }
     const emailInput = event.currentTarget.elements.namedItem("email");

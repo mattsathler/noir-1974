@@ -364,8 +364,16 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/connections/{fromID}/{toID}", handler.disconnectWhiteboardPins)
 		if _, ok := handler.store.(blackwireStore); ok {
 			mux.HandleFunc("GET /api/blackwire/profile", handler.blackwireProfile)
+			mux.HandleFunc("POST /api/blackwire/profile", handler.registerBlackwireProfile)
 			mux.HandleFunc("GET /api/blackwire/market", handler.blackwireMarket)
 			mux.HandleFunc("POST /api/blackwire/market/{boardID}/{itemID}/sell", handler.sellBlackwireOffer)
+		}
+		if _, ok := handler.store.(blackwireApplicationStore); ok {
+			mux.HandleFunc("POST /api/blackwire/apps/{appID}/fetch", handler.fetchBlackwireApp)
+			mux.HandleFunc("POST /api/blackwire/apps/{appID}/install", handler.installBlackwireApp)
+		}
+		if _, ok := handler.store.(blackwireApplicationUninstaller); ok {
+			mux.HandleFunc("DELETE /api/blackwire/apps/{appID}", handler.uninstallBlackwireApp)
 		}
 		if _, ok := handler.store.(blackwireIdentityRegistrar); ok {
 			mux.HandleFunc("POST /api/blackwire/identity", handler.registerNewBlackwireIdentity)

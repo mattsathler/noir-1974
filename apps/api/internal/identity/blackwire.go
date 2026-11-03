@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"noir-1974/apps/api/internal/market"
 	"noir-1974/apps/api/internal/world"
 )
@@ -16,6 +17,14 @@ import (
 var errBlackwireUnavailable = errors.New("blackwire information is unavailable")
 var errBlackwireBanned = errors.New("blackwire identity has been burned")
 var errBlackwireIdentityNotBanned = errors.New("blackwire identity is not eligible for replacement")
+var errBlackwireProfileActive = errors.New("blackwire profile is already registered")
+var errBlackwireUsernameTaken = errors.New("blackwire username is already in use")
+var errBlackwireProfileRequired = errors.New("a Blackwire profile is required")
+var errBlackwirePackageUnavailable = errors.New("Blackwire package is unavailable")
+var errBlackwirePackageNotFetched = errors.New("Blackwire package has not been fetched")
+var errBlackwireAvatarUnavailable = errors.New("Blackwire portrait is unavailable")
+var errBlackwireAppPreinstalled = errors.New("preinstalled Blackwire application cannot be removed")
+var errBlackwireAppNotInstalled = errors.New("Blackwire application is not installed")
 
 type blackwireOffer struct {
 	BoardID    string `json:"boardId"`
@@ -30,18 +39,41 @@ type blackwireOffer struct {
 }
 
 type blackwireMarketplace struct {
-	Offers  []blackwireOffer `json:"offers"`
-	Account blackwireAccount `json:"account"`
+	Offers       []blackwireOffer           `json:"offers"`
+	Account      blackwireAccount           `json:"account"`
+	Applications []blackwireApplicationInfo `json:"applications"`
 }
 
 type blackwireAccount struct {
-	Handle               string   `json:"handle"`
-	CryptoCents          int64    `json:"cryptoCents"`
-	Reputation           int64    `json:"reputation"`
-	Level                int      `json:"level"`
-	Banned               bool     `json:"banned"`
-	NextLevelReputation  int64    `json:"nextLevelReputation"`
-	UnlockedApplications []string `json:"unlockedApplications"`
+	Handle                string   `json:"handle"`
+	Username              string   `json:"username"`
+	AvatarID              string   `json:"avatarId"`
+	ProfileComplete       bool     `json:"profileComplete"`
+	CryptoCents           int64    `json:"cryptoCents"`
+	Reputation            int64    `json:"reputation"`
+	Level                 int      `json:"level"`
+	Banned                bool     `json:"banned"`
+	NextLevelReputation   int64    `json:"nextLevelReputation"`
+	UnlockedApplications  []string `json:"unlockedApplications"`
+	InstalledApplications []string `json:"installedApplications"`
+	FetchedApplications   []string `json:"fetchedApplications"`
+}
+
+type blackwireApplicationInfo struct {
+	ID           string   `json:"id"`
+	Executable   string   `json:"executable"`
+	Summary      string   `json:"summary"`
+	Description  string   `json:"description"`
+	Version      string   `json:"version"`
+	Creator      string   `json:"creator"`
+	Origin       string   `json:"origin"`
+	Category     string   `json:"category"`
+	PackageURL   string   `json:"packageUrl,omitempty"`
+	Available    bool     `json:"available"`
+	Preinstalled bool     `json:"preinstalled"`
+	Installed    bool     `json:"installed"`
+	Fetched      bool     `json:"fetched"`
+	Commands     []string `json:"commands"`
 }
 
 type blackwireStore interface {
@@ -54,10 +86,41 @@ type blackwireIdentityRegistrar interface {
 	registerNewBlackwireIdentity(context.Context, string, string) (blackwireAccount, error)
 }
 
+type blackwireProfileWriter interface {
+	registerBlackwireProfile(context.Context, string, string, string, string) (blackwireAccount, error)
+}
+
+type blackwireApplicationStore interface {
+	fetchBlackwireApp(context.Context, string, string, string) (blackwireAccount, error)
+	installBlackwireApp(context.Context, string, string, string) (blackwireAccount, error)
+}
+
+type blackwireApplicationUninstaller interface {
+	uninstallBlackwireApp(context.Context, string, string, string) (blackwireAccount, error)
+}
+
 var blackwireLevelThresholds = []int64{0, 50, 150, 400, 900}
 
 func blackwireApplications() []string {
-	return []string{"ghostkey", "email-breaker", "bankrupt"}
+	return []string{"ghostkey", "email-breaker", "bankrupt", "blackwire", "deadletter"}
+}
+
+func blackwireApplicationCatalog(account blackwireAccount) []blackwireApplicationInfo {
+	installed := make(map[string]bool, len(account.InstalledApplications))
+	fetched := make(map[string]bool, len(account.FetchedApplications))
+	for _, appID := range account.InstalledApplications {
+		installed[appID] = true
+	}
+	for _, appID := range account.FetchedApplications {
+		fetched[appID] = true
+	}
+	return []blackwireApplicationInfo{
+		{ID: "ghostkey", Executable: "GHOSTKEY.EXE", Summary: "Map network directories and exposed services.", Description: "A field utility for tracing public directories and finding compromised company services. Results depend on the route and protections in place.", Version: "4.7.2", Creator: "The Crow", Origin: "Unlisted relay · origin unverified", Category: "NETWORK RECONNAISSANCE", Available: true, Preinstalled: true, Installed: true, Commands: []string{"disable protection", "run ghostkey.exe"}},
+		{ID: "email-breaker", Executable: "MAILBREAKER.EXE", Summary: "Force access to a published staff mailbox.", Description: "Tests a published company mailbox against the relay's breach routines. The recipient's company email address is required.", Version: "2.3.0", Creator: "Bai He · 白鹤", Origin: "Guangzhou relay · China (unverified)", Category: "MAIL ACCESS", Available: true, Preinstalled: true, Installed: true, Commands: []string{"disable protection", "run mailbreaker.exe"}},
+		{ID: "bankrupt", Executable: "BANKRUPT.EXE", Summary: "Force access to a staff bank account ledger.", Description: "A targeted financial account breach utility. A staff member's published eight-digit account number is required.", Version: "1.6.1", Creator: "Moroz · Мороз", Origin: "Novosibirsk relay · Russia (unverified)", Category: "FINANCIAL ACCESS", Available: true, Preinstalled: true, Installed: true, Commands: []string{"disable protection", "run bankrupt.exe"}},
+		{ID: "blackwire", Executable: "BLACKWIRE.EXE", Summary: "Open the Blackwire relay in the web browser.", Description: "The trusted relay client for opening this catalogue and information exchange in the Meridian web browser.", Version: "1.0.0", Creator: "The Crow", Origin: "Rotating relay · origin concealed", Category: "RELAY CLIENT", Available: true, Preinstalled: true, Installed: true, Commands: []string{"run blackwire.exe"}},
+		{ID: "deadletter", Executable: "DEADLETTER.EXE", Summary: "Read a small offline archive left on the Blackwire relay.", Description: "A quiet, read-only archive reader. It stores a few fragments locally and does not connect to external services.", Version: "1.0.0", Creator: "Paper Kite · 纸鸢", Origin: "Shanghai relay · China (unverified)", Category: "OFFLINE READER", PackageURL: "merid://blackwire/packages/deadletter-1.pkg", Available: true, Installed: installed["deadletter"], Fetched: fetched["deadletter"], Commands: []string{"disable protection", "fetch merid://blackwire/packages/deadletter-1.pkg", "install merid://blackwire/packages/deadletter-1.pkg", "run deadletter.exe"}},
+	}
 }
 
 func blackwireReputationFor(category string) int64 {
@@ -95,19 +158,24 @@ func ensureBlackwireAccount(ctx context.Context, db querier, accountID, serverID
 			return ErrNoCharacter
 		}
 	}
-	_, err = db.Exec(ctx, `INSERT INTO player_blackwire_accounts(server_id,account_id,handle)
-		VALUES($1::uuid,$2::uuid,'BW-'||upper(substr(md5($1::text||':'||$2::text),1,8)))
+	_, err = db.Exec(ctx, `INSERT INTO player_blackwire_accounts(server_id,account_id,handle,avatar_id,profile_complete)
+		VALUES($1::uuid,$2::uuid,'BW-'||upper(substr(md5($1::text||':'||$2::text),1,8)),'portrait-01',false)
 		ON CONFLICT(server_id,account_id) DO NOTHING`, serverID, accountID)
 	return err
 }
 
 func readBlackwireAccount(ctx context.Context, db querier, accountID, serverID string) (blackwireAccount, error) {
 	var result blackwireAccount
-	err := db.QueryRow(ctx, `SELECT handle,crypto_cents,reputation,level,banned_at IS NOT NULL FROM player_blackwire_accounts
-		WHERE server_id=$1::uuid AND account_id=$2::uuid`, serverID, accountID).Scan(&result.Handle, &result.CryptoCents, &result.Reputation, &result.Level, &result.Banned)
+	err := db.QueryRow(ctx, `SELECT handle,avatar_id,profile_complete,crypto_cents,reputation,level,banned_at IS NOT NULL,
+		COALESCE((SELECT array_agg(app_id ORDER BY app_id) FROM player_blackwire_installed_apps installed
+			WHERE installed.server_id=player_blackwire_accounts.server_id AND installed.account_id=player_blackwire_accounts.account_id),ARRAY[]::text[]),
+		COALESCE((SELECT array_agg(app_id ORDER BY app_id) FROM player_blackwire_downloads downloaded
+			WHERE downloaded.server_id=player_blackwire_accounts.server_id AND downloaded.account_id=player_blackwire_accounts.account_id),ARRAY[]::text[])
+		FROM player_blackwire_accounts WHERE server_id=$1::uuid AND account_id=$2::uuid`, serverID, accountID).Scan(&result.Handle, &result.AvatarID, &result.ProfileComplete, &result.CryptoCents, &result.Reputation, &result.Level, &result.Banned, &result.InstalledApplications, &result.FetchedApplications)
 	if err != nil {
 		return blackwireAccount{}, err
 	}
+	result.Username = result.Handle
 	for _, threshold := range blackwireLevelThresholds {
 		if result.Reputation < threshold {
 			result.NextLevelReputation = threshold
@@ -115,6 +183,7 @@ func readBlackwireAccount(ctx context.Context, db querier, accountID, serverID s
 		}
 	}
 	result.UnlockedApplications = blackwireApplications()
+	result.InstalledApplications = append([]string{"ghostkey", "email-breaker", "bankrupt", "blackwire"}, result.InstalledApplications...)
 	return result, nil
 }
 
@@ -123,6 +192,206 @@ func (s *postgresStore) blackwireProfile(ctx context.Context, accountID, serverI
 		return blackwireAccount{}, err
 	}
 	return readBlackwireAccount(ctx, s.db, accountID, serverID)
+}
+
+func blackwireAvatarExists(avatarID string) bool {
+	switch avatarID {
+	case "portrait-01", "portrait-02", "portrait-03", "portrait-04", "portrait-05", "portrait-06":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *postgresStore) registerBlackwireProfile(ctx context.Context, accountID, serverID, username, avatarID string) (blackwireAccount, error) {
+	if !blackwireAvatarExists(avatarID) {
+		return blackwireAccount{}, errBlackwireAvatarUnavailable
+	}
+	transactional, ok := s.db.(interface {
+		Begin(context.Context) (pgx.Tx, error)
+	})
+	if !ok {
+		return blackwireAccount{}, errors.New("Blackwire profile transactions are unavailable")
+	}
+	tx, err := transactional.Begin(ctx)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := ensureBlackwireAccount(ctx, tx, accountID, serverID); err != nil {
+		return blackwireAccount{}, err
+	}
+	var complete, banned bool
+	if err := tx.QueryRow(ctx, `SELECT profile_complete,banned_at IS NOT NULL FROM player_blackwire_accounts
+		WHERE server_id=$1::uuid AND account_id=$2::uuid FOR UPDATE`, serverID, accountID).Scan(&complete, &banned); err != nil {
+		return blackwireAccount{}, err
+	}
+	if banned {
+		return blackwireAccount{}, errBlackwireBanned
+	}
+	if complete {
+		return blackwireAccount{}, errBlackwireProfileActive
+	}
+	var usernameExists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM player_blackwire_accounts
+		WHERE server_id=$1::uuid AND lower(handle)=lower($2))`, serverID, username).Scan(&usernameExists); err != nil {
+		return blackwireAccount{}, err
+	}
+	if usernameExists {
+		return blackwireAccount{}, errBlackwireUsernameTaken
+	}
+	if _, err := tx.Exec(ctx, `UPDATE player_blackwire_accounts SET handle=$3,avatar_id=$4,profile_complete=true,updated_at=now()
+		WHERE server_id=$1::uuid AND account_id=$2::uuid`, serverID, accountID, username, avatarID); err != nil {
+		var postgresError *pgconn.PgError
+		if errors.As(err, &postgresError) && postgresError.Code == "23505" {
+			return blackwireAccount{}, errBlackwireUsernameTaken
+		}
+		return blackwireAccount{}, err
+	}
+	profile, err := readBlackwireAccount(ctx, tx, accountID, serverID)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return blackwireAccount{}, err
+	}
+	return profile, nil
+}
+
+func (s *postgresStore) blackwireAppAccountState(ctx context.Context, accountID, serverID string) (bool, bool, error) {
+	if err := ensureBlackwireAccount(ctx, s.db, accountID, serverID); err != nil {
+		return false, false, err
+	}
+	var complete, banned bool
+	err := s.db.QueryRow(ctx, `SELECT profile_complete,banned_at IS NOT NULL FROM player_blackwire_accounts
+		WHERE server_id=$1::uuid AND account_id=$2::uuid`, serverID, accountID).Scan(&complete, &banned)
+	return complete, banned, err
+}
+
+func (s *postgresStore) fetchBlackwireApp(ctx context.Context, accountID, serverID, appID string) (blackwireAccount, error) {
+	if appID != "deadletter" {
+		return blackwireAccount{}, errBlackwirePackageUnavailable
+	}
+	complete, banned, err := s.blackwireAppAccountState(ctx, accountID, serverID)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	if banned {
+		return blackwireAccount{}, errBlackwireBanned
+	}
+	if !complete {
+		return blackwireAccount{}, errBlackwireProfileRequired
+	}
+	_, err = s.db.Exec(ctx, `INSERT INTO player_blackwire_downloads(server_id,account_id,app_id)
+		VALUES($1::uuid,$2::uuid,$3) ON CONFLICT(server_id,account_id,app_id) DO UPDATE SET fetched_at=now()`, serverID, accountID, appID)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	profile, err := readBlackwireAccount(ctx, s.db, accountID, serverID)
+	return profile, err
+}
+
+func (s *postgresStore) installBlackwireApp(ctx context.Context, accountID, serverID, appID string) (blackwireAccount, error) {
+	if appID != "deadletter" {
+		return blackwireAccount{}, errBlackwirePackageUnavailable
+	}
+	transactional, ok := s.db.(interface {
+		Begin(context.Context) (pgx.Tx, error)
+	})
+	if !ok {
+		return blackwireAccount{}, errors.New("Blackwire installation transactions are unavailable")
+	}
+	tx, err := transactional.Begin(ctx)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := ensureBlackwireAccount(ctx, tx, accountID, serverID); err != nil {
+		return blackwireAccount{}, err
+	}
+	var complete, banned bool
+	if err := tx.QueryRow(ctx, `SELECT profile_complete,banned_at IS NOT NULL FROM player_blackwire_accounts
+		WHERE server_id=$1::uuid AND account_id=$2::uuid FOR UPDATE`, serverID, accountID).Scan(&complete, &banned); err != nil {
+		return blackwireAccount{}, err
+	}
+	if banned {
+		return blackwireAccount{}, errBlackwireBanned
+	}
+	if !complete {
+		return blackwireAccount{}, errBlackwireProfileRequired
+	}
+	var fetched bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM player_blackwire_downloads WHERE server_id=$1::uuid AND account_id=$2::uuid AND app_id=$3)`, serverID, accountID, appID).Scan(&fetched); err != nil {
+		return blackwireAccount{}, err
+	}
+	if !fetched {
+		return blackwireAccount{}, errBlackwirePackageNotFetched
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO player_blackwire_installed_apps(server_id,account_id,app_id)
+		VALUES($1::uuid,$2::uuid,$3) ON CONFLICT(server_id,account_id,app_id) DO NOTHING`, serverID, accountID, appID); err != nil {
+		return blackwireAccount{}, err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM player_blackwire_downloads WHERE server_id=$1::uuid AND account_id=$2::uuid AND app_id=$3`, serverID, accountID, appID); err != nil {
+		return blackwireAccount{}, err
+	}
+	profile, err := readBlackwireAccount(ctx, tx, accountID, serverID)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return blackwireAccount{}, err
+	}
+	return profile, nil
+}
+
+func (s *postgresStore) uninstallBlackwireApp(ctx context.Context, accountID, serverID, appID string) (blackwireAccount, error) {
+	if appID != "deadletter" {
+		if appID == "ghostkey" || appID == "email-breaker" || appID == "bankrupt" || appID == "blackwire" {
+			return blackwireAccount{}, errBlackwireAppPreinstalled
+		}
+		return blackwireAccount{}, errBlackwirePackageUnavailable
+	}
+	transactional, ok := s.db.(interface {
+		Begin(context.Context) (pgx.Tx, error)
+	})
+	if !ok {
+		return blackwireAccount{}, errors.New("Blackwire uninstall transactions are unavailable")
+	}
+	tx, err := transactional.Begin(ctx)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := ensureBlackwireAccount(ctx, tx, accountID, serverID); err != nil {
+		return blackwireAccount{}, err
+	}
+	var complete, banned bool
+	if err := tx.QueryRow(ctx, `SELECT profile_complete,banned_at IS NOT NULL FROM player_blackwire_accounts
+		WHERE server_id=$1::uuid AND account_id=$2::uuid FOR UPDATE`, serverID, accountID).Scan(&complete, &banned); err != nil {
+		return blackwireAccount{}, err
+	}
+	if banned {
+		return blackwireAccount{}, errBlackwireBanned
+	}
+	if !complete {
+		return blackwireAccount{}, errBlackwireProfileRequired
+	}
+	result, err := tx.Exec(ctx, `DELETE FROM player_blackwire_installed_apps
+		WHERE server_id=$1::uuid AND account_id=$2::uuid AND app_id=$3`, serverID, accountID, appID)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	if result.RowsAffected() == 0 {
+		return blackwireAccount{}, errBlackwireAppNotInstalled
+	}
+	profile, err := readBlackwireAccount(ctx, tx, accountID, serverID)
+	if err != nil {
+		return blackwireAccount{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return blackwireAccount{}, err
+	}
+	return profile, nil
 }
 
 func (s *postgresStore) registerNewBlackwireIdentity(ctx context.Context, accountID, serverID string) (blackwireAccount, error) {
@@ -143,7 +412,7 @@ func (s *postgresStore) registerNewBlackwireIdentity(ctx context.Context, accoun
 	result, err := tx.Exec(ctx, `UPDATE player_blackwire_accounts
 		SET identity_generation=identity_generation+1,
 			handle='BW-'||upper(substr(md5(server_id::text||':'||account_id::text||':'||(identity_generation+1)::text),1,8)),
-			crypto_cents=0,reputation=0,level=1,banned_at=NULL,updated_at=now()
+			avatar_id='portrait-01',profile_complete=false,crypto_cents=0,reputation=0,level=1,banned_at=NULL,updated_at=now()
 		WHERE server_id=$1::uuid AND account_id=$2::uuid AND banned_at IS NOT NULL`, serverID, accountID)
 	if err != nil {
 		return blackwireAccount{}, err
@@ -236,7 +505,7 @@ func (s *postgresStore) blackwireOffers(ctx context.Context, accountID, serverID
 		return blackwireMarketplace{}, err
 	}
 	if profile.Banned {
-		return blackwireMarketplace{Offers: []blackwireOffer{}, Account: profile}, nil
+		return blackwireMarketplace{Offers: []blackwireOffer{}, Account: profile, Applications: blackwireApplicationCatalog(profile)}, nil
 	}
 	queryer, ok := s.db.(interface {
 		Query(context.Context, string, ...any) (pgx.Rows, error)
@@ -268,7 +537,7 @@ func (s *postgresStore) blackwireOffers(ctx context.Context, accountID, serverID
 		return blackwireMarketplace{}, err
 	}
 	defer rows.Close()
-	result := blackwireMarketplace{Offers: []blackwireOffer{}}
+	result := blackwireMarketplace{Offers: []blackwireOffer{}, Applications: blackwireApplicationCatalog(profile)}
 	for rows.Next() {
 		var boardID, boardTitle, itemID string
 		var raw []byte
@@ -290,6 +559,7 @@ func (s *postgresStore) blackwireOffers(ctx context.Context, accountID, serverID
 		return blackwireMarketplace{}, err
 	}
 	result.Account = profile
+	result.Applications = blackwireApplicationCatalog(profile)
 	return result, nil
 }
 

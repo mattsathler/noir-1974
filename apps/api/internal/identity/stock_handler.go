@@ -226,7 +226,7 @@ func (h *Handler) stockPortfolio(w http.ResponseWriter, r *http.Request) {
 	}
 	progression, positions, err := reader.playerStockPortfolio(r.Context(), current.ID, h.worldServerID)
 	if errors.Is(err, ErrNoCharacter) {
-		h.writeAPIError(w, r, http.StatusConflict, "PLAYER_CHARACTER_REQUIRED", "Create a character before using the stock exchange.", nil)
+		h.writeAPIError(w, r, http.StatusConflict, "PLAYER_PROFILE_REQUIRED", "Complete your Meridian profile before using the stock exchange.", nil)
 		return
 	}
 	if err != nil {
@@ -343,7 +343,7 @@ func (h *Handler) stockOrder(w http.ResponseWriter, r *http.Request) {
 	creditsCents, err := writer.executeStockOrder(r.Context(), current.ID, h.worldServerID, &listing, input)
 	switch {
 	case errors.Is(err, ErrNoCharacter):
-		h.writeAPIError(w, r, http.StatusConflict, "PLAYER_CHARACTER_REQUIRED", "Create a character before using the stock exchange.", nil)
+		h.writeAPIError(w, r, http.StatusConflict, "PLAYER_PROFILE_REQUIRED", "Complete your Meridian profile before using the stock exchange.", nil)
 		return
 	case errors.Is(err, ErrInsufficientFunds):
 		h.writeAPIError(w, r, http.StatusConflict, "INSUFFICIENT_CREDITS", "There are not enough Credits for this order.", nil)

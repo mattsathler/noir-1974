@@ -17,6 +17,8 @@ Cada melhoria deve explicar o problema observável, o resultado esperado, o esco
 | I06 | Widgets informativos no desktop | Computador pessoal, Union Mercantile Bank e Rogue DNS | Médio |
 | I07 | Balanceamento de exposição, hosts e segurança hacker | M33 — exposição hacker e defesas virtuais | Médio |
 | I09 | Remover lore do The Crow de emails de resposta | Correio gerado por ações do jogador | Curto |
+| I10 | Descobrir contas bancárias em notas fiscais por email | Ghostkey e investigação financeira | Médio |
+| I11 | Dados pessoais procedurais de NPCs | Perfis e registros pessoais | Médio |
 
 ## Melhorias implementadas
 

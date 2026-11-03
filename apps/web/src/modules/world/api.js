@@ -327,6 +327,26 @@ export async function registerNewBlackwireIdentity() {
   return whiteboardRequest("/api/blackwire/identity", { method: "POST" });
 }
 
+export async function registerBlackwireProfile(username, avatarId) {
+  return whiteboardRequest("/api/blackwire/profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, avatarId }),
+  });
+}
+
+export async function fetchBlackwireApplication(appId) {
+  return whiteboardRequest(`/api/blackwire/apps/${encodeURIComponent(appId)}/fetch`, { method: "POST" });
+}
+
+export async function installBlackwireApplication(appId) {
+  return whiteboardRequest(`/api/blackwire/apps/${encodeURIComponent(appId)}/install`, { method: "POST" });
+}
+
+export async function uninstallBlackwireApplication(appId) {
+  return whiteboardRequest(`/api/blackwire/apps/${encodeURIComponent(appId)}`, { method: "DELETE" });
+}
+
 export async function sellBlackwireItem(boardId, itemId) {
   return whiteboardRequest(`/api/blackwire/market/${encodeURIComponent(boardId)}/${encodeURIComponent(itemId)}/sell`, { method: "POST", pendingCursor: false });
 }

@@ -18,7 +18,7 @@ import { BatteryFull } from "pixelarticons/react/BatteryFull";
 import { Terminal } from "pixelarticons/react/Terminal";
 import { Bomb } from "pixelarticons/react/Bomb";
 import Typewriter from "../../../../../../@noir-ui/components/Typewriter.jsx";
-import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, getBlackwireProfile, getCachedWhiteboard, getWhiteboards, pinWhiteboardItem, requestFacilitySiteAccess, setWhiteboardSaveState } from "../../../world/api.js";
+import { cachePinnedWhiteboardItem, cacheWhiteboardDraft, createWhiteboard, createWhiteboardDraft, fetchBlackwireApplication, getBlackwireProfile, getCachedWhiteboard, getWhiteboards, installBlackwireApplication, pinWhiteboardItem, requestFacilitySiteAccess, setWhiteboardSaveState, uninstallBlackwireApplication } from "../../../world/api.js";
 import CaseFiles from "../../../cases/pages/files/CaseFiles.jsx";
 import WorldDirectory from "../../../world/pages/directory/WorldDirectory.jsx";
 import EmailInbox from "../../../mail/pages/inbox/EmailInbox.jsx";
@@ -35,7 +35,8 @@ import { loreProgramForSite } from "./lorePublications.js";
 import HospitalWebsite from "./HospitalWebsite.jsx";
 import BankWebsite from "./BankWebsite.jsx";
 import StockExchangeApp from "./StockExchangeApp.jsx";
-import BlackwireWebsite from "./BlackwireWebsite.jsx";
+import BlackwireWebsite, { BLACKWIRE_PORTRAITS } from "./BlackwireWebsite.jsx";
+import DeadletterApp from "./DeadletterApp.jsx";
 import MeridianEnterprisesWebsite from "./MeridianEnterprisesWebsite.jsx";
 import NewspaperWindow from "../../../world/pages/newspaper/NewspaperWindow.jsx";
 import DeepLinkWebsite from "./DeepLinkWebsite.jsx";
@@ -77,6 +78,7 @@ const GHOSTKEY_PROGRAM = { id: "ghostkey", label: "GHOSTKEY.EXE", Icon: Bug, sta
 const EMAIL_BREAKER_PROGRAM = { id: "email-breaker", label: "EMAIL_BREAKER.EXE", Icon: Mail, state: "UNSIGNED", available: true };
 const BANKRUPT_PROGRAM = { id: "bankrupt", label: "BANKRUPT.EXE", Icon: Dollar, state: "UNSIGNED", available: true };
 const BLACKWIRE_PROGRAM = { id: "blackwire", label: "BLACKWIRE · INFORMATION MARKET", Icon: Wifi, state: "ONLINE", available: true, siteAddress: "merid/blackwire.local/market" };
+const DEADLETTER_PROGRAM = { id: "deadletter", label: "DEADLETTER.EXE", Icon: Note, state: "OFFLINE ARCHIVE", available: true };
 const PERSON_SEARCH_PROGRAM = { id: "person-search", label: "PERSON SEARCH", Icon: User, available: true };
 const PATIENT_SEARCH_PROGRAM = { id: "patient-search", label: "PATIENT_SEARCH_APP.EXE", Icon: Cross, state: "PRIVILEGED", available: true };
 const GATE_RECORDS_PROGRAM = { id: "gate-records", label: "GATE_ACCESS_LOG_APP.EXE", Icon: MapIcon, state: "PRIVILEGED", available: true };
@@ -88,7 +90,7 @@ function localServiceLocationId(cityId, service) {
   const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
   return `service:${cityKey}/${service}`;
 }
-const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "minesweeper", "mail-compose"];
+const DESKTOP_APP_IDS = ["newspaper", "settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "deadletter", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "minesweeper", "mail-compose"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -220,6 +222,8 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
   const [proxyBoot, setProxyBoot] = useState({ active: false, target: "" });
   const [characterPreviewVisual, setCharacterPreviewVisual] = useState(character?.visual);
   const [blackwireProfile, setBlackwireProfile] = useState(null);
+  const [protectionEnabled, setProtectionEnabled] = useState(true);
+  const blackwirePortrait = BLACKWIRE_PORTRAITS.find((portrait) => portrait.id === blackwireProfile?.avatarId) || BLACKWIRE_PORTRAITS[0];
   const [accessAttemptId, setAccessAttemptId] = useState(initialAccessAttemptId);
   const [windows, setWindows] = useState(() => {
     try {
@@ -777,7 +781,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
               <section className="desktop-status-widget desktop-status-widget--identity" aria-label="Player identity">
                 <div className="desktop-status-widget__portrait">{character?.visual && <ModularFace visual={character.visual} name={character.displayName || accountUsername || "Player"} />}</div>
                 <div className="desktop-status-widget__details"><span>ACCOUNT HOLDER</span><strong>{character?.displayName || accountUsername || "PLAYER"}</strong>
-                  {blackwireProfile && <small>ALTER EGO · {blackwireProfile.handle}</small>}
+                  {blackwireProfile?.profileComplete && <small className="desktop-status-widget__blackwire-handle"><span className="desktop-status-widget__blackwire-portrait"><ModularFace visual={blackwirePortrait.visual} name={blackwirePortrait.name} /></span>BLACKWIRE · {blackwireProfile.handle}</small>}
                 </div>
               </section>
               <section className="desktop-status-widget" aria-label="Union Mercantile Bank balance">
@@ -853,16 +857,39 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "character-appearance"
                     ? <CharacterAppearanceEditor windowed character={character} onPreview={setCharacterPreviewVisual} onClose={() => closeWindow(id)} onSaved={(savedCharacter) => { onCharacterSaved?.(savedCharacter); closeWindow(id); setCharacterPreviewVisual(savedCharacter.visual); }} />
                     : program.id === "terminal"
-                      ? <TerminalApp onRun={(programId) => {
-                        launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : programId === "bankrupt" ? BANKRUPT_PROGRAM : programId === "blackwire" ? BLACKWIRE_PROGRAM : EMAIL_BREAKER_PROGRAM);
-                        return undefined;
-                      }} />
+                      ? <TerminalApp
+                        protectionEnabled={protectionEnabled}
+                        installedApplications={blackwireProfile?.installedApplications || ["ghostkey", "email-breaker", "bankrupt"]}
+                        fetchedApplications={blackwireProfile?.fetchedApplications || []}
+                        onProtectionChange={setProtectionEnabled}
+                        onFetchPackage={async (appId) => {
+                          const result = await fetchBlackwireApplication(appId);
+                          setBlackwireProfile(result.account);
+                          return result;
+                        }}
+                        onInstallPackage={async (appId) => {
+                          const result = await installBlackwireApplication(appId);
+                          setBlackwireProfile(result.account);
+                          return result;
+                        }}
+                        onUninstallApp={async (appId) => {
+                          const result = await uninstallBlackwireApplication(appId);
+                          setBlackwireProfile(result.account);
+                          windowsStateRef.current.filter((item) => item.program.id === appId).forEach((item) => closeWindow(item.id));
+                          return result;
+                        }}
+                        onRun={(programId) => {
+                          launchProgram(programId === "ghostkey" ? GHOSTKEY_PROGRAM : programId === "bankrupt" ? BANKRUPT_PROGRAM : programId === "deadletter" ? DEADLETTER_PROGRAM : programId === "blackwire" ? BLACKWIRE_PROGRAM : EMAIL_BREAKER_PROGRAM);
+                          return undefined;
+                        }} />
                     : program.id === "ghostkey"
                       ? <GhostkeyExplorer countryId={cityId?.split("/")[0] || ""} countryName={countryName} onOpenPatientSearch={(siteAddress) => openPatientSearchFromGhost(siteAddress, id)} onOpenGateRecords={(siteAddress) => openGateRecordsFromGhost(siteAddress, id)} onOpenEmployeeDirectory={(companyRecord) => launchProgram({ ...EMPLOYEE_DIRECTORY_PROGRAM, companyRecord, siteAddress: companyRecord.siteAddress, accessedViaGhost: true }, id)} onOpenWarrantRequest={(siteAddress) => launchProgram({ ...RESIDENTIAL_SEARCH_PROGRAM, siteAddress, accessedViaGhost: true }, id)} />
                       : program.id === "email-breaker"
                         ? <EmailBreakerApp serverTime={serverTime} onOpenHackedMailbox={openHackedMailbox} />
                       : program.id === "bankrupt"
                         ? <BankruptApp onOpenBankLedger={openHackedBankLedger} />
+                    : program.id === "deadletter"
+                      ? <DeadletterApp />
                       : program.id === "person-search"
                         ? <PoliceWebsite page="person-search" navigate={(destination) => launchProgram(destination, id)} searchId={`police-site-search-${id}`}><WorldDirectory key={`${id}:person-search`} program="interpol" countryName={countryName} cityId={cityId} serverTime={serverTime} timeZone={timeZone} onPrint={requestPrint} /></PoliceWebsite>
                       : program.id === "employee-directory"
@@ -872,7 +899,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "minesweeper"
                       ? <MinesweeperApp />
                     : program.id === "blackwire"
-                      ? <BlackwireWebsite onAccountChange={setBlackwireProfile} />
+                      ? <BlackwireWebsite profile={blackwireProfile} onAccountChange={setBlackwireProfile} />
                     : program.id === "proxy"
                     ? <ProxyConnection
                         world={{ city: location?.split(",")[0], cityId, country: countryName }}

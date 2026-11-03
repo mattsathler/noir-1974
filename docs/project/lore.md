@@ -2,7 +2,7 @@
 
 Este documento reúne os fatos canônicos estabelecidos sobre a história e as figuras centrais do universo. Novas criações devem respeitar as [regras do jogo](../rules/README.md), em especial a [Regra 0003 — Universo governado por grandes empresas](../rules/0003-universo-corporativo.md).
 
-## O mundo de Noir
+## O universo
 
 A história se passa no **século XVIII**, mas o desenvolvimento tecnológico acelerou muito além dos costumes. A sociedade tem tecnologias extraordinárias sem abandonar roupas, hábitos, objetos e convenções de aparência antiga.
 
@@ -10,7 +10,7 @@ O mundo é extremamente anarcocapitalista e comandado por grandes empresas. O po
 
 ## Moeda
 
-**Credits** são a moeda universal de Noir, usada em todas as cidades e transações. Textos, registros e sistemas do jogo devem usar Credits, sem moedas locais ou históricas.
+**Credits** são a moeda universal, usada em todas as cidades e transações. Textos, registros e sistemas devem usar Credits, sem moedas locais ou históricas.
 
 ## O GATE e a Meridian Global
 
@@ -26,7 +26,7 @@ O GATE continua sendo uma infraestrutura física de transporte usada por pessoas
 
 O computador pessoal do detetive é o espaço central da investigação. Sua interface apresenta um sistema operacional próprio, com navegador, janelas e ferramentas de trabalho. Portais públicos permitem consultar informações de uma jurisdição; o diretório nacional apresenta empresas de todas as cidades do país conectado, e cada empresa mantém seu próprio site e cadastro de funcionários.
 
-O **Proxy** conecta o computador a um nó de cidade e define a jurisdição ativa. Trocar de nó altera a cidade investigativa da sessão, sem mover o personagem. As consultas e ações continuam sujeitas às mesmas regras de conta, jurisdição e autorização do serviço. Os resultados de Person Search abrangem o país conectado; o diretório de funcionários de um site empresarial contém somente as pessoas empregadas por aquela empresa.
+O **Proxy** conecta o computador a um nó de cidade e define a jurisdição ativa. Trocar de nó altera a cidade investigativa da sessão, sem registrar deslocamento físico. As consultas e ações continuam sujeitas às mesmas regras de conta, jurisdição e autorização do serviço. Os resultados de Person Search abrangem o país conectado; o diretório de funcionários de um site empresarial contém somente as pessoas empregadas por aquela empresa.
 
 Os portais e sistemas corporativos pertencem à ordem empresarial de Noir. A Meridian Global controla partes essenciais da infraestrutura de conexão, enquanto empresas e instituições operam seus próprios serviços. A aparência e a linguagem desses sistemas preservam formulários, diretórios e convenções antiquadas, mesmo quando sua capacidade de comunicação é extraordinária.
 
@@ -58,7 +58,7 @@ Reservado, elegante e implacável, Voss raramente aparece em público. Não prec
 
 > “As fronteiras nunca deveriam dividir o mundo. Deveriam cobrar pela travessia.”
 
-### Notas de construção do personagem
+### Notas sobre Adrian Voss
 
 - **Adrian:** nome sofisticado, plausível para a época e sem exageros futuristas.
 - **Voss:** sobrenome curto, seco e memorável, adequado a manchetes, documentos corporativos e rumores.
@@ -68,7 +68,7 @@ Reservado, elegante e implacável, Voss raramente aparece em público. Não prec
 
 O jogador interpreta um **detetive particular**. Ele já trabalhou com a Interpol; essa relação passada explica por que ainda tem acesso a determinados recursos e informações ligados à instituição. Ele não é um agente da Interpol, e sua atuação como investigador independente deve permanecer clara na narrativa.
 
-Ao criar o personagem, o jogador poderá montar sua aparência com peças visuais modulares em pixel art — rosto, cabelo, tom de pele, características e acessórios. A composição deve seguir a [Regra 0001](../rules/0001-direcao-artistica.md): escala, paleta, contraste, contorno e nível de detalhe consistentes, com roupas e aparência coerentes com o século XVIII e o estilo punk antigo de Noir. A escolha é individual e persiste na conta.
+Ao configurar sua identidade, o jogador poderá montar sua aparência com peças visuais modulares em pixel art — rosto, cabelo, tom de pele, características e acessórios. A composição deve seguir a [Regra 0001](../rules/0001-direcao-artistica.md): escala, paleta, contraste, contorno e nível de detalhe consistentes, com roupas e aparência coerentes com o século XVIII e o estilo punk antigo deste universo. A escolha é individual e persiste na conta.
 
 NPCs também terão representação visual modular. Suas peças serão escolhidas deterministicamente pela seed e pela versão do gerador do servidor, tornando cada composição estável e compartilhada entre os jogadores daquele servidor.
 

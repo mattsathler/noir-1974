@@ -37,7 +37,7 @@ export default function CharacterCreationPage({ onComplete }) {
     const displayName = String(fields.get("displayName")).trim();
     const displayNameLength = Array.from(displayName).length;
     if (displayNameLength < 2 || displayNameLength > 40) {
-      setError("Detective name must be 2–40 characters long.");
+      setError("Display name must contain 2–40 symbols.");
       return;
     }
     submissionLocked.current = true;

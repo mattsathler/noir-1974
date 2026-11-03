@@ -28,20 +28,20 @@ O `black_market.exe` será a porta de entrada para baixar e usar ferramentas ile
 
 Ghostkey e Mailbreaker poderão começar desinstalados. Um tutorial curto deverá explicar como obter e usar ferramentas pelo mercado clandestino, introduzindo seus riscos e consequências.
 
-A primeira etapa da progressão adicionará fama em pontos e saldo em Credits por personagem/servidor, sem ranking. O jogador poderá investir em ações de empresas nacionais pelo desktop. Descobrir ou solucionar casos não pagará Credits nesta etapa. Uma etapa seguinte fará a cotação de cada empresa reagir a acontecimentos associados a ela, principalmente homicídios ligados a extorsões ou conflitos corporativos; a pontuação de mercado será isolada por servidor e não pagará Credits diretamente.
+A primeira etapa da progressão adicionará fama em pontos e saldo em Credits para cada identidade de jogador em um servidor, sem ranking. O jogador poderá investir em ações de empresas nacionais pelo desktop. Descobrir ou solucionar casos não pagará Credits nesta etapa. Uma etapa seguinte fará a cotação de cada empresa reagir a acontecimentos associados a ela, principalmente homicídios ligados a extorsões ou conflitos corporativos; a pontuação de mercado será isolada por servidor e não pagará Credits diretamente.
 
 ## Online — proposta em avaliação
 
-O modelo desejado é permitir que cada jogador crie personagens vinculados a mundos/servidores diferentes e escolha entre:
+O modelo desejado é permitir que cada jogador participe de universos/servidores diferentes e escolha entre:
 
-- **Singleplayer:** mundo e estado privados do personagem.
-- **Multiplayer:** personagem participando de um mundo cujo estado é compartilhado com os demais jogadores daquele servidor.
+- **Singleplayer:** universo e estado privados do jogador.
+- **Multiplayer:** jogador participando de um universo cujo estado é compartilhado com as demais pessoas daquele servidor.
 
 A arquitetura atual já associa um mundo determinístico a cada servidor por meio de uma seed, e isola as mutations e os casos por `server_id`. Portanto, mundos públicos compartilhados e mundos privados de jogador são compatíveis com a base conceitual existente. Um mundo singleplayer pode ser tratado como uma instância privada, equivalente a um servidor de um único jogador.
 
 Uma seed, sozinha, não define o compartilhamento. Ela reconstrói a sociedade base; a identidade da instância determina o escopo das mutations, dos casos e do progresso. Assim, dois mundos podem partir da mesma seed e ainda manter estados mutáveis isolados. Compartilhar um mundo multiplayer exige compartilhar tanto a base determinística quanto a instância de estado.
 
-O modelo de personagem por mundo/servidor ainda precisa de decisão formal. Antes de implementar, definir se um personagem pode existir em mais de uma instância, como funciona a entrada em servidores existentes, e se um mundo singleplayer pode ser compartilhado depois sem perder ou expor seu estado privado.
+O modelo de identidade por universo/servidor ainda precisa de decisão formal. Antes de implementar, definir como uma identidade participa de mais de uma instância, como funciona a entrada em servidores existentes, e se um universo singleplayer pode ser compartilhado depois sem perder ou expor seu estado privado.
 
 ## Direção para as próximas milestones
 
@@ -53,8 +53,8 @@ A M30 introduziu a Blackwire, rede clandestina criada por The Crow, e o mercado 
 
 A M31 aprofunda a manipulação de mercado: grupos de empresas rivais do mesmo ramo terão relações determinísticas e estáveis por seed. Movimentos ligados à rivalidade devem ser opostos entre a empresa afetada e todas as suas rivais. O jogador aprenderá essas relações observando cotações e changes e poderá usá-las em conjunto com a venda de informações da Blackwire. Evidências sem ligação direta com a empresa terão impacto menor; crimes financeiros, fraude corporativa, extorsão e dados de executivos terão peso maior. Exposições mais graves, especialmente políticas, serão raras e difíceis de rastrear, podendo gerar consequências e notícias conforme sua gravidade.
 
-A M32 separa a progressão legal do personagem da progressão clandestina de seu alter ego hacker. Uma conta Blackwire própria por personagem/servidor mantém handle, Crypto e reputação. Ghostkey e Mailbreaker são ferramentas iniciais; Bankrupt desbloqueia no nível 2, verificado pelo cliente e pela API. O desktop mostra o handle e Crypto separado do saldo Union. Vendas antigas reconstituem reputação e o valor ainda disponível, até o total vendido, migra para Crypto. A lavagem ainda não está implementada; a identidade hacker pode perder conta e progresso em milestones posteriores sem apagar o personagem legal.
+A M32 separa a progressão legal do jogador da progressão clandestina de sua identidade hacker. Uma conta Blackwire própria por usuário/servidor mantém handle, Crypto e reputação. Ghostkey e Mailbreaker são ferramentas iniciais; Bankrupt desbloqueia no nível 2, verificado pelo cliente e pela API. O desktop mostra o handle e Crypto separado do saldo Union. Vendas antigas reconstituem reputação e o valor ainda disponível, até o total vendido, migra para Crypto. A lavagem ainda não está implementada; a identidade hacker pode perder conta e progresso em milestones posteriores sem apagar o perfil legal do jogador.
 
 A M33 introduz cautela para ações ilegais por meio de exposição invisível, defesas virtuais empresariais determinísticas e consequências narrativas crescentes. Rogue DNS ajuda a interromper alertas no país anterior e reduzir exposição. Em níveis críticos, The Crow poderá banir a conta Blackwire, levando à perda da progressão ilegal. As empresas terão níveis crescentes de proteção, do sistema desprotegido à Meridian Web Security.
 
-O Online permanece uma proposta arquitetural até que o modelo de personagens, instâncias e compartilhamento de estado seja fechado em um ADR aceito.
+O Online permanece uma proposta arquitetural até que o modelo de identidade por universo, instâncias e compartilhamento de estado seja fechado em um ADR aceito.

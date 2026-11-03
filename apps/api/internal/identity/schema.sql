@@ -57,6 +57,30 @@ CREATE TABLE IF NOT EXISTS player_blackwire_accounts (
 ALTER TABLE player_blackwire_accounts ADD COLUMN IF NOT EXISTS legacy_sales_migrated boolean NOT NULL DEFAULT true;
 ALTER TABLE player_blackwire_accounts ADD COLUMN IF NOT EXISTS identity_generation integer NOT NULL DEFAULT 1;
 ALTER TABLE player_blackwire_accounts ADD COLUMN IF NOT EXISTS banned_at timestamptz;
+ALTER TABLE player_blackwire_accounts ADD COLUMN IF NOT EXISTS avatar_id text NOT NULL DEFAULT 'portrait-01';
+ALTER TABLE player_blackwire_accounts ADD COLUMN IF NOT EXISTS profile_complete boolean NOT NULL DEFAULT true;
+CREATE UNIQUE INDEX IF NOT EXISTS player_blackwire_username_unique_idx
+    ON player_blackwire_accounts(server_id, lower(handle));
+
+CREATE TABLE IF NOT EXISTS player_blackwire_downloads (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL,
+    app_id text NOT NULL CHECK (app_id <> ''),
+    fetched_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, app_id),
+    FOREIGN KEY (server_id, account_id)
+        REFERENCES player_blackwire_accounts(server_id, account_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS player_blackwire_installed_apps (
+    server_id uuid NOT NULL,
+    account_id uuid NOT NULL,
+    app_id text NOT NULL CHECK (app_id <> ''),
+    installed_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, account_id, app_id),
+    FOREIGN KEY (server_id, account_id)
+        REFERENCES player_blackwire_accounts(server_id, account_id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS player_stock_positions (
     server_id uuid NOT NULL,

@@ -4,10 +4,10 @@ Os fatos centrais do cenário, do GATE, da Meridian Global e de Adrian Voss est�
 
 ## Vesper
 
-Personagem misterioso que apresenta e ensina o jogo.
+Detetive misterioso que orienta quem está começando a investigar.
 
 - Detetive desconhecido/legendário, com vários casos resolvidos.
-- Guia do tutorial; explica como Noir 1974 funciona.
+- Guia de primeiros passos; explica os recursos disponíveis ao detetive.
 - Apresentação misteriosa; voz modificada.
 - Referência de personalidade: uma espécie de **L**, de *Death Note*.
 - **Não participa** do loop principal de investigação na versão inicial.
@@ -25,4 +25,4 @@ Autoridade institucional ligada ao passado profissional do jogador na Interpol.
 
 Detetive particular que já trabalhou com a Interpol e ainda conserva acesso a determinados recursos e informações da instituição. Não é um agente ativo da Interpol. A natureza exata desse acesso ainda será definida.
 
-Na criação do personagem, o jogador monta sua aparência com peças modulares em pixel art — como rosto, cabelo, tom de pele, características visuais e acessórios — produzidas de acordo com a [Regra 0001](../rules/0001-direcao-artistica.md) e a direção visual de Noir 1974. A seleção fica salva na conta do jogador. NPCs também recebem aparências compostas pelo mesmo catálogo, geradas deterministicamente pela seed versionada do servidor.
+Ao configurar sua identidade, o jogador monta sua aparência com peças modulares em pixel art — como rosto, cabelo, tom de pele, características visuais e acessórios — produzidas de acordo com a [Regra 0001](../rules/0001-direcao-artistica.md) e a direção visual do universo. A seleção fica salva na conta. As demais pessoas também recebem aparências compostas pelo mesmo catálogo, geradas deterministicamente pela seed versionada do servidor.

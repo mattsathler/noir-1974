@@ -4,7 +4,7 @@ Use este prompt como base em toda geração de imagens do jogo. Substitua os cam
 
 ## Prompt-base
 
-> Crie uma imagem para **Noir 1974**, jogo de investigação e dedução urbana ambientado em uma metrópole noir de futuro próximo, com atmosfera de policial procedural e ficção científica distópica. **Assunto da imagem:** [descrever personagem, cenário, objeto ou situação]. **Função no jogo:** [descrever onde será usada e o que precisa comunicar]. **Composição:** [descrever plano, ponto de vista e espaço para interface, se necessário].
+> Crie uma imagem para **Noir 1974**, universo de investigação e dedução urbana ambientado em uma metrópole noir de futuro próximo, com atmosfera de policial procedural e ficção científica distópica. **Assunto da imagem:** [descrever pessoa, cenário, objeto ou situação]. **Função da imagem:** [descrever onde será usada e o que precisa comunicar]. **Composição:** [descrever plano, ponto de vista e espaço para interface, se necessário].
 >
 > A imagem deve parecer uma cena de um jogo narrativo investigativo consistente: pixel art de alta densidade com acabamento pictórico, formas construídas por pixels visíveis e blocos de cor, contornos definidos mas não uniformemente grossos, detalhes ambientais minuciosos e textura granulada. Evite aparência vetorial, fotografia, 3D polido ou pixel art simples e colorida. A imagem deve continuar legível em tamanho reduzido; agrupe detalhes em silhuetas e massas tonais claras.
 >
@@ -29,7 +29,7 @@ Use este prompt como base em toda geração de imagens do jogo. Substitua os cam
 ## Instruções por tipo de imagem
 
 - **Cenário/fundo:** priorizar leitura de profundidade, atmosfera, silhuetas arquitetônicas e espaço negativo para a interface.
-- **Retrato/personagem:** manter a mesma paleta e textura; expressão contida, roupa funcional e iluminação lateral. Fundo simples e escuro para separar a silhueta.
+- **Retrato de uma pessoa:** manter a mesma paleta e textura; expressão contida, roupa funcional e iluminação lateral. Fundo simples e escuro para separar a silhueta.
 - **Objeto/pista:** fundo neutro ou transparente conforme o uso; forma imediatamente reconhecível, iluminação controlada e detalhes suficientes para inspeção. Não adicionar brilho, contorno ou cor que funcione como marcador de pista.
 - **Mapa ou tela informativa:** manter a paleta e o acabamento, mas priorizar legibilidade e relações espaciais. Não simular um tabuleiro ou identidade visual de outro jogo.
 - **Logo e tipografia:** tratar como arte gráfica separada, em alto contraste marfim sobre preto, letras condensadas e robustas com desgaste de impressão e pequenos escorridos. Preservar exatamente o nome e os caracteres fornecidos; não pedir à geração de imagem para inventar a grafia.
