@@ -496,6 +496,13 @@ func classifyBlackwireOffer(item map[string]any) (int64, string, string) {
 	return price, category, companyID
 }
 
+func blackwirePriceForMarketChange(priceCents, changeBps int64) int64 {
+	const maxAdjustmentBps int64 = 5000
+	changeBps = max(-maxAdjustmentBps, min(maxAdjustmentBps, changeBps))
+	adjusted := (priceCents*(10000+changeBps) + 5000) / 10000
+	return max(int64(1), adjusted)
+}
+
 func (s *postgresStore) blackwireOffers(ctx context.Context, accountID, serverID string) (blackwireMarketplace, error) {
 	if err := ensureBlackwireAccount(ctx, s.db, accountID, serverID); err != nil {
 		return blackwireMarketplace{}, err
@@ -623,7 +630,7 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 	marketDelta := blackwireMarketDelta(category)
 	marketEventID := "blackwire:" + accountID + ":" + itemID
 	var rivalIDs []string
-	if companyID != "" && marketDelta != 0 {
+	if companyID != "" {
 		var seed string
 		var version int
 		if err := tx.QueryRow(ctx, `SELECT w.world_seed,COALESCE(city.generator_version,w.generator_version)
@@ -632,11 +639,25 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 			WHERE w.server_id=$1::uuid`, serverID, companyID).Scan(&seed, &version); err != nil {
 			return blackwireOffer{}, blackwireAccount{}, err
 		}
+		marketNow := time.Now().UTC()
 		if group, groupErr := world.CompanyRivalGroupFor(seed, version, companyID); groupErr == nil {
-			rivalIDs = make([]string, 0, len(group.CompanyIDs))
-			for _, rivalID := range group.CompanyIDs {
-				if rivalID != companyID {
-					rivalIDs = append(rivalIDs, rivalID)
+			movements := rivalMarketMovements(serverID, []world.CompanyRivalGroup{group}, marketNow)
+			var eventChangeBps int64
+			var sourceCompanyID string
+			eventErr := tx.QueryRow(ctx, `SELECT (score_after-score_before)*10,source_company_id
+				FROM company_market_events WHERE server_id=$1::uuid AND company_id=$2
+				ORDER BY recorded_at DESC,event_id DESC LIMIT 1`, serverID, companyID).Scan(&eventChangeBps, &sourceCompanyID)
+			if eventErr != nil && !errors.Is(eventErr, pgx.ErrNoRows) {
+				return blackwireOffer{}, blackwireAccount{}, eventErr
+			}
+			movement := movements[companyID].forAnchor(companyID, sourceCompanyID)
+			price = blackwirePriceForMarketChange(price, combineMarketChanges(eventChangeBps, movement.changeBps))
+			if marketDelta != 0 {
+				rivalIDs = make([]string, 0, len(group.CompanyIDs))
+				for _, rivalID := range group.CompanyIDs {
+					if rivalID != companyID {
+						rivalIDs = append(rivalIDs, rivalID)
+					}
 				}
 			}
 		}

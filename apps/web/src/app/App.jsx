@@ -19,13 +19,13 @@ function pageFromPath(pathname) {
   if (pathname === "/register") return "register";
   if (pathname === "/character/new") return "character";
   if (["/game", "/archive", "/arrival"].includes(pathname)) return "game";
-  if (pathname === "/loading") return "loading";
+  if (pathname === "/loading") return "game";
   if (pathname === "/logout") return "logout";
   return "login";
 }
 
 function needsSession(page) {
-  return ["game", "character", "loading", "whiteboard"].includes(page);
+  return ["game", "character", "whiteboard"].includes(page);
 }
 
 export default function App() {
@@ -33,7 +33,6 @@ export default function App() {
   const [world, setWorld] = useState(null);
   const [checkingSession, setCheckingSession] = useState(() => needsSession(pageFromPath(window.location.pathname)));
   const [sessionCheckCount, setSessionCheckCount] = useState(0);
-  const [loadingDestination, setLoadingDestination] = useState("game");
   const [startupDestination, setStartupDestination] = useState(null);
 
   useEffect(() => {
@@ -113,7 +112,7 @@ export default function App() {
       setCheckingSession(true);
       setSessionCheckCount((count) => count + 1);
     }
-    if (["character", "game", "loading"].includes(nextPage)) {
+    if (["character", "game"].includes(nextPage)) {
       if (nextData) {
         setWorld(nextData.world ?? nextData);
       }
@@ -133,12 +132,6 @@ export default function App() {
     return () => { active = false; };
   }, [navigate, page]);
 
-  useEffect(() => {
-    if (page !== "loading") return undefined;
-    const timer = window.setTimeout(() => navigate(`/${loadingDestination}`, loadingDestination), 850);
-    return () => window.clearTimeout(timer);
-  }, [loadingDestination, navigate, page]);
-
   if (checkingSession) {
     return <ComputerAccessShell title="Checking user session" labelledBy="session-check-title" busy>
       <section className="m-auto text-primary" aria-labelledby="session-check-title">
@@ -151,8 +144,7 @@ export default function App() {
 
   if (page === "startup") return <WorkstationStartup onComplete={() => {
     if (startupDestination?.character) {
-      setLoadingDestination("game");
-      navigate("/loading", "loading", startupDestination);
+      navigate("/game", "game", startupDestination);
     } else {
       navigate("/character/new", "character", startupDestination);
     }
@@ -179,13 +171,7 @@ export default function App() {
   if (page === "register") {
     return <RegisterPage onLogin={() => navigate("/login", "login")} onAccountCreated={() => navigate("/character/new", "character")} />;
   }
-  if (page === "character") return <CharacterCreationPage onComplete={() => { setLoadingDestination("game"); navigate("/loading", "loading"); }} />;
-  if (page === "loading") return <ComputerAccessShell title="Loading computer" labelledBy="workstation-loading-title" variant="login" busy>
-    <section className="computer-access-loading" aria-labelledby="workstation-loading-title" role="status">
-      <strong className="computer-sequence__brand"><span>M</span><span>OS</span></strong>
-      <h1 id="workstation-loading-title">Starting</h1>
-    </section>
-  </ComputerAccessShell>;
+  if (page === "character") return <CharacterCreationPage onComplete={() => navigate("/game", "game")} />;
   if (page === "game") return <GamePage initialWorld={world} onLogout={() => navigate("/logout", "logout")} />;
   if (page === "whiteboard") {
     const boardPath = window.location.pathname.match(/^\/whiteboard(?:\/([^/]+))?\/?$/);

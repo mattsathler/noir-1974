@@ -208,10 +208,11 @@ function browserAddress(program, facilityContext, cityId) {
   return networkSiteAddress(program, countryId, program.id);
 }
 
-export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onNotification, notifications = [], notificationsOpen = false, onToggleNotifications = () => {}, onCloseNotifications = () => {}, onDeleteNotification = () => {}, snackbar, onDismissSnackbar = () => {}, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, playerProgression = null, onProgressionChange = NOOP, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange, soundEffectsEnabled = true, onSoundEffectsChange, conversationCharacter, onCloseConversation }) {
+export default function ComputerDesktop({ location, display, serverTime, timeZone, cityId, countryName, issueDay, facilityContext, onClose, onOpenCompany, onOpenCompanyStaff, onOpenService, onProxyConnected, onNotification, notifications = [], notificationsOpen = false, onToggleNotifications = () => {}, onCloseNotifications = () => {}, onDeleteNotification = () => {}, snackbar, onDismissSnackbar = () => {}, persistent = false, initialAccessAttemptId = "", initialFacilityAccessGranted = false, onOpenWhiteboard, onLogout, accountUsername = "", character, onCharacterSaved, playerProgression = null, onProgressionChange = NOOP, desktopPreferences = DEFAULT_DESKTOP_PREFERENCES, onDesktopPreferencesChange, soundEffectsEnabled = true, onSoundEffectsChange, soundEffectsVolume = 1, onSoundEffectsVolumeChange, conversationCharacter, onCloseConversation }) {
   const notifyNewPlayerMessage = useCallback((message) => onNotification?.({ type: "EMAIL", title: message.subject || "New email received", message: `From ${message.sender || "unknown sender"}.` }), [onNotification]);
   const programs = programsFor(facilityContext);
   const isCompanyComputer = Boolean(facilityContext && facilityContext.kind !== "personal");
+  const selectedWallpaper = DESKTOP_WALLPAPERS.find((wallpaper) => wallpaper.id === desktopPreferences.wallpaper) || DESKTOP_WALLPAPERS[0];
   const visibleDesktopPrograms = persistent ? [WEB_BROWSER_PROGRAM, PROXY_PROGRAM, TERMINAL_PROGRAM, ...(!isCompanyComputer ? [PERSONAL_PROGRAMS.find((program) => program.id === "stock-exchange"), PERSONAL_PROGRAMS.find((program) => program.id === "minesweeper")] : []), PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"), ...(!isCompanyComputer ? [SETTINGS_PROGRAM] : [])] : programs;
   const startMenuPrograms = persistent ? PERSONAL_START_MENU_PROGRAMS : programs;
   const facilityAccessGranted = !isCompanyComputer || initialFacilityAccessGranted;
@@ -746,9 +747,9 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
       aria-label="Detective computer desktop"
       onMouseDown={(event) => { if (!persistent && event.target === event.currentTarget) exitComputer(); }}
     >
-      <section className={`computer-frame ${persistent ? "computer-frame--persistent" : "computer-frame--modal"}`} data-desktop-theme={persistent ? desktopPreferences.theme : undefined} aria-label="Desktop">
+      <section className={`computer-frame ${persistent ? "computer-frame--persistent" : "computer-frame--modal"}`} data-desktop-theme={persistent ? selectedWallpaper.mode : undefined} aria-label="Desktop">
       <div className="computer-bezel">
-        <div className={`computer-screen${persistent ? " computer-screen--desktop" : ""}`} style={persistent ? { "--noir-desktop-wallpaper": `url("${DESKTOP_WALLPAPERS.find((wallpaper) => wallpaper.id === desktopPreferences.wallpaper)?.image || DESKTOP_WALLPAPERS[0].image}") center / cover` } : undefined} onMouseDown={(event) => {
+        <div className={`computer-screen${persistent ? " computer-screen--desktop" : ""}`} style={persistent ? { "--noir-desktop-wallpaper": `url("${selectedWallpaper.image}") center / cover`, "--desktop-accent": selectedWallpaper.accent } : undefined} onMouseDown={(event) => {
           if (startMenuOpen && !event.target.closest(".computer-start-menu") && !event.target.closest(".computer-start")) setStartMenuOpen(false);
         }}>
           <div className="computer-screen__glass texture-scanlines" aria-hidden="true" />
@@ -856,7 +857,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 <div className={`computer-window__body${persistent && !DESKTOP_APP_IDS.includes(program.id) ? " computer-window__body--website" : ""}${desktopWindow.loading || desktopWindow.navigationPending ? " computer-window__body--loading" : ""}`} aria-busy={desktopWindow.loading || desktopWindow.navigationPending}>
                   {desktopWindow.loading ? <div className="computer-browser-loading" role="status" aria-label="Loading webpage" /> : <>
                   {program.id === "settings"
-                    ? <DesktopSettings preferences={desktopPreferences} soundEffectsEnabled={soundEffectsEnabled} onSoundEffectsChange={onSoundEffectsChange} onChange={(patch) => onDesktopPreferencesChange?.(patch)} />
+                    ? <DesktopSettings preferences={desktopPreferences} soundEffectsEnabled={soundEffectsEnabled} onSoundEffectsChange={onSoundEffectsChange} soundEffectsVolume={soundEffectsVolume} onSoundEffectsVolumeChange={onSoundEffectsVolumeChange} onChange={(patch) => onDesktopPreferencesChange?.(patch)} />
                     : program.id === "account-settings"
                     ? <AccountSettings accountUsername={accountUsername} character={character} characterPreviewVisual={characterPreviewVisual} location={location} progression={playerProgression} onEditCharacter={() => launchProgram(CHARACTER_APPEARANCE_PROGRAM)} />
                     : program.id === "character-appearance"
@@ -1023,7 +1024,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                   <button type="button" onClick={() => { launchProgram(PROXY_PROGRAM); setStartMenuOpen(false); }}><Wifi aria-hidden="true" /><span>ROGUE DNS</span></button>
                   <button type="button" onClick={() => { launchProgram(PERSONAL_MAIL_PROGRAM); setStartMenuOpen(false); }}><Mail aria-hidden="true" /><span>PERSONAL MAIL</span></button>
                   <button type="button" onClick={() => { onOpenWhiteboard?.(); setStartMenuOpen(false); }}><Files aria-hidden="true" /><span>CASE BOARD</span></button>
-                  <button type="button" onClick={() => { setStartMenuOpen(false); onLogout?.(); }}><span aria-hidden="true">↗</span><span>LOG OUT</span></button>
+                  <button className="computer-start-menu__logout" type="button" onClick={() => { setStartMenuOpen(false); onLogout?.(); }}><span aria-hidden="true">↗</span><span>LOG OUT</span></button>
                 </div>
               </section>
             </nav>}

@@ -5,7 +5,7 @@ import { connectProxy, getCompanyWebsite, getCurrentWorld, requestFacilitySiteAc
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
 import ComputerAccessShell from "../../../identity/components/ComputerAccessShell.jsx";
 import { readDesktopPreferences, saveDesktopPreferences } from "./desktopPreferences.js";
-import { playRetroSound, readRetroSoundEnabled, setRetroSoundEnabled } from "./retroSoundEffects.js";
+import { playRetroSound, readRetroSoundEnabled, readRetroSoundVolume, setRetroSoundEnabled, setRetroSoundVolume } from "./retroSoundEffects.js";
 
 function cityIdFromLocation(locationId = "") {
   const path = locationId.replace(/^service:/u, "").replace(/^location:/u, "");
@@ -55,6 +55,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const [playerProgression, setPlayerProgression] = useState(null);
   const [desktopPreferences, setDesktopPreferences] = useState(readDesktopPreferences);
   const [soundEffectsEnabled, setSoundEffectsEnabled] = useState(readRetroSoundEnabled);
+  const [soundEffectsVolume, setSoundEffectsVolume] = useState(readRetroSoundVolume);
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerContext, setComputerContext] = useState(null);
   const [companyAccessAttemptId, setCompanyAccessAttemptId] = useState("");
@@ -130,6 +131,7 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   }, []);
 
   useEffect(() => setRetroSoundEnabled(soundEffectsEnabled), [soundEffectsEnabled]);
+  useEffect(() => setRetroSoundVolume(soundEffectsVolume), [soundEffectsVolume]);
 
   useEffect(() => () => window.clearTimeout(snackbarTimer.current), []);
 
@@ -249,6 +251,10 @@ export default function GamePage({ initialWorld = null, onLogout }) {
   const updateDesktopPreferences = useCallback((patch) => {
     setDesktopPreferences((current) => ({ ...current, ...patch }));
   }, []);
+  const updateSoundEffectsVolume = useCallback((volume) => {
+    setSoundEffectsVolume(volume);
+    setRetroSoundVolume(volume);
+  }, []);
 
   useEffect(() => { saveDesktopPreferences(desktopPreferences); }, [desktopPreferences]);
 
@@ -301,6 +307,8 @@ export default function GamePage({ initialWorld = null, onLogout }) {
           onDesktopPreferencesChange={updateDesktopPreferences}
           soundEffectsEnabled={soundEffectsEnabled}
           onSoundEffectsChange={setSoundEffectsEnabled}
+          soundEffectsVolume={soundEffectsVolume}
+          onSoundEffectsVolumeChange={updateSoundEffectsVolume}
           onLogout={onLogout}
           conversationCharacter={conversationCharacter}
           onCloseConversation={closeConversation}

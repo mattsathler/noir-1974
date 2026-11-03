@@ -1,7 +1,35 @@
 let audioContext;
+let masterGain;
 let keyNoiseBuffer;
 let soundEnabled = true;
 const SOUND_STORAGE_KEY = "noir:system:sound-effects:v1";
+const SOUND_VOLUME_STORAGE_KEY = "noir:system:sound-volume:v1";
+const DEFAULT_SOUND_VOLUME = 1;
+
+export function readRetroSoundVolume() {
+  if (typeof window === "undefined") return DEFAULT_SOUND_VOLUME;
+  try {
+    const saved = window.localStorage.getItem(SOUND_VOLUME_STORAGE_KEY);
+    if (saved === null) return DEFAULT_SOUND_VOLUME;
+    const value = Number(saved);
+    return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : DEFAULT_SOUND_VOLUME;
+  } catch {
+    return DEFAULT_SOUND_VOLUME;
+  }
+}
+
+let soundVolume = readRetroSoundVolume();
+
+export function setRetroSoundVolume(volume) {
+  soundVolume = Number.isFinite(Number(volume)) ? Math.max(0, Math.min(1, Number(volume))) : DEFAULT_SOUND_VOLUME;
+  if (audioContext && masterGain) masterGain.gain.setTargetAtTime(soundVolume, audioContext.currentTime, 0.015);
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SOUND_VOLUME_STORAGE_KEY, String(soundVolume));
+  } catch {
+    // Keep the volume control available for this session if storage is unavailable.
+  }
+}
 
 export function readRetroSoundEnabled() {
   if (typeof window === "undefined") return true;
@@ -37,6 +65,11 @@ function getAudioContext() {
   const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextConstructor) return null;
   audioContext ??= new AudioContextConstructor();
+  if (!masterGain) {
+    masterGain = audioContext.createGain();
+    masterGain.gain.value = soundVolume;
+    masterGain.connect(audioContext.destination);
+  }
   return audioContext;
 }
 
@@ -50,7 +83,7 @@ function playTone(context, frequency, startAt, duration, volume, endFrequency = 
   gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.003);
   gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
   oscillator.connect(gain);
-  gain.connect(context.destination);
+  gain.connect(masterGain || context.destination);
   oscillator.start(startAt);
   oscillator.stop(startAt + duration + 0.005);
 }
@@ -78,7 +111,7 @@ function playTypewriterKey(context, startAt) {
   noise.connect(highPass);
   highPass.connect(lowPass);
   lowPass.connect(clack);
-  clack.connect(context.destination);
+  clack.connect(masterGain || context.destination);
   noise.start(startAt, Math.random() * 0.015, 0.038);
 
   const bodyNoise = context.createBufferSource();
@@ -97,16 +130,17 @@ function playTypewriterKey(context, startAt) {
   bodyNoise.connect(bodyHighPass);
   bodyHighPass.connect(bodyLowPass);
   bodyLowPass.connect(bodyGain);
-  bodyGain.connect(context.destination);
+  bodyGain.connect(masterGain || context.destination);
   bodyNoise.start(bodyStart, Math.random() * 0.015, 0.026);
 }
 
 export function playRetroSound(kind = "click", enabled = soundEnabled) {
-  if (!enabled) return;
+  if (!enabled || soundVolume <= 0) return;
   try {
     const context = getAudioContext();
     if (!context) return;
     const compose = () => {
+      if (soundVolume <= 0) return;
       const startAt = context.currentTime + 0.01;
       if (kind === "boot") {
         [[261.6, 0], [329.6, 0.15], [392, 0.3], [523.3, 0.48]].forEach(([frequency, offset]) => {
