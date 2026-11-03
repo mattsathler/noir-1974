@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getNewspaperIssue } from "../../api.js";
 import APIErrorNotice from "../../../../shared/APIErrorNotice.jsx";
+import ModularFace from "../../../identity/components/ModularFace.jsx";
 
 export default function NewspaperWindow({ cityId, issueDay, onClose, embedded = false }) {
   const [issue, setIssue] = useState(null);
@@ -76,7 +77,13 @@ export default function NewspaperWindow({ cityId, issueDay, onClose, embedded = 
             <section className="newspaper-lead" aria-labelledby="newspaper-lead-title">
               <p className="newspaper-section-label">{issue.lead.section} · LATEST NEWS</p>
               <h2 id="newspaper-lead-title">{issue.lead.headline}</h2>
-              <p className="newspaper-lead__summary">{issue.lead.summary}</p>
+              <div className={`newspaper-lead__copy${issue.lead.portrait ? " newspaper-lead__copy--pictured" : ""}`}>
+                <p className="newspaper-lead__summary">{issue.lead.summary}</p>
+                {issue.lead.portrait && <figure className="newspaper-lead__portrait">
+                  <ModularFace visual={issue.lead.portrait} name={issue.lead.portraitName || "City resident"} />
+                  <figcaption>{issue.lead.portraitName || "CITY FILE"} · FILE PHOTO</figcaption>
+                </figure>}
+              </div>
             </section>
 
             <section className="newspaper-columns" aria-label="Other city news">
@@ -84,6 +91,10 @@ export default function NewspaperWindow({ cityId, issueDay, onClose, embedded = 
                 <article className="newspaper-article" key={article.id}>
                   <p className="newspaper-section-label">{article.section}</p>
                   <h3>{article.headline}</h3>
+                  {article.portrait && <figure className="newspaper-article__portrait">
+                    <ModularFace visual={article.portrait} name={article.portraitName || "City resident"} />
+                    <figcaption>{article.portraitName || "CITY FILE"} · FILE PHOTO</figcaption>
+                  </figure>}
                   <p>{article.summary}</p>
                   <span className="newspaper-article__number">{String(index + 1).padStart(2, "0")}</span>
                 </article>

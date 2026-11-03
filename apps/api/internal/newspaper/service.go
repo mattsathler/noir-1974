@@ -52,11 +52,13 @@ type issueFlight struct {
 }
 
 type Article struct {
-	ID       string `json:"id"`
-	Section  string `json:"section"`
-	Headline string `json:"headline"`
-	Summary  string `json:"summary"`
-	CaseID   string `json:"caseId,omitempty"`
+	ID           string                `json:"id"`
+	Section      string                `json:"section"`
+	Headline     string                `json:"headline"`
+	Summary      string                `json:"summary"`
+	CaseID       string                `json:"caseId,omitempty"`
+	PortraitName string                `json:"portraitName,omitempty"`
+	Portrait     *world.VisualIdentity `json:"portrait,omitempty"`
 }
 
 type Issue struct {
@@ -165,8 +167,12 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 
 	local := base
 	npcNames := make(map[string]string, len(local.NPCs))
+	npcPortraits := make(map[string]*world.VisualIdentity, len(local.NPCs))
 	for _, npc := range local.NPCs {
 		npcNames[npc.ID] = npc.Name
+		if npc.Visual != nil {
+			npcPortraits[npc.Name] = npc.Visual
+		}
 	}
 	lead := Article{ID: "city-desk-" + cityID + "-" + dateKey, Section: "CITY DESK", Headline: "A quiet day for the city police", Summary: fmt.Sprintf("There are no current homicide inquiries or new arrests in %s. Local authorities remain on duty.", city)}
 	articles := makeLightStories(local, serverID+"/"+cityID, dateKey)
@@ -187,7 +193,7 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 				continue
 			}
 			openDiscoveries = append(openDiscoveries, discovery)
-			bodyArticles = append(bodyArticles, bodyDiscoveryArticle(discovery))
+			bodyArticles = append(bodyArticles, bodyDiscoveryArticle(discovery, npcPortraits[discovery.VictimName]))
 		}
 		discoveries = openDiscoveries
 		articles = append(bodyArticles, articles...)
@@ -227,11 +233,11 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 	hasCurrentCaseLead := false
 	if activeErr == nil && activeCase.Status == "open" {
 		if name, found := npcNames[activeCase.VictimID]; found {
-			lead = Article{ID: activeCase.ID + "-current", Section: "CITY POLICE", Headline: fmt.Sprintf("Police continue inquiry into the death of %s", name), Summary: fmt.Sprintf("The homicide inquiry concerning %s remains open. Authorities continue to investigate.", name), CaseID: activeCase.ID}
+			lead = Article{ID: activeCase.ID + "-current", Section: "CITY POLICE", Headline: fmt.Sprintf("Police continue inquiry into the death of %s", name), Summary: fmt.Sprintf("The homicide inquiry concerning %s remains open. Authorities continue to investigate.", name), CaseID: activeCase.ID, PortraitName: name, Portrait: activeCase.VictimVisual}
 			hasCurrentCaseLead = true
 			for _, discovery := range discoveries {
 				if discovery.CaseID == activeCase.ID {
-					lead = bodyDiscoveryArticle(discovery)
+					lead = bodyDiscoveryArticle(discovery, npcPortraits[discovery.VictimName])
 					break
 				}
 			}
@@ -244,7 +250,7 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 		}
 		if err == nil {
 			if name, found := npcNames[arrest.VictimID]; found {
-				arrestArticle := Article{ID: arrest.ID + "-arrest", Section: "CITY POLICE", Headline: fmt.Sprintf("Police announce arrest in the death of %s", name), Summary: fmt.Sprintf("A suspect has been taken into custody in the homicide inquiry concerning %s. The corporate review has concluded.", name), CaseID: arrest.ID}
+				arrestArticle := Article{ID: arrest.ID + "-arrest", Section: "CITY POLICE", Headline: fmt.Sprintf("Police announce arrest in the death of %s", name), Summary: fmt.Sprintf("A suspect has been taken into custody in the homicide inquiry concerning %s. The corporate review has concluded.", name), CaseID: arrest.ID, PortraitName: name, Portrait: arrest.VictimVisual}
 				if hasCurrentCaseLead {
 					articles = append([]Article{arrestArticle}, articles...)
 				} else {
@@ -305,17 +311,19 @@ func makeConflictStories(key, dateKey string) []Article {
 	return []Article{selectStory(billReports, "bill-report"), selectStory(appWarnings, "illicit-app-warning")}
 }
 
-func bodyDiscoveryArticle(discovery cases.PublicBodyDiscovery) Article {
+func bodyDiscoveryArticle(discovery cases.PublicBodyDiscovery, portrait *world.VisualIdentity) Article {
 	place := discovery.LocationName
 	if discovery.DistrictName != "" {
 		place += ", " + discovery.DistrictName
 	}
 	return Article{
-		ID:       "body-found-" + discovery.CaseID,
-		Section:  "BODY FOUND",
-		Headline: fmt.Sprintf("Body of %s discovered in %s", discovery.VictimName, place),
-		Summary:  fmt.Sprintf("Authorities reported finding %s at %s. The circumstances remain under investigation.", discovery.VictimName, place),
-		CaseID:   discovery.CaseID,
+		ID:           "body-found-" + discovery.CaseID,
+		Section:      "BODY FOUND",
+		Headline:     fmt.Sprintf("Body of %s discovered in %s", discovery.VictimName, place),
+		Summary:      fmt.Sprintf("Authorities reported finding %s at %s. The circumstances remain under investigation.", discovery.VictimName, place),
+		CaseID:       discovery.CaseID,
+		PortraitName: discovery.VictimName,
+		Portrait:     portrait,
 	}
 }
 
