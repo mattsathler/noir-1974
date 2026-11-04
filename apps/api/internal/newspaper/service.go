@@ -180,6 +180,7 @@ func (service *Service) buildIssue(ctx context.Context, serverID, cityID, city, 
 	// one-off case event. Keep both viewpoints in every edition so the player
 	// repeatedly encounters the regime's framing and the Crow's justification.
 	articles = append(makeConflictStories(serverID+"/"+cityID, dateKey), articles...)
+	articles = append(articles[:2], append(makeBrainStories(serverID+"/"+cityID, dateKey), articles[2:]...)...)
 	var discoveries []cases.PublicBodyDiscovery
 	if reader, ok := service.cases.(bodyDiscoveryReader); ok {
 		discoveries, err = reader.ListPublicBodyDiscoveries(ctx, serverID, cityID, serverTime)
@@ -309,6 +310,20 @@ func makeConflictStories(key, dateKey string) []Article {
 		return Article{ID: item.id, Section: "STATE WATCH", Headline: item.headline, Summary: item.summary}
 	}
 	return []Article{selectStory(billReports, "bill-report"), selectStory(appWarnings, "illicit-app-warning")}
+}
+
+func makeBrainStories(key, dateKey string) []Article {
+	stories := []newsTemplate{
+		{id: "brain-inc-benefits", headline: "Meridian's Brain.inc brings daily services within thought", summary: "Meridian Global says its new neural implant can simplify ordinary tasks through the Merid_OSx. The company describes the service as secure and voluntary; several employers have begun listing an active implant among preferred qualifications."},
+		{id: "brain-inc-safety", headline: "Early Brain.inc users report no difficulties, Meridian says", summary: "Meridian Global reports no serious problems among current Brain.inc users and calls the Merid_OSx a dependable aid for daily life. Independent access to the chip's data practices remains limited."},
+		{id: "brain-inc-access", headline: "Public offices consider faster service for Brain.inc users", summary: "A proposed administrative rule would let residents with a Meridian implant use a shorter queue for selected public services. Officials call the measure efficient. Critics ask whether those without a chip will still receive equal access."},
+		{id: "brain-inc-work", headline: "Meridian partners advertise complimentary Brain.inc consultation", summary: "Participating employers and clinics will offer appointments to discuss the neural implant. Promotional material emphasizes convenience and security, while the consent forms refer broadly to service diagnostics and data extraction."},
+		{id: "brain-inc-records", headline: "Questions raised over information collected by neural implants", summary: "A technical notice describes the Merid_OSx as capable of recording location and usage data to improve its services. Meridian says the information is protected and used responsibly; the notice does not specify how long records are kept."},
+		{id: "brain-inc-voss", headline: "Voss-backed council urges common standard for neural services", summary: "A government advisory council has recommended that public offices recognize Brain.inc credentials for faster service. Its review was funded by a Meridian foundation associated with Adrian Voss. Officials say the recommendation is not a requirement; residents without an implant may continue using the ordinary queue."},
+	}
+	index := int(storyRank(key+"/"+dateKey, "brain-inc-story") % uint64(len(stories)))
+	story := stories[index]
+	return []Article{{ID: story.id + "-" + dateKey, Section: "MERIDIAN & SOCIETY", Headline: story.headline, Summary: story.summary}}
 }
 
 func bodyDiscoveryArticle(discovery cases.PublicBodyDiscovery, portrait *world.VisualIdentity) Article {

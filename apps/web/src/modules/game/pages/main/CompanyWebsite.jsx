@@ -13,6 +13,7 @@ const LOCAL_ADS = [
   { name: "VINCENT’S PHOTOGRAPHIC SUPPLY", headline: "Keep the moment, not just the memory.", detail: "Film, camera repairs and same-day developing." },
   { name: "UNION MERCANTILE BANK", headline: "A safe place for the next good idea.", detail: "Visit your neighborhood counter for savings advice." },
   { name: "JARDIN DES FLEURS", headline: "A fresh arrangement brightens any room.", detail: "Seasonal flowers delivered throughout the city." },
+  { name: "BRAIN.INC BY MERIDIAN", headline: "Let the day answer to you.", detail: "Book a complimentary neural implant consultation. Everyday services, securely connected through Merid_OSx. Ask your employer whether an active implant qualifies you for preferred access." },
 ];
 
 function adsFor(site, pageId) {

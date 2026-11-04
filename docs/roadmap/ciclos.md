@@ -60,4 +60,6 @@ M23 migra a navegação investigativa para o computador pessoal, Proxy e sites. 
 
 A M36 está proposta para tornar a Blackwire a central de perfis hackers e downloads de aplicativos. O registro usa username e retrato pronto, sem senha Blackwire; downloads são obtidos, instalados e executados por comandos no Terminal depois de desativar temporariamente a proteção do MERID_OS. A M36 preserva contas e progressão da M32 e integra os controles de segurança da M33.
 
+A M37 introduziu o Brain.inc, chip neural da Meridian que executa o Merid_OSx, por meio de propaganda, cobertura jornalística, emails e políticas graduais que excluem não usuários. A milestone foi aceita após a integração desses conteúdos ao jornal, à caixa de entrada e aos websites; a invasão dos chips pelo One Above All permanece futura.
+
 Pular um ciclo só com ADR explicando por que o critério deixou de ser necessário.

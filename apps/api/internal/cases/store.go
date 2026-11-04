@@ -1486,6 +1486,7 @@ func (store *PostgresStore) ensureSampleSpam(ctx context.Context, serverID, acco
 		{"Royal Pigeon Mutual", "Your complimentary pigeon is waiting", "Dear resident, your complimentary pigeon has been reserved. Please send three crumbs to confirm delivery. The bird has already declined to carry this notice, so we are sending it by post."},
 		{"The Clock Recovery Bureau", "The town clock owes you eleven minutes", "Our patented clock audit found that the town clock may owe you eleven minutes, subject to the railway's objection. Reply with your preferred minute. We cannot guarantee it will be the correct one."},
 		{"Café des Écoles Spoon Committee", "A teaspoon has selected you for a survey", "One teaspoon would like to ask whether the drawer is too small. A second teaspoon denies any complaint. A third has gone missing and is therefore unavailable for comment. A modest fee secures the full report."},
+		{"Meridian Neural Services", "An invitation to experience Brain.inc", "Dear resident, Meridian Neural Services invites you to arrange a complimentary Brain.inc consultation. The Merid_OSx offers convenient assistance with everyday tasks, secure access to participating services, and a more personal experience. Appointments are available through your local Meridian office. Implantation is voluntary, subject to current service requirements."},
 	}
 	values := make([]string, 0, len(spam))
 	args := []any{serverID, accountID}
@@ -1535,6 +1536,8 @@ func recurringSpamMessage(sequence int64) struct{ sender, subject, body string }
 		{"Maison du Parapluie", "A forecast specially prepared for you", "Our weather desk predicts a strong chance of umbrellas this week. Reply with your coat size and a small handling fee to receive the forecast before the clouds do."},
 		{"National Turnip Register", "Your household may qualify for a turnip", "A turnip has been set aside in your name, pending proof that you have a suitable basket. The register accepts payment in advance and questions on Thursdays only."},
 		{"Rue des Lanternes Society", "An invitation to our invisible lamp sale", "Our finest lamps are currently invisible to the public. Reserve one today and be the first to notice when it arrives. Delivery charges are calculated separately."},
+		{"Meridian Neural Services", "Your Brain.inc consultation is ready to arrange", "Meridian Neural Services is accepting appointments for Brain.inc consultations. Learn how the Merid_OSx can simplify daily correspondence and provide convenient access to participating services. The consultation is complimentary. Certain services may require an active implant under current provider policy."},
+		{"Meridian Neural Services", "A more convenient day with Brain.inc", "The Brain.inc neural implant connects you to helpful Merid_OSx services throughout the day. Meridian reports no serious problems among current users. Arrange a consultation with your participating clinic; service diagnostics and data extraction are governed by the enclosed consent terms."},
 		{"The Society for Retired Keys", "We found a lock that may suit you", "A retired key has asked us to find it a quiet lock. Send your address and a modest deposit. The key's references are sealed for its own protection."},
 	}
 	return messages[int(sequence%int64(len(messages)))]

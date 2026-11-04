@@ -30,6 +30,16 @@ O **Proxy** conecta o computador a um nó de cidade e define a jurisdição ativ
 
 Os portais e sistemas corporativos pertencem à ordem empresarial de Noir. A Meridian Global controla partes essenciais da infraestrutura de conexão, enquanto empresas e instituições operam seus próprios serviços. A aparência e a linguagem desses sistemas preservam formulários, diretórios e convenções antiquadas, mesmo quando sua capacidade de comunicação é extraordinária.
 
+## Brain.inc e o Merid_OSx
+
+A Meridian desenvolveu o **Brain.inc**, um chip neural implantável que executa o **Merid_OSx**, uma subpatente do Merid_OS. A campanha pública apresenta o chip como um assistente para tarefas cotidianas e uma forma de integração conveniente aos serviços da Meridian. Parte da população já o utiliza.
+
+Documentos e materiais técnicos associados ao produto também indicam capacidades que vão além da assistência anunciada, incluindo rastreamento e extração de dados neurais e comportamentais. A Meridian divulga essas funções como segurança, diagnóstico e otimização, sem esclarecer plenamente o alcance da coleta ou o uso dos dados.
+
+O governo, sob influência de Adrian Voss, começa a pressionar pela implantação universal. A política avança por propaganda e leis graduais que restringem o acesso de não usuários a serviços e oportunidades, em vez de começar com uma ordem explícita de implantação. A coerção é apresentada publicamente como modernização e inclusão.
+
+The Crow considera o Brain.inc uma ferramenta de controle corporativo e estatal. O **One Above All** é um projeto futuro para invadir os chips e transferir o controle dos dados coletados para ele, com a intenção de expor a Meridian e o governo. O alto nível de segurança do Merid_OSx impede que Crow faça isso sozinho; o protagonista poderá se tornar capaz de avançar o projeto. O plano e suas consequências não são implementados pela introdução inicial do Brain.inc.
+
 ## Tecnologia e costumes
 
 O mundo expressa uma tensão constante: **a tecnologia avançou muito mais rápido que os costumes**. O GATE tem uma capacidade quase cyberpunk, mas o aparelho é uma cabina antiga, barulhenta e de funcionamento físico. Telefones continuam antiquados; as pessoas ainda usam roupas de época e mantêm hábitos tradicionais.
@@ -77,5 +87,6 @@ NPCs também terão representação visual modular. Suas peças serão escolhida
 - As regras físicas, limitações, segurança e operação detalhada do GATE.
 - A topologia, os limites técnicos e os operadores da rede de dados e dos nós proxy.
 - A história pessoal de Adrian Voss e sua relação direta com a criação do dispositivo.
+- A extensão técnica da vigilância do Brain.inc, os limites do Merid_OSx e as consequências de uma invasão pelo One Above All.
 - A estrutura interna da Meridian Global e a organização de sua rede mundial.
 - A natureza exata do antigo vínculo do detetive com a Interpol e quais recursos continuam acessíveis pela rede.
