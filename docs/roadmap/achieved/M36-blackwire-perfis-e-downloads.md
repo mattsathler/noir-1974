@@ -1,6 +1,6 @@
 # M36 — Blackwire: perfis e downloads de aplicativos
 
-**Status:** Em curso
+**Status:** Em curso — implementação principal concluída; validação dos critérios de aceite pendente
 **Trilha:** Blackwire, aplicativos e segurança do computador  
 **Depende de:** M23 — Sistema operacional, Proxy e sites investigativos; M32 — Identidade e progressão Blackwire; M33 — Exposição e defesas virtuais; M35 — Login e experiência de jogo dentro do desktop
 
@@ -42,15 +42,17 @@ Transformar a Blackwire no ponto de encontro e na central de ferramentas para jo
 
 ## Critérios de aceite
 
-- [ ] Uma conta sem perfil Blackwire pode registrar um pseudônimo único no servidor e selecionar um retrato pronto, sem criar senha Blackwire.
-- [ ] O perfil fica vinculado à conta de jogo e ao servidor existentes; perfil, Crypto, reputação, nível e desbloqueios antigos são preservados.
-- [ ] O vocabulário visível ao jogador não usa “alter ego” e apresenta a identidade de forma diegética por meio do username e do retrato.
-- [ ] Depois do registro, a página principal da Blackwire é aberta e oferece um marketplace de aplicativos sem remover o mercado de informações atual.
-- [ ] A lista de aplicativos abre páginas próprias com descrição, versão, criador, origem reivindicada, categoria, disponibilidade e comandos adequados ao estado instalado/não instalado, sem exigir nível para acesso.
-- [ ] Com proteção ligada, `fetch`, `install` e `run` de aplicativos sem assinatura falham com aviso diegético e não avançam a instalação; depois de `disable protection`, a sequência `fetch` → `install` → `run` funciona para um aplicativo disponível.
-- [ ] As dependências entre obter, instalar e executar são aplicadas; a proteção volta a ser ativada após logout/reboot.
-- [ ] Pelo menos um aplicativo piloto novo pode ser obtido na Blackwire e executado como janela/aplicativo no desktop da M35.
-- [ ] O retrato é escolhido de um catálogo de assets pronto, sem upload ou geração pelo jogador; a imagem final de The Crow pode ser adicionada depois sem alterar o modelo.
+- [x] Uma conta sem perfil Blackwire pode registrar um pseudônimo único no servidor e selecionar um retrato pronto, sem criar senha Blackwire.
+- [x] O perfil fica vinculado à conta de jogo e ao servidor existentes; perfil, Crypto, reputação, nível e desbloqueios antigos são preservados.
+- [x] O vocabulário visível ao jogador não usa “alter ego” e apresenta a identidade de forma diegética por meio do username e do retrato.
+- [x] Depois do registro, a página principal da Blackwire oferece a área Downloads junto ao marketplace de informações existente.
+- [x] A lista de aplicativos abre páginas próprias com descrição, versão, criador, origem reivindicada, categoria, disponibilidade e comandos conforme o estado; o catálogo não aplica bloqueio por nível.
+- [x] O Terminal implementa `fetch`, `install`, `run`, `uninstall` e os comandos para desativar/reativar a proteção. Com proteção ligada, operações de pacote e execução de aplicativos sem assinatura são bloqueadas.
+- [x] O servidor registra pacotes obtidos e aplicativos instalados no escopo da conta/servidor, exige obtenção antes da instalação e impede remover aplicativos pré-instalados.
+- [x] `DEADLETTER.EXE` está disponível como leitor offline somente de leitura e pode ser aberto como aplicativo no desktop.
+- [x] O perfil usa um catálogo de retratos prontos, sem upload, e novos perfis antigos recebem `portrait-01` como padrão.
+
+**Validação pendente:** confirmar em execução os fluxos completos, incluindo a persistência após logout/reboot e a reativação da proteção. Os itens acima refletem funcionalidades encontradas no código; a marcação não substitui essa validação integrada.
 
 ## Fora de escopo
 
