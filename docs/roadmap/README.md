@@ -8,6 +8,8 @@ Milestones concluídas ficam em [`achieved/`](achieved/); milestones em andament
 
 Melhorias independentes, de escopo curto ou médio, ficam em [`melhorias/`](melhorias/). Uma melhoria não depende da conclusão de outra melhoria. Se o trabalho exigir várias etapas coordenadas ou ultrapassar escopo médio, deve ser descrito como milestone.
 
+Ideias em desenvolvimento ficam em [`ideias/`](ideias/). São propostas exploratórias de utilidade ainda em avaliação; podem virar sistemas, milestones, melhorias ou ser descartadas. Não fazem parte da sequência oficial até serem promovidas.
+
 Milestones independentes de várias etapas também ficam em [`milestones/`](milestones/), mas em uma trilha própria: não bloqueiam o ciclo principal nem entram no cálculo do fluxo criminal. Consulte a tabela abaixo.
 
 Prova técnica que sustenta o restante (meta do ciclo 4):
