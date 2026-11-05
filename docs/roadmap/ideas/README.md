@@ -6,4 +6,4 @@ Esta pasta reúne propostas exploratórias cuja utilidade e forma ainda estão s
 
 | Ideia | Estado | Documento |
 | --- | --- | --- |
-| Routine Detectives | Em exploração | [Routine Detectives](routine-detectives.md) |
+| Routine Detectives | Promovida para proposta M38 | [M38 — Detetives de rotina e destruição de provas](../milestones/M38-detetives-de-rotina-e-destruicao-de-provas.md) · [registro da ideia](routine-detectives.md) |

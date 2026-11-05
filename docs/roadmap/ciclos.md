@@ -62,4 +62,6 @@ A M36 está proposta para tornar a Blackwire a central de perfis hackers e downl
 
 A M37 introduziu o Brain.inc, chip neural da Meridian que executa o Merid_OSx, por meio de propaganda, cobertura jornalística, emails e políticas graduais que excluem não usuários. A milestone foi aceita após a integração desses conteúdos ao jornal, à caixa de entrada e aos websites; a invasão dos chips pelo One Above All permanece futura.
 
+A M38 está proposta na trilha independente de investigação cotidiana. Ela define detetives procedurais, revisão policial dos casos após sete dias, atribuição pública da resolução e destruição global de provas confirmadas. Não altera a sequência nem a porcentagem do fluxo criminal.
+
 Pular um ciclo só com ADR explicando por que o critério deixou de ser necessário.
