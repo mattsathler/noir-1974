@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS cases (
     case_seed text NOT NULL CHECK (case_seed <> ''),
     city_id text NOT NULL DEFAULT 'fr/lyon' CHECK (city_id <> ''),
     generator_version integer NOT NULL CHECK (generator_version > 0),
-    case_type text NOT NULL CHECK (case_type IN ('homicide', 'embezzlement', 'financial_extortion', 'accounting_fraud')),
+    case_type text NOT NULL CHECK (case_type IN ('homicide', 'embezzlement', 'financial_extortion', 'accounting_fraud', 'insurance_fraud', 'investment_fraud', 'money_laundering', 'financial_identity_theft', 'procurement_fraud', 'forged_will', 'cargo_theft', 'art_forgery', 'antiquities_smuggling', 'correspondence_blackmail', 'industrial_sabotage', 'arson', 'staged_disappearance', 'confidential_document_theft', 'police_corruption')),
     archetype_id text NOT NULL DEFAULT 'workplace_conflict' CHECK (archetype_id <> ''),
     company_id text,
     motive text NOT NULL DEFAULT 'Legacy workplace homicide.' CHECK (motive <> ''),
@@ -33,7 +33,7 @@ ALTER TABLE cases ADD COLUMN IF NOT EXISTS crime_at timestamptz;
 ALTER TABLE cases ALTER COLUMN victim_entity_id DROP NOT NULL;
 ALTER TABLE cases ALTER COLUMN location_entity_id DROP NOT NULL;
 ALTER TABLE cases DROP CONSTRAINT IF EXISTS cases_case_type_check;
-ALTER TABLE cases ADD CONSTRAINT cases_case_type_check CHECK (case_type IN ('homicide', 'embezzlement', 'financial_extortion', 'accounting_fraud'));
+ALTER TABLE cases ADD CONSTRAINT cases_case_type_check CHECK (case_type IN ('homicide', 'embezzlement', 'financial_extortion', 'accounting_fraud', 'insurance_fraud', 'investment_fraud', 'money_laundering', 'financial_identity_theft', 'procurement_fraud', 'forged_will', 'cargo_theft', 'art_forgery', 'antiquities_smuggling', 'correspondence_blackmail', 'industrial_sabotage', 'arson', 'staged_disappearance', 'confidential_document_theft', 'police_corruption'));
 UPDATE cases c
 SET city_id = substring(r.region_id from '^([^/]+/[^/]+)')
 FROM world_entities e

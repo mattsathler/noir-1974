@@ -22,6 +22,14 @@ O validador comum verifica seed/versão/ID, vítimas e culpados existentes e dis
 
 As ameaças são frequentes e escalonam. O nome exato do empregador aparece em apenas uma das cinco mensagens iniciais; as demais dão pistas indiretas e repetem a aparência física. Nas etapas posteriores, as ameaças não repetem o nome da empresa. Colegas e companheiros da vítima podem confirmar por email os detalhes sem entregar novamente o empregador. Assim, cruzar aquela única referência com a descrição e o diretório de staff é a principal dedução. Os IDs dos alvos futuros não fazem parte da API pública antes dos eventos.
 
+### Expansão de crimes (gerador v9)
+
+A v9 acrescenta 15 tipos de investigação sem homicídio: `insurance_fraud`, `investment_fraud`, `money_laundering`, `financial_identity_theft`, `procurement_fraud`, `forged_will`, `cargo_theft`, `art_forgery`, `antiquities_smuggling`, `correspondence_blackmail`, `industrial_sabotage`, `arson`, `staged_disappearance`, `confidential_document_theft` e `police_corruption`. Com `embezzlement`, `financial_extortion` e `accounting_fraud`, são 18 modelos de crime patrimonial ou corporativo. Cada cenário exige uma empresa com sede e dois funcionários distintos; documentos do caso e registros financeiros relacionam o principal e o cúmplice. Os tipos novos não reutilizam os eventos posteriores de acobertamento que pertencem aos três casos financeiros anteriores.
+
+A v9 também registra dez novas motivações de homicídio: `inheritance`, `revenge`, `silence_witness`, `conceal_fraud`, `power_struggle`, `mistaken_identity`, `blackmail`, `debt`, `protect_reputation` e `conceal_accident`. Elas usam vítimas e culpados com vínculos de emprego na mesma empresa, cena na sede e três evidências documentais vinculadas aos participantes. Com `workplace_conflict` (rivalidade profissional) e `jealousy`, completam as 12 ideias de homicídio da expansão. A API de acusação atribui força probatória aos documentos v9 sem expor seus vínculos internos.
+
+As versões v3–v8 mantêm suas escolhas anteriores: os novos tipos só entram na seleção v9, e a v8 permanece aceita para reconstrução de casos existentes. A seleção continua equilibrada em duas etapas, primeiro pelo modelo disponível e depois pelo cenário determinístico daquele modelo.
+
 ## Persistência e estado
 
 - `cases` guarda a definição compacta: seed, versão, tipo, arquétipo, motivação, empresa afetada e os IDs opcionais de vítima e cena/local. `killer_entity_id` é legado e guarda o autor principal; decisões atuais usam participantes.

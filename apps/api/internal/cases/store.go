@@ -3553,12 +3553,14 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 			EXISTS (SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
 				WHERE e.server_id=$1::uuid AND e.case_id=$2 AND e.evidence_id=proof.item_id
 				  AND ((c.archetype_id IN ('workplace_conflict','serial_killer') AND e.evidence_type='office_log')
-				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='travel_register'))) AS strong_case_evidence,
+				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='travel_register')
+				    OR (c.generator_version>=9 AND e.evidence_type=c.archetype_id || '_document'))) AS strong_case_evidence,
 			EXISTS (SELECT 1 FROM case_evidence e JOIN cases c USING(server_id,case_id)
 				WHERE e.server_id=$1::uuid AND e.case_id=$2 AND e.evidence_id=proof.item_id
 				  AND ((c.archetype_id='workplace_conflict' AND e.evidence_type='meeting_minutes')
 				    OR (c.archetype_id='financial_extortion' AND e.evidence_type='account_record')
-				    OR (c.archetype_id IN ('jealousy','serial_killer') AND e.evidence_type IN ('letter_fragment','witness_statement')))) AS supporting_case_evidence,
+				    OR (c.archetype_id IN ('jealousy','serial_killer') AND e.evidence_type IN ('letter_fragment','witness_statement'))
+				    OR (c.generator_version>=9 AND e.evidence_type IN (c.archetype_id || '_account',c.archetype_id || '_corroboration')))) AS supporting_case_evidence,
 			EXISTS (SELECT 1 FROM case_mail_messages m JOIN cases c USING(server_id,case_id)
 				WHERE m.server_id=$1::uuid AND m.case_id=$2 AND m.message_id=proof.item_id
 				  AND m.internal_relation IN ('anonymous_warning','anonymous_followup','killer_remorse','jealousy_exchange','case_correspondence')) AS case_correspondence,

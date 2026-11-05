@@ -15,7 +15,8 @@ import (
 	"noir-1974/apps/api/internal/world"
 )
 
-const GeneratorVersion = 8
+const GeneratorVersion = 9
+const previousSerialGeneratorVersion = 8
 const previousFinancialGeneratorVersion = 7
 const connectedGeneratorVersion = 4
 const contextualGeneratorVersion = 6
@@ -25,7 +26,7 @@ const legacyGeneratorVersion = 3
 var (
 	ErrInvalidCaseSeed       = errors.New("case seed is required")
 	ErrUnsupportedGenerator  = errors.New("unsupported case generator version")
-	ErrNoValidCaseCandidates = errors.New("world has no valid homicide candidates")
+	ErrNoValidCaseCandidates = errors.New("world has no valid crime candidates")
 	ErrInvalidDefinition     = errors.New("invalid case definition")
 	ErrUnsolvableCase        = errors.New("case has no reachable clue")
 )
@@ -115,7 +116,59 @@ var archetypeGenerators = []archetypeGenerator{
 	{id: "serial_killer", candidates: serialKillerCandidates, validate: validateSerialKiller, evidenceTypes: []string{"letter_fragment", "witness_statement", "office_log"}},
 }
 
-// Generate creates a deterministic homicide definition from existing world facts.
+func init() {
+	archetypeGenerators = append(archetypeGenerators, newHomicideMotiveGenerators()...)
+}
+
+type homicideMotive struct {
+	id     string
+	motive string
+	clues  [3]string
+}
+
+var newHomicideMotives = []homicideMotive{
+	{id: "inheritance", motive: "The victim was killed after a disputed inheritance threatened to change who controlled a company estate.", clues: [3]string{"A sealed estate instruction was copied before it reached the company registrar.", "The victim's notes identify a recent challenge to the expected inheritance.", "The registrar's access book places a company colleague with the altered copy."}},
+	{id: "revenge", motive: "A workplace grievance became a planned act of revenge against a colleague.", clues: [3]string{"A dated complaint records the principal's grievance against the victim.", "A private note refers to settling the dispute after the victim rejected an appeal.", "The office access register places the principal near the victim after hours."}},
+	{id: "silence_witness", motive: "The victim was killed after discovering evidence of misconduct and preparing to report it.", clues: [3]string{"The victim's draft statement names an irregular company transfer.", "A missing page from the inquiry file was checked out by the principal.", "A copied ledger page connects the file and the transfer to the same employee."}},
+	{id: "conceal_fraud", motive: "The victim was killed to prevent exposure of a financial scheme involving company records.", clues: [3]string{"A ledger copy shows figures changed after the victim's review.", "A correction slip bears the principal's authorization initials.", "Meeting minutes show the victim planned to present the discrepancy."}},
+	{id: "power_struggle", motive: "The victim's removal would secure the principal's control of a company office and its records.", clues: [3]string{"A succession memorandum names the victim as the next office holder.", "A private agenda records the principal's objection to that appointment.", "A staff access log places the principal in the records room before the appointment vote."}},
+	{id: "mistaken_identity", motive: "The killer mistook the victim for the intended target after acting on an incomplete description.", clues: [3]string{"A note describes a target by workplace clothing and shift rather than by name.", "A witness account places the victim in the target's borrowed coat.", "The staff roster shows the intended colleague had exchanged shifts with the victim."}},
+	{id: "blackmail", motive: "The victim was killed after using private correspondence to demand money and threaten a disclosure.", clues: [3]string{"A draft demand requests payment before a named disclosure date.", "A retained envelope links the correspondence to the principal's office.", "The victim's appointment book records a meeting with the principal shortly before the deadline."}},
+	{id: "debt", motive: "A private debt between colleagues escalated when the victim demanded repayment.", clues: [3]string{"A signed IOU records an overdue private loan to the victim.", "The principal's payroll advance request cites an urgent personal obligation.", "A witness statement places both colleagues together after a repayment demand."}},
+	{id: "protect_reputation", motive: "The victim was killed to keep a damaging personal or professional scandal from becoming public.", clues: [3]string{"A sealed complaint describes a concealed company incident.", "The principal requested the complaint file shortly before it disappeared.", "The victim's appointment notes show an imminent meeting with the newspaper editor."}},
+	{id: "conceal_accident", motive: "A company colleague killed the victim and staged the scene to resemble an accident.", clues: [3]string{"A maintenance report records that the equipment was inspected before the supposed failure.", "The principal amended the inspection log after the death.", "A shift register places the principal at the site during the staged failure and the later cleanup."}},
+}
+
+func newHomicideMotiveGenerators() []archetypeGenerator {
+	result := make([]archetypeGenerator, 0, len(newHomicideMotives))
+	for _, motive := range newHomicideMotives {
+		selected := motive
+		result = append(result, archetypeGenerator{
+			id: selected.id,
+			candidates: func(base world.World) []candidate {
+				items := workplaceCandidates(base)
+				for index := range items {
+					items[index].archetypeID = selected.id
+					items[index].motive = selected.motive
+					principal, victim := items[index].killerID, items[index].victimID
+					items[index].evidence = []evidencePlan{
+						{typeID: selected.id + "_document", presentation: "Investigative document", content: selected.clues[0], supports: []string{principal}},
+						{typeID: selected.id + "_account", presentation: "Company record", content: selected.clues[1], supports: []string{victim}},
+						{typeID: selected.id + "_corroboration", presentation: "Corroborating record", content: selected.clues[2], supports: []string{principal, victim}},
+					}
+				}
+				return items
+			},
+			validate: func(definition Definition, base world.World) bool {
+				return definition.ArchetypeID == selected.id && validateWorkplaceConflict(definition, base)
+			},
+			evidenceTypes: []string{selected.id + "_document", selected.id + "_account", selected.id + "_corroboration"},
+		})
+	}
+	return result
+}
+
+// Generate creates a deterministic crime definition from existing world facts.
 func Generate(base world.World, seed string, version int) (Definition, error) {
 	return GenerateExcluding(base, seed, version, nil)
 }
@@ -125,7 +178,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	if strings.TrimSpace(seed) == "" {
 		return Definition{}, ErrInvalidCaseSeed
 	}
-	if version != GeneratorVersion && version != previousFinancialGeneratorVersion && version != contextualGeneratorVersion && version != previousGeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
+	if version != GeneratorVersion && version != previousSerialGeneratorVersion && version != previousFinancialGeneratorVersion && version != contextualGeneratorVersion && version != previousGeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
 		return Definition{}, fmt.Errorf("%w: %d", ErrUnsupportedGenerator, version)
 	}
 	candidateWorld := base
@@ -256,6 +309,9 @@ func buildFinancialCaseRecords(seed, caseID string, selected candidate, crimeAt 
 	case "accounting_fraud":
 		descriptionOut, descriptionIn = "A revenue adjustment was credited after a revised company declaration was filed.", "A matching adjustment was transferred into a secondary account."
 		internalRelation = "accounting_adjustment"
+	default:
+		descriptionOut, descriptionIn = "A payment connected to an open inquiry was issued outside the approved ledger.", "A matching payment connected to the inquiry cleared through a secondary account."
+		internalRelation = selected.caseType + "_payment"
 	}
 	return []records.Record{
 		{ID: caseRecordID(caseID, internalRelation+"-source", principal), NPCID: principal, RelatedNPCID: accomplice, Source: "bank", OccurredAt: crimeAt.Add(-24 * time.Hour), Operator: "Union Mercantile Settlement Office", Description: descriptionOut, Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: internalRelation},
@@ -271,6 +327,11 @@ type caseChoice struct {
 func currentCaseChoices(base world.World, version int) []caseChoice {
 	choices := make([]caseChoice, 0, len(archetypeGenerators)+3)
 	for _, archetype := range archetypeGenerators {
+		// v8 historically had the serial option in both this registry and the
+		// explicit append below. Preserve that choice set for old seeds; v9 fixes it.
+		if version >= GeneratorVersion && archetype.id == "serial_killer" {
+			continue
+		}
 		candidates := archetypeCandidates(archetype, base, version)
 		if len(candidates) > 0 {
 			choices = append(choices, caseChoice{id: "homicide/" + archetype.id, candidates: candidates})
@@ -283,11 +344,31 @@ func currentCaseChoices(base world.World, version int) []caseChoice {
 		}
 	}
 	if version >= GeneratorVersion {
+		for _, caseType := range expandedCrimeTypes {
+			candidates := financialCandidates(base, caseType)
+			if len(candidates) > 0 {
+				choices = append(choices, caseChoice{id: caseType, candidates: candidates})
+			}
+		}
+	}
+	if version >= previousSerialGeneratorVersion {
 		if candidates := serialKillerCandidates(base); len(candidates) > 0 {
 			choices = append(choices, caseChoice{id: "homicide/serial_killer", candidates: candidates})
 		}
 	}
 	return choices
+}
+
+// expandedCrimeTypes are non-homicide investigations that can be grounded in
+// existing company, employee, and headquarters relationships.
+var expandedCrimeTypes = []string{
+	"insurance_fraud", "investment_fraud", "money_laundering", "financial_identity_theft",
+	"procurement_fraud", "forged_will", "cargo_theft", "art_forgery", "antiquities_smuggling",
+	"correspondence_blackmail", "industrial_sabotage", "arson", "staged_disappearance", "confidential_document_theft", "police_corruption",
+}
+
+func financialCrimeType(caseType string) bool {
+	return contains(append([]string{"embezzlement", "financial_extortion", "accounting_fraud"}, expandedCrimeTypes...), caseType)
 }
 
 func financialCandidates(base world.World, caseType string) []candidate {
@@ -356,12 +437,44 @@ func financialCandidates(base world.World, caseType string) []candidate {
 						{typeID: "working_ledger", presentation: "Working ledger", content: "The retained ledger contains the original figures and a second employee's correction marks.", supports: []string{accomplice.employee}},
 						{typeID: "submission_register", presentation: "Submission register", content: "A dispatch entry links both employees to the altered filing packet.", supports: []string{principal.employee, accomplice.employee}},
 					}
+				default:
+					item.motive, item.evidence = expandedCrimeStory(caseType, principal.employee, accomplice.employee)
 				}
 				result = append(result, item)
 			}
 		}
 	}
 	return result
+}
+
+func expandedCrimeStory(caseType, principalID, accompliceID string) (string, []evidencePlan) {
+	type story struct{ motive, first, second, third string }
+	stories := map[string]story{
+		"insurance_fraud":             {"A staged loss was filed for an insurance payment, with two employees preparing the claim and supporting records.", "The claim names the principal as the person who certified the loss.", "A retained inventory copy bears the accomplice's alterations.", "The dates and values on the claim conflict with the company's dispatch register."},
+		"investment_fraud":            {"Two employees circulated a false investment offer and redirected the subscriptions.", "The principal signed the private investment circular.", "The accomplice logged deposits against a project absent from company minutes.", "A reconciliation links the subscriptions to a secondary account."},
+		"money_laundering":            {"Company transactions were routed through ordinary accounts to disguise the source of funds.", "The principal approved an unexplained transfer sequence.", "The accomplice filed invoices for services absent from company records.", "Matching references connect the invoices and transfers."},
+		"financial_identity_theft":    {"An employee used another person's financial identity to authorize unauthorized transactions.", "A payment instruction carries the principal's access code.", "The accomplice retained a duplicate form with altered identity details.", "The settlement register shows the resulting funds moving to a secondary account."},
+		"procurement_fraud":           {"A purchasing contract was steered through concealed bid coordination.", "The principal approved the selected supplier outside the usual review.", "The accomplice's comparison sheet contains copied bid figures.", "Meeting notes connect both employees to the changed award record."},
+		"forged_will":                 {"A forged estate document was used to redirect a company-held inheritance payment.", "The principal delivered the disputed instruction to the company registrar.", "The accomplice altered the filing copy after the original was logged.", "The dispatch book places both employees with the document before the transfer."},
+		"cargo_theft":                 {"A shipment was diverted before delivery, with an employee changing its route and a colleague clearing the manifest.", "The principal authorized the altered route.", "The accomplice signed the amended cargo manifest.", "The dock ledger records the shipment as delivered despite its missing freight."},
+		"art_forgery":                 {"A reproduction was substituted for an insured original while two employees handled the inventory paperwork.", "The principal signed the transfer certificate for the disputed work.", "The accomplice's inventory copy records a replacement after closing.", "The valuation sheet and movement log give incompatible descriptions of the same item."},
+		"antiquities_smuggling":       {"A protected artifact was moved under a false commercial description.", "The principal approved the export declaration.", "The accomplice altered the crate inventory before dispatch.", "The retained packing list conflicts with the transport register."},
+		"correspondence_blackmail":    {"A private letter was used to demand money from a company officer, with a colleague arranging collection.", "The principal's draft names the threatened disclosure.", "The accomplice logged a sealed collection envelope.", "A payment reference matches the amount demanded in the correspondence."},
+		"industrial_sabotage":         {"Equipment was deliberately disabled and maintenance records were altered to hide the cause.", "The principal signed out the restricted maintenance key.", "The accomplice changed the inspection entry after the breakdown.", "The shift ledger places both employees in the plant during the unexplained shutdown."},
+		"arson":                       {"A company building was deliberately set alight after records were removed and an insurance claim prepared.", "The principal filed an early loss estimate.", "The accomplice signed the after-hours access register.", "The inventory and access records show the same restricted room was cleared before the fire."},
+		"staged_disappearance":        {"An employee's disappearance was staged to evade a debt and move company funds.", "The principal prepared a false departure notice.", "The accomplice recorded a company advance under a closed account.", "The travel and payroll ledgers conflict with the reported departure date."},
+		"confidential_document_theft": {"Restricted company papers were copied and removed for an unauthorized sale.", "The principal requested access to the sealed archive.", "The accomplice's checkout slip lists the missing folder under another title.", "A duplicate index records both employees handling the file."},
+		"police_corruption":           {"A company employee paid for confidential police information and a colleague concealed the expense.", "The principal authorized an unlisted consulting payment.", "The accomplice filed the receipt under a false account heading.", "The payment ledger and access log link the two employees to the same inquiry date."},
+	}
+	selected, ok := stories[caseType]
+	if !ok {
+		return "", nil
+	}
+	return selected.motive, []evidencePlan{
+		{typeID: caseType + "_primary_document", presentation: "Primary document", content: selected.first, supports: []string{principalID}},
+		{typeID: caseType + "_supporting_record", presentation: "Supporting record", content: selected.second, supports: []string{accompliceID}},
+		{typeID: caseType + "_corroborating_entry", presentation: "Corroborating entry", content: selected.third, supports: []string{principalID, accompliceID}},
+	}
 }
 
 // serialKillerCandidates requires the existing world to support the entire
@@ -550,7 +663,7 @@ func companyByID(companies []world.Company, id string) world.Company {
 }
 
 func validateFinancialDefinition(definition Definition, base world.World) error {
-	if definition.GeneratorVersion < previousFinancialGeneratorVersion || definition.CaseType != definition.ArchetypeID || !contains([]string{"embezzlement", "financial_extortion", "accounting_fraud"}, definition.CaseType) || definition.VictimID != "" || definition.KillerID == "" || definition.CompanyID == "" || definition.CrimeAt.IsZero() || len(definition.Participants) != 2 || len(definition.Relationships) != 2 || len(definition.Evidence) != 3 {
+	if definition.GeneratorVersion < previousFinancialGeneratorVersion || definition.CaseType != definition.ArchetypeID || !financialCrimeType(definition.CaseType) || definition.VictimID != "" || definition.KillerID == "" || definition.CompanyID == "" || definition.CrimeAt.IsZero() || len(definition.Participants) != 2 || len(definition.Relationships) != 2 || len(definition.Evidence) != 3 {
 		return ErrInvalidDefinition
 	}
 	if !containsNPC(base.NPCs, definition.KillerID) || !containsNPC(base.NPCs, definition.Participants[1].NPCID) || definition.Participants[0] != (CaseParticipant{NPCID: definition.KillerID, Role: "principal"}) || definition.Participants[1].Role != "accomplice" || definition.Participants[0].NPCID == definition.Participants[1].NPCID || definition.LocationID != "" {
@@ -587,6 +700,10 @@ func validateFinancialDefinition(definition Definition, base world.World) error 
 		"embezzlement":        {"settlement_ledger", "duplicate_receipt", "account_reconciliation"},
 		"financial_extortion": {"payment_demand", "collection_record", "account_reconciliation"},
 		"accounting_fraud":    {"filing_copy", "working_ledger", "submission_register"},
+	}
+	if contains(expandedCrimeTypes, definition.CaseType) {
+		prefix := definition.CaseType
+		expectedTypes[definition.CaseType] = []string{prefix + "_primary_document", prefix + "_supporting_record", prefix + "_corroborating_entry"}
 	}
 	for _, evidenceType := range expectedTypes[definition.CaseType] {
 		if !required[evidenceType] {
@@ -675,8 +792,13 @@ func availableArchetypesForVersion(base world.World, version int) []archetypeGen
 }
 
 func archetypeCandidates(archetype archetypeGenerator, base world.World, version int) []candidate {
-	if archetype.id == "serial_killer" && version < GeneratorVersion {
+	if archetype.id == "serial_killer" && version < previousSerialGeneratorVersion {
 		return nil
+	}
+	for _, motive := range newHomicideMotives {
+		if archetype.id == motive.id && version < GeneratorVersion {
+			return nil
+		}
 	}
 	if version >= contextualGeneratorVersion && archetype.id == "jealousy" {
 		return jealousyCandidatesV6(base)
@@ -1008,7 +1130,7 @@ func Validate(definition Definition, base world.World) error {
 }
 
 func supportedCaseGeneratorVersion(version int) bool {
-	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == previousGeneratorVersion || version == contextualGeneratorVersion || version == previousFinancialGeneratorVersion || version == GeneratorVersion
+	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == previousGeneratorVersion || version == contextualGeneratorVersion || version == previousFinancialGeneratorVersion || version == previousSerialGeneratorVersion || version == GeneratorVersion
 }
 
 func availableArchetypes(base world.World) []archetypeGenerator {
@@ -1350,7 +1472,7 @@ func validateWorkplaceConflict(definition Definition, base world.World) bool {
 }
 
 func validateSerialKiller(definition Definition, base world.World) bool {
-	if definition.GeneratorVersion < GeneratorVersion || definition.CompanyID == "" || len(definition.FutureVictimIDs) != 1 {
+	if definition.GeneratorVersion < previousSerialGeneratorVersion || definition.CompanyID == "" || len(definition.FutureVictimIDs) != 1 {
 		return false
 	}
 	killer, victim := npcByID(base.NPCs, definition.KillerID), npcByID(base.NPCs, definition.VictimID)

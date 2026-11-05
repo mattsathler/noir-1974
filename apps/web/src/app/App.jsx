@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import LoginPage from "../modules/identity/pages/login/LoginPage.jsx";
 import RegisterPage from "../modules/identity/pages/register/RegisterPage.jsx";
 import CharacterCreationPage from "../modules/identity/pages/character-creation/CharacterCreationPage.jsx";
@@ -30,6 +30,7 @@ function needsSession(page) {
 
 export default function App() {
   const [page, setPage] = useState(() => pageFromPath(window.location.pathname));
+  const routePath = useRef(window.location.pathname);
   const [world, setWorld] = useState(null);
   const [checkingSession, setCheckingSession] = useState(() => needsSession(pageFromPath(window.location.pathname)));
   const [sessionCheckCount, setSessionCheckCount] = useState(0);
@@ -68,12 +69,14 @@ export default function App() {
         if (requestedPage === "whiteboard" || requestedPage === "login" && returnTo && pageFromPath(returnTo) === "whiteboard") {
           const boardPath = requestedPage === "whiteboard" ? requestedPath : returnTo;
           window.history.replaceState({}, "", boardPath);
+          routePath.current = window.location.pathname;
           setPage("whiteboard");
           return;
         }
         const nextPage = current.character ? "game" : "character";
         const nextPath = current.character ? "/game" : "/character/new";
         window.history.replaceState({}, "", nextPath);
+        routePath.current = window.location.pathname;
         setPage(nextPage);
       })
       .catch(() => {
@@ -87,6 +90,7 @@ export default function App() {
         }
       })
       .finally(() => {
+        if (active) routePath.current = window.location.pathname;
         if (active) setCheckingSession(false);
       });
 
@@ -95,6 +99,8 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
+      if (routePath.current === window.location.pathname) return;
+      routePath.current = window.location.pathname;
       const nextPage = pageFromPath(window.location.pathname);
       setPage(nextPage);
       if (needsSession(nextPage)) {
@@ -108,6 +114,7 @@ export default function App() {
 
   const navigate = useCallback((path, nextPage, nextData = null) => {
     window.history.pushState({}, "", path);
+    routePath.current = window.location.pathname;
     if (nextPage === "whiteboard" && !nextData) {
       setCheckingSession(true);
       setSessionCheckCount((count) => count + 1);
@@ -176,7 +183,10 @@ export default function App() {
   if (page === "whiteboard") {
     const boardPath = window.location.pathname.match(/^\/whiteboard(?:\/([^/]+))?\/?$/);
     const boardId = boardPath?.[1] ? decodeURIComponent(boardPath[1]) : undefined;
-    return <main className="whiteboard-standalone"><Whiteboard initialBoardId={boardId} standalone focusBoard={(nextBoardId) => window.history.replaceState({}, "", `/whiteboard/${encodeURIComponent(nextBoardId)}`)} /></main>;
+    return <main className="whiteboard-standalone"><Whiteboard initialBoardId={boardId} standalone focusBoard={(nextBoardId) => {
+      window.history.replaceState({}, "", `/whiteboard/${encodeURIComponent(nextBoardId)}`);
+      routePath.current = window.location.pathname;
+    }} /></main>;
   }
   if (page === "logout") return <ComputerAccessShell title="Ending user session" labelledBy="session-end-title" busy>
     <section className="m-auto text-primary" aria-labelledby="session-end-title"><h1 id="session-end-title" className="text-xl m-0">Ending session</h1><p className="text-sm text-secondary">Closing this workstation account…</p></section>

@@ -198,7 +198,13 @@ func (store *PostgresStore) postMortemForPatient(ctx context.Context, serverID s
 		return nil, nil, err
 	}
 	address := strings.Trim(strings.Join([]string{sceneName, regionName, city.Name, city.Country}, ", "), ", ")
-	causes := map[string]string{"workplace_conflict": "Fatal blunt force injuries", "jealousy": "Fatal penetrating injuries", "financial_extortion": "Fatal blunt force injuries"}
+	causes := map[string]string{
+		"workplace_conflict": "Fatal blunt force injuries", "jealousy": "Fatal penetrating injuries", "financial_extortion": "Fatal blunt force injuries",
+		"inheritance": "Fatal blunt force injuries", "revenge": "Fatal penetrating injuries", "silence_witness": "Fatal blunt force injuries",
+		"conceal_fraud": "Fatal blunt force injuries", "power_struggle": "Fatal penetrating injuries", "mistaken_identity": "Fatal blunt force injuries",
+		"blackmail": "Fatal penetrating injuries", "debt": "Fatal blunt force injuries", "protect_reputation": "Fatal penetrating injuries",
+		"conceal_accident": "Fatal blunt force injuries",
+	}
 	record := &PostMortemRecord{ReportID: "case:postmortem:" + caseID, EstimatedDeathAt: deathAt.UTC(), Cause: causes[archetype], BodyFoundAt: address, Evidence: []HospitalEvidence{}}
 	if record.Cause == "" {
 		record.Cause = "Fatal injuries consistent with homicide"
