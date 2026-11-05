@@ -671,7 +671,7 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
                   onChange={(event) => updateNoteDraft(pin, "content", event.target.value)}
                 />
               </> : <>
-                <header className="personal-whiteboard__pin-drag-handle" onPointerDown={(event) => beginDrag(event, pin)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}><span>{pin.source.toUpperCase()} · PINNED{pin.metadata?.crimeType ? ` · ${pin.metadata.crimeType.replaceAll("_", " ").toUpperCase()}` : ""}</span><button className="personal-whiteboard__remove-pin" type="button" aria-label={`Remove ${pin.title} from board`} disabled={boardLocked || busy} onClick={() => removePin(pin.id)}><Trash aria-hidden="true" /></button></header>
+                <header className="personal-whiteboard__pin-drag-handle" onPointerDown={(event) => beginDrag(event, pin)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}><span>{pin.source.toUpperCase()} · PINNED</span><button className="personal-whiteboard__remove-pin" type="button" aria-label={`Remove ${pin.title} from board`} disabled={boardLocked || busy} onClick={() => removePin(pin.id)}><Trash aria-hidden="true" /></button></header>
                 {pin.metadata?.npc?.visual && <div className="personal-whiteboard__person-portrait"><ModularFace visual={pin.metadata.npc.visual} name={pin.metadata.npc.name || pin.title} /></div>}
                 <h2>{pin.title}</h2><p>{displayPinContent(pin)}</p>
                 <label className="personal-whiteboard__designation">MARK PIN

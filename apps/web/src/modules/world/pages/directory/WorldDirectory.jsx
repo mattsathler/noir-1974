@@ -260,6 +260,8 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
       {selectedPerson && (() => {
         const { npc, workplaces = [], maritalStatus, reportedScene } = selectedPerson;
         const employment = workplaces.length ? workplaces.map(({ company, address }) => `${company} — ${address}`).join("; ") : "NOT LISTED";
+        const personalData = npc.personalData || {};
+        const personalValue = (value) => value || "NOT RECORDED";
         return <section className="world-person-file" aria-label={`${npc.name} details`}>
           <header className="world-person-file__toolbar">{!initialTargetNPC?.id && <button type="button" onClick={() => { activityRequestId.current++; setActivity([]); setActivityMessage(""); setSelectedPerson(null); }}>← BACK TO RESULTS</button>}<span>{isInterpol ? "PUBLIC PERSON RECORD" : isBankRecords ? "ACCOUNT HOLDER" : "TRAVEL SUBJECT"}</span></header>
           <div className="world-person-file__identity">
@@ -274,15 +276,48 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
           </dl>}
 
           {isInterpol && <>
-            <dl className="world-record__personnel-facts world-person-file__facts">
-              <div><dt>DESCRIPTION</dt><dd>{npc.appearance || "NOT RECORDED"}</dd></div>
-              <div><dt>EMPLOYMENT</dt><dd>{employment}</dd></div>
-              <div><dt>MARITAL STATUS</dt><dd>{maritalStatus?.toUpperCase() || "UNKNOWN"}</dd></div>
-              {reportedScene && <div><dt>REPORTED SCENE</dt><dd>{reportedScene.address}</dd></div>}
-            </dl>
+            <div className="world-person-file__fact-groups">
+              <dl className="world-record__personnel-facts world-person-file__facts world-person-file__facts--featured">
+                <div><dt>DESCRIPTION</dt><dd>{npc.appearance || "NOT RECORDED"}</dd></div>
+                <div><dt>PERSONALITY</dt><dd>{npc.personality || "NOT RECORDED"}</dd></div>
+                <div><dt>EMPLOYMENT</dt><dd>{employment}</dd></div>
+                {reportedScene && <div><dt>REPORTED SCENE</dt><dd>{reportedScene.address}</dd></div>}
+              </dl>
+              <section className="world-person-file__fact-group" aria-label="Identity details">
+                <h3>IDENTITY</h3>
+                <dl className="world-record__personnel-facts world-person-file__facts world-person-file__facts--compact">
+                  <div><dt>SEX</dt><dd>{personalValue(personalData.sex)}</dd></div>
+                  <div><dt>BIRTHDAY</dt><dd>{personalData.birthDay && personalData.birthMonth ? `${personalData.birthDay} ${personalData.birthMonth}` : "NOT RECORDED"}</dd></div>
+                  <div><dt>NATIONALITY</dt><dd>{personalValue(personalData.nationality)}</dd></div>
+                  <div><dt>BIRTHPLACE</dt><dd>{personalValue(personalData.birthplace)}</dd></div>
+                  <div><dt>PRIMARY LANGUAGE</dt><dd>{personalValue(personalData.primaryLanguage)}</dd></div>
+                  {personalData.religion && <div><dt>RELIGION</dt><dd>{personalData.religion.toUpperCase()}</dd></div>}
+                  <div><dt>IDENTIFICATION</dt><dd>{personalValue(personalData.fictionalId)}</dd></div>
+                  <div><dt>SIGNATURE</dt><dd>{personalValue(personalData.signature)}</dd></div>
+                </dl>
+              </section>
+              <section className="world-person-file__fact-group" aria-label="Physical characteristics">
+                <h3>PHYSICAL PROFILE</h3>
+                <dl className="world-record__personnel-facts world-person-file__facts world-person-file__facts--compact">
+                  <div><dt>BLOOD TYPE</dt><dd>{personalValue(personalData.bloodType)}</dd></div>
+                  <div><dt>BUILD</dt><dd>{personalValue(personalData.bodyType).toUpperCase()}</dd></div>
+                  <div><dt>HEIGHT</dt><dd>{personalData.heightCm ? `${personalData.heightCm} CM` : "NOT RECORDED"}</dd></div>
+                  <div><dt>WEIGHT</dt><dd>{personalData.weightKg ? `${personalData.weightKg} KG` : "NOT RECORDED"}</dd></div>
+                  <div><dt>DOMINANT HAND</dt><dd>{personalValue(personalData.dominantHand).toUpperCase()}</dd></div>
+                </dl>
+              </section>
+              <section className="world-person-file__fact-group" aria-label="Personal profile">
+                <h3>PERSONAL PROFILE</h3>
+                <dl className="world-record__personnel-facts world-person-file__facts world-person-file__facts--compact">
+                  <div><dt>MARITAL STATUS</dt><dd>{maritalStatus?.toUpperCase() || "UNKNOWN"}</dd></div>
+                  <div><dt>TEMPERAMENT</dt><dd>{personalValue(personalData.temperament)}</dd></div>
+                  <div><dt>HOBBIES</dt><dd>{personalData.hobbies?.length ? personalData.hobbies.join(", ") : "NOT RECORDED"}</dd></div>
+                </dl>
+              </section>
+            </div>
             <button className="page-print-button" type="button" aria-label={`Print person record for ${npc.name}`} title="Print record" onClick={() => onPrint?.({
               id: `person:${npc.id}`, source: "person", title: npc.name,
-              content: [`AGE · ${npc.age} YEARS`, `STATUS · ${npc.status?.toUpperCase() || "UNKNOWN"}`, `DESCRIPTION · ${npc.appearance || "NOT RECORDED"}`, `EMPLOYMENT · ${employment}`, `MARITAL STATUS · ${maritalStatus?.toUpperCase() || "UNKNOWN"}`, ...(npc.personalData ? [`SEX · ${npc.personalData.sex}`, `BIRTHDAY · ${npc.personalData.birthDay} ${npc.personalData.birthMonth}`, `NATIONALITY · ${npc.personalData.nationality}`, `BIRTHPLACE · ${npc.personalData.birthplace}`, `LANGUAGE · ${npc.personalData.primaryLanguage}`, `IDENTIFICATION · ${npc.personalData.fictionalId}`, `SIGNATURE · ${npc.personalData.signature}`, `BLOOD TYPE · ${npc.personalData.bloodType}`, `BUILD · ${npc.personalData.bodyType}`, `HEIGHT · ${npc.personalData.heightCm} CM`, `WEIGHT · ${npc.personalData.weightKg} KG`, `DOMINANT HAND · ${npc.personalData.dominantHand}`, `TEMPERAMENT · ${npc.personalData.temperament}`, `HOBBIES · ${npc.personalData.hobbies?.join(", ")}`, ...(npc.personalData.religion ? [`RELIGION · ${npc.personalData.religion}`] : [])] : []), ...(reportedScene ? [`REPORTED SCENE · ${reportedScene.address}`] : [])].join("\n"),
+              content: [`AGE · ${npc.age} YEARS`, `STATUS · ${npc.status?.toUpperCase() || "UNKNOWN"}`, `DESCRIPTION · ${npc.appearance || "NOT RECORDED"}`, `PERSONALITY · ${npc.personality || "NOT RECORDED"}`, `EMPLOYMENT · ${employment}`, `MARITAL STATUS · ${maritalStatus?.toUpperCase() || "UNKNOWN"}`, ...(npc.personalData ? [`SEX · ${npc.personalData.sex}`, `BIRTHDAY · ${npc.personalData.birthDay} ${npc.personalData.birthMonth}`, `NATIONALITY · ${npc.personalData.nationality}`, `BIRTHPLACE · ${npc.personalData.birthplace}`, `LANGUAGE · ${npc.personalData.primaryLanguage}`, `IDENTIFICATION · ${npc.personalData.fictionalId}`, `SIGNATURE · ${npc.personalData.signature}`, `BLOOD TYPE · ${npc.personalData.bloodType}`, `BUILD · ${npc.personalData.bodyType}`, `HEIGHT · ${npc.personalData.heightCm} CM`, `WEIGHT · ${npc.personalData.weightKg} KG`, `DOMINANT HAND · ${npc.personalData.dominantHand}`, `TEMPERAMENT · ${npc.personalData.temperament}`, `HOBBIES · ${npc.personalData.hobbies?.join(", ")}`, ...(npc.personalData.religion ? [`RELIGION · ${npc.personalData.religion}`] : [])] : []), ...(reportedScene ? [`REPORTED SCENE · ${reportedScene.address}`] : [])].join("\n"),
               metadata: selectedPerson,
             })}><Printer aria-hidden="true" /></button>
           </>}

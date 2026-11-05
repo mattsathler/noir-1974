@@ -483,7 +483,7 @@ func (store *PostgresStore) PersonSearchScenes(ctx context.Context, serverID, co
 type PublicEvidence struct {
 	ID           string `json:"id"`
 	CrimeID      string `json:"crimeId,omitempty"`
-	CrimeType    string `json:"crimeType,omitempty"`
+	CrimeType    string `json:"-"`
 	Type         string `json:"type"`
 	Presentation string `json:"presentation"`
 	Content      string `json:"content"`

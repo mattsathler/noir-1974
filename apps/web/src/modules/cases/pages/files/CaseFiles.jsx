@@ -120,7 +120,7 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
           <h2>PUBLIC RECORDS</h2>
           {caseFileError && <p role="alert">{caseFileError}</p>}
           {!caseFile && !caseFileError && <p>READING THE PUBLIC FILE…</p>}
-          {caseFile?.evidence?.map((item) => <article key={item.id}><div><strong>{item.presentation}</strong><p>{item.content}</p></div><button type="button" onClick={() => onPrint?.({ id: item.id, source: "case", title: item.presentation, content: item.content, metadata: { caseId: record.id, crimeId: item.crimeId, crimeType: item.crimeType } })}>PRINT ↗</button></article>)}
+          {caseFile?.evidence?.map((item) => <article key={item.id}><div><strong>{item.presentation}</strong><p>{item.content}</p></div><button type="button" onClick={() => onPrint?.({ id: item.id, source: "case", title: item.presentation, content: item.content, metadata: { caseId: record.id, crimeId: item.crimeId } })}>PRINT ↗</button></article>)}
           {caseFile && !caseFile.evidence?.length && <p className="case-files__detail-note">No further public records are available.</p>}
         </section>}
         {kind === "missing" || (kind === "case" && record.caseType === "homicide") ? <p className="case-files__detail-note">The public file contains no further investigative findings.</p> : null}

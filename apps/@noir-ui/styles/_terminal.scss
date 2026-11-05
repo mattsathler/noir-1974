@@ -1247,6 +1247,17 @@
 .world-person-file__identity h2 { margin: 0; color: var(--noir-paper-100); font-family: var(--noir-font-sans); font-size: 1.2rem; font-weight: 400; }
 .world-person-file__identity p { margin: var(--noir-space-2) 0 0; color: var(--noir-brass-300); font-size: 0.6rem; letter-spacing: 0.08em; }
 .world-person-file__facts { padding: var(--noir-space-3); background: rgb(0 0 0 / 18%); }
+.world-directory--person-search .world-person-file__facts--compact { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; padding: 0; background: transparent; }
+.world-directory--person-search .world-person-file__facts--compact > div { min-width: 0; gap: 0.15rem; padding: 0.4rem 0.5rem; background: color-mix(in srgb, var(--noir-paper-100) 5%, var(--noir-ink-950)); border: 1px solid var(--noir-ink-700); }
+.world-directory--person-search .world-person-file__facts--compact dt { font-size: 0.5rem; }
+.world-directory--person-search .world-person-file__facts--compact dd { font-size: 0.62rem; line-height: 1.35; }
+.world-directory--person-search .world-person-file__fact-groups { display: grid; gap: 0.55rem; }
+.world-directory--person-search .world-person-file__facts--featured { grid-template-columns: minmax(0, 1fr); gap: 0.35rem; padding: 0; background: transparent; }
+.world-directory--person-search .world-person-file__facts--featured > div { min-width: 0; gap: 0.15rem; padding: 0.45rem 0.55rem; background: color-mix(in srgb, var(--noir-paper-100) 5%, var(--noir-ink-950)); border: 1px solid var(--noir-ink-700); }
+.world-directory--person-search .world-person-file__fact-group { display: grid; gap: 0.3rem; }
+.world-directory--person-search .world-person-file__fact-group h3 { margin: 0; color: var(--noir-brass-300); font-size: 0.52rem; font-weight: 400; letter-spacing: 0.1em; }
+@media (max-width: 42rem) { .world-directory--person-search .world-person-file__facts--compact { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 26rem) { .world-directory--person-search .world-person-file__facts--compact { grid-template-columns: minmax(0, 1fr); } }
 .world-person-file > .page-print-button { margin-top: var(--noir-space-3); }
 .world-person-file .world-record__activity { margin-top: var(--noir-space-4); padding: var(--noir-space-4) 0 0; }
 .world-person-file .world-record__activity h3 { margin: 0 0 var(--noir-space-3); color: var(--noir-brass-300); font-size: 0.65rem; font-weight: 400; letter-spacing: 0.1em; }
@@ -2546,6 +2557,11 @@
 .institutional-site--police .world-directory--person-search .world-person-file__facts > div { gap: 0.2rem; padding: 0.5rem 0.55rem; background: #f1f4f7; border: 1px solid #d9e0e6; }
 .institutional-site--police .world-directory--person-search .world-person-file__facts dt { color: #50677c; font: 700 0.55rem Arial, sans-serif; letter-spacing: 0.06em; }
 .institutional-site--police .world-directory--person-search .world-person-file__facts dd { color: #273541; font: 0.68rem/1.5 Arial, sans-serif; }
+.legacy-police .world-directory--person-search .world-person-file__facts--compact > div,.institutional-site--police .world-directory--person-search .world-person-file__facts--compact > div { gap: 0.15rem; padding: 0.4rem 0.5rem; }
+.legacy-police .world-directory--person-search .world-person-file__facts--compact dt,.institutional-site--police .world-directory--person-search .world-person-file__facts--compact dt { font-size: 0.5rem; }
+.legacy-police .world-directory--person-search .world-person-file__facts--compact dd,.institutional-site--police .world-directory--person-search .world-person-file__facts--compact dd { font-size: 0.62rem; line-height: 1.35; }
+.legacy-police .world-directory--person-search .world-person-file__facts--featured > div,.institutional-site--police .world-directory--person-search .world-person-file__facts--featured > div { gap: 0.15rem; padding: 0.45rem 0.55rem; }
+.legacy-police .world-directory--person-search .world-person-file__fact-group h3,.institutional-site--police .world-directory--person-search .world-person-file__fact-group h3 { color: #50677c; font: 700 0.52rem Arial, sans-serif; letter-spacing: 0.06em; }
 .institutional-site--police .world-directory--person-search .page-print-button { color: #174a7c; }
 .institutional-site--hospital { --institutional-primary: #087a78; --institutional-accent: #bb3340; --institutional-nav: #e2f1ef; --institutional-link: #006665; }
 .institutional-site--hospital .institutional-site__symbol { color: #fff; background: #c7313d; border-color: #f4ced0; font: 700 1.5rem Arial, sans-serif; }

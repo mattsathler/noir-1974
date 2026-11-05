@@ -182,6 +182,7 @@ type PersonSearchNPC struct {
 	Name         string          `json:"name"`
 	Age          int             `json:"age"`
 	Appearance   string          `json:"appearance"`
+	Personality  string          `json:"personality"`
 	Status       string          `json:"status"`
 	Visual       *VisualIdentity `json:"visual,omitempty"`
 	PersonalData NPCPersonalData `json:"personalData"`
@@ -1558,7 +1559,7 @@ func personSearchRecords(base World, matches []NPC) []PersonSearchRecord {
 			maritalStatus = "single"
 		}
 		results = append(results, PersonSearchRecord{
-			NPC:        PersonSearchNPC{ID: npc.ID, Name: npc.Name, Age: npc.Age, Appearance: npc.Appearance, Status: npc.Status, Visual: npc.Visual, PersonalData: npc.PersonalData},
+			NPC:        PersonSearchNPC{ID: npc.ID, Name: npc.Name, Age: npc.Age, Appearance: npc.Appearance, Personality: npc.Personality, Status: npc.Status, Visual: npc.Visual, PersonalData: npc.PersonalData},
 			Workplaces: workplaces, MaritalStatus: maritalStatus,
 		})
 	}

@@ -77,12 +77,8 @@ export default function NewspaperWindow({ cityId, issueDay, onClose, embedded = 
             <section className="newspaper-lead" aria-labelledby="newspaper-lead-title">
               <p className="newspaper-section-label">{issue.lead.section} · LATEST NEWS</p>
               <h2 id="newspaper-lead-title">{issue.lead.headline}</h2>
-              <div className={`newspaper-lead__copy${issue.lead.portrait ? " newspaper-lead__copy--pictured" : ""}`}>
+              <div className="newspaper-lead__copy">
                 <p className="newspaper-lead__summary">{issue.lead.summary}</p>
-                {issue.lead.portrait && <figure className="newspaper-lead__portrait">
-                  <ModularFace visual={issue.lead.portrait} name={issue.lead.portraitName || "City resident"} />
-                  <figcaption>{issue.lead.portraitName || "CITY FILE"} · FILE PHOTO</figcaption>
-                </figure>}
               </div>
             </section>
 
