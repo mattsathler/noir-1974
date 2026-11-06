@@ -30,6 +30,14 @@ A v9 também registra dez novas motivações de homicídio: `inheritance`, `reve
 
 As versões v3–v8 mantêm suas escolhas anteriores: os novos tipos só entram na seleção v9, e a v8 permanece aceita para reconstrução de casos existentes. A seleção continua equilibrada em duas etapas, primeiro pelo modelo disponível e depois pelo cenário determinístico daquele modelo.
 
+### Ritmo narrativo e pistas (gerador v10)
+
+A v10 preserva a seleção e a reconstrução v9, mas muda a linha do tempo e as mensagens dos homicídios. Documentos ligados ao caso recebem datas entre três e onze semanas antes do crime. Transferências financeiras e encontros GATE ligados a extorsão ou ciúme também antecedem o crime por pelo menos três semanas; registros de presença na cena permanecem no horário do homicídio.
+
+As mensagens de caso passam a privilegiar conversas corriqueiras. Cada homicídio gera duas mensagens banais antes do crime e, quando há correspondente disponível, duas notas de colegas enviadas semanas depois, que mencionam a ausência da vítima de passagem. O catálogo traz 200 variações para cada grupo de mensagens cotidianas, pós-evento e arrependimento. Mensagens de arrependimento confessando o assassinato são determinísticas e aparecem em apenas 1 a cada 25 seeds, nunca antes de cinco semanas após o crime. A v10 também apresenta descrições documentais mais indiretas, sem expor no texto público a classificação ou o participante que cada item sustenta. Motivações simples, como silenciar uma investigação, coexistem com tramas mais elaboradas, como chantagem.
+
+As versões v3–v9 continuam aceitas e mantêm suas datas, pistas e comportamento de mensagens; nenhuma reconstrução antiga adota o novo ritmo.
+
 ## Persistência e estado
 
 - `cases` guarda a definição compacta: seed, versão, tipo, arquétipo, motivação, empresa afetada e os IDs opcionais de vítima e cena/local. `killer_entity_id` é legado e guarda o autor principal; decisões atuais usam participantes.

@@ -15,7 +15,8 @@ import (
 	"noir-1974/apps/api/internal/world"
 )
 
-const GeneratorVersion = 9
+const GeneratorVersion = 10
+const previousNarrativeGeneratorVersion = 9
 const previousSerialGeneratorVersion = 8
 const previousFinancialGeneratorVersion = 7
 const connectedGeneratorVersion = 4
@@ -178,7 +179,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	if strings.TrimSpace(seed) == "" {
 		return Definition{}, ErrInvalidCaseSeed
 	}
-	if version != GeneratorVersion && version != previousSerialGeneratorVersion && version != previousFinancialGeneratorVersion && version != contextualGeneratorVersion && version != previousGeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
+	if version != GeneratorVersion && version != previousNarrativeGeneratorVersion && version != previousSerialGeneratorVersion && version != previousFinancialGeneratorVersion && version != contextualGeneratorVersion && version != previousGeneratorVersion && version != connectedGeneratorVersion && version != legacyGeneratorVersion {
 		return Definition{}, fmt.Errorf("%w: %d", ErrUnsupportedGenerator, version)
 	}
 	candidateWorld := base
@@ -243,6 +244,9 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 		// Cases are generated before their evening crime time; keep generated records historical.
 		crimeAt = crimeAt.In(cityLocation).AddDate(0, 0, -1).UTC()
 	}
+	if version >= GeneratorVersion && selected.caseType == "" {
+		selected = paceHomicideEvidence(seed, selected, crimeAt)
+	}
 	definition := Definition{
 		ID:               caseID,
 		CityID:           caseCityID,
@@ -279,10 +283,16 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	}
 	if selected.caseType != "" {
 		definition.CrimeAt = crimeAt
-		definition.Records = buildFinancialCaseRecords(seed, caseID, selected, crimeAt)
+		definition.Records = buildFinancialCaseRecords(seed, caseID, selected, crimeAt, version)
 	} else if version >= connectedGeneratorVersion {
 		definition.Records = buildConnectedCaseRecords(seed, base.GeneratorVersion, caseID, selected, base, crimeAt, version)
-		if selected.archetypeID == "serial_killer" {
+		if version >= GeneratorVersion {
+			emails, err := buildQuietCaseEmails(seed, base.GeneratorVersion, caseID, selected, base, crimeAt)
+			if err != nil {
+				return Definition{}, err
+			}
+			definition.Emails = emails
+		} else if selected.archetypeID == "serial_killer" {
 			definition.Emails = buildSerialKillerEmails(seed, base.GeneratorVersion, caseID, selected, base, crimeAt)
 		} else {
 			definition.Emails = buildConnectedCaseEmails(seed, base.GeneratorVersion, caseID, selected, base, crimeAt)
@@ -296,7 +306,7 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 	return definition, nil
 }
 
-func buildFinancialCaseRecords(seed, caseID string, selected candidate, crimeAt time.Time) []records.Record {
+func buildFinancialCaseRecords(seed, caseID string, selected candidate, crimeAt time.Time, caseVersion int) []records.Record {
 	amount := 2750 + keyIndex(seed, "corporate-value", 9251)
 	reference := fmt.Sprintf("company settlement %06d", keyIndex(seed, "corporate-reference", 1000000))
 	principal, accomplice := selected.killerID, selected.accompliceID
@@ -313,9 +323,13 @@ func buildFinancialCaseRecords(seed, caseID string, selected candidate, crimeAt 
 		descriptionOut, descriptionIn = "A payment connected to an open inquiry was issued outside the approved ledger.", "A matching payment connected to the inquiry cleared through a secondary account."
 		internalRelation = selected.caseType + "_payment"
 	}
+	transferAt := crimeAt.Add(-24 * time.Hour)
+	if caseVersion >= GeneratorVersion {
+		transferAt = crimeAt.AddDate(0, 0, -(21 + keyIndex(seed, "financial-transfer-days", 25)))
+	}
 	return []records.Record{
-		{ID: caseRecordID(caseID, internalRelation+"-source", principal), NPCID: principal, RelatedNPCID: accomplice, Source: "bank", OccurredAt: crimeAt.Add(-24 * time.Hour), Operator: "Union Mercantile Settlement Office", Description: descriptionOut, Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: internalRelation},
-		{ID: caseRecordID(caseID, internalRelation+"-recipient", accomplice), NPCID: accomplice, RelatedNPCID: principal, Source: "bank", OccurredAt: crimeAt.Add(-24*time.Hour + 8*time.Minute), Operator: "Union Mercantile Settlement Office", Description: descriptionIn, Reference: reference, Amount: amount, Direction: "incoming", CaseID: caseID, InternalRelation: internalRelation},
+		{ID: caseRecordID(caseID, internalRelation+"-source", principal), NPCID: principal, RelatedNPCID: accomplice, Source: "bank", OccurredAt: transferAt, Operator: "Union Mercantile Settlement Office", Description: descriptionOut, Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: internalRelation},
+		{ID: caseRecordID(caseID, internalRelation+"-recipient", accomplice), NPCID: accomplice, RelatedNPCID: principal, Source: "bank", OccurredAt: transferAt.Add(8 * time.Minute), Operator: "Union Mercantile Settlement Office", Description: descriptionIn, Reference: reference, Amount: amount, Direction: "incoming", CaseID: caseID, InternalRelation: internalRelation},
 	}
 }
 
@@ -329,7 +343,7 @@ func currentCaseChoices(base world.World, version int) []caseChoice {
 	for _, archetype := range archetypeGenerators {
 		// v8 historically had the serial option in both this registry and the
 		// explicit append below. Preserve that choice set for old seeds; v9 fixes it.
-		if version >= GeneratorVersion && archetype.id == "serial_killer" {
+		if version >= previousNarrativeGeneratorVersion && archetype.id == "serial_killer" {
 			continue
 		}
 		candidates := archetypeCandidates(archetype, base, version)
@@ -343,7 +357,7 @@ func currentCaseChoices(base world.World, version int) []caseChoice {
 			choices = append(choices, caseChoice{id: caseType, candidates: candidates})
 		}
 	}
-	if version >= GeneratorVersion {
+	if version >= previousNarrativeGeneratorVersion {
 		for _, caseType := range expandedCrimeTypes {
 			candidates := financialCandidates(base, caseType)
 			if len(candidates) > 0 {
@@ -796,7 +810,7 @@ func archetypeCandidates(archetype archetypeGenerator, base world.World, version
 		return nil
 	}
 	for _, motive := range newHomicideMotives {
-		if archetype.id == motive.id && version < GeneratorVersion {
+		if archetype.id == motive.id && version < previousNarrativeGeneratorVersion {
 			return nil
 		}
 	}
@@ -873,11 +887,14 @@ func buildConnectedCaseRecords(seed string, worldVersion int, caseID string, sel
 		amount := 45 + keyIndex(key, "payment-amount", 46)
 		reference := fmt.Sprintf("unregistered account %04d", keyIndex(key, "account-reference", 10000))
 		paidAt := crimeAt.AddDate(0, 0, -2).Add(-70 * time.Minute)
+		if caseVersion >= GeneratorVersion {
+			paidAt = crimeAt.AddDate(0, 0, -(21 + keyIndex(key, "extortion-payment-days", 25))).Add(-70 * time.Minute)
+		}
 		result = append(result,
 			records.Record{ID: caseRecordID(key, "payment-out", selected.victimID), NPCID: selected.victimID, Source: "bank", OccurredAt: paidAt, Operator: "Union Mercantile Settlement Office", Description: "An anonymous remittance was sent and cleared.", Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: "extortion_payment", RelatedNPCID: selected.killerID},
 			records.Record{ID: caseRecordID(key, "payment-in", selected.killerID), NPCID: selected.killerID, Source: "bank", OccurredAt: paidAt, Operator: "Union Mercantile Settlement Office", Description: "An anonymous remittance was received and cleared.", Reference: reference, Amount: amount, Direction: "incoming", CaseID: caseID, InternalRelation: "extortion_payment", RelatedNPCID: selected.victimID},
 		)
-		result = append(result, buildTransferDecoys(key, caseID, base, selected, crimeAt)...)
+		result = append(result, buildTransferDecoys(key, caseID, base, selected, crimeAt, caseVersion)...)
 	}
 	if selected.archetypeID == "jealousy" && selected.paramourID != "" {
 		paramourOrigin := regionName(base, npcByID(base.NPCs, selected.paramourID).RegionID)
@@ -885,6 +902,9 @@ func buildConnectedCaseRecords(seed string, worldVersion int, caseID string, sel
 			paramourOrigin = alternateDistrict(base, scene)
 		}
 		rendezvous := crimeAt.AddDate(0, 0, -3).Add(-42 * time.Minute)
+		if caseVersion >= GeneratorVersion {
+			rendezvous = crimeAt.AddDate(0, 0, -(21 + keyIndex(key, "jealousy-rendezvous-days", 28))).Add(-42 * time.Minute)
+		}
 		result = append(result,
 			caseGateRecord(key, caseID, "affair-victim", selected.victimID, selected.paramourID, rendezvous, victimOrigin, scene, "A passenger entry was recorded at the local relay."),
 			caseGateRecord(key, caseID, "affair-paramour", selected.paramourID, selected.victimID, rendezvous, paramourOrigin, scene, "A passenger entry was recorded at the local relay."),
@@ -903,7 +923,7 @@ func caseGateRecord(key, caseID, role, npcID, relatedID string, at time.Time, or
 	return records.Record{ID: caseRecordID(key, role, npcID), NPCID: npcID, Source: "gate", OccurredAt: at.UTC(), Operator: "Meridian Global · GATE Network", Description: description, Origin: origin, Destination: destination, CaseID: caseID, InternalRelation: role, RelatedNPCID: relatedID}
 }
 
-func buildTransferDecoys(key, caseID string, base world.World, selected candidate, crimeAt time.Time) []records.Record {
+func buildTransferDecoys(key, caseID string, base world.World, selected candidate, crimeAt time.Time, caseVersion int) []records.Record {
 	caseCityID := cityForLocation(base, selected.locationID)
 	people := make([]world.NPC, 0, len(base.NPCs))
 	for _, person := range base.NPCs {
@@ -925,7 +945,11 @@ func buildTransferDecoys(key, caseID string, base world.World, selected candidat
 		from, to := people[index], people[index+1]
 		amount := 20 + keyIndex(key, "decoy-amount/"+from.ID, 120)
 		reference := fmt.Sprintf("unregistered account %04d", keyIndex(key, "decoy-account/"+from.ID, 10000))
-		at := crimeAt.AddDate(0, 0, -4-index/2).Add(time.Duration(9*60+keyIndex(key, "decoy-time/"+from.ID, 8*60)) * time.Minute)
+		daysBefore := 4 + index/2
+		if caseVersion >= GeneratorVersion {
+			daysBefore = 16 + keyIndex(key, "decoy-days/"+from.ID, 30) + index/2
+		}
+		at := crimeAt.AddDate(0, 0, -daysBefore).Add(time.Duration(9*60+keyIndex(key, "decoy-time/"+from.ID, 8*60)) * time.Minute)
 		result = append(result,
 			records.Record{ID: caseRecordID(key, "decoy-out/"+from.ID, to.ID), NPCID: from.ID, Source: "bank", OccurredAt: at, Operator: "Union Mercantile Settlement Office", Description: "An anonymous remittance was sent and cleared.", Reference: reference, Amount: amount, Direction: "outgoing", CaseID: caseID, InternalRelation: "unrelated_transfer", RelatedNPCID: to.ID},
 			records.Record{ID: caseRecordID(key, "decoy-in/"+to.ID, from.ID), NPCID: to.ID, Source: "bank", OccurredAt: at, Operator: "Union Mercantile Settlement Office", Description: "An anonymous remittance was received and cleared.", Reference: reference, Amount: amount, Direction: "incoming", CaseID: caseID, InternalRelation: "unrelated_transfer", RelatedNPCID: from.ID},
@@ -1130,7 +1154,7 @@ func Validate(definition Definition, base world.World) error {
 }
 
 func supportedCaseGeneratorVersion(version int) bool {
-	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == previousGeneratorVersion || version == contextualGeneratorVersion || version == previousFinancialGeneratorVersion || version == previousSerialGeneratorVersion || version == GeneratorVersion
+	return version == legacyGeneratorVersion || version == connectedGeneratorVersion || version == previousGeneratorVersion || version == contextualGeneratorVersion || version == previousFinancialGeneratorVersion || version == previousSerialGeneratorVersion || version == previousNarrativeGeneratorVersion || version == GeneratorVersion
 }
 
 func availableArchetypes(base world.World) []archetypeGenerator {
@@ -1651,9 +1675,15 @@ func validateConnectedCaseRecords(definition Definition, base world.World) bool 
 		if victimPayment == nil || killerReceipt == nil || victimPayment.Amount != killerReceipt.Amount || victimPayment.Reference == "" || victimPayment.Reference != killerReceipt.Reference || !victimPayment.OccurredAt.Equal(killerReceipt.OccurredAt) {
 			return false
 		}
+		if definition.GeneratorVersion >= GeneratorVersion && !victimPayment.OccurredAt.Before(definition.CrimeAt.AddDate(0, 0, -14)) {
+			return false
+		}
 	}
 	if definition.ArchetypeID == "jealousy" {
 		if affairVictim == nil || affairParamour == nil || affairVictim.Source != "gate" || affairParamour.Source != "gate" || affairVictim.NPCID != definition.VictimID || affairParamour.NPCID != definition.ParamourID || affairVictim.Destination != expectedScene || affairParamour.Destination != expectedScene || !affairVictim.OccurredAt.Equal(affairParamour.OccurredAt) {
+			return false
+		}
+		if definition.GeneratorVersion >= GeneratorVersion && !affairVictim.OccurredAt.Before(definition.CrimeAt.AddDate(0, 0, -14)) {
 			return false
 		}
 	}
@@ -1661,6 +1691,9 @@ func validateConnectedCaseRecords(definition Definition, base world.World) bool 
 }
 
 func validateConnectedCaseEmails(definition Definition, base world.World) bool {
+	if definition.GeneratorVersion >= GeneratorVersion {
+		return validateQuietCaseEmails(definition, base)
+	}
 	remorse := false
 	serialThreat := false
 	workplaceClueCount := 0

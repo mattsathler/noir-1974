@@ -446,6 +446,15 @@ func (s *postgresStore) registerNewBlackwireIdentity(ctx context.Context, accoun
 	return profile, nil
 }
 
+func isBlankBlackwireNote(item map[string]any) bool {
+	source, _ := item["source"].(string)
+	if source != "note" {
+		return false
+	}
+	content, _ := item["content"].(string)
+	return strings.TrimSpace(content) == ""
+}
+
 func classifyBlackwireOffer(item map[string]any) (int64, string, string) {
 	title, _ := item["title"].(string)
 	content, _ := item["content"].(string)
@@ -567,6 +576,9 @@ func (s *postgresStore) blackwireOffers(ctx context.Context, accountID, serverID
 		if err := json.Unmarshal(raw, &item); err != nil {
 			continue
 		}
+		if isBlankBlackwireNote(item) {
+			continue
+		}
 		price, category, companyID := classifyBlackwireOffer(item)
 		offer := blackwireOffer{BoardID: boardID, BoardTitle: boardTitle, ItemID: itemID, PriceCents: price, Category: category, CompanyID: companyID}
 		offer.Source, _ = item["source"].(string)
@@ -637,6 +649,9 @@ func (s *postgresStore) sellBlackwireItem(ctx context.Context, accountID, server
 	var item map[string]any
 	if err := json.Unmarshal(raw, &item); err != nil {
 		return blackwireOffer{}, blackwireAccount{}, fmt.Errorf("decode discovered information: %w", err)
+	}
+	if isBlankBlackwireNote(item) {
+		return blackwireOffer{}, blackwireAccount{}, errBlackwireUnavailable
 	}
 	price, category, companyID := classifyBlackwireOffer(item)
 	marketDelta := blackwireMarketDelta(category)
