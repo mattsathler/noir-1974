@@ -39,6 +39,15 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
     state: "ONLINE",
     available: true,
   };
+  const blackwireSite = {
+    id: "blackwire",
+    label: "BLACKWIRE RELAY",
+    Icon: null,
+    state: "UNLISTED",
+    available: true,
+    siteAddress: "merid/blackwire.local",
+    description: "Dispatches from The Crow, relay notes and the unlisted software marketplace.",
+  };
   const emailSite = { ...emailProgram, label: "MERIDIAN EMAIL", available: true };
   const coreDirectorySites = [hospitalSite, policeSite, bankSite, enterpriseSite, emailSite];
   const directorySites = coreDirectorySites;
@@ -123,6 +132,12 @@ export default function LegacyCountryPortal({ countryName, location, cityId = ""
             <h2>Reading desk</h2>
             <p className="legacy-site__section-lead">Notes and opinions currently making their way across the network.</p>
             <div className="legacy-portal__reading-grid">
+              <article className="legacy-portal__reading-card">
+                <small>UNLISTED RELAY · BLACKWIRE</small>
+                <h3>Field notes from The Crow</h3>
+                <p>Hacking notes, practical reminders and examinations of the systems that shape life across the relay.</p>
+                <a href="#blackwire" onClick={(event) => { event.preventDefault(); openSite(blackwireSite); }}>Open The Crow's Desk »</a>
+              </article>
               {readingDesk.map((publication) => (
                 <article className="legacy-portal__reading-card" key={publication.id}>
                   <small>{publication.name} · {publication.category}</small>
@@ -152,6 +167,7 @@ function portalDescription(id) {
     "company-portal": "Search the national register of companies and visit their public listings.",
     "hospital-website": "Hospital information, departments, visiting hours and admissions guidance for the connected city.",
     "bank-website": "Branch information, savings services and public notices from Union Mercantile Bank.",
+    blackwire: "Dispatches from The Crow, relay notes and the unlisted software marketplace.",
     "meridian-enterprises": "Corporate information, Meridian OS services and the GATE network. Access logs are available inside the GATE section.",
   })[id] || "Public information and records available through the connected relay.";
 }

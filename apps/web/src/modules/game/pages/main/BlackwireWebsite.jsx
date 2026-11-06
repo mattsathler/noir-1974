@@ -13,6 +13,42 @@ export const BLACKWIRE_PORTRAITS = [
   { id: "portrait-06", name: "Unknown", visual: { hairId: "hair_mohawk_black", skinId: "skin_brown", eyesId: "eyes_amber", beardId: "", faceId: "", accessoryIds: [] } },
 ];
 
+const CROW_DISPATCHES = [
+  {
+    id: "footprints",
+    category: "FIELD NOTES · NETWORKS",
+    date: "29 OCTOBER 1974",
+    title: "Every door leaves a mark",
+    standfirst: "A route is not a disguise. It is a record someone else may keep.",
+    paragraphs: [
+      "Directories tell you where a service lives. They also remember who came asking. Learn what a system publishes before you touch it, and notice which requests leave a name, a time or a return address behind.",
+      "Change your route when the work calls for it. Never mistake a different exit for permission, and never assume a quiet connection is an invisible one.",
+    ],
+  },
+  {
+    id: "corroboration",
+    category: "PRACTICE · RECORDS",
+    date: "27 OCTOBER 1974",
+    title: "Read the margin before the headline",
+    standfirst: "One record can point. Two independent records can begin to tell a story.",
+    paragraphs: [
+      "Write down who made a record, when it was made and what the source could actually know. A company ledger, a witness and a newspaper do not carry the same weight, even when their dates match.",
+      "Keep the gaps visible. A blank line is a question, not an invitation to invent an answer.",
+    ],
+  },
+  {
+    id: "infrastructure",
+    category: "EXPOSÉ · MERIDIAN",
+    date: "24 OCTOBER 1974",
+    title: "The wire has an owner",
+    standfirst: "Meridian calls the relay a public service. Its switches still answer to private offices.",
+    paragraphs: [
+      "A network can connect a city and still decide which doors open easily. The same infrastructure carries public notices, company correspondence and the quiet logs that make movement legible to whoever holds the keys.",
+      "Ask who maintains the line, who pays for it and who can read its traffic. That is where the map becomes politics.",
+    ],
+  },
+];
+
 export default function BlackwireWebsite({ profile = null, onAccountChange = () => {} }) {
   const siteRef = useRef(null);
   const [market, setMarket] = useState({ offers: [] });
@@ -24,7 +60,7 @@ export default function BlackwireWebsite({ profile = null, onAccountChange = () 
   const [registering, setRegistering] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [section, setSection] = useState("market");
+  const [section, setSection] = useState("hub");
   const [selectedAppId, setSelectedAppId] = useState("");
   const [username, setUsername] = useState("");
   const [avatarId, setAvatarId] = useState("portrait-01");
@@ -39,7 +75,10 @@ export default function BlackwireWebsite({ profile = null, onAccountChange = () 
   const visibleBoardGroups = boardFilter === "all" ? boardGroups : boardGroups.filter((board) => board.id === boardFilter);
   const selectedApplication = market.applications?.find((app) => app.id === selectedAppId) || null;
   const selectedApplicationCommands = selectedApplication
-    ? [...(selectedApplication.commands || []), ...(selectedApplication.installed && !selectedApplication.preinstalled ? [`uninstall ${selectedApplication.id}.exe`] : [])]
+    ? [
+      ...(selectedApplication.commands || []),
+      ...(selectedApplication.id !== "blackwire" ? [`uninstall ${selectedApplication.id}.exe`] : []),
+    ]
     : [];
 
   useLayoutEffect(() => {
@@ -57,7 +96,7 @@ export default function BlackwireWebsite({ profile = null, onAccountChange = () 
       account: profile,
       applications: current.applications?.map((app) => ({
         ...app,
-        installed: app.preinstalled || profile.installedApplications?.includes(app.id),
+        installed: profile.installedApplications?.includes(app.id),
         fetched: profile.fetchedApplications?.includes(app.id),
       })) || current.applications,
     }));
@@ -124,7 +163,7 @@ export default function BlackwireWebsite({ profile = null, onAccountChange = () 
       setMarket((current) => ({ ...current, account: result.account }));
       onAccountChange(result.account || null);
       setMessage("PROFILE REGISTERED. THE RELAY IS YOURS TO USE.");
-      setSection("market");
+      setSection("hub");
     } catch (cause) {
       setError(cause.message || "THAT HANDLE IS UNAVAILABLE. CHOOSE ANOTHER.");
     } finally {
@@ -141,19 +180,12 @@ export default function BlackwireWebsite({ profile = null, onAccountChange = () 
       <span className="blackwire-site__connection"><i aria-hidden="true" /> PRIVATE RELAY</span>
     </header>
     <nav className="blackwire-site__nav" aria-label="Blackwire sections">
-      <button type="button" aria-current={section === "market" ? "page" : undefined} onClick={() => { setSection("market"); setSelectedAppId(""); }}>MARKET</button><button type="button" aria-current={section === "archive" ? "page" : undefined} onClick={() => { setSection("archive"); setSelectedAppId(""); }}>ARCHIVE · RESTRICTED</button><button type="button" aria-current={section === "downloads" ? "page" : undefined} onClick={() => { setSection("downloads"); setSelectedAppId(""); }}>SOFTWARE · {market.applications?.length || 0} LISTED</button>
+      <button type="button" aria-current={section === "hub" ? "page" : undefined} onClick={() => { setSection("hub"); setSelectedAppId(""); }}>THE CROW'S DESK</button><button type="button" aria-current={section === "market" ? "page" : undefined} onClick={() => { setSection("market"); setSelectedAppId(""); }}>INFORMATION EXCHANGE</button><button type="button" aria-current={section === "downloads" ? "page" : undefined} onClick={() => { setSection("downloads"); setSelectedAppId(""); }}>SOFTWARE MARKETPLACE</button><button type="button" aria-current={section === "archive" ? "page" : undefined} onClick={() => { setSection("archive"); setSelectedAppId(""); }}>RESTRICTED ARCHIVE</button>
     </nav>
-    {market.account && <section className="blackwire-site__account" aria-label="Blackwire hacker account">
-      {market.account.profileComplete && <><figure className="blackwire-site__profile-portrait"><ModularFace visual={selectedPortrait.visual} name={selectedPortrait.name} /></figure><div><span className="blackwire-site__eyebrow">BLACKWIRE HANDLE</span><strong>{market.account.handle}</strong></div></>}
-      <div><span className="blackwire-site__eyebrow">BLACKWIRE PROGRESSION</span><strong>LEVEL {market.account.level} · {market.account.reputation}{market.account.nextLevelReputation ? ` / ${market.account.nextLevelReputation} REP` : " REP · MAX"}</strong></div>
-      <div><span className="blackwire-site__eyebrow">CRYPTO BALANCE</span><strong>{(market.account.cryptoCents / 100).toFixed(2)} CRYPTO</strong></div>
-      <div><span className="blackwire-site__eyebrow">AVAILABLE SOFTWARE</span><strong>{market.account.unlockedApplications.map((application) => `${application.toUpperCase()}.EXE`).join(" · ")}</strong></div>
+    {market.account && <section className="blackwire-site__account" aria-label="Blackwire account">
+      <figure className="blackwire-site__profile-portrait"><ModularFace visual={selectedPortrait.visual} name={selectedPortrait.name} /></figure>
+      <div><span className="blackwire-site__eyebrow">RELAY IDENTITY</span><strong>{market.account.profileComplete ? market.account.handle : "PROFILE NOT REGISTERED"}</strong><span className="blackwire-site__account-note">{market.account.profileComplete ? "REGISTERED MEMBER · PRIVATE SESSION" : "CHOOSE A HANDLE TO JOIN THE RELAY"}</span></div>
     </section>}
-    <section className="blackwire-site__welcome">
-      <p className="blackwire-site__eyebrow">A MESSAGE FROM THE CROW</p>
-      <h2>Information has a price.</h2>
-      <p>Blackwire is a private exchange for people who know how to find what others would rather keep hidden.</p>
-    </section>
     {!loading && market.account && !market.account.profileComplete ? <section className="blackwire-site__profile-form" aria-labelledby="blackwire-profile-title">
       <p className="blackwire-site__eyebrow">RELAY REGISTRATION · NO PASSWORD REQUIRED</p>
       <h2 id="blackwire-profile-title">Choose your handle.</h2>
@@ -166,6 +198,20 @@ export default function BlackwireWebsite({ profile = null, onAccountChange = () 
         <button className="blackwire-site__link-action" type="submit" disabled={profileBusy}>{profileBusy ? "REGISTERING…" : "REGISTER PROFILE ↵"}</button>
       </form>
     </section> : null}
+    {section === "hub" && <section className="blackwire-site__hub" aria-labelledby="blackwire-hub-title">
+      <header className="blackwire-site__hub-heading"><div><p className="blackwire-site__eyebrow">NOTES FROM AN UNLISTED DESK</p><h2 id="blackwire-hub-title">The Crow's desk</h2></div><span>READ CLOSELY · THINK FOR YOURSELF</span></header>
+      <article className="blackwire-site__dispatch blackwire-site__dispatch--featured">
+        <p className="blackwire-site__eyebrow">A MESSAGE FROM THE CROW · {CROW_DISPATCHES[0].date}</p>
+        <h3>Information has a price. Attention has a cost.</h3>
+        <p>Blackwire is a relay for field notes, inconvenient records and tools that travel without a proper letterhead. Keep your questions sharper than your certainty.</p>
+      </article>
+      <div className="blackwire-site__dispatches">{CROW_DISPATCHES.map((dispatch) => <article className="blackwire-site__dispatch" key={dispatch.id}>
+        <p className="blackwire-site__eyebrow">{dispatch.category} · {dispatch.date}</p>
+        <h3>{dispatch.title}</h3>
+        <p className="blackwire-site__dispatch-standfirst">{dispatch.standfirst}</p>
+        {dispatch.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+      </article>)}</div>
+    </section>}
     {market.account?.profileComplete && section === "market" && <section className="blackwire-site__market" aria-labelledby="blackwire-market-title">
       <header><div><p className="blackwire-site__eyebrow">BLACKWIRE EXCHANGE</p><h2 id="blackwire-market-title">INFORMATION MARKET</h2></div><span>PRIVATE SETTLEMENT · PERSONAL MAIL</span></header>
       <p className="blackwire-site__market-copy">Sell information pinned to your investigation boards. Every sale is final: the note is removed from your boards and can no longer support a case.</p>
@@ -195,26 +241,25 @@ export default function BlackwireWebsite({ profile = null, onAccountChange = () 
     </section>
     }
     {market.account?.profileComplete && section === "downloads" && <section className="blackwire-site__downloads" aria-labelledby="blackwire-downloads-title">
-      <header><div><p className="blackwire-site__eyebrow">BLACKWIRE SOFTWARE RELAY · UNLISTED CATALOG</p><h2 id="blackwire-downloads-title">{selectedApplication ? selectedApplication.executable : "Illegal software marketplace"}</h2></div><span>{selectedApplication ? selectedApplication.version : `${market.applications?.length || 0} LISTINGS`}</span></header>
+      <header><div><p className="blackwire-site__eyebrow">BLACKWIRE SOFTWARE RELAY · UNLISTED CATALOG</p><h2 id="blackwire-downloads-title">{selectedApplication ? selectedApplication.executable : "Software marketplace"}</h2></div><span>{selectedApplication ? selectedApplication.version : `${market.applications?.length || 0} LISTINGS`}</span></header>
       {!selectedApplication ? <>
-        <p>Browse tools circulating through the relay. Open a listing for its creator, release details and Terminal instructions. Packages are fetched and installed from Terminal; unsigned software requires MERID_OS protection to be disabled.</p>
+        <p>Browse tools circulating through the relay. Installed applications stay listed here, with their current status and Terminal commands. Packages are fetched and installed from Terminal; unsigned software requires MERID_OS protection to be disabled.</p>
         <div className="blackwire-site__catalog">{market.applications?.map((app) => <article className="blackwire-site__catalog-card" key={app.id}>
           <div className="blackwire-site__catalog-mark" aria-hidden="true">{app.executable.split(".")[0].slice(0, 2)}</div>
-          <div className="blackwire-site__catalog-main"><div className="blackwire-site__catalog-heading"><h3><button className="blackwire-site__app-name-link" type="button" onClick={() => setSelectedAppId(app.id)} aria-label={`Open ${app.executable} details`}>{app.executable}</button></h3><span>{app.preinstalled ? "ON SYSTEM" : app.installed ? "INSTALLED" : app.fetched ? "PACKAGE READY" : app.available ? "AVAILABLE" : "UNAVAILABLE"}</span></div>
+          <div className="blackwire-site__catalog-main"><div className="blackwire-site__catalog-heading"><h3><button className="blackwire-site__app-name-link" type="button" onClick={() => setSelectedAppId(app.id)} aria-label={`Open ${app.executable} details`}>{app.executable}</button></h3><span>{app.installed ? "INSTALLED · LISTED" : app.fetched ? "PACKAGE READY" : app.available ? "AVAILABLE" : "UNAVAILABLE"}</span></div>
             <p>{app.summary}</p><small>v{app.version} · {app.category} · {app.creator} · {app.origin}</small>
           </div>
         </article>)}</div>
       </> : <div className="blackwire-site__app-page">
         <button className="blackwire-site__back-link" type="button" onClick={() => setSelectedAppId("")}>← ALL APPLICATIONS</button>
-        <div className="blackwire-site__app-heading"><div><p className="blackwire-site__eyebrow">{selectedApplication.preinstalled ? "INCLUDED WITH THE COMPUTER" : "BLACKWIRE PACKAGE"} · {selectedApplication.category}</p><h3>{selectedApplication.executable}</h3><p>{selectedApplication.summary}</p></div><div className="blackwire-site__catalog-mark" aria-hidden="true">{selectedApplication.executable.split(".")[0].slice(0, 2)}</div></div>
+        <div className="blackwire-site__app-heading"><div><p className="blackwire-site__eyebrow">BLACKWIRE PACKAGE · {selectedApplication.category}</p><h3>{selectedApplication.executable}</h3><p>{selectedApplication.summary}</p></div><div className="blackwire-site__catalog-mark" aria-hidden="true">{selectedApplication.executable.split(".")[0].slice(0, 2)}</div></div>
         <p className="blackwire-site__app-description">{selectedApplication.description}</p>
-        <dl className="blackwire-site__app-facts"><div><dt>VERSION</dt><dd>{selectedApplication.version}</dd></div><div><dt>CREATOR</dt><dd>{selectedApplication.creator}</dd></div><div><dt>CLAIMED ORIGIN</dt><dd>{selectedApplication.origin}</dd></div><div><dt>STATUS</dt><dd>{selectedApplication.preinstalled ? "INCLUDED WITH SYSTEM" : selectedApplication.installed ? "INSTALLED FOR THIS USER" : selectedApplication.fetched ? "PACKAGE FETCHED" : selectedApplication.available ? "AVAILABLE ON RELAY" : "UNAVAILABLE"}</dd></div><div><dt>TYPE</dt><dd>{selectedApplication.preinstalled ? "SYSTEM SOFTWARE" : "OPTIONAL SOFTWARE"}</dd></div></dl>
+        <dl className="blackwire-site__app-facts"><div><dt>VERSION</dt><dd>{selectedApplication.version}</dd></div><div><dt>CREATOR</dt><dd>{selectedApplication.creator}</dd></div><div><dt>CLAIMED ORIGIN</dt><dd>{selectedApplication.origin}</dd></div><div><dt>STATUS</dt><dd>{selectedApplication.installed ? "INSTALLED FOR THIS USER" : selectedApplication.fetched ? "PACKAGE READY" : selectedApplication.available ? "AVAILABLE ON RELAY" : "UNAVAILABLE"}</dd></div><div><dt>TYPE</dt><dd>OPTIONAL SOFTWARE</dd></div></dl>
         {selectedApplication.packageUrl && <p className="blackwire-site__package-address">PACKAGE ADDRESS · <code>{selectedApplication.packageUrl}</code></p>}
-        <section className="blackwire-site__app-commands" aria-labelledby="blackwire-app-commands-title"><p className="blackwire-site__eyebrow">TERMINAL · COMMANDS</p><h4 id="blackwire-app-commands-title">{selectedApplication.preinstalled ? "Launch instructions" : selectedApplication.installed ? "Manage this application" : "Installation instructions"}</h4>
+        <section className="blackwire-site__app-commands" aria-labelledby="blackwire-app-commands-title"><p className="blackwire-site__eyebrow">TERMINAL · COMMANDS</p><h4 id="blackwire-app-commands-title">Available commands</h4>
           <pre>{selectedApplicationCommands.join("\n")}</pre>
-          {!selectedApplication.preinstalled && <p>Follow the commands in order: fetch the package, install it, then run the application. Use UNINSTALL to remove it later.</p>}
-          {!selectedApplication.preinstalled && !selectedApplication.installed && <p>First disable MERID_OS protection. It will turn itself back on after logout or reboot.</p>}
-          {selectedApplication.installed && <p className="blackwire-site__installed-note">Installed for this user. Use <code>run {selectedApplication.id}.exe</code> in Terminal. Remove it with <code>uninstall {selectedApplication.id}.exe</code>.</p>}
+          <p>Use FETCH, INSTALL and RUN in order when setting up an application. Disable MERID_OS protection for unsigned packages. This listing and its commands remain available after a download or installation.</p>
+          {selectedApplication.id === "blackwire" && <p className="blackwire-site__installed-note">This required relay client is included with your account and cannot be removed.</p>}
         </section>
       </div>}
     </section>}

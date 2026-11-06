@@ -149,8 +149,8 @@ func (h *Handler) uninstallBlackwireApp(w http.ResponseWriter, r *http.Request) 
 	switch {
 	case errors.Is(err, errBlackwirePackageUnavailable):
 		h.writeAPIError(w, r, http.StatusNotFound, "BLACKWIRE_PACKAGE_UNAVAILABLE", "This application is not available for removal.", err)
-	case errors.Is(err, errBlackwireAppPreinstalled):
-		h.writeAPIError(w, r, http.StatusConflict, "BLACKWIRE_APP_PREINSTALLED", "Applications included with the computer cannot be removed.", err)
+	case errors.Is(err, errBlackwireAppProtected):
+		h.writeAPIError(w, r, http.StatusConflict, "BLACKWIRE_APP_PROTECTED", "The Blackwire relay client cannot be removed.", err)
 	case errors.Is(err, errBlackwireAppNotInstalled):
 		h.writeAPIError(w, r, http.StatusConflict, "BLACKWIRE_APP_NOT_INSTALLED", "This application is not installed.", err)
 	case errors.Is(err, errBlackwireProfileRequired):

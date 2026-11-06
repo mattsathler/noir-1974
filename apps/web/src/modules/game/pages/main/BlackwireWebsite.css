@@ -13,6 +13,8 @@
   letter-spacing: .025em;
   text-align: left;
 }
+.computer-window:has(.blackwire-site) .computer-window__body { display: flex; flex-direction: column; align-items: stretch; background: #171a18; }
+.computer-window:has(.blackwire-site) .blackwire-site { min-height: 100%; flex: 1 0 auto; }
 .blackwire-site__masthead { display: flex; align-items: center; gap: 13px; padding: 20px clamp(18px, 4vw, 40px); border-bottom: 1px solid #41473f; background: #202421; }
 .blackwire-site__mark { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border: 1px solid #6c786a; color: #d3c58d; font-size: 13px; font-weight: 700; letter-spacing: .08em; }
 .blackwire-site__identity { min-width: 0; }
@@ -24,9 +26,10 @@
 .blackwire-site__nav button { padding: 0; color: inherit; background: transparent; border: 0; font: inherit; letter-spacing: inherit; cursor: pointer; }
 .blackwire-site__nav button[aria-current="page"] { color: #d5c68d; }
 .blackwire-site__nav button:hover,.blackwire-site__nav button:focus-visible { color: #eee3b4; text-decoration: underline; outline: 0; }
-.blackwire-site__account { display: grid; grid-template-columns: 42px repeat(4, minmax(0, 1fr)); align-items: center; gap: 14px; margin: 16px clamp(18px, 4vw, 40px) 0; padding: 12px 16px; border: 1px solid #42483d; background: #1d211e; }
+.blackwire-site__account { display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: center; gap: 12px; margin: 16px clamp(18px, 4vw, 40px) 0; padding: 10px 14px; border: 1px solid #42483d; background: #1d211e; }
 .blackwire-site__account > div { display: grid; gap: 3px; min-width: 0; }
 .blackwire-site__account strong { overflow-wrap: anywhere; color: #d5c68d; font-size: 12px; font-weight: 500; }
+.blackwire-site__account-note { color: #818b7d; font-size: 8px; letter-spacing: .08em; }
 .blackwire-site__profile-portrait { display: grid; width: 40px; height: 44px; margin: 0; place-items: center; overflow: hidden; border: 1px solid #58604e; background: #292d28; }
 .blackwire-site__profile-portrait .modular-face { width: 36px; height: 40px; }
 .blackwire-site__profile-portrait .modular-face__layer { image-rendering: pixelated; }
@@ -92,9 +95,19 @@
 .blackwire-site__download-card code { color: #d5c68d; overflow-wrap: anywhere; }
 .blackwire-site__package-address { font-size: 9px !important; }
 .blackwire-site__installed-note { margin-bottom: 0; color: #9db49a !important; }
-.blackwire-site__welcome { max-width: 750px; padding: clamp(26px, 6vh, 55px) clamp(18px, 4vw, 40px) 28px; }
-.blackwire-site__welcome h2 { margin: 0 0 9px; color: #e1e0d4; font-size: clamp(19px, 3vw, 27px); font-weight: 500; letter-spacing: .03em; }
-.blackwire-site__welcome > p:last-child { max-width: 580px; margin: 0; color: #afb4a8; font-size: 12px; line-height: 1.8; }
+.blackwire-site__hub { display: grid; gap: 12px; margin: 0 clamp(18px, 4vw, 40px) 20px; }
+.blackwire-site__hub-heading { display: flex; align-items: end; justify-content: space-between; gap: 14px; padding: 25px 0 12px; border-bottom: 2px solid #6c786a; }
+.blackwire-site__hub-heading .blackwire-site__eyebrow { margin-bottom: 4px; }
+.blackwire-site__hub-heading h2 { margin: 0; color: #e1e0d4; font-size: clamp(20px, 3vw, 28px); font-weight: 500; letter-spacing: .05em; }
+.blackwire-site__hub-heading > span { color: #899487; font-size: 8px; letter-spacing: .08em; }
+.blackwire-site__dispatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
+.blackwire-site__dispatch { min-width: 0; padding: 15px; border: 1px solid #394139; background: #1a1e1b; }
+.blackwire-site__dispatch h3 { margin: 5px 0 9px; color: #dedfd4; font-size: 15px; font-weight: 500; line-height: 1.35; }
+.blackwire-site__dispatch > p:not(.blackwire-site__eyebrow) { margin: 8px 0 0; color: #a9aea3; font-size: 10px; line-height: 1.7; }
+.blackwire-site__dispatch .blackwire-site__dispatch-standfirst { color: #d5c68d; font-size: 11px; }
+.blackwire-site__dispatch--featured { padding: 18px 20px; border-left: 3px solid #a99b60; background: #202421; }
+.blackwire-site__dispatch--featured h3 { max-width: 640px; font-size: clamp(17px, 2.8vw, 23px); }
+.blackwire-site__dispatch--featured > p:last-child { max-width: 720px; font-size: 11px; }
 .blackwire-site__market { margin: 0 clamp(18px, 4vw, 40px); padding: 18px 20px 22px; border: 1px solid #444b40; background: #1d211e; }
 .blackwire-site__market > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding-bottom: 13px; border-bottom: 1px solid #393f37; }
 .blackwire-site__market h2 { margin: 0; color: #d7d8cd; font-size: 15px; font-weight: 500; letter-spacing: .09em; }
@@ -144,5 +157,5 @@
 .deadletter-app__entry blockquote { margin: 0; color: #34483e; }
 .deadletter-app__entry small { display: block; margin-top: 7px; color: #737a6e; font-size: 8px; }
 .deadletter-app > footer { margin-top: 14px; padding-top: 8px; color: #657263; border-top: 1px solid #bdc6b6; font-size: 8px; letter-spacing: .08em; }
-@media (max-width: 620px) { .blackwire-site__account { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-inline: 14px; } }
-@media (max-width: 520px) { .blackwire-site__masthead { padding: 14px; } .blackwire-site__nav { gap: 12px; padding-inline: 14px; font-size: 8px; } .blackwire-site__welcome { padding-inline: 14px; } .blackwire-site__market { margin-inline: 14px; padding: 14px; } .blackwire-site__filter { align-items: stretch; flex-direction: column; gap: 6px; } .blackwire-site__catalog-card { flex-wrap: wrap; } .blackwire-site__app-heading .blackwire-site__catalog-mark { width: 44px; height: 44px; } .blackwire-site__app-facts > div { border-bottom: 1px solid #353c34; } .blackwire-site__footer { flex-direction: column; padding-inline: 14px; } }
+@media (max-width: 620px) { .blackwire-site__account { margin-inline: 14px; } }
+@media (max-width: 520px) { .blackwire-site__masthead { padding: 14px; } .blackwire-site__nav { flex-wrap: wrap; gap: 12px; padding: 9px 14px; font-size: 8px; } .blackwire-site__hub { margin-inline: 14px; } .blackwire-site__hub-heading { align-items: flex-start; flex-direction: column; gap: 5px; } .blackwire-site__market { margin-inline: 14px; padding: 14px; } .blackwire-site__filter { align-items: stretch; flex-direction: column; gap: 6px; } .blackwire-site__catalog-card { flex-wrap: wrap; } .blackwire-site__app-heading .blackwire-site__catalog-mark { width: 44px; height: 44px; } .blackwire-site__app-facts > div { border-bottom: 1px solid #353c34; } .blackwire-site__footer { flex-direction: column; padding-inline: 14px; } }

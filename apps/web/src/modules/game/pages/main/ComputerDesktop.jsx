@@ -78,7 +78,7 @@ const PROXY_PROGRAM = { id: "proxy", label: "ROGUE DNS", Icon: Wifi, state: "UNL
 const GHOSTKEY_PROGRAM = { id: "ghostkey", label: "GHOSTKEY.EXE", Icon: Bug, state: "READY", available: true };
 const EMAIL_BREAKER_PROGRAM = { id: "email-breaker", label: "EMAIL_BREAKER.EXE", Icon: Mail, state: "UNSIGNED", available: true };
 const BANKRUPT_PROGRAM = { id: "bankrupt", label: "BANKRUPT.EXE", Icon: Dollar, state: "UNSIGNED", available: true };
-const BLACKWIRE_PROGRAM = { id: "blackwire", label: "BLACKWIRE · INFORMATION MARKET", Icon: Wifi, state: "ONLINE", available: true, siteAddress: "merid/blackwire.local/market" };
+const BLACKWIRE_PROGRAM = { id: "blackwire", label: "BLACKWIRE · THE CROW'S DESK", Icon: Wifi, state: "ONLINE", available: true, siteAddress: "merid/blackwire.local" };
 const DEADLETTER_PROGRAM = { id: "deadletter", label: "DEADLETTER.EXE", Icon: Note, state: "OFFLINE ARCHIVE", available: true };
 const PERSON_SEARCH_PROGRAM = { id: "person-search", label: "PERSON SEARCH", Icon: User, available: true };
 const PATIENT_SEARCH_PROGRAM = { id: "patient-search", label: "PATIENT_SEARCH_APP.EXE", Icon: Cross, state: "PRIVILEGED", available: true };
@@ -91,7 +91,7 @@ function localServiceLocationId(cityId, service) {
   const cityKey = cityId === "fr/lyon" ? "lyon" : cityId;
   return `service:${cityKey}/${service}`;
 }
-const DESKTOP_APP_IDS = ["newspaper", "settings", "account-settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "deadletter", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "minesweeper", "mail-compose"];
+const DESKTOP_APP_IDS = ["newspaper", "settings", "account-settings", "character-appearance", "proxy", "terminal", "ghostkey", "email-breaker", "bankrupt", "blackwire", "deadletter", "patient-search", "gate-records", "employee-directory", "warrant-request", "stock-exchange", "minesweeper", "mail-compose"];
 const PERSONAL_START_MENU_PROGRAMS = [
   WEB_BROWSER_PROGRAM,
   PERSONAL_PROGRAMS.find((program) => program.id === "newspaper"),
@@ -794,7 +794,6 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 {Number.isFinite(playerProgression?.creditsCents)
                   ? <strong className="desktop-status-widget__value">CR {(playerProgression.creditsCents / 100).toFixed(2)}</strong>
                   : <span className="desktop-status-widget__pending" role="status">BALANCE UNAVAILABLE</span>}
-                {blackwireProfile && <small className="desktop-status-widget__crypto"><span>CRYPTO BALANCE</span><strong>{(blackwireProfile.cryptoCents / 100).toFixed(2)} CRYPTO</strong></small>}
               </section>
               <section className="desktop-status-widget" aria-label="Rogue DNS route and local time">
                 <span className="desktop-status-widget__label">ROGUE DNS · ACTIVE EXIT</span>
@@ -848,7 +847,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                 }}
               >
                 <header className="computer-window__titlebar" onPointerDown={startWindowDrag} onPointerMove={moveWindow} onPointerUp={endWindowDrag} onPointerCancel={endWindowDrag}>
-                  <span>{persistent && !["web-browser", ...DESKTOP_APP_IDS].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "WEB BROWSER" : program.id === "settings" ? "MERID_OS SETTINGS" : program.id === "account-settings" ? "MERID_OS ACCOUNT" : program.id === "proxy" ? "ROGUE DNS" : companySiteName}</span>
+                  <span>{persistent && !["web-browser", ...DESKTOP_APP_IDS].includes(program.id) && <button type="button" className="computer-browser-back" aria-label="Go back" title="Go back" onPointerDown={(event) => event.stopPropagation()} onClick={() => goBackInBrowser(id)}>←</button>}<span className="computer-status-light" /> {program.id === "web-browser" ? "WEB BROWSER" : program.id === "settings" ? "MERID_OS SETTINGS" : program.id === "account-settings" ? "MERID_OS ACCOUNT" : program.id === "proxy" ? "ROGUE DNS" : program.id === "blackwire" ? "BLACKWIRE RELAY" : companySiteName}</span>
                   <span className="computer-window__titlebar-actions">
                     <button type="button" className="computer-window__minimize" aria-label={`Minimize ${companySiteName}`} title={`Minimize ${companySiteName}`} onClick={() => minimizeWindow(id)}>−</button>
                     <button type="button" className="computer-window__close" aria-label={`Close ${companySiteName}`} onClick={() => closeWindow(id)}>×</button>
@@ -866,7 +865,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                     : program.id === "terminal"
                       ? <TerminalApp
                         protectionEnabled={protectionEnabled}
-                        installedApplications={blackwireProfile?.installedApplications || ["ghostkey", "email-breaker", "bankrupt"]}
+                        installedApplications={blackwireProfile?.installedApplications || []}
                         fetchedApplications={blackwireProfile?.fetchedApplications || []}
                         onProtectionChange={setProtectionEnabled}
                         onFetchPackage={async (appId) => {
@@ -940,7 +939,7 @@ export default function ComputerDesktop({ location, display, serverTime, timeZon
                       : program.id === "hospital-website"
                         ? <HospitalWebsite service={program.service} onConnect={onOpenService} />
                       : program.id === "bank-website"
-                        ? <BankWebsite countryId={cityId?.split("/")[0] || ""} onOpenStockExchange={() => launchProgram(PERSONAL_PROGRAMS.find((item) => item.id === "stock-exchange"), id)} />
+                        ? <BankWebsite countryId={cityId?.split("/")[0] || ""} creditsCents={playerProgression?.creditsCents} cryptoCents={blackwireProfile?.cryptoCents} onOpenStockExchange={() => launchProgram(PERSONAL_PROGRAMS.find((item) => item.id === "stock-exchange"), id)} />
                       : program.id === "company-website"
                         ? <CompanyWebsite
                             site={program.website}

@@ -48,10 +48,13 @@ const COMMANDS = {
 };
 
 const BLACKWIRE_PACKAGES = {
+  "merid://blackwire/packages/ghostkey-4.pkg": { id: "ghostkey", executable: "GHOSTKEY.EXE" },
+  "merid://blackwire/packages/mailbreaker-2.pkg": { id: "email-breaker", executable: "MAILBREAKER.EXE" },
+  "merid://blackwire/packages/bankrupt-1.pkg": { id: "bankrupt", executable: "BANKRUPT.EXE" },
+  "merid://blackwire/packages/blackwire-1.pkg": { id: "blackwire", executable: "BLACKWIRE.EXE" },
   "merid://blackwire/packages/deadletter-1.pkg": { id: "deadletter", executable: "DEADLETTER.EXE" },
 };
-const BASE_APPLICATIONS = ["ghostkey", "email-breaker", "bankrupt", "blackwire"];
-const UNINSTALLABLE_APPLICATIONS = ["deadletter"];
+const UNINSTALLABLE_APPLICATIONS = Object.values(BLACKWIRE_PACKAGES).map((app) => app.id).filter((appId) => appId !== "blackwire");
 
 function decryptText(value) {
   return [...value].map((character) => {
@@ -62,12 +65,16 @@ function decryptText(value) {
   }).join("");
 }
 
-export default function TerminalApp({ onRun, protectionEnabled = true, onProtectionChange = () => {}, installedApplications = BASE_APPLICATIONS, fetchedApplications = [], onFetchPackage = fetchBlackwireApplication, onInstallPackage = installBlackwireApplication, onUninstallApp = uninstallBlackwireApplication }) {
+function normalizeApplicationName(value) {
+  return value.toLowerCase().replace(/\.exe$/i, "").replace(/[^a-z0-9]/g, "");
+}
+
+export default function TerminalApp({ onRun, protectionEnabled = true, onProtectionChange = () => {}, installedApplications = [], fetchedApplications = [], onFetchPackage = fetchBlackwireApplication, onInstallPackage = installBlackwireApplication, onUninstallApp = uninstallBlackwireApplication }) {
   const [command, setCommand] = useState("");
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [launchPending, setLaunchPending] = useState(false);
-  const [installedApps, setInstalledApps] = useState(() => [...new Set([...BASE_APPLICATIONS, ...installedApplications])]);
+  const [installedApps, setInstalledApps] = useState(() => [...new Set(installedApplications)]);
   const [fetchedApps, setFetchedApps] = useState(fetchedApplications);
   const launchTimer = useRef(null);
   const outputRef = useRef(null);
@@ -80,7 +87,7 @@ export default function TerminalApp({ onRun, protectionEnabled = true, onProtect
 
   useEffect(() => () => window.clearTimeout(launchTimer.current), []);
 
-  useEffect(() => setInstalledApps([...new Set([...BASE_APPLICATIONS, ...installedApplications])]), [installedApplications]);
+  useEffect(() => setInstalledApps([...new Set(installedApplications)]), [installedApplications]);
   useEffect(() => setFetchedApps(fetchedApplications), [fetchedApplications]);
 
   useEffect(() => {
@@ -102,7 +109,18 @@ export default function TerminalApp({ onRun, protectionEnabled = true, onProtect
     setHistoryIndex(-1);
 
     if (entered.toLowerCase() === "help") {
-      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                         Show this command list", "  DISABLE PROTECTION           Allow unsigned software this session", "  ENABLE PROTECTION            Restore MERID_OS protection", "  FETCH <PACKAGE LINK>         Fetch a listed Blackwire package", "  INSTALL <PACKAGE LINK>       Install a fetched package", "  UNINSTALL <APPLICATION.EXE>  Remove an optional application", "  RUN <APPLICATION.EXE>        Start installed software", "  RUN BLACKWIRE.EXE            Open Blackwire in Web Browser", ""]);
+      setOutput((previous) => [...previous, `> ${entered}`, "Available commands:", "  HELP                         Show this command list", "  LIST APPS                    List applications installed on this computer", "  DISABLE PROTECTION           Allow unsigned software this session", "  ENABLE PROTECTION            Restore MERID_OS protection", "  FETCH <PACKAGE LINK>         Fetch a listed Blackwire package", "  INSTALL <PACKAGE LINK>       Install a fetched package", "  UNINSTALL <APP NAME OR EXE>  Remove an optional application", "  RUN <APPLICATION.EXE>        Start installed software", "  RUN BLACKWIRE.EXE            Open Blackwire in Web Browser", ""]);
+      return;
+    }
+
+    if (/^list\s+apps$/i.test(entered)) {
+      const installedNames = [...new Set(installedApps)]
+        .map((appId) => {
+          const label = Object.values(COMMANDS).find((app) => app.id === appId)?.label || appId.toUpperCase();
+          return label.toUpperCase().endsWith(".EXE") ? label : `${label}.EXE`;
+        })
+        .sort((left, right) => left.localeCompare(right));
+      setOutput((previous) => [...previous, `> ${entered}`, "Installed applications:", ...(installedNames.length ? installedNames : ["No optional applications are installed."]), ""]);
       return;
     }
 
@@ -176,18 +194,15 @@ export default function TerminalApp({ onRun, protectionEnabled = true, onProtect
 
     const uninstallMatch = entered.match(/^uninstall\s+(.+)$/i);
     if (uninstallMatch) {
-      const requestedName = uninstallMatch[1].trim().toLowerCase().replace(/\.exe$/i, "");
-      const app = Object.values(COMMANDS).find((entry) => entry.id === requestedName);
+      const requestedName = normalizeApplicationName(uninstallMatch[1].trim());
+      const app = Object.values(COMMANDS).find((entry) => normalizeApplicationName(entry.id) === requestedName || normalizeApplicationName(entry.label) === requestedName);
       if (!app) {
         setOutput((previous) => [...previous, `> ${entered}`, "That application is not listed on this computer.", "Use UNINSTALL with an optional application's executable name.", ""]);
         return;
       }
-      if (BASE_APPLICATIONS.includes(app.id)) {
-        setOutput((previous) => [...previous, `> ${entered}`, `${app.label} is included with the computer and cannot be removed.`, ""]);
-        return;
-      }
       if (!UNINSTALLABLE_APPLICATIONS.includes(app.id)) {
-        setOutput((previous) => [...previous, `> ${entered}`, `${app.label} is not available for removal.`, ""]);
+        const reason = app.id === "blackwire" ? "BLACKWIRE.EXE is the required relay client and cannot be removed." : `${app.label} is not available for removal.`;
+        setOutput((previous) => [...previous, `> ${entered}`, reason, ""]);
         return;
       }
       if (!installedApps.includes(app.id)) {
@@ -231,7 +246,7 @@ export default function TerminalApp({ onRun, protectionEnabled = true, onProtect
     }
 
     if (!installedApps.includes(program.id)) {
-      setOutput((previous) => [...previous, `> ${entered}`, `${program.label} is not installed on this computer.`, "Check the Blackwire Downloads catalogue for an available package.", ""]);
+      setOutput((previous) => [...previous, `> ${entered}`, `${program.label} is not installed on this computer.`, "Check the Blackwire Software Marketplace for an available package.", ""]);
       return;
     }
 

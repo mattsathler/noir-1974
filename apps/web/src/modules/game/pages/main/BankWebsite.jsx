@@ -21,7 +21,7 @@ export function BankMasthead() {
   </header>;
 }
 
-export default function BankWebsite({ countryId = "", onOpenStockExchange = () => {} }) {
+export default function BankWebsite({ countryId = "", creditsCents, cryptoCents, onOpenStockExchange = () => {} }) {
   const [page, setPage] = useState("home");
   const [marketPage, setMarketPage] = useState(1);
   const [market, setMarket] = useState({ listings: [], page: 1, pageSize: 25, total: 0, countryName: "" });
@@ -51,6 +51,11 @@ export default function BankWebsite({ countryId = "", onOpenStockExchange = () =
         <div><p className="bank-website__eyebrow">UNION MERCANTILE BANK · {activePage.label}</p><h1>A sound account.<br />A steadier tomorrow.</h1><p>For generations, Union Mercantile has kept the savings, wages and commerce of the nation moving.</p><div className="bank-website__hero-actions"><button type="button" onClick={() => setPage("accounts")}>EXPLORE SAVINGS »</button><button type="button" className="is-secondary" onClick={() => setPage("branches")}>FIND A BRANCH »</button></div></div>
         <aside className="bank-website__hero-seal"><span>UNION</span><strong>1848</strong><small>SECURE · STEADY · NATIONAL</small></aside>
       </section>
+      {(Number.isFinite(creditsCents) || Number.isFinite(cryptoCents)) && <section className="bank-website__account-overview" aria-label="Personal account position">
+        <div><p className="bank-website__eyebrow">PRIVATE STATEMENT · ACCOUNT HOLDER</p><h2>Current account position</h2></div>
+        {Number.isFinite(creditsCents) && <article><span>AVAILABLE CREDITS</span><strong>CR {formatCredits(creditsCents)}</strong></article>}
+        {Number.isFinite(cryptoCents) && <article><span>DIGITAL CURRENCY · CRYPTO</span><strong>{formatCredits(cryptoCents)} CRYPTO</strong></article>}
+      </section>}
       <div className="bank-website__home-grid">
         <main className="bank-website__main">
           <section className="bank-website__section"><div className="bank-website__section-heading"><div><p className="bank-website__eyebrow">SERVICES FOR EVERY HOUSEHOLD</p><h2>Banking made dependable</h2></div><button type="button" onClick={() => setPage("accounts")}>ALL SERVICES »</button></div>

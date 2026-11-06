@@ -23,7 +23,7 @@ var errBlackwireProfileRequired = errors.New("a Blackwire profile is required")
 var errBlackwirePackageUnavailable = errors.New("Blackwire package is unavailable")
 var errBlackwirePackageNotFetched = errors.New("Blackwire package has not been fetched")
 var errBlackwireAvatarUnavailable = errors.New("Blackwire portrait is unavailable")
-var errBlackwireAppPreinstalled = errors.New("preinstalled Blackwire application cannot be removed")
+var errBlackwireAppProtected = errors.New("Blackwire relay client cannot be removed")
 var errBlackwireAppNotInstalled = errors.New("Blackwire application is not installed")
 
 type blackwireOffer struct {
@@ -70,7 +70,6 @@ type blackwireApplicationInfo struct {
 	Category     string   `json:"category"`
 	PackageURL   string   `json:"packageUrl,omitempty"`
 	Available    bool     `json:"available"`
-	Preinstalled bool     `json:"preinstalled"`
 	Installed    bool     `json:"installed"`
 	Fetched      bool     `json:"fetched"`
 	Commands     []string `json:"commands"`
@@ -105,6 +104,15 @@ func blackwireApplications() []string {
 	return []string{"ghostkey", "email-breaker", "bankrupt", "blackwire", "deadletter"}
 }
 
+func blackwireApplicationAvailable(appID string) bool {
+	for _, availableID := range blackwireApplications() {
+		if appID == availableID {
+			return true
+		}
+	}
+	return false
+}
+
 func blackwireApplicationCatalog(account blackwireAccount) []blackwireApplicationInfo {
 	installed := make(map[string]bool, len(account.InstalledApplications))
 	fetched := make(map[string]bool, len(account.FetchedApplications))
@@ -115,10 +123,10 @@ func blackwireApplicationCatalog(account blackwireAccount) []blackwireApplicatio
 		fetched[appID] = true
 	}
 	return []blackwireApplicationInfo{
-		{ID: "ghostkey", Executable: "GHOSTKEY.EXE", Summary: "Map network directories and exposed services.", Description: "A field utility for tracing public directories and finding compromised company services. Results depend on the route and protections in place.", Version: "4.7.2", Creator: "The Crow", Origin: "Unlisted relay · origin unverified", Category: "NETWORK RECONNAISSANCE", Available: true, Preinstalled: true, Installed: true, Commands: []string{"disable protection", "run ghostkey.exe"}},
-		{ID: "email-breaker", Executable: "MAILBREAKER.EXE", Summary: "Force access to a published staff mailbox.", Description: "Tests a published company mailbox against the relay's breach routines. The recipient's company email address is required.", Version: "2.3.0", Creator: "Bai He · 白鹤", Origin: "Guangzhou relay · China (unverified)", Category: "MAIL ACCESS", Available: true, Preinstalled: true, Installed: true, Commands: []string{"disable protection", "run mailbreaker.exe"}},
-		{ID: "bankrupt", Executable: "BANKRUPT.EXE", Summary: "Force access to a staff bank account ledger.", Description: "A targeted financial account breach utility. A staff member's published eight-digit account number is required.", Version: "1.6.1", Creator: "Moroz · Мороз", Origin: "Novosibirsk relay · Russia (unverified)", Category: "FINANCIAL ACCESS", Available: true, Preinstalled: true, Installed: true, Commands: []string{"disable protection", "run bankrupt.exe"}},
-		{ID: "blackwire", Executable: "BLACKWIRE.EXE", Summary: "Open the Blackwire relay in the web browser.", Description: "The trusted relay client for opening this catalogue and information exchange in the Meridian web browser.", Version: "1.0.0", Creator: "The Crow", Origin: "Rotating relay · origin concealed", Category: "RELAY CLIENT", Available: true, Preinstalled: true, Installed: true, Commands: []string{"run blackwire.exe"}},
+		{ID: "ghostkey", Executable: "GHOSTKEY.EXE", Summary: "Map network directories and exposed services.", Description: "A field utility for tracing public directories and finding compromised company services. Results depend on the route and protections in place.", Version: "4.7.2", Creator: "The Crow", Origin: "Unlisted relay · origin unverified", Category: "NETWORK RECONNAISSANCE", PackageURL: "merid://blackwire/packages/ghostkey-4.pkg", Available: true, Installed: installed["ghostkey"], Fetched: fetched["ghostkey"], Commands: []string{"disable protection", "fetch merid://blackwire/packages/ghostkey-4.pkg", "install merid://blackwire/packages/ghostkey-4.pkg", "run ghostkey.exe"}},
+		{ID: "email-breaker", Executable: "MAILBREAKER.EXE", Summary: "Force access to a published staff mailbox.", Description: "Tests a published company mailbox against the relay's breach routines. The recipient's company email address is required.", Version: "2.3.0", Creator: "Bai He · 白鹤", Origin: "Guangzhou relay · China (unverified)", Category: "MAIL ACCESS", PackageURL: "merid://blackwire/packages/mailbreaker-2.pkg", Available: true, Installed: installed["email-breaker"], Fetched: fetched["email-breaker"], Commands: []string{"disable protection", "fetch merid://blackwire/packages/mailbreaker-2.pkg", "install merid://blackwire/packages/mailbreaker-2.pkg", "run mailbreaker.exe"}},
+		{ID: "bankrupt", Executable: "BANKRUPT.EXE", Summary: "Force access to a staff bank account ledger.", Description: "A targeted financial account breach utility. A staff member's published eight-digit account number is required.", Version: "1.6.1", Creator: "Moroz · Мороз", Origin: "Novosibirsk relay · Russia (unverified)", Category: "FINANCIAL ACCESS", PackageURL: "merid://blackwire/packages/bankrupt-1.pkg", Available: true, Installed: installed["bankrupt"], Fetched: fetched["bankrupt"], Commands: []string{"disable protection", "fetch merid://blackwire/packages/bankrupt-1.pkg", "install merid://blackwire/packages/bankrupt-1.pkg", "run bankrupt.exe"}},
+		{ID: "blackwire", Executable: "BLACKWIRE.EXE", Summary: "Open The Crow's Desk and the Blackwire software relay.", Description: "The relay client for opening The Crow's field notes, information exchange and software marketplace in the Meridian web browser.", Version: "1.0.0", Creator: "The Crow", Origin: "Rotating relay · origin concealed", Category: "RELAY CLIENT", PackageURL: "merid://blackwire/packages/blackwire-1.pkg", Available: true, Installed: installed["blackwire"], Fetched: fetched["blackwire"], Commands: []string{"disable protection", "fetch merid://blackwire/packages/blackwire-1.pkg", "install merid://blackwire/packages/blackwire-1.pkg", "run blackwire.exe"}},
 		{ID: "deadletter", Executable: "DEADLETTER.EXE", Summary: "Read a small offline archive left on the Blackwire relay.", Description: "A quiet, read-only archive reader. It stores a few fragments locally and does not connect to external services.", Version: "1.0.0", Creator: "Paper Kite · 纸鸢", Origin: "Shanghai relay · China (unverified)", Category: "OFFLINE READER", PackageURL: "merid://blackwire/packages/deadletter-1.pkg", Available: true, Installed: installed["deadletter"], Fetched: fetched["deadletter"], Commands: []string{"disable protection", "fetch merid://blackwire/packages/deadletter-1.pkg", "install merid://blackwire/packages/deadletter-1.pkg", "run deadletter.exe"}},
 	}
 }
@@ -161,6 +169,11 @@ func ensureBlackwireAccount(ctx context.Context, db querier, accountID, serverID
 	_, err = db.Exec(ctx, `INSERT INTO player_blackwire_accounts(server_id,account_id,handle,avatar_id,profile_complete)
 		VALUES($1::uuid,$2::uuid,'BW-'||upper(substr(md5($1::text||':'||$2::text),1,8)),'portrait-01',false)
 		ON CONFLICT(server_id,account_id) DO NOTHING`, serverID, accountID)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(ctx, `INSERT INTO player_blackwire_installed_apps(server_id,account_id,app_id)
+		VALUES($1::uuid,$2::uuid,'blackwire') ON CONFLICT DO NOTHING`, serverID, accountID)
 	return err
 }
 
@@ -183,7 +196,6 @@ func readBlackwireAccount(ctx context.Context, db querier, accountID, serverID s
 		}
 	}
 	result.UnlockedApplications = blackwireApplications()
-	result.InstalledApplications = append([]string{"ghostkey", "email-breaker", "bankrupt", "blackwire"}, result.InstalledApplications...)
 	return result, nil
 }
 
@@ -269,7 +281,7 @@ func (s *postgresStore) blackwireAppAccountState(ctx context.Context, accountID,
 }
 
 func (s *postgresStore) fetchBlackwireApp(ctx context.Context, accountID, serverID, appID string) (blackwireAccount, error) {
-	if appID != "deadletter" {
+	if !blackwireApplicationAvailable(appID) {
 		return blackwireAccount{}, errBlackwirePackageUnavailable
 	}
 	complete, banned, err := s.blackwireAppAccountState(ctx, accountID, serverID)
@@ -292,7 +304,7 @@ func (s *postgresStore) fetchBlackwireApp(ctx context.Context, accountID, server
 }
 
 func (s *postgresStore) installBlackwireApp(ctx context.Context, accountID, serverID, appID string) (blackwireAccount, error) {
-	if appID != "deadletter" {
+	if !blackwireApplicationAvailable(appID) {
 		return blackwireAccount{}, errBlackwirePackageUnavailable
 	}
 	transactional, ok := s.db.(interface {
@@ -345,11 +357,11 @@ func (s *postgresStore) installBlackwireApp(ctx context.Context, accountID, serv
 }
 
 func (s *postgresStore) uninstallBlackwireApp(ctx context.Context, accountID, serverID, appID string) (blackwireAccount, error) {
-	if appID != "deadletter" {
-		if appID == "ghostkey" || appID == "email-breaker" || appID == "bankrupt" || appID == "blackwire" {
-			return blackwireAccount{}, errBlackwireAppPreinstalled
-		}
+	if !blackwireApplicationAvailable(appID) {
 		return blackwireAccount{}, errBlackwirePackageUnavailable
+	}
+	if appID == "blackwire" {
+		return blackwireAccount{}, errBlackwireAppProtected
 	}
 	transactional, ok := s.db.(interface {
 		Begin(context.Context) (pgx.Tx, error)

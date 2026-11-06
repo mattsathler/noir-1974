@@ -2332,6 +2332,12 @@
 .bank-website__ticker .is-down { color: #e1957c; }
 .bank-website__hero { display: grid; min-height: 12rem; grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.32fr); align-items: center; gap: 1rem; padding: clamp(1rem, 3vw, 2rem); background: radial-gradient(ellipse at 82% 50%, #ddcf9f 0, #e9e3ce 24%, transparent 25%), linear-gradient(100deg, #f2eedf, #e1e6d8); border-bottom: 1px solid #c9c4b2; }
 .bank-website__hero h1,.bank-website__subpage h1 { margin: 0.25rem 0 0.45rem; color: #284b38; font-size: clamp(1.3rem, 3vw, 2.2rem); font-weight: 500; line-height: 1.08; }
+.bank-website__account-overview { display: grid; grid-template-columns: minmax(0, 1fr) repeat(2, minmax(9rem, 0.55fr)); align-items: center; gap: 0.6rem; margin: 0.7rem 0; padding: 0.7rem; background: #f2f1e8; border: 1px solid #d4d0c1; }
+.bank-website__account-overview h2 { margin: 0; color: #30543f; font-size: 0.85rem; font-weight: 600; }
+.bank-website__account-overview .bank-website__eyebrow { margin-bottom: 0.2rem; color: #657162; font-size: 0.48rem; }
+.bank-website__account-overview article { display: grid; gap: 0.25rem; min-width: 0; padding-left: 0.6rem; border-left: 1px solid #d4d0c1; }
+.bank-website__account-overview article span { color: #667064; font-size: 0.46rem; letter-spacing: 0.07em; }
+.bank-website__account-overview article strong { color: #284b38; font-size: 0.8rem; font-weight: 600; overflow-wrap: anywhere; }
 .bank-website__hero p:not(.bank-website__eyebrow),.bank-website__subpage-intro { max-width: 42rem; margin: 0; color: #4e594c; }
 .bank-website__eyebrow { margin: 0; color: #8b6b2f; font-size: 0.52rem; font-weight: 700; letter-spacing: 0.13em; }
 .bank-website__hero-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem; }
@@ -2394,6 +2400,8 @@
 @media (max-width: 700px) {
   .bank-website__masthead-note { display: none; }
   .bank-website__hero { grid-template-columns: minmax(0, 1fr) 5rem; }
+  .bank-website__account-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bank-website__account-overview > div { grid-column: 1 / -1; }
   .bank-website__hero-seal { width: 4.8rem; height: 4.8rem; }
   .bank-website__hero-seal strong { font-size: 1.3rem; }
   .bank-website__home-grid,.bank-website__subpage-layout { grid-template-columns: 1fr; }
