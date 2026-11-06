@@ -51,6 +51,8 @@ type issueFlight struct {
 	err   error
 }
 
+const issueCacheTTL = 10 * time.Minute
+
 type Article struct {
 	ID           string                `json:"id"`
 	Section      string                `json:"section"`
@@ -97,7 +99,7 @@ func (service *Service) InvalidateAll() {
 	clear(service.issues)
 }
 
-// Issue caches one generated edition per server, city, and in-game calendar day.
+// Issue caches one generated edition per server, city, and in-game calendar day for ten minutes.
 func (service *Service) Issue(ctx context.Context, serverID, cityID, city, country string, serverTime time.Time) (Issue, error) {
 	if serverTime.IsZero() {
 		return Issue{}, fmt.Errorf("invalid newspaper date")
@@ -111,7 +113,7 @@ func (service *Service) Issue(ctx context.Context, serverID, cityID, city, count
 	dateKey := serverTime.In(zone).Format("2006-01-02")
 	cacheKey := serverID + "/" + cityID + "/" + dateKey
 	service.mu.Lock()
-	if cached, ok := service.issues[cacheKey]; ok && time.Since(cached.updatedAt) < time.Minute {
+	if cached, ok := service.issues[cacheKey]; ok && time.Since(cached.updatedAt) < issueCacheTTL {
 		service.mu.Unlock()
 		return cached.issue, nil
 	}
