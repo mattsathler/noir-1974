@@ -1620,7 +1620,7 @@ func (store *PostgresStore) Create(ctx context.Context, serverID string, base wo
 		return fmt.Errorf("check existing case: %w", err)
 	}
 	rivalIDs := []string(nil)
-	if definition.CompanyID != "" && (definition.ArchetypeID == "workplace_conflict" || definition.ArchetypeID == "financial_extortion") {
+	if definition.CompanyID != "" {
 		rivalIDs, err = store.companyRivalIDs(ctx, serverID, definition.CompanyID)
 		if err != nil {
 			return fmt.Errorf("resolve company market rivals: %w", err)
@@ -2390,23 +2390,86 @@ func caseSceneIsResidential(base world.World, locationID string) bool {
 }
 
 func applyCorporateMarketImpact(ctx context.Context, tx pgx.Tx, serverID string, definition Definition, rivalIDs []string) error {
-	delta := 0
-	switch definition.ArchetypeID {
-	case "workplace_conflict":
-		delta = -25
-	case "financial_extortion":
-		delta = -75
-	default:
+	totalDelta := marketImpactForCase(definition)
+	if totalDelta == 0 || definition.CompanyID == "" {
 		return nil
 	}
-	if definition.CompanyID == "" {
-		return nil
-	}
+	openingDelta := totalDelta / 4
 	occurredAt := definition.CrimeAt
 	if occurredAt.IsZero() {
 		occurredAt = time.Now().UTC()
 	}
-	return market.ApplyCompanyImpact(ctx, tx, serverID, definition.ID, definition.CompanyID, definition.ArchetypeID, delta, occurredAt.UTC(), rivalIDs)
+	return market.ApplyCompanyImpact(ctx, tx, serverID, definition.ID+":opening", definition.CompanyID, "case_crime_opened", openingDelta, occurredAt.UTC(), rivalIDs)
+}
+
+func marketImpactForCase(definition Definition) int {
+	impact := map[string]int{
+		"workplace_conflict": -25, "jealousy": -18, "financial_extortion": -75,
+		"serial_killer": -40, "inheritance": -30, "revenge": -20, "silence_witness": -35,
+		"conceal_fraud": -50, "power_struggle": -25, "mistaken_identity": -15, "blackmail": -35,
+		"debt": -20, "protect_reputation": -30, "conceal_accident": -40,
+		"embezzlement": -55, "accounting_fraud": -45, "insurance_fraud": -38,
+		"investment_fraud": -55, "money_laundering": -70, "financial_identity_theft": -45,
+		"procurement_fraud": -40, "forged_will": -30, "cargo_theft": -35, "art_forgery": -30,
+		"antiquities_smuggling": -55, "correspondence_blackmail": -35, "industrial_sabotage": -60,
+		"arson": -80, "staged_disappearance": -25, "confidential_document_theft": -30,
+		"police_corruption": -65,
+	}
+	key := definition.CaseType
+	if key == "homicide" || key == "" {
+		key = definition.ArchetypeID
+	}
+	return impact[key]
+}
+
+func (store *PostgresStore) applyCaseCompletionMarketImpact(ctx context.Context, tx pgx.Tx, serverID, caseID string, occurredAt time.Time) error {
+	var companyID, archetype, status string
+	if err := tx.QueryRow(ctx, `SELECT c.company_id,c.archetype_id,s.status FROM cases c
+		JOIN case_states s USING(server_id,case_id) WHERE c.server_id=$1::uuid AND c.case_id=$2`, serverID, caseID).Scan(&companyID, &archetype, &status); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	if status != "solved" || companyID == "" {
+		return nil
+	}
+	var openingRecorded bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM company_market_events WHERE server_id=$1::uuid AND event_id=$2)`, serverID, caseID+":opening").Scan(&openingRecorded); err != nil {
+		return err
+	}
+	if !openingRecorded {
+		return nil
+	}
+	totalDelta := marketImpactForCase(Definition{CaseType: "homicide", ArchetypeID: archetype})
+	if totalDelta == 0 {
+		// Financial cases use their case type as the archetype ID.
+		totalDelta = marketImpactForCase(Definition{CaseType: archetype, ArchetypeID: archetype})
+	}
+	openingDelta := totalDelta / 4
+	resolutionDelta := totalDelta - openingDelta
+	if resolutionDelta == 0 {
+		return nil
+	}
+	var seed string
+	var version int
+	if err := tx.QueryRow(ctx, `SELECT w.world_seed,COALESCE(city.generator_version,w.generator_version)
+		FROM worlds w LEFT JOIN world_city_generators city ON city.server_id=w.server_id
+		AND city.city_id=split_part(split_part($2,':',2),'/companies/',1)
+		WHERE w.server_id=$1::uuid`, serverID, companyID).Scan(&seed, &version); err != nil {
+		return err
+	}
+	group, err := world.CompanyRivalGroupFor(seed, version, companyID)
+	if err != nil {
+		return err
+	}
+	rivals := make([]string, 0, len(group.CompanyIDs))
+	for _, rivalID := range group.CompanyIDs {
+		if rivalID != companyID {
+			rivals = append(rivals, rivalID)
+		}
+	}
+	return market.ApplyCompanyImpact(ctx, tx, serverID, caseID+":resolution", companyID, "case_resolved", resolutionDelta, occurredAt.UTC(), rivals)
 }
 
 func (store *PostgresStore) companyRivalIDs(ctx context.Context, serverID, companyID string) ([]string, error) {
@@ -3630,6 +3693,9 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		if _, err := tx.Exec(ctx, `UPDATE case_states SET status='solved',updated_at=$3 WHERE server_id=$1::uuid AND case_id=$2`, serverID, request.CaseID, now.UTC()); err != nil {
 			return AccusationResult{}, err
 		}
+		if err := store.applyCaseCompletionMarketImpact(ctx, tx, serverID, request.CaseID, now.UTC()); err != nil {
+			return AccusationResult{}, fmt.Errorf("apply resolved case market impact: %w", err)
+		}
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO player_inbox_messages(server_id,account_id,message_id,warrant_id,sent_at,subject,body,attachments)
 		VALUES($1::uuid,$2::uuid,$3,NULL,$4,$5,$6,'[]'::jsonb) ON CONFLICT DO NOTHING`, serverID, accountID, "accusation:"+requestID, now.UTC(), subject, body); err != nil {
@@ -3821,6 +3887,9 @@ func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, se
 		AND NOT EXISTS (SELECT 1 FROM case_participants p WHERE p.server_id=$1::uuid AND p.case_id=$2 AND p.participant_role IN ('principal','accomplice')
 		AND COALESCE((SELECT value #>> '{}' FROM world_mutations m WHERE m.server_id=$1::uuid AND m.entity_id=p.npc_entity_id AND m.field_key='status' ORDER BY mutation_order DESC LIMIT 1),'')<>'arrested')`, serverID, request.CaseID, now.UTC()); err != nil {
 		return AccusationResult{}, err
+	}
+	if err := store.applyCaseCompletionMarketImpact(ctx, tx, serverID, request.CaseID, now.UTC()); err != nil {
+		return AccusationResult{}, fmt.Errorf("apply resolved case market impact: %w", err)
 	}
 	body := "The corporate review has concluded. Each named person was assessed separately.\n\n" + strings.Join(lines, "\n")
 	return complete(body, anyArrest)

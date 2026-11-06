@@ -139,7 +139,7 @@ ALTER TABLE company_market_events DROP CONSTRAINT IF EXISTS company_market_event
 ALTER TABLE company_market_events ADD COLUMN IF NOT EXISTS correlation_id text NOT NULL DEFAULT '';
 ALTER TABLE company_market_events ADD COLUMN IF NOT EXISTS source_company_id text NOT NULL DEFAULT '';
 ALTER TABLE company_market_events ADD CONSTRAINT company_market_events_event_type_check
-    CHECK (event_type IN ('workplace_conflict', 'financial_extortion', 'blackwire_leak', 'rival_market_movement'));
+    CHECK (event_type IN ('workplace_conflict', 'financial_extortion', 'blackwire_leak', 'rival_market_movement', 'case_crime_opened', 'case_resolved'));
 CREATE INDEX IF NOT EXISTS company_market_events_history_idx
     ON company_market_events(server_id, company_id, recorded_at DESC, event_id);
 CREATE INDEX IF NOT EXISTS company_market_events_correlation_idx

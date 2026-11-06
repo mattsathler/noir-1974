@@ -223,6 +223,12 @@ func GenerateExcluding(base world.World, seed string, version int, excluded map[
 		selected = candidates[caseIndex(seed+"/"+archetype.id, version, len(candidates))]
 	}
 	caseID := makeCaseID(seed, version)
+	if version >= GeneratorVersion && selected.caseType == "" && selected.archetypeID == "jealousy" && selected.companyID == "" {
+		selected.companyID = employerCompanyForNPC(base, selected.killerID)
+		if selected.companyID == "" {
+			selected.companyID = employerCompanyForNPC(base, selected.victimID)
+		}
+	}
 	generatedAt := time.Now()
 	caseDate := generatedAt.UTC().Truncate(24 * time.Hour)
 	caseDay := caseDate
@@ -780,6 +786,20 @@ func cityForCompany(base world.World, companyID string) string {
 		}
 	}
 	return "fr/lyon"
+}
+
+func employerCompanyForNPC(base world.World, npcID string) string {
+	companyIDs := make([]string, 0)
+	for _, relation := range base.EmploymentRelationships {
+		if relation.EmployeeNPCID == npcID {
+			companyIDs = append(companyIDs, relation.EmployerCompanyID)
+		}
+	}
+	sort.Strings(companyIDs)
+	if len(companyIDs) == 0 {
+		return ""
+	}
+	return companyIDs[0]
 }
 
 func caseTimeOffset(seed, archetypeID string, version int) time.Duration {
