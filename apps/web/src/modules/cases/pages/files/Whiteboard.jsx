@@ -12,6 +12,7 @@ import {
   deleteWhiteboard,
   discardWhiteboardDraft,
   disconnectWhiteboardPins,
+  destroyCaseEvidence,
   getCachedWhiteboard,
   getWhiteboardSaveState,
   getWhiteboard,
@@ -55,6 +56,7 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
   const [saveState, setSaveState] = useState("saved");
   const [renamingBoardId, setRenamingBoardId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [destroyTarget, setDestroyTarget] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [noteDrafts, setNoteDrafts] = useState({});
   const [connectorLines, setConnectorLines] = useState([]);
@@ -421,6 +423,20 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
     finally { setBusy(false); }
   }
 
+  async function confirmDestroyEvidence() {
+    if (!board || !destroyTarget || boardLocked || busy) return;
+    const boardID = board.id;
+    setBusy(true);
+    try {
+      await destroyCaseEvidence(destroyTarget.id);
+      setDestroyTarget(null);
+      await loadBoard(boardID);
+      setMessage("SOURCE DESTROYED · ALL INVESTIGATORS AFFECTED");
+    } catch (error) {
+      setMessage(error.message || "THE SOURCE COULD NOT BE DESTROYED");
+    } finally { setBusy(false); }
+  }
+
   async function changeDesignation(pin, designation) {
     if (!board || boardLocked || busy) return;
     const boardID=board.id;
@@ -674,6 +690,7 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
                 <header className="personal-whiteboard__pin-drag-handle" onPointerDown={(event) => beginDrag(event, pin)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}><span>{pin.source.toUpperCase()} · PINNED</span><button className="personal-whiteboard__remove-pin" type="button" aria-label={`Remove ${pin.title} from board`} disabled={boardLocked || busy} onClick={() => removePin(pin.id)}><Trash aria-hidden="true" /></button></header>
                 {pin.metadata?.npc?.visual && <div className="personal-whiteboard__person-portrait"><ModularFace visual={pin.metadata.npc.visual} name={pin.metadata.npc.name || pin.title} /></div>}
                 <h2>{pin.title}</h2><p>{displayPinContent(pin)}</p>
+                {["email", "bank", "gate", "case"].includes(pin.source) && <button className="personal-whiteboard__destroy-source" type="button" disabled={boardLocked || busy} onClick={() => setDestroyTarget(pin)}>DESTROY SOURCE…</button>}
                 <label className="personal-whiteboard__designation">MARK PIN
                   <select aria-label={`Mark ${pin.title}`} value={pin.designation||""} disabled={boardLocked || busy} onChange={(event)=>changeDesignation(pin,event.target.value)}>
                     <option value="">UNMARKED</option><option value="proof">PROOF</option>
@@ -702,6 +719,17 @@ export default function Whiteboard({ initialBoardId, focusBoard, standalone = fa
           <div>
             <button type="button" disabled={busy} onClick={() => setConfirmDelete(false)}>CANCEL</button>
             <button type="button" className="personal-whiteboard__confirm-delete" disabled={busy} onClick={confirmDeleteBoard}>{busy ? "DELETING…" : "DELETE BOARD"}</button>
+          </div>
+        </section>
+      </div>}
+      {destroyTarget && <div className="personal-whiteboard__confirm-backdrop">
+        <section className="personal-whiteboard__confirm" role="alertdialog" aria-modal="true" aria-labelledby="destroy-evidence-title" aria-describedby="destroy-evidence-description">
+          <p className="computer-window__eyebrow">PERMANENT · SHARED ACTION</p>
+          <h2 id="destroy-evidence-title">DESTROY THIS SOURCE?</h2>
+          <p id="destroy-evidence-description">This permanently removes “{destroyTarget.title}” from every investigator’s records. The source cannot be recovered and may affect the police investigation.</p>
+          <div>
+            <button type="button" disabled={busy} onClick={() => setDestroyTarget(null)}>CANCEL</button>
+            <button type="button" className="personal-whiteboard__confirm-delete" disabled={busy} onClick={confirmDestroyEvidence}>{busy ? "DESTROYING…" : "DESTROY SOURCE"}</button>
           </div>
         </section>
       </div>}

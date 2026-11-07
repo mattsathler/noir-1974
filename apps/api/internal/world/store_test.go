@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -335,14 +336,14 @@ func TestPostgresStoreReconstructsNPCProfilesAndIndexedRelations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetNPC() error = %v", err)
 	}
-	if profile.NPC != firstNPC || len(profile.Employment) != 1 || profile.Employment[0].Company != employer || len(profile.PersonalRelationships) != 1 || profile.PersonalRelationships[0].NPC != partner {
+	if !reflect.DeepEqual(profile.NPC, firstNPC) || len(profile.Employment) != 1 || !reflect.DeepEqual(profile.Employment[0].Company, employer) || len(profile.PersonalRelationships) != 1 || !reflect.DeepEqual(profile.PersonalRelationships[0].NPC, partner) {
 		t.Fatalf("GetNPC() profile did not include generated attributes and relations: %+v", profile)
 	}
 	reverseProfile, err := store.GetNPC(context.Background(), "server-id", partner.ID)
 	if err != nil {
 		t.Fatalf("GetNPC() reverse relationship error = %v", err)
 	}
-	if len(reverseProfile.PersonalRelationships) != 1 || reverseProfile.PersonalRelationships[0].NPC != firstNPC {
+	if len(reverseProfile.PersonalRelationships) != 1 || !reflect.DeepEqual(reverseProfile.PersonalRelationships[0].NPC, firstNPC) {
 		t.Fatalf("reverse personal relationship lookup failed: %+v", reverseProfile.PersonalRelationships)
 	}
 	for _, query := range database.queries {

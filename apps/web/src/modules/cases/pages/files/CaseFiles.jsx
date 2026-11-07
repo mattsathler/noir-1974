@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getCaseFile, getCrimeReports } from "../../../world/api.js";
+import { destroyCaseEvidence, getCaseFile, getCrimeReports } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 
@@ -33,6 +33,8 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
   const [selected, setSelected] = useState(null);
   const [caseFile, setCaseFile] = useState(null);
   const [caseFileError, setCaseFileError] = useState("");
+  const [destroyTarget, setDestroyTarget] = useState(null);
+  const [destroyBusy, setDestroyBusy] = useState(false);
   const [search, setSearch] = useState(initialSearch);
   const [appliedSearch, setAppliedSearch] = useState(initialSearch);
   const [fromDate, setFromDate] = useState(dateDaysBefore(initialTo, 30));
@@ -81,7 +83,9 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
   }, [selected]);
 
   const needle = appliedSearch.trim().toLocaleLowerCase();
-  const visibleCases = useMemo(() => cases.filter((record) => !needle || `${record.victimName ?? ""} ${record.organizationName ?? ""} ${record.caseType ?? ""}`.toLocaleLowerCase().includes(needle)), [cases, needle]);
+  const searchedCases = useMemo(() => cases.filter((record) => !needle || `${record.victimName ?? ""} ${record.organizationName ?? ""} ${record.caseType ?? ""}`.toLocaleLowerCase().includes(needle)), [cases, needle]);
+  const visibleCases = useMemo(() => searchedCases.filter((record) => record.status === "open"), [searchedCases]);
+  const resolvedCases = useMemo(() => searchedCases.filter((record) => record.status === "solved"), [searchedCases]);
   const visibleMissing = useMemo(() => missing.filter((person) => !needle || person.name.toLocaleLowerCase().includes(needle)), [missing, needle]);
   const missingIds = useMemo(() => new Set(missing.map((person) => person.npcId)), [missing]);
   const openCaseVictims = useMemo(() => new Set(visibleCases.map((record) => record.victimId)), [visibleCases]);
@@ -99,6 +103,18 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
 
   function openRecord(kind, record) {
     setSelected({ kind, record });
+  }
+
+  async function confirmDestroyEvidence() {
+    if (!destroyTarget || destroyBusy) return;
+    setDestroyBusy(true);
+    try {
+      await destroyCaseEvidence(destroyTarget.id);
+      setCaseFile((previous) => previous ? { ...previous, evidence: previous.evidence.filter((item) => item.id !== destroyTarget.id) } : previous);
+      setDestroyTarget(null);
+    } catch (error) {
+      setCaseFileError(error.message || "THE SOURCE COULD NOT BE DESTROYED.");
+    } finally { setDestroyBusy(false); }
   }
 
   if (selected) {
@@ -120,10 +136,21 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
           <h2>PUBLIC RECORDS</h2>
           {caseFileError && <p role="alert">{caseFileError}</p>}
           {!caseFile && !caseFileError && <p>READING THE PUBLIC FILE…</p>}
-          {caseFile?.evidence?.map((item) => <article key={item.id}><div><strong>{item.presentation}</strong><p>{item.content}</p></div><button type="button" onClick={() => onPrint?.({ id: item.id, source: "case", title: item.presentation, content: item.content, metadata: { caseId: record.id, crimeId: item.crimeId } })}>PRINT ↗</button></article>)}
+          {caseFile?.evidence?.map((item) => <article key={item.id}><div><strong>{item.presentation}</strong><p>{item.content}</p></div><button type="button" onClick={() => onPrint?.({ id: item.id, source: "case", title: item.presentation, content: item.content, metadata: { caseId: record.id, crimeId: item.crimeId } })}>PRINT ↗</button><button className="personal-whiteboard__destroy-source" type="button" disabled={destroyBusy} onClick={() => setDestroyTarget(item)}>DESTROY SOURCE…</button></article>)}
           {caseFile && !caseFile.evidence?.length && <p className="case-files__detail-note">No further public records are available.</p>}
         </section>}
         {kind === "missing" || (kind === "case" && record.caseType === "homicide") ? <p className="case-files__detail-note">The public file contains no further investigative findings.</p> : null}
+        {destroyTarget && <div className="personal-whiteboard__confirm-backdrop">
+          <section className="personal-whiteboard__confirm" role="alertdialog" aria-modal="true" aria-labelledby="destroy-case-source-title" aria-describedby="destroy-case-source-description">
+            <p className="computer-window__eyebrow">PERMANENT · SHARED ACTION</p>
+            <h2 id="destroy-case-source-title">DESTROY THIS SOURCE?</h2>
+            <p id="destroy-case-source-description">This permanently removes “{destroyTarget.presentation}” from every investigator’s files. It cannot be recovered and may affect the police investigation.</p>
+            <div>
+              <button type="button" disabled={destroyBusy} onClick={() => setDestroyTarget(null)}>CANCEL</button>
+              <button type="button" className="personal-whiteboard__confirm-delete" disabled={destroyBusy} onClick={confirmDestroyEvidence}>{destroyBusy ? "DESTROYING…" : "DESTROY SOURCE"}</button>
+            </div>
+          </section>
+        </div>}
       </section>
     );
   }
@@ -162,6 +189,17 @@ export default function CaseFiles({ cityId, issueDay, timeZone, initialSearch = 
           </div>
         ) : <p className="case-files__empty">{needle ? "NO MATCHING OPEN INQUIRIES." : "NO OPEN INQUIRIES IN THIS DATE RANGE."}</p>}
       </section>
+
+      {resolvedCases.length > 0 && <section className="case-files__section" aria-labelledby="resolved-cases-title">
+        <h2 id="resolved-cases-title">OFFICIAL CASE OUTCOMES <span>{resolvedCases.length}</span></h2>
+        <div className="case-files__list">
+          {resolvedCases.map((record) => <article className="case-files__record" key={record.id}>
+            <span className="case-files__select-status">{record.resolutionSource === "police" ? "CITY POLICE · CASE CLOSED" : "CASE CLOSED"}</span>
+            <button className="case-files__name-link" type="button" onClick={() => openRecord("case", record)}>{record.victimName || record.organizationName || "PUBLIC INVESTIGATION"}</button>
+            <time dateTime={record.crimeAt}>REPORTED · {formatReportDate(record.crimeAt, timeZone)}</time>
+          </article>)}
+        </div>
+      </section>}
 
       <section className="case-files__section case-files__missing" aria-labelledby="missing-persons-title">
         <h2 id="missing-persons-title">MISSING PERSONS <span>{additionalMissing.length}</span></h2>

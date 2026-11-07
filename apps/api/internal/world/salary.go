@@ -29,6 +29,6 @@ func DailySalaryCredits(role string) int {
 	case strings.Contains(role, "clerk"), strings.Contains(role, "assistant"), strings.Contains(role, "operator"), strings.Contains(role, "worker"), strings.Contains(role, "cashier"), strings.Contains(role, "driver"), strings.Contains(role, "guard"), strings.Contains(role, "cleaner"), strings.Contains(role, "porter"), strings.Contains(role, "waiter"), strings.Contains(role, "usher"), strings.Contains(role, "miner"), strings.Contains(role, "mechanic"), strings.Contains(role, "technician"), strings.Contains(role, "nurse"), strings.Contains(role, "receptionist"), strings.Contains(role, "secretary"), strings.Contains(role, "typist"), strings.Contains(role, "bookkeeper"), strings.Contains(role, "accountant"):
 		return 11
 	default:
-		return 14
+		return 0
 	}
 }

@@ -4,7 +4,7 @@ import { Files } from "pixelarticons/react/Files";
 import { Note } from "pixelarticons/react/Note";
 import { Box } from "pixelarticons/react/Box";
 import { Trash } from "pixelarticons/react/Trash";
-import { deletePlayerEmail, findNPCByEmail, getNPCEmails, getPlayerEmails, sendNPCEmailQuestion } from "../../../world/api.js";
+import { deletePlayerEmail, destroyCaseEvidence, findNPCByEmail, getNPCEmails, getPlayerEmails, sendNPCEmailQuestion } from "../../../world/api.js";
 import DatePicker from "../../../world/components/DatePicker.jsx";
 
 const ATTACHMENT_ICONS = { document: Files, paper: Note, object: Box };
@@ -93,11 +93,28 @@ export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPri
   const throughToday = new Date(serverTime).toISOString().slice(0, 10);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("OPENING MAILBOX…");
+  const [destroyTarget, setDestroyTarget] = useState(null);
+  const [destroyBusy, setDestroyBusy] = useState(false);
   const [from, setFrom] = useState(() => initialFrom || dateBefore(throughToday, 6));
   const [through, setThrough] = useState(() => initialThrough || throughToday);
   const deletedIDs = useRef(new Set());
   const pendingDeleteIDs = useRef(new Set());
   const previousMessageIDs = useRef(null);
+
+  async function confirmDestroyEmail() {
+    if (!destroyTarget || destroyBusy) return;
+    setDestroyBusy(true);
+    try {
+      await destroyCaseEvidence(destroyTarget.id);
+      setMessages((previous) => destroyTarget.attachment
+        ? previous.map((item) => ({ ...item, attachments: item.attachments?.filter((attachment) => attachment.id !== destroyTarget.id) }))
+        : previous.filter((item) => item.id !== destroyTarget.id));
+      setStatus("SOURCE DESTROYED · ALL INVESTIGATORS AFFECTED");
+      setDestroyTarget(null);
+    } catch (error) {
+      setStatus(error.message || "THE SOURCE COULD NOT BE DESTROYED");
+    } finally { setDestroyBusy(false); }
+  }
 
   useEffect(() => {
     if (!hackedAccount) return undefined;
@@ -219,16 +236,30 @@ export default function PlayerMailbox({ serverTime = new Date(), timeZone, onPri
                 <header><span>{bodyFound ? "BODY DISCOVERY · CONFIRMED" : "CASE · ATTACHMENT"}</span></header>
                 <span className={`search-attachment__icon search-attachment__icon--${item.kind}`} aria-hidden="true"><AttachmentIcon /></span>
                 <h4>{item.title}</h4><p>{item.content}</p>
-                <footer><button className="page-print-button" type="button" aria-label={`Print ${item.title}`} title="Print page" onClick={() => onPrint?.({ id: item.id, source: item.source, title: item.title, content: item.content, metadata: item.metadata })}><Printer aria-hidden="true" /></button></footer>
+                <footer><button className="page-print-button" type="button" aria-label={`Print ${item.title}`} title="Print page" onClick={() => onPrint?.({ id: item.id, source: item.source, title: item.title, content: item.content, metadata: item.metadata })}><Printer aria-hidden="true" /></button>
+                  {item.metadata?.caseId && <button className="personal-whiteboard__destroy-source" type="button" disabled={destroyBusy} onClick={() => setDestroyTarget({ ...item, subject: item.title, attachment: true })}>DESTROY SOURCE…</button>}
+                </footer>
               </article>;
             })}</div>
           </section>}
         </div>
       </details>
       {hackedAccount && <button className="email-message__print page-print-button" type="button" aria-label={`Add email to whiteboard: ${message.subject}`} title="Add email to a whiteboard" onClick={() => printMessage(message)}><Printer aria-hidden="true" /></button>}
+      {hackedAccount && message.caseLinked && <button className="personal-whiteboard__destroy-source" type="button" disabled={destroyBusy} onClick={() => setDestroyTarget(message)}>DESTROY SOURCE…</button>}
       {hackedAccount
         ? <button className="email-message__delete" type="button" disabled aria-label={`Cannot delete email: ${message.subject}`} title="Mailbox is read-only"><Trash aria-hidden="true" /></button>
         : <button className="email-message__delete" type="button" aria-label={`Delete email: ${message.subject}`} title="Delete email" onClick={() => deleteMessage(message)}><Trash aria-hidden="true" /></button>}
     </div>)}
+    {destroyTarget && <div className="personal-whiteboard__confirm-backdrop">
+      <section className="personal-whiteboard__confirm" role="alertdialog" aria-modal="true" aria-labelledby="destroy-email-title" aria-describedby="destroy-email-description">
+        <p className="computer-window__eyebrow">PERMANENT · SHARED ACTION</p>
+        <h2 id="destroy-email-title">DESTROY THIS SOURCE?</h2>
+        <p id="destroy-email-description">This permanently removes “{destroyTarget.subject || destroyTarget.title}” from every investigator’s files. It cannot be recovered and may affect the police investigation.</p>
+        <div>
+          <button type="button" disabled={destroyBusy} onClick={() => setDestroyTarget(null)}>CANCEL</button>
+          <button type="button" className="personal-whiteboard__confirm-delete" disabled={destroyBusy} onClick={confirmDestroyEmail}>{destroyBusy ? "DESTROYING…" : "DESTROY SOURCE"}</button>
+        </div>
+      </section>
+    </div>}
   </div>;
 }

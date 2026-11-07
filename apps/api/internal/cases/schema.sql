@@ -261,6 +261,37 @@ ALTER TABLE case_states ADD COLUMN IF NOT EXISTS body_found_method text;
 ALTER TABLE case_states DROP CONSTRAINT IF EXISTS case_states_body_found_method_check;
 ALTER TABLE case_states ADD CONSTRAINT case_states_body_found_method_check CHECK (body_found_method IS NULL OR body_found_method IN ('automatic', 'residential_search'));
 CREATE INDEX IF NOT EXISTS case_states_body_discovery_idx ON case_states(server_id, body_found_at) WHERE body_found_at IS NOT NULL;
+ALTER TABLE case_states ADD COLUMN IF NOT EXISTS resolution_source text;
+ALTER TABLE case_states DROP CONSTRAINT IF EXISTS case_states_resolution_source_check;
+ALTER TABLE case_states ADD CONSTRAINT case_states_resolution_source_check
+    CHECK (resolution_source IS NULL OR resolution_source IN ('player', 'police'));
+
+-- Police work is private case state. The stable procedural agent is a case-local
+-- identifier and is deliberately not materialized as a citizen.
+CREATE TABLE IF NOT EXISTS police_case_investigations (
+    server_id uuid NOT NULL,
+    case_id text NOT NULL,
+    agent_id text NOT NULL,
+    review_at timestamptz NOT NULL,
+    collected_item_ids text[] NOT NULL DEFAULT '{}',
+    reviewed_at timestamptz,
+    outcome text CHECK (outcome IS NULL OR outcome IN ('insufficient', 'solved')),
+    PRIMARY KEY (server_id, case_id),
+    FOREIGN KEY (server_id, case_id) REFERENCES cases(server_id, case_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS police_case_investigations_due_idx
+    ON police_case_investigations(server_id, review_at) WHERE reviewed_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS destroyed_case_evidence (
+    server_id uuid NOT NULL,
+    case_id text NOT NULL,
+    item_id text NOT NULL,
+    source_id text NOT NULL,
+    destroyed_by uuid NOT NULL REFERENCES player_accounts(id),
+    destroyed_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (server_id, case_id, item_id),
+    FOREIGN KEY (server_id, case_id) REFERENCES cases(server_id, case_id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS case_evolution_jobs (
     server_id uuid NOT NULL,

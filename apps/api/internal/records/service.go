@@ -67,6 +67,7 @@ func (service *Service) NPCRecords(ctx context.Context, serverID, npcID string, 
 		availableAt = current
 	}
 	for index := range all {
+		all[index].CaseLinked = all[index].CaseLinked || all[index].CaseID != "" || all[index].CrimeID != ""
 		if all[index].OccurredAt.After(availableAt) {
 			continue
 		}

@@ -40,6 +40,7 @@ type Record struct {
 	Direction   string    `json:"direction,omitempty"`
 	Origin      string    `json:"origin,omitempty"`
 	Destination string    `json:"destination,omitempty"`
+	CaseLinked  bool      `json:"caseLinked,omitempty"`
 
 	CaseID           string `json:"-"`
 	InternalRelation string `json:"-"`

@@ -29,15 +29,16 @@ var (
 // Message is a player-visible message. Mailbox and case relationship fields
 // are authoritative backend metadata and are deliberately omitted from JSON.
 type Message struct {
-	ID        string    `json:"id"`
-	CrimeID   string    `json:"crimeId,omitempty"`
-	CrimeType string    `json:"crimeType,omitempty"`
-	SentAt    time.Time `json:"sentAt"`
-	Service   string    `json:"service"`
-	Sender    string    `json:"sender"`
-	Recipient string    `json:"recipient"`
-	Subject   string    `json:"subject"`
-	Body      string    `json:"body"`
+	ID         string    `json:"id"`
+	CrimeID    string    `json:"crimeId,omitempty"`
+	CrimeType  string    `json:"crimeType,omitempty"`
+	SentAt     time.Time `json:"sentAt"`
+	Service    string    `json:"service"`
+	Sender     string    `json:"sender"`
+	Recipient  string    `json:"recipient"`
+	Subject    string    `json:"subject"`
+	Body       string    `json:"body"`
+	CaseLinked bool      `json:"caseLinked,omitempty"`
 
 	MailboxNPCID     string `json:"-"`
 	RelatedNPCID     string `json:"-"`

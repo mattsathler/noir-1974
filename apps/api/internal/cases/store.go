@@ -308,6 +308,7 @@ type PublicCase struct {
 	CrimeAt          time.Time             `json:"crimeAt,omitempty"`
 	LocationID       string                `json:"-"`
 	Status           string                `json:"status"`
+	ResolutionSource string                `json:"resolutionSource,omitempty"`
 	CreatedAt        time.Time             `json:"createdAt"`
 }
 
@@ -1166,15 +1167,53 @@ func (store *PostgresStore) completeResidentialSearch(ctx context.Context, serve
 		weaponIndex := int(identity[16]) % len(weapons)
 		items = append(items, makeResidentialAttachment(warrantID, len(items), weapons[weaponIndex]))
 	}
-	attachmentsJSON, err := json.Marshal(items)
-	if err != nil {
-		return WarrantRequest{}, err
+	if caseID != "" {
+		for index := range items {
+			var metadata map[string]any
+			if err := json.Unmarshal(items[index].Metadata, &metadata); err != nil {
+				return WarrantRequest{}, fmt.Errorf("decode residential item metadata: %w", err)
+			}
+			metadata["caseId"] = caseID
+			items[index].Metadata, err = json.Marshal(metadata)
+			if err != nil {
+				return WarrantRequest{}, fmt.Errorf("link residential item to case: %w", err)
+			}
+		}
 	}
 	tx, err := store.db.Begin(ctx)
 	if err != nil {
 		return WarrantRequest{}, fmt.Errorf("begin residential search: %w", err)
 	}
 	defer func() { _ = tx.Rollback(context.Background()) }()
+	if caseID != "" {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))`, serverID, caseID); err != nil {
+			return WarrantRequest{}, err
+		}
+		ids := make([]string, 0, len(items))
+		for _, item := range items {
+			ids = append(ids, item.ID)
+		}
+		var destroyedIDs []string
+		if err := tx.QueryRow(ctx, `SELECT COALESCE(array_agg(item_id),'{}'::text[]) FROM destroyed_case_evidence
+			WHERE server_id=$1::uuid AND case_id=$2 AND item_id=ANY($3::text[])`, serverID, caseID, ids).Scan(&destroyedIDs); err != nil {
+			return WarrantRequest{}, err
+		}
+		destroyed := make(map[string]struct{}, len(destroyedIDs))
+		for _, id := range destroyedIDs {
+			destroyed[id] = struct{}{}
+		}
+		available := items[:0]
+		for _, item := range items {
+			if _, exists := destroyed[item.ID]; !exists {
+				available = append(available, item)
+			}
+		}
+		items = available
+	}
+	attachmentsJSON, err := json.Marshal(items)
+	if err != nil {
+		return WarrantRequest{}, err
+	}
 	if existingReport {
 		warrantID = priorID
 		if _, err := tx.Exec(ctx, `UPDATE player_search_warrants SET catalog_version=$7,station_location_id=$5,created_at=$6
@@ -2519,12 +2558,12 @@ func persistCaseEmails(ctx context.Context, tx pgx.Tx, serverID string, definiti
 // NPCRecords loads only the selected person's case-related entries within the
 // requested interval. It deliberately omits the internal relationship label.
 func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID string, from, through time.Time, source string) ([]records.Record, error) {
-	query := `SELECT activity.crime_id,crime.crime_type,activity.record_data FROM case_activity_records activity JOIN case_crimes crime USING(server_id,case_id,crime_id)
+	query := `SELECT activity.record_data FROM case_activity_records activity
 		 WHERE activity.server_id = $1::uuid AND activity.npc_entity_id = $2 AND activity.occurred_at >= $3 AND activity.occurred_at <= $4 AND activity.occurred_at <= now()
 		 ORDER BY activity.occurred_at, activity.record_id`
 	args := []any{serverID, npcID, from, through}
 	if source != "" {
-		query = `SELECT activity.crime_id,crime.crime_type,activity.record_data FROM case_activity_records activity JOIN case_crimes crime USING(server_id,case_id,crime_id)
+		query = `SELECT activity.record_data FROM case_activity_records activity
 			 WHERE activity.server_id = $1::uuid AND activity.npc_entity_id = $2 AND activity.source = $5 AND activity.occurred_at >= $3 AND activity.occurred_at <= $4 AND activity.occurred_at <= now()
 			 ORDER BY activity.occurred_at, activity.record_id`
 		args = append(args, source)
@@ -2538,12 +2577,13 @@ func (store *PostgresStore) NPCRecords(ctx context.Context, serverID, npcID stri
 	for rows.Next() {
 		var data []byte
 		var item records.Record
-		if err := rows.Scan(&item.CrimeID, &item.CrimeType, &data); err != nil {
+		if err := rows.Scan(&data); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(data, &item); err != nil {
 			return nil, fmt.Errorf("decode case activity record: %w", err)
 		}
+		item.CaseLinked = true
 		result = append(result, item)
 	}
 	return result, rows.Err()
@@ -2577,6 +2617,7 @@ func (store *PostgresStore) NPCEmails(ctx context.Context, serverID, npcID strin
 		if err := json.Unmarshal(data, &item); err != nil {
 			return nil, fmt.Errorf("decode case email: %w", err)
 		}
+		item.CaseLinked = true
 		item.MailboxNPCID = npcID
 		if (item.InternalRelation == "anonymous_warning" || item.InternalRelation == "anonymous_followup") && recipientMailboxID == npcID {
 			item.Sender = "Unknown sender"
@@ -2697,13 +2738,13 @@ func (store *PostgresStore) CityCrimeReports(ctx context.Context, serverID, city
 	rows, err := store.db.Query(ctx, `SELECT c.case_id,c.city_id,c.case_type,COALESCE(c.victim_entity_id,''),s.status,
 		COALESCE(c.crime_at,c.created_at),c.created_at,COALESCE(v.generation_key,''),w.world_seed,
 		COALESCE(organization.generation_key,''),
-		COALESCE(city_generator.generator_version,w.generator_version)
+		COALESCE(city_generator.generator_version,w.generator_version),COALESCE(s.resolution_source,'')
 		FROM cases c JOIN case_states s USING(server_id,case_id)
 		LEFT JOIN world_entities v ON v.server_id=c.server_id AND v.entity_id=c.victim_entity_id
 		LEFT JOIN world_entities organization ON organization.server_id=c.server_id AND organization.entity_id=c.company_id AND organization.entity_type='company'
 		JOIN worlds w ON w.server_id=c.server_id
 		LEFT JOIN world_city_generators city_generator ON city_generator.server_id=c.server_id AND city_generator.city_id=c.city_id
-		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND s.status='open'
+		WHERE c.server_id=$1::uuid AND c.city_id=$2 AND s.status IN ('open','solved')
 		AND COALESCE(c.crime_at,c.created_at)>=$3 AND COALESCE(c.crime_at,c.created_at)<$4 AND COALESCE(c.crime_at,c.created_at)<=$5
 		ORDER BY c.crime_at DESC,c.case_id DESC`, serverID, cityID, from.UTC(), until.UTC(), now.UTC())
 	if err != nil {
@@ -2713,7 +2754,7 @@ func (store *PostgresStore) CityCrimeReports(ctx context.Context, serverID, city
 		var item PublicCase
 		var generationKey, seed, organizationKey string
 		var worldVersion int
-		if err := rows.Scan(&item.ID, &item.CityID, &item.CaseType, &item.VictimID, &item.Status, &item.CrimeAt, &item.CreatedAt, &generationKey, &seed, &organizationKey, &worldVersion); err != nil {
+		if err := rows.Scan(&item.ID, &item.CityID, &item.CaseType, &item.VictimID, &item.Status, &item.CrimeAt, &item.CreatedAt, &generationKey, &seed, &organizationKey, &worldVersion, &item.ResolutionSource); err != nil {
 			rows.Close()
 			return CrimeReportDigest{}, err
 		}
@@ -3243,12 +3284,88 @@ func (store *PostgresStore) RecordDiscoveredItems(ctx context.Context, serverID,
 		 SELECT $1::uuid, $2::uuid, item->>'id', item->>'source', item
 		 FROM jsonb_array_elements($3::jsonb) AS items(item)
 		 WHERE NOT EXISTS (SELECT 1 FROM player_blackwire_sales sale WHERE sale.server_id=$1::uuid AND sale.account_id=$2::uuid AND sale.item_id=item->>'id')
+		   AND NOT EXISTS (SELECT 1 FROM destroyed_case_evidence destroyed WHERE destroyed.server_id=$1::uuid AND destroyed.item_id=item->>'id')
 		 ON CONFLICT (server_id, account_id, item_id) DO UPDATE
 		 SET item_source = EXCLUDED.item_source, item_data = EXCLUDED.item_data`,
 		serverID, accountID, string(data)); err != nil {
 		return fmt.Errorf("record discovered items: %w", err)
 	}
 	return nil
+}
+
+// DestroyDiscoveredCaseEvidence permanently removes an eligible shared source
+// and every player's cached copy. The tombstone contains identifiers only.
+func (store *PostgresStore) DestroyDiscoveredCaseEvidence(ctx context.Context, serverID, accountID, itemID string) error {
+	tx, err := store.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	var caseID string
+	err = tx.QueryRow(ctx, `SELECT COALESCE(e.case_id,a.case_id,m.case_id,search_case.case_id,'')
+		FROM player_discovered_items item
+		LEFT JOIN case_evidence e ON e.server_id=item.server_id AND e.evidence_id=item.item_id AND item.item_source='case'
+		LEFT JOIN case_activity_records a ON a.server_id=item.server_id AND a.record_id=item.item_id AND a.source=item.item_source AND item.item_source IN ('bank','gate')
+		LEFT JOIN case_mail_messages m ON m.server_id=item.server_id AND m.message_id=item.item_id AND item.item_source='email'
+		LEFT JOIN cases search_case ON search_case.server_id=item.server_id AND search_case.case_id=item.item_data #>> '{metadata,caseId}'
+		LEFT JOIN player_inbox_messages search_mail ON search_mail.server_id=item.server_id AND search_mail.account_id=item.account_id
+			AND search_mail.warrant_id=item.item_data #>> '{metadata,warrantId}'
+			AND search_mail.attachments @> jsonb_build_array(jsonb_build_object('id',item.item_id))
+		WHERE item.server_id=$1::uuid AND item.account_id=$2::uuid AND item.item_id=$3
+		AND item.item_source IN ('email','bank','gate','case')
+		AND (e.evidence_id IS NOT NULL OR a.record_id IS NOT NULL OR m.message_id IS NOT NULL
+		 OR (item.item_source='case' AND item.item_data #>> '{metadata,origin}'='residential search' AND search_case.case_id IS NOT NULL AND search_mail.message_id IS NOT NULL))
+		`, serverID, accountID, itemID).Scan(&caseID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrEvidenceNotFound
+		}
+		return err
+	}
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))`, serverID, caseID); err != nil {
+		return err
+	}
+	var alreadyDestroyed bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM destroyed_case_evidence WHERE server_id=$1::uuid AND case_id=$2 AND item_id=$3)`, serverID, caseID, itemID).Scan(&alreadyDestroyed); err != nil {
+		return err
+	}
+	if alreadyDestroyed {
+		return ErrEvidenceNotFound
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO destroyed_case_evidence(server_id,case_id,item_id,source_id,destroyed_by)
+		VALUES($1::uuid,$2,$3,$3,$4::uuid) ON CONFLICT(server_id,case_id,item_id) DO NOTHING`, serverID, caseID, itemID, accountID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM case_evidence WHERE server_id=$1::uuid AND case_id=$2 AND evidence_id=$3`, serverID, caseID, itemID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM case_activity_records WHERE server_id=$1::uuid AND case_id=$2 AND record_id=$3`, serverID, caseID, itemID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM case_mail_messages WHERE server_id=$1::uuid AND case_id=$2 AND message_id=$3`, serverID, caseID, itemID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM player_inbox_messages WHERE server_id=$1::uuid AND case_id=$2 AND message_id=$3`, serverID, caseID, itemID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE player_inbox_messages message SET attachments=COALESCE((
+		SELECT jsonb_agg(attachment.item) FROM jsonb_array_elements(message.attachments) AS attachment(item) WHERE attachment.item->>'id'<>$2
+		),'[]'::jsonb) WHERE message.server_id=$1::uuid AND message.attachments @> jsonb_build_array(jsonb_build_object('id',$2))`, serverID, itemID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM player_discovered_items WHERE server_id=$1::uuid AND item_id=$2`, serverID, itemID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE player_case_progress progress_row SET progress=jsonb_set(
+		jsonb_set(
+			jsonb_set(progress_row.progress,'{discoveredEvidenceIds}',COALESCE(progress_row.progress->'discoveredEvidenceIds','[]'::jsonb)-$3::text,true),
+			'{whiteboardPins}',COALESCE(progress_row.progress->'whiteboardPins','[]'::jsonb)-$3::text,true),
+		'{whiteboardConnections}',COALESCE((SELECT jsonb_agg(connection.item) FROM jsonb_array_elements(COALESCE(progress_row.progress->'whiteboardConnections','[]'::jsonb)) connection(item)
+			WHERE connection.item->>'fromId'<>$3 AND connection.item->>'toId'<>$3),'[]'::jsonb),true),updated_at=now()
+		WHERE server_id=$1::uuid AND case_id=$2`, serverID, caseID, itemID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (store *PostgresStore) ListWhiteboards(ctx context.Context, serverID, accountID string) ([]Whiteboard, error) {
@@ -3512,6 +3629,29 @@ WHERE p.server_id=$1::uuid AND p.account_id=$2::uuid AND p.whiteboard_id=$3`
 
 // resolveAccusation delivers the delayed review based on the immutable board snapshot.
 func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, accountID, requestID string, request accusationPayload, now time.Time) (AccusationResult, error) {
+	if request.CaseID != "" && len(request.ProofIDs) > 0 {
+		var availableProofIDs []string
+		if err := store.db.QueryRow(ctx, `SELECT COALESCE(array_agg(DISTINCT proof.item_id ORDER BY proof.item_id),'{}'::text[])
+			FROM unnest($3::text[]) proof(item_id)
+			WHERE NOT EXISTS(SELECT 1 FROM destroyed_case_evidence d WHERE d.server_id=$1::uuid AND d.case_id=$2 AND d.item_id=proof.item_id)`, serverID, request.CaseID, request.ProofIDs).Scan(&availableProofIDs); err != nil {
+			return AccusationResult{}, err
+		}
+		request.ProofIDs = availableProofIDs
+		if len(availableProofIDs) == 0 {
+			request.CrimeIDs = nil
+		} else {
+			if err := store.db.QueryRow(ctx, `SELECT COALESCE(array_agg(DISTINCT evidence.crime_id ORDER BY evidence.crime_id),'{}'::text[])
+				FROM (
+					SELECT server_id,case_id,crime_id,evidence_id AS item_id FROM case_evidence WHERE server_id=$1::uuid AND case_id=$2
+					UNION ALL SELECT server_id,case_id,crime_id,record_id FROM case_activity_records WHERE server_id=$1::uuid AND case_id=$2
+					UNION ALL SELECT server_id,case_id,crime_id,message_id FROM case_mail_messages WHERE server_id=$1::uuid AND case_id=$2
+				) evidence JOIN case_crimes crime USING(server_id,case_id,crime_id)
+				WHERE evidence.item_id=ANY($3::text[]) AND crime.crime_id=ANY($4::text[]) AND crime.occurred_at<=$5`,
+				serverID, request.CaseID, availableProofIDs, request.CrimeIDs, now.UTC()).Scan(&request.CrimeIDs); err != nil {
+				return AccusationResult{}, err
+			}
+		}
+	}
 	if err := store.validateAccusationCrimeSnapshot(ctx, serverID, request, now); err != nil {
 		log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q case_id=%q stage=validate_snapshot error=%q", requestID, serverID, accountID, request.BoardID, request.CaseID, err.Error())
 		return AccusationResult{}, err
@@ -3673,7 +3813,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 	// combination is worth 2.75 points (1 + 1 + 0.75) and still requires the
 	// correct accused person and victim.
 	corroborated := correctAccused && proofStrength >= 2.75
-	accepted := corroborated || accusationAccepted(serverID, accountID, request.CaseID, chance)
+	accepted := len(request.ProofIDs) > 0 && (corroborated || accusationAccepted(serverID, accountID, request.CaseID, chance))
 	log.Printf("board_evaluation request_id=%q server_id=%q account_id=%q board_id=%q case_id=%q case_status=%q case_type=%q archetype_id=%q generator_version=%d accused_id=%q killer_id=%q accused_matches_killer=%t victim_id=%q expected_victim_id=%q victim_matches=%t crime_ids=%q proof_count=%d proof_strength=%.2f chance=%d corroborated=%t accepted=%t proof_breakdown=%s", requestID, serverID, accountID, request.BoardID, request.CaseID, caseStatus, caseType, archetypeID, generatorVersion, request.AccusedID, killerID, request.AccusedID == killerID, request.VictimID, victimID, victimMatches, request.CrimeIDs, totalProofs, proofStrength, chance, corroborated, accepted, proofBreakdown)
 	outcome, subject, body := "insufficient", "Accusation review · Case decision", "The corporate review has concluded. The available material did not meet the standard for an arrest. The decision does not identify which submissions were considered relevant."
 	if accepted {
@@ -3690,7 +3830,7 @@ func (store *PostgresStore) resolveAccusation(ctx context.Context, serverID, acc
 		if _, err := tx.Exec(ctx, `INSERT INTO world_mutations(server_id,entity_id,field_key,value) VALUES($1::uuid,$2,'status',$3::jsonb)`, serverID, request.AccusedID, string(statusJSON)); err != nil {
 			return AccusationResult{}, err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE case_states SET status='solved',updated_at=$3 WHERE server_id=$1::uuid AND case_id=$2`, serverID, request.CaseID, now.UTC()); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE case_states SET status='solved',resolution_source='player',updated_at=$3 WHERE server_id=$1::uuid AND case_id=$2`, serverID, request.CaseID, now.UTC()); err != nil {
 			return AccusationResult{}, err
 		}
 		if err := store.applyCaseCompletionMarketImpact(ctx, tx, serverID, request.CaseID, now.UTC()); err != nil {
@@ -3883,7 +4023,7 @@ func (store *PostgresStore) resolveParticipantAccusation(ctx context.Context, se
 			lines = append(lines, fmt.Sprintf("%s: the evidence did not meet the standard for an arrest.", name))
 		}
 	}
-	if _, err := tx.Exec(ctx, `UPDATE case_states SET status='solved',updated_at=$3 WHERE server_id=$1::uuid AND case_id=$2
+	if _, err := tx.Exec(ctx, `UPDATE case_states SET status='solved',resolution_source='player',updated_at=$3 WHERE server_id=$1::uuid AND case_id=$2
 		AND NOT EXISTS (SELECT 1 FROM case_participants p WHERE p.server_id=$1::uuid AND p.case_id=$2 AND p.participant_role IN ('principal','accomplice')
 		AND COALESCE((SELECT value #>> '{}' FROM world_mutations m WHERE m.server_id=$1::uuid AND m.entity_id=p.npc_entity_id AND m.field_key='status' ORDER BY mutation_order DESC LIMIT 1),'')<>'arrested')`, serverID, request.CaseID, now.UTC()); err != nil {
 		return AccusationResult{}, err

@@ -457,6 +457,10 @@ export async function getWhiteboards() {
   return writeWhiteboardCache("list", [...remoteBoards, ...pendingDrafts]);
 }
 
+export function destroyCaseEvidence(itemId) {
+  return whiteboardRequest(`/api/case-evidence/${encodeURIComponent(itemId)}`, { method: "DELETE" });
+}
+
 export function createWhiteboardDraft(index = 0) {
   const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   return { id: `board_${nonce}`, title: `INVESTIGATION ${index + 1}`, createdAt: new Date().toISOString(), pins: [], connections: [] };

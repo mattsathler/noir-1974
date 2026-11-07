@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Printer } from "pixelarticons/react/Printer";
-import { getCompanyAtLocation, getNPCRecords, searchCompanies, searchLocations, searchNationalCompanies, searchPeople } from "../../api.js";
+import { destroyCaseEvidence, getCompanyAtLocation, getNPCRecords, searchCompanies, searchLocations, searchNationalCompanies, searchPeople } from "../../api.js";
 import DatePicker from "../../components/DatePicker.jsx";
 import ModularFace from "../../../identity/components/ModularFace.jsx";
 
@@ -74,6 +74,8 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
   const [activity, setActivity] = useState([]);
   const [activityMessage, setActivityMessage] = useState("");
   const [activityBusy, setActivityBusy] = useState(false);
+  const [destroyTarget, setDestroyTarget] = useState(null);
+  const [destroyBusy, setDestroyBusy] = useState(false);
   const requestId = useRef(0);
   const activityRequestId = useRef(0);
   const isInterpol = program === "interpol";
@@ -155,6 +157,19 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
     } finally {
       if (request === activityRequestId.current) setActivityBusy(false);
     }
+  }
+
+  async function confirmDestroyRecord() {
+    if (!destroyTarget || destroyBusy) return;
+    setDestroyBusy(true);
+    try {
+      await destroyCaseEvidence(destroyTarget.id);
+      setActivity((previous) => previous.filter((record) => record.id !== destroyTarget.id));
+      setActivityMessage("SOURCE DESTROYED · ALL INVESTIGATORS AFFECTED");
+      setDestroyTarget(null);
+    } catch (error) {
+      setActivityMessage(error.message || "THE SOURCE COULD NOT BE DESTROYED");
+    } finally { setDestroyBusy(false); }
   }
 
   async function submitSearch(event) {
@@ -336,6 +351,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               {isBankRecords && record.amount > 0 && <p className={`world-record__amount world-record__amount--${record.direction || "outgoing"}`}><span>{record.direction === "incoming" ? "CREDIT · RECEIVED" : "DEBIT · SENT"}</span><strong>{record.direction === "incoming" ? "+" : "−"}{record.amount} CREDITS</strong></p>}
               {(record.origin || record.destination) && <div className="world-record__route" aria-label={`Recorded route from ${record.origin || "unknown location"} to ${record.destination || "unknown location"}`}><span>RECORDED PASSAGE</span><div><strong>{record.origin || "UNKNOWN ORIGIN"}</strong><b aria-hidden="true">→</b><strong>{record.destination || "UNKNOWN DESTINATION"}</strong></div></div>}
               <button className="page-print-button" type="button" aria-label={`Print ${isGateRecords ? "GATE log" : "financial record"}`} title="Print record" onClick={() => onPrint?.({ id: record.id, source: record.source, title: isGateRecords ? "GATE ACCESS LOG" : "FINANCIAL RECORD", content: `${isGateRecords ? `GATE USED · ${displayRecordDate(record.occurredAt, timeZone)} · ` : ""}${record.description}${record.amount > 0 ? ` · ${record.direction === "incoming" ? "CREDIT" : "DEBIT"} · ${record.amount} Credits` : ""}${record.reference ? ` · ACCOUNT REFERENCE · ${record.reference}` : ""}${record.origin || record.destination ? ` · ${record.origin || "UNKNOWN"} → ${record.destination || "UNKNOWN"}` : ""}`, metadata: record })}><Printer aria-hidden="true" /></button>
+              {record.caseLinked && <button className="personal-whiteboard__destroy-source" type="button" disabled={destroyBusy} onClick={() => setDestroyTarget(record)}>DESTROY SOURCE…</button>}
             </article>)}
           </section>}
         </section>;
@@ -397,7 +413,7 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
               <figure className="world-record__staff-portrait">
                 <ModularFace visual={employee.visual ?? FALLBACK_NPC_VISUAL} name={employee.name} />
               </figure>
-              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span><small>DAILY WAGE · {Number(employee.dailySalaryCredits || 0).toLocaleString("en-US")} CREDITS</small><small>EMAIL · {employee.email}</small></div>
+              <div><strong>{employee.name}</strong><span>{employee.role?.toUpperCase() || "ROLE NOT LISTED"}</span><small>DAILY WAGE · {Number(employee.dailySalaryCredits || 0).toLocaleString("en-US")} CREDITS</small>{employee.bankAccountNumber && <small>BANK ACCOUNT · {employee.bankAccountNumber}</small>}<small>EMAIL · {employee.email}</small></div>
             </article>)}
           </div>
         </article>
@@ -409,6 +425,17 @@ export default function WorldDirectory({ program, companyLocationId = "", compan
           <p>{address.full}</p>
         </article>
       ))}
+      {destroyTarget && <div className="personal-whiteboard__confirm-backdrop">
+        <section className="personal-whiteboard__confirm" role="alertdialog" aria-modal="true" aria-labelledby="destroy-record-title" aria-describedby="destroy-record-description">
+          <p className="computer-window__eyebrow">PERMANENT · SHARED ACTION</p>
+          <h2 id="destroy-record-title">DESTROY THIS SOURCE?</h2>
+          <p id="destroy-record-description">This permanently removes the record from every investigator’s files. It cannot be recovered and may affect the police investigation.</p>
+          <div>
+            <button type="button" disabled={destroyBusy} onClick={() => setDestroyTarget(null)}>CANCEL</button>
+            <button type="button" className="personal-whiteboard__confirm-delete" disabled={destroyBusy} onClick={confirmDestroyRecord}>{destroyBusy ? "DESTROYING…" : "DESTROY SOURCE"}</button>
+          </div>
+        </section>
+      </div>}
     </div>
   );
 }

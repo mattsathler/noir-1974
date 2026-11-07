@@ -39,6 +39,10 @@ type dueCaseEvolutionRunner interface {
 	ProcessDueCaseEvolution(context.Context, string, time.Time) error
 }
 
+type duePoliceWorkRunner interface {
+	ProcessDuePoliceWork(context.Context, string, time.Time) error
+}
+
 type RecurringGenerator struct {
 	databaseURL, serverID string
 	store                 recurringStore
@@ -84,6 +88,11 @@ func (g *RecurringGenerator) runOne(ctx context.Context) error {
 		if evolutions, ok := g.store.(dueCaseEvolutionRunner); ok {
 			if err := evolutions.ProcessDueCaseEvolution(ctx, g.serverID, time.Now().UTC()); err != nil {
 				return fmt.Errorf("process due case evolution: %w", err)
+			}
+		}
+		if police, ok := g.store.(duePoliceWorkRunner); ok {
+			if err := police.ProcessDuePoliceWork(ctx, g.serverID, time.Now().UTC()); err != nil {
+				return fmt.Errorf("process police casework: %w", err)
 			}
 		}
 		discoveries, tracksBodies := g.store.(dueBodyDiscoveryRunner)

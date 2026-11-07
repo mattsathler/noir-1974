@@ -229,6 +229,10 @@ type WhiteboardAPIReader interface {
 	DisconnectWhiteboardPins(context.Context, string, string, string, string, string) error
 }
 
+type caseEvidenceDestroyer interface {
+	DestroyDiscoveredCaseEvidence(context.Context, string, string, string) error
+}
+
 // NewHandler creates the identity API. Cookies are secure in production deployments.
 func NewHandler(repository store, secureCookie bool) http.Handler {
 	return newHandler(repository, secureCookie, nil, "", nil, nil, nil, nil, false, nil)
@@ -360,6 +364,9 @@ func newHandler(repository store, secureCookie bool, reader WorldDirectoryReader
 			mux.HandleFunc("PUT /api/whiteboards/{boardID}/pins/{itemID}/designation", handler.setWhiteboardPinDesignation)
 		}
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/pins/{itemID}", handler.removeWhiteboardPin)
+		if _, ok := handler.whiteboardReader.(caseEvidenceDestroyer); ok {
+			mux.HandleFunc("DELETE /api/case-evidence/{itemID}", handler.destroyCaseEvidence)
+		}
 		mux.HandleFunc("POST /api/whiteboards/{boardID}/connections", handler.connectWhiteboardPins)
 		mux.HandleFunc("DELETE /api/whiteboards/{boardID}/connections/{fromID}/{toID}", handler.disconnectWhiteboardPins)
 		if _, ok := handler.store.(blackwireStore); ok {
@@ -681,6 +688,27 @@ func (h *Handler) deletePlayerEmail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.writeAPIError(w, r, http.StatusInternalServerError, "PLAYER_EMAIL_DELETE_FAILED", "could not delete personal mail", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) destroyCaseEvidence(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.caseAccount(w, r)
+	if !ok {
+		return
+	}
+	reader, ok := h.whiteboardReader.(caseEvidenceDestroyer)
+	if !ok {
+		http.Error(w, "evidence destruction unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if err := reader.DestroyDiscoveredCaseEvidence(r.Context(), h.worldServerID, current.ID, r.PathValue("itemID")); err != nil {
+		if errors.Is(err, cases.ErrEvidenceNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		h.writeAPIError(w, r, http.StatusInternalServerError, "CASE_EVIDENCE_DESTROY_FAILED", "could not destroy case evidence", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

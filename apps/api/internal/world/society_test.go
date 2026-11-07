@@ -198,7 +198,7 @@ func TestGenerateCityCreatesAnIndependentDeterministicPopulation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("reconstruct company %q: %v", company.ID, err)
 		}
-		if company != rebuilt {
+		if !reflect.DeepEqual(company, rebuilt) {
 			t.Fatalf("company %q changed when reconstructed", company.ID)
 		}
 	}
@@ -294,7 +294,7 @@ func TestAgeAppearanceRulesAndRegionalSkinMixes(t *testing.T) {
 	}
 
 	for _, test := range []struct {
-		age              int
+		age                int
 		wantFine, wantDeep int
 	}{{44, 0, 0}, {45, 12, 0}, {60, 16, 20}} {
 		fine, deep := 0, 0

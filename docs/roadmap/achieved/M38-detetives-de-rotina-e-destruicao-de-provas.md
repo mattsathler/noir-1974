@@ -1,6 +1,6 @@
 # M38 — Detetives de rotina e destruição de provas
 
-**Status:** Proposta  
+**Status:** Concluída
 **Trilha:** Investigação cotidiana  
 **Depende de:** M12 — Interações investigativas em locais; M13 — Acusação e julgamento; M16 — Crime Reports; M27 — Casos financeiros e múltiplos acusados; M28 — Casos evolutivos e comunicação por email; M30 — Blackwire: mercado de informações; M35 — Login e jogo no desktop
 
@@ -21,16 +21,16 @@ Fazer a polícia investigar casos em paralelo com o jogador. Detetives procedura
 
 ## Critérios de aceite
 
-- [ ] Todo caso aberto recebe um agente policial estável e uma data de revisão sete dias após sua criação; o agendamento e a execução são idempotentes após reinício da API.
-- [ ] O agente recolhe no máximo três itens únicos durante o prazo, escolhidos de forma determinística entre as fontes investigativas ligadas ao caso e ainda disponíveis.
-- [ ] A revisão policial considera somente os itens recolhidos pelo agente e ignora todo item com tombstone de destruição.
-- [ ] Se a evidência atingir os critérios atuais para todos os participantes culpados, a polícia registra as prisões, muda o caso para `solved` e salva a origem `police`; se não atingir, o caso continua `open`.
-- [ ] Uma revisão insuficiente não encerra o caso, não cria uma acusação contra inocentes e não impede uma acusação posterior do jogador.
-- [ ] Crime Reports identifica casos concluídos pela polícia. Casos concluídos pelo jogador mantêm a atribuição `player`; nenhuma das duas rotas publica a classificação interna das pistas.
-- [ ] O jogador consegue iniciar a destruição de um item elegível em sua fonte e precisa confirmá-la em um modal que explica o efeito global e permanente.
-- [ ] Depois da confirmação, o item desaparece das consultas, caixas de entrada, inventários de busca e boards aplicáveis a todos os jogadores, e não pode sustentar revisão policial ou acusação.
-- [ ] A venda de uma anotação pela Blackwire mantém o comportamento atual e não cria tombstone nem remove o registro das fontes investigativas de outros jogadores ou da polícia.
-- [ ] A interface não apresenta barra ou porcentagem de investigação policial; casos resolvidos comunicam apenas o resultado oficial pelo Crime Reports.
+- [x] Todo caso aberto recebe um agente policial estável e uma data de revisão sete dias após sua criação; o agendamento e a execução são idempotentes após reinício da API.
+- [x] O agente recolhe no máximo três itens únicos durante o prazo, escolhidos de forma determinística entre as fontes investigativas ligadas ao caso e ainda disponíveis.
+- [x] A revisão policial considera somente os itens recolhidos pelo agente e ignora todo item com tombstone de destruição.
+- [x] Se a evidência atingir os critérios atuais para todos os participantes culpados, a polícia registra as prisões, muda o caso para `solved` e salva a origem `police`; se não atingir, o caso continua `open`.
+- [x] Uma revisão insuficiente não encerra o caso, não cria uma acusação contra inocentes e não impede uma acusação posterior do jogador.
+- [x] Crime Reports identifica casos concluídos pela polícia. Casos concluídos pelo jogador mantêm a atribuição `player`; nenhuma das duas rotas publica a classificação interna das pistas.
+- [x] O jogador consegue iniciar a destruição de um item elegível em sua fonte e precisa confirmá-la em um modal que explica o efeito global e permanente.
+- [x] Depois da confirmação, o item desaparece das consultas, caixas de entrada, inventários de busca e boards aplicáveis a todos os jogadores, e não pode sustentar revisão policial ou acusação.
+- [x] A venda de uma anotação pela Blackwire mantém o comportamento atual e não cria tombstone nem remove o registro das fontes investigativas de outros jogadores ou da polícia.
+- [x] A interface não apresenta barra ou porcentagem de investigação policial; casos resolvidos comunicam apenas o resultado oficial pelo Crime Reports.
 
 ## Fora de escopo
 

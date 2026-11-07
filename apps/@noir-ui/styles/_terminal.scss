@@ -1444,6 +1444,8 @@
 .personal-whiteboard__confirm button { padding: var(--noir-space-2) var(--noir-space-3); color: var(--noir-paper-200); background: var(--noir-ink-900); border: 1px solid var(--noir-ink-500); cursor: pointer; font: inherit; font-size: 0.72rem; letter-spacing: 0.08em; }
 .personal-whiteboard__confirm button.personal-whiteboard__confirm-delete { color: var(--noir-danger); border-color: var(--noir-danger); }
 .personal-whiteboard__confirm button:disabled { opacity: 0.5; cursor: wait; }
+.personal-whiteboard__destroy-source { margin-top: var(--noir-space-3); padding: var(--noir-space-2); color: var(--noir-danger); background: transparent; border: 1px solid var(--noir-danger); cursor: pointer; font: inherit; font-size: 0.68rem; letter-spacing: 0.08em; }
+.personal-whiteboard__destroy-source:disabled { opacity: 0.5; cursor: wait; }
 .personal-whiteboard__pages { display: flex; gap: var(--noir-space-2); margin-top: var(--noir-space-4); overflow-x: auto; border-bottom: 1px solid var(--noir-ink-600); }
 .personal-whiteboard__pages button { flex: 0 0 auto; padding: var(--noir-space-2) var(--noir-space-3); color: var(--noir-paper-400); background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; font: inherit; font-size: 0.76rem; }
 .personal-whiteboard__pages button[aria-current="page"] { color: var(--noir-paper-100); border-bottom-color: var(--noir-brass-400); }

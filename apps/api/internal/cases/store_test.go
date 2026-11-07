@@ -244,6 +244,9 @@ func (fixture *casePersistenceFixture) Query(_ context.Context, query string, ar
 	if strings.Contains(query, "FROM case_mail_messages") {
 		return &caseFixtureRows{rows: fixture.emailRows}, nil
 	}
+	if strings.Contains(query, "FROM player_npc_email_questions") {
+		return &caseFixtureRows{}, nil
+	}
 	return nil, errors.New("unexpected case row query")
 }
 
@@ -253,7 +256,7 @@ func TestAnonymousCaseEmailHidesSenderOnlyInRecipientMailbox(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixture := newCasePersistenceFixture()
-	fixture.emailRows = [][]any{{"case:one", "npc:victim", "npc:killer", "anonymous_warning", data}}
+	fixture.emailRows = [][]any{{"case-1", "crime-1", "homicide", "npc:victim", "npc:killer", "anonymous_warning", data}}
 	store := NewPostgresStore(fixture)
 
 	received, err := store.NPCEmails(context.Background(), "server-1", "npc:victim", time.Time{}, time.Time{})
@@ -326,8 +329,34 @@ func TestListOpenPublicCasesForSessionRejectsMissingSession(t *testing.T) {
 }
 
 func (fixture *casePersistenceFixture) Begin(context.Context) (pgx.Tx, error) {
-	return nil, errors.New("case fixture does not create definitions")
+	return caseFixtureTx{}, nil
 }
+
+type caseFixtureTx struct{}
+
+func (caseFixtureTx) Begin(context.Context) (pgx.Tx, error) {
+	return nil, errors.New("nested transaction unsupported")
+}
+func (caseFixtureTx) Commit(context.Context) error   { return nil }
+func (caseFixtureTx) Rollback(context.Context) error { return nil }
+func (caseFixtureTx) CopyFrom(context.Context, pgx.Identifier, []string, pgx.CopyFromSource) (int64, error) {
+	return 0, errors.New("copy unsupported")
+}
+func (caseFixtureTx) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults { return nil }
+func (caseFixtureTx) LargeObjects() pgx.LargeObjects                         { return pgx.LargeObjects{} }
+func (caseFixtureTx) Prepare(context.Context, string, string) (*pgconn.StatementDescription, error) {
+	return nil, errors.New("prepare unsupported")
+}
+func (caseFixtureTx) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
+	return pgconn.NewCommandTag("UPDATE 0"), nil
+}
+func (caseFixtureTx) Query(context.Context, string, ...any) (pgx.Rows, error) {
+	return &caseFixtureRows{}, nil
+}
+func (caseFixtureTx) QueryRow(context.Context, string, ...any) pgx.Row {
+	return testCaseRow{err: pgx.ErrNoRows}
+}
+func (caseFixtureTx) Conn() *pgx.Conn { return nil }
 
 type caseFixtureRows struct {
 	rows    [][]any
